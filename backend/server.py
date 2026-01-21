@@ -14927,6 +14927,49 @@ Retorne o JSON com a análise completa."""
                 clean_result = clean_result.strip()
 
                 parsed_result = json.loads(clean_result)
+
+                # Filter out errors where original equals sugestao (no actual change)
+                # This fixes a bug where AI flags items as errors when before/after are identical
+                if parsed_result.get("erros"):
+                    original_count = len(parsed_result["erros"])
+                    filtered_errors = []
+                    for erro in parsed_result["erros"]:
+                        original_text = (erro.get("original") or "").strip()
+                        sugestao = (erro.get("sugestao") or "").strip()
+                        # Only keep errors where there's an actual difference
+                        if original_text != sugestao:
+                            filtered_errors.append(erro)
+                        else:
+                            logger.info(f"Filtered out duplicate simple proofread error: '{original_text}' == '{sugestao}'")
+
+                    parsed_result["erros"] = filtered_errors
+                    filtered_count = original_count - len(filtered_errors)
+
+                    # Recalculate counts after filtering
+                    if filtered_count > 0:
+                        parsed_result["total_erros"] = len(filtered_errors)
+                        parsed_result["criticos"] = sum(1 for e in filtered_errors if e.get("gravidade") == "CRÍTICO")
+                        parsed_result["altos"] = sum(1 for e in filtered_errors if e.get("gravidade") == "ALTO")
+                        parsed_result["medios"] = sum(1 for e in filtered_errors if e.get("gravidade") == "MÉDIO")
+                        parsed_result["baixos"] = sum(1 for e in filtered_errors if e.get("gravidade") == "BAIXO")
+
+                        # Recalculate score and classification
+                        total = len(filtered_errors)
+                        criticos = parsed_result["criticos"]
+                        altos = parsed_result["altos"]
+
+                        if criticos > 0 or altos > 2:
+                            parsed_result["classificacao"] = "REPROVADO"
+                            parsed_result["pontuacao_final"] = max(0, 70 - (criticos * 15) - (altos * 5))
+                        elif altos > 0 or total > 3:
+                            parsed_result["classificacao"] = "APROVADO_COM_OBSERVACOES"
+                            parsed_result["pontuacao_final"] = max(70, 85 - (altos * 5) - (total * 2))
+                        else:
+                            parsed_result["classificacao"] = "APROVADO"
+                            parsed_result["pontuacao_final"] = max(85, 100 - (total * 3))
+
+                        logger.info(f"Simple proofread: Filtered {filtered_count} duplicate errors, {len(filtered_errors)} remaining")
+
                 return parsed_result
 
             except json.JSONDecodeError:
@@ -15163,6 +15206,43 @@ Analise minuciosamente e retorne o JSON com todos os erros encontrados."""
                 clean_result = clean_result.strip()
 
                 parsed_result = json.loads(clean_result)
+
+                # Filter out errors where traducao_errada equals correcao (no actual change)
+                # This fixes a bug where AI flags items as errors when before/after are identical
+                if parsed_result.get("erros"):
+                    original_count = len(parsed_result["erros"])
+                    filtered_errors = []
+                    for erro in parsed_result["erros"]:
+                        traducao_errada = (erro.get("traducao_errada") or "").strip()
+                        correcao = (erro.get("correcao") or "").strip()
+                        # Only keep errors where there's an actual difference
+                        if traducao_errada != correcao:
+                            filtered_errors.append(erro)
+                        else:
+                            logger.info(f"Filtered out duplicate proofreading error: '{traducao_errada}' == '{correcao}'")
+
+                    parsed_result["erros"] = filtered_errors
+                    filtered_count = original_count - len(filtered_errors)
+
+                    # Recalculate summary counts after filtering
+                    if filtered_count > 0 and parsed_result.get("resumo"):
+                        resumo = parsed_result["resumo"]
+                        resumo["total_erros"] = len(filtered_errors)
+                        # Recalculate severity counts from filtered errors
+                        resumo["criticos"] = sum(1 for e in filtered_errors if e.get("gravidade") == "CRÍTICO")
+                        resumo["altos"] = sum(1 for e in filtered_errors if e.get("gravidade") == "ALTO")
+                        resumo["medios"] = sum(1 for e in filtered_errors if e.get("gravidade") == "MÉDIO")
+                        resumo["baixos"] = sum(1 for e in filtered_errors if e.get("gravidade") == "BAIXO")
+
+                        # Update quality classification based on new counts
+                        if resumo["criticos"] > 0 or resumo["altos"] > 2:
+                            resumo["qualidade"] = "REPROVADO"
+                        elif resumo["altos"] > 0 or resumo["medios"] > 3:
+                            resumo["qualidade"] = "APROVADO_COM_OBSERVACOES"
+                        else:
+                            resumo["qualidade"] = "APROVADO"
+
+                        logger.info(f"Proofreading: Filtered {filtered_count} duplicate errors, {len(filtered_errors)} remaining")
 
                 return {
                     "status": "success",
