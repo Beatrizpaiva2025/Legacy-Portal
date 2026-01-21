@@ -1511,6 +1511,7 @@ class PartnerInvoiceCreate(BaseModel):
 class PartnerInvoicePayStripe(BaseModel):
     invoice_id: str
     origin_url: str
+    currency: Optional[str] = "usd"  # Support multi-currency (usd, brl, etc.)
 
 class PartnerInvoicePayZelle(BaseModel):
     invoice_id: str
@@ -5320,7 +5321,7 @@ async def get_partner_assigned_coupons(partner_id: str, admin_key: str):
 
 # ==================== PARTNER CREDIT QUALIFICATION ====================
 
-CREDIT_QUALIFICATION_MIN_ORDERS = 3  # Minimum paid orders to qualify for invoice plans
+CREDIT_QUALIFICATION_MIN_TRANSLATIONS = 10  # Minimum paid translations to qualify for biweekly invoice
 
 @api_router.get("/partner/credit-qualification")
 async def get_partner_credit_qualification(token: str):
@@ -5334,8 +5335,8 @@ async def get_partner_credit_qualification(token: str):
     plan_approved = partner.get("payment_plan_approved", False)
 
     # Calculate qualification status
-    qualifies = total_paid_orders >= CREDIT_QUALIFICATION_MIN_ORDERS
-    orders_remaining = max(0, CREDIT_QUALIFICATION_MIN_ORDERS - total_paid_orders)
+    qualifies = total_paid_orders >= CREDIT_QUALIFICATION_MIN_TRANSLATIONS
+    orders_remaining = max(0, CREDIT_QUALIFICATION_MIN_TRANSLATIONS - total_paid_orders)
 
     # Check if upgrade is pending
     upgrade_pending = partner.get("payment_plan_upgrade_requested", False)
@@ -5346,7 +5347,7 @@ async def get_partner_credit_qualification(token: str):
         "plan_approved": plan_approved,
         "qualifies_for_invoice": qualifies,
         "total_paid_orders": total_paid_orders,
-        "orders_required": CREDIT_QUALIFICATION_MIN_ORDERS,
+        "orders_required": CREDIT_QUALIFICATION_MIN_TRANSLATIONS,
         "orders_remaining": orders_remaining,
         "upgrade_pending": upgrade_pending,
         "requested_plan": requested_plan
@@ -5365,10 +5366,10 @@ async def request_payment_plan_upgrade(token: str, plan: str):
 
     # Check qualification
     total_paid_orders = partner.get("total_paid_orders", 0)
-    if total_paid_orders < CREDIT_QUALIFICATION_MIN_ORDERS:
+    if total_paid_orders < CREDIT_QUALIFICATION_MIN_TRANSLATIONS:
         raise HTTPException(
             status_code=400,
-            detail=f"Not yet qualified. Complete {CREDIT_QUALIFICATION_MIN_ORDERS - total_paid_orders} more paid orders to qualify."
+            detail=f"Not yet qualified. Complete {CREDIT_QUALIFICATION_MIN_TRANSLATIONS - total_paid_orders} more paid translations to qualify."
         )
 
     # Check if already on invoice plan
@@ -9510,17 +9511,35 @@ async def create_invoice_stripe_checkout(invoice_id: str, request: PartnerInvoic
         if invoice.get("status") == "paid":
             raise HTTPException(status_code=400, detail="Invoice already paid")
 
+        # Get currency configuration for multi-currency support (BRL includes PIX)
+        currency = request.currency.lower() if request.currency else "usd"
+        if currency not in CURRENCY_CONFIG:
+            currency = "usd"
+
+        currency_info = CURRENCY_CONFIG[currency]
+        payment_methods = currency_info["payment_methods"]
+
+        # Calculate amount in target currency
+        base_amount_usd = invoice.get("total_amount", 0)
+        if currency != "usd":
+            rates_response = await get_exchange_rates()
+            rates = rates_response.get("rates", {"usd": 1.0, "brl": 5.0, "eur": 0.92, "gbp": 0.79})
+            exchange_rate = rates.get(currency, 1.0)
+            amount_in_currency = base_amount_usd * exchange_rate
+        else:
+            amount_in_currency = base_amount_usd
+
         # Create Stripe checkout session
         checkout_params = {
-            'payment_method_types': ['card'],
+            'payment_method_types': payment_methods,
             'line_items': [{
                 'price_data': {
-                    'currency': 'usd',
+                    'currency': currency,
                     'product_data': {
                         'name': f'Invoice {invoice.get("invoice_number")}',
                         'description': f'Partner Invoice - {invoice.get("partner_company")} - {len(invoice.get("order_ids", []))} orders',
                     },
-                    'unit_amount': int(invoice.get("total_amount", 0) * 100),
+                    'unit_amount': int(amount_in_currency * 100),
                 },
                 'quantity': 1,
             }],
@@ -22205,13 +22224,11 @@ async def get_salespeople(admin_key: str = Header(None)):
         raise HTTPException(status_code=500, detail=f"Failed to fetch salespeople: {str(e)}")
 
 # Generate unique referral code for salesperson
-def generate_referral_code(name: str) -> str:
-    """Generate a unique referral code based on name + random string"""
-    # Take first 3-4 letters of name (uppercase, no spaces)
-    name_part = ''.join(c for c in name.upper() if c.isalpha())[:4]
-    # Add random alphanumeric suffix
-    random_part = secrets.token_hex(2).upper()
-    return f"{name_part}{random_part}"
+def generate_referral_code(name: str = None) -> str:
+    """Generate a unique random referral code (6 alphanumeric characters)"""
+    # Generate fully random alphanumeric code (uppercase letters and numbers)
+    chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'  # Removed confusing chars (0, O, 1, I)
+    return ''.join(secrets.choice(chars) for _ in range(6))
 
 # Create salesperson
 @app.post("/api/admin/salespeople")
