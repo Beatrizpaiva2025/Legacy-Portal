@@ -3085,7 +3085,7 @@ const OrdersPage = ({ token }) => {
 };
 
 // ==================== INVOICES PAGE ====================
-const InvoicesPage = ({ token, t }) => {
+const InvoicesPage = ({ token, t, currency }) => {
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
@@ -3139,7 +3139,7 @@ const InvoicesPage = ({ token, t }) => {
       const response = await axios.post(`${API}/partner/invoices/${selectedInvoice.id}/pay-stripe`, {
         invoice_id: selectedInvoice.id,
         origin_url: window.location.origin,
-        currency: currency.code.toLowerCase() // Pass currency for BRL/PIX support
+        currency: currency?.code?.toLowerCase() || 'usd' // Pass currency for BRL/PIX support (fallback to USD)
       });
       if (response.data.checkout_url) {
         window.location.href = response.data.checkout_url;
@@ -4690,7 +4690,7 @@ function App() {
       case 'orders':
         return <OrdersPage token={token} />;
       case 'invoices':
-        return <InvoicesPage token={token} t={t} />;
+        return <InvoicesPage token={token} t={t} currency={currency} />;
       case 'messages':
         return <MessagesPage token={token} />;
       case 'payment-plan':
