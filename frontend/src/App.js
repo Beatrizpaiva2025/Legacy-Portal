@@ -74,16 +74,26 @@ const TRANSLATIONS = {
     paymentPlanTitle: 'Payment Plan',
     currentPlan: 'Current Plan',
     qualificationStatus: 'Qualification Status',
-    qualifiedForInvoice: 'You qualify for invoice plans!',
+    qualifiedForInvoice: 'You qualify for biweekly invoice!',
     notQualifiedYet: 'Not yet qualified',
-    ordersCompleted: 'orders completed',
-    ordersRemaining: 'more orders to qualify',
+    translationsCompleted: 'translations completed',
+    translationsRemaining: 'more translations to qualify',
     requestUpgrade: 'Request Upgrade',
     upgradeRequested: 'Upgrade Requested',
     awaitingApproval: 'Awaiting admin approval',
     selectPlanToUpgrade: 'Select the plan you want:',
     submitUpgradeRequest: 'Submit Upgrade Request',
     upgradeSuccess: 'Upgrade request submitted successfully!',
+    // Payment Plan Terms Explanation
+    paymentPlanTermsTitle: 'How Payment Plans Work',
+    paymentPlanTerm1: 'Complete 10 paid translations to qualify for Biweekly Invoice payment.',
+    paymentPlanTerm2: 'After 3 consecutive months of on-time payments (by invoice due date), you unlock 30-day payment terms.',
+    paymentPlanTerm3: 'On-time payment means paying by the invoice due date.',
+    currentTerms: 'Current Terms',
+    paymentDueOnInvoice: 'Payment due on invoice date',
+    net30Terms: '30-day payment terms',
+    monthsOnTime: 'months of on-time payments',
+    monthsRequired: '3 months required',
     // Invoice Page
     myInvoices: 'My Invoices',
     noInvoices: 'No invoices found',
@@ -166,7 +176,7 @@ const TRANSLATIONS = {
     monthlyInvoiceDesc: 'Receive monthly invoice',
     invoiceRequiresApproval: 'Invoice plans require account approval after registration',
     invoiceComingSoon: 'Available after qualification',
-    invoiceQualificationNote: 'Invoice plans unlock after 3 paid orders. Request upgrade from your dashboard.',
+    invoiceQualificationNote: 'Biweekly invoice unlocks after 10 paid translations. Request upgrade from your dashboard.',
     paymentMethod: 'Preferred Payment Method',
     zelle: 'Zelle',
     creditCard: 'Credit Card',
@@ -235,16 +245,26 @@ const TRANSLATIONS = {
     paymentPlanTitle: 'Plan de Pago',
     currentPlan: 'Plan Actual',
     qualificationStatus: 'Estado de Calificación',
-    qualifiedForInvoice: '¡Califica para planes de factura!',
+    qualifiedForInvoice: '¡Califica para factura quincenal!',
     notQualifiedYet: 'Aún no calificado',
-    ordersCompleted: 'pedidos completados',
-    ordersRemaining: 'pedidos más para calificar',
+    translationsCompleted: 'traducciones completadas',
+    translationsRemaining: 'traducciones más para calificar',
     requestUpgrade: 'Solicitar Mejora',
     upgradeRequested: 'Mejora Solicitada',
     awaitingApproval: 'Esperando aprobación del administrador',
     selectPlanToUpgrade: 'Seleccione el plan que desea:',
     submitUpgradeRequest: 'Enviar Solicitud',
     upgradeSuccess: '¡Solicitud de mejora enviada exitosamente!',
+    // Payment Plan Terms Explanation
+    paymentPlanTermsTitle: 'Cómo Funcionan los Planes de Pago',
+    paymentPlanTerm1: 'Complete 10 traducciones pagas para calificar para Factura Quincenal.',
+    paymentPlanTerm2: 'Después de 3 meses consecutivos de pagos puntuales (en la fecha de vencimiento), desbloquea términos de pago de 30 días.',
+    paymentPlanTerm3: 'Pago puntual significa pagar antes de la fecha de vencimiento de la factura.',
+    currentTerms: 'Términos Actuales',
+    paymentDueOnInvoice: 'Pago vence en fecha de factura',
+    net30Terms: 'Términos de pago de 30 días',
+    monthsOnTime: 'meses de pagos puntuales',
+    monthsRequired: '3 meses requeridos',
     // Invoice Page
     myInvoices: 'Mis Facturas',
     noInvoices: 'No se encontraron facturas',
@@ -326,7 +346,7 @@ const TRANSLATIONS = {
     monthlyInvoiceDesc: 'Reciba factura mensual',
     invoiceRequiresApproval: 'Planes de factura requieren aprobación después del registro',
     invoiceComingSoon: 'Disponible tras calificación',
-    invoiceQualificationNote: 'Planes de factura se desbloquean después de 3 pedidos pagados. Solicite desde su panel.',
+    invoiceQualificationNote: 'Factura quincenal se desbloquea después de 10 traducciones pagas. Solicite desde su panel.',
     paymentMethod: 'Método de Pago Preferido',
     zelle: 'Zelle',
     creditCard: 'Tarjeta de Crédito',
@@ -395,16 +415,26 @@ const TRANSLATIONS = {
     paymentPlanTitle: 'Plano de Pagamento',
     currentPlan: 'Plano Atual',
     qualificationStatus: 'Status de Qualificação',
-    qualifiedForInvoice: 'Você se qualifica para planos de fatura!',
+    qualifiedForInvoice: 'Você se qualifica para fatura quinzenal!',
     notQualifiedYet: 'Ainda não qualificado',
-    ordersCompleted: 'pedidos concluídos',
-    ordersRemaining: 'pedidos restantes para qualificar',
+    translationsCompleted: 'traduções concluídas',
+    translationsRemaining: 'traduções restantes para qualificar',
     requestUpgrade: 'Solicitar Upgrade',
     upgradeRequested: 'Upgrade Solicitado',
     awaitingApproval: 'Aguardando aprovação do administrador',
     selectPlanToUpgrade: 'Selecione o plano desejado:',
     submitUpgradeRequest: 'Enviar Solicitação',
     upgradeSuccess: 'Solicitação de upgrade enviada com sucesso!',
+    // Payment Plan Terms Explanation
+    paymentPlanTermsTitle: 'Como Funcionam os Planos de Pagamento',
+    paymentPlanTerm1: 'Complete 10 traduções pagas para se qualificar para Fatura Quinzenal.',
+    paymentPlanTerm2: 'Após 3 meses consecutivos de pagamentos em dia (na data de vencimento da fatura), você libera condições de pagamento de 30 dias.',
+    paymentPlanTerm3: 'Pagamento em dia significa pagar até a data de vencimento da fatura.',
+    currentTerms: 'Condições Atuais',
+    paymentDueOnInvoice: 'Pagamento vence na data da fatura',
+    net30Terms: 'Condições de pagamento de 30 dias',
+    monthsOnTime: 'meses de pagamentos em dia',
+    monthsRequired: '3 meses necessários',
     // Invoice Page
     myInvoices: 'Minhas Faturas',
     noInvoices: 'Nenhuma fatura encontrada',
@@ -486,7 +516,7 @@ const TRANSLATIONS = {
     monthlyInvoiceDesc: 'Receba fatura mensal',
     invoiceRequiresApproval: 'Planos de fatura requerem aprovação após o cadastro',
     invoiceComingSoon: 'Disponível após qualificação',
-    invoiceQualificationNote: 'Planos de fatura são liberados após 3 pedidos pagos. Solicite pelo painel.',
+    invoiceQualificationNote: 'Fatura quinzenal é liberada após 10 traduções pagas. Solicite pelo painel.',
     paymentMethod: 'Método de Pagamento Preferido',
     zelle: 'Zelle',
     creditCard: 'Cartão de Crédito',
@@ -3493,6 +3523,30 @@ const PaymentPlanPage = ({ token, t }) => {
     <div className="p-8 max-w-2xl">
       <h1 className="text-2xl font-bold text-gray-800 mb-6">{t?.paymentPlanTitle || 'Payment Plan'}</h1>
 
+      {/* Payment Plan Terms Explanation */}
+      <div className="bg-blue-50 rounded-lg border border-blue-200 p-6 mb-6">
+        <h2 className="text-sm font-semibold text-blue-800 mb-3 flex items-center gap-2">
+          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd"/>
+          </svg>
+          {t?.paymentPlanTermsTitle || 'How Payment Plans Work'}
+        </h2>
+        <ul className="space-y-2 text-sm text-blue-700">
+          <li className="flex items-start gap-2">
+            <span className="font-bold text-blue-600 mt-0.5">1.</span>
+            <span>{t?.paymentPlanTerm1 || 'Complete 10 paid translations to qualify for Biweekly Invoice payment.'}</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="font-bold text-blue-600 mt-0.5">2.</span>
+            <span>{t?.paymentPlanTerm2 || 'After 3 consecutive months of on-time payments (by invoice due date), you unlock 30-day payment terms.'}</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="font-bold text-blue-600 mt-0.5">3.</span>
+            <span>{t?.paymentPlanTerm3 || 'On-time payment means paying by the invoice due date.'}</span>
+          </li>
+        </ul>
+      </div>
+
       {/* Current Plan Card */}
       <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
         <h2 className="text-sm font-medium text-gray-500 mb-2">{t?.currentPlan || 'Current Plan'}</h2>
@@ -3514,13 +3568,13 @@ const PaymentPlanPage = ({ token, t }) => {
         {/* Progress Bar */}
         <div className="mb-4">
           <div className="flex justify-between text-sm mb-2">
-            <span className="text-gray-600">{qualification?.total_paid_orders || 0} {t?.ordersCompleted || 'orders completed'}</span>
-            <span className="text-gray-500">{qualification?.orders_required || 3} required</span>
+            <span className="text-gray-600">{qualification?.total_paid_orders || 0} {t?.translationsCompleted || 'translations completed'}</span>
+            <span className="text-gray-500">{qualification?.orders_required || 10} required</span>
           </div>
           <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
             <div
               className={`h-full transition-all duration-500 ${qualification?.qualifies_for_invoice ? 'bg-green-500' : 'bg-teal-500'}`}
-              style={{ width: `${Math.min(100, ((qualification?.total_paid_orders || 0) / (qualification?.orders_required || 3)) * 100)}%` }}
+              style={{ width: `${Math.min(100, ((qualification?.total_paid_orders || 0) / (qualification?.orders_required || 10)) * 100)}%` }}
             />
           </div>
         </div>
@@ -3530,11 +3584,11 @@ const PaymentPlanPage = ({ token, t }) => {
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
             </svg>
-            <span className="font-medium">{t?.qualifiedForInvoice || 'You qualify for invoice plans!'}</span>
+            <span className="font-medium">{t?.qualifiedForInvoice || 'You qualify for biweekly invoice!'}</span>
           </div>
         ) : (
           <div className="text-gray-600">
-            <span>{qualification?.orders_remaining || 3} {t?.ordersRemaining || 'more orders to qualify'}</span>
+            <span>{qualification?.orders_remaining || 10} {t?.translationsRemaining || 'more translations to qualify'}</span>
           </div>
         )}
       </div>
@@ -3595,7 +3649,7 @@ const PaymentPlanPage = ({ token, t }) => {
                 <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/>
               </svg>
               <p className="text-sm text-gray-600">{t?.notQualifiedYet || 'Not yet qualified'}</p>
-              <p className="text-xs text-gray-500 mt-1">{qualification?.orders_remaining} {t?.ordersRemaining || 'more orders to qualify'}</p>
+              <p className="text-xs text-gray-500 mt-1">{qualification?.orders_remaining} {t?.translationsRemaining || 'more translations to qualify'}</p>
             </div>
           )}
         </div>
