@@ -27583,8 +27583,9 @@ const SalesControlPage = ({ adminKey }) => {
 
   // Form states
   const [newSalesperson, setNewSalesperson] = useState({
-    name: '', email: '', phone: '', commission_type: 'tier', commission_rate: 0, base_salary: 0, monthly_target: 10, referral_bonus: 0
+    name: '', email: '', phone: '', country_code: '+1', commission_type: 'tier', commission_rate: 0, base_salary: 0, monthly_target: 10, referral_bonus: 0
   });
+  const [createdSalesperson, setCreatedSalesperson] = useState(null); // For success modal with referral link
   const [newAcquisition, setNewAcquisition] = useState({
     salesperson_id: '', partner_id: '', partner_name: '', partner_tier: 'bronze', notes: ''
   });
@@ -27635,16 +27636,21 @@ const SalesControlPage = ({ adminKey }) => {
 
   const handleAddSalesperson = async () => {
     try {
+      // Combine country code with phone number
+      const phoneWithCode = newSalesperson.phone ? `${newSalesperson.country_code} ${newSalesperson.phone}` : '';
+      const salespersonData = { ...newSalesperson, phone: phoneWithCode };
+      delete salespersonData.country_code; // Remove country_code field before sending
+
       const res = await fetch(`${API_URL}/admin/salespeople`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'admin-key': adminKey },
-        body: JSON.stringify(newSalesperson)
+        body: JSON.stringify(salespersonData)
       });
       const data = await res.json();
       if (res.ok) {
-        alert('Salesperson added successfully!');
         setShowAddSalesperson(false);
-        setNewSalesperson({ name: '', email: '', phone: '', commission_type: 'tier', commission_rate: 0, base_salary: 0, monthly_target: 10, referral_bonus: 0 });
+        setCreatedSalesperson(data.salesperson); // Show success modal with referral link
+        setNewSalesperson({ name: '', email: '', phone: '', country_code: '+1', commission_type: 'tier', commission_rate: 0, base_salary: 0, monthly_target: 10, referral_bonus: 0 });
         fetchAllData();
       } else {
         alert(`Error: ${data.detail || 'Failed to add salesperson'}`);
@@ -28502,160 +28508,223 @@ const SalesControlPage = ({ adminKey }) => {
 
       {/* Add Salesperson Modal */}
       {showAddSalesperson && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <span>👤</span> Add Salesperson
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
-                <input
-                  type="text"
-                  value={newSalesperson.name}
-                  onChange={(e) => setNewSalesperson({...newSalesperson, name: e.target.value})}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="John Doe"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-                <input
-                  type="email"
-                  value={newSalesperson.email}
-                  onChange={(e) => setNewSalesperson({...newSalesperson, email: e.target.value})}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="john@example.com"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                <input
-                  type="text"
-                  value={newSalesperson.phone}
-                  onChange={(e) => setNewSalesperson({...newSalesperson, phone: e.target.value})}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="(555) 123-4567"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Comissão</label>
-                <select
-                  value={newSalesperson.commission_type}
-                  onChange={(e) => setNewSalesperson({...newSalesperson, commission_type: e.target.value})}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="tier">Por Tier ($50-150/parceiro)</option>
-                  <option value="fixed">Valor Fixo por Parceiro</option>
-                  <option value="percentage">Percentual sobre Vendas</option>
-                  <option value="referral_plus_commission">Bônus Referral + Comissão %</option>
-                </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  {newSalesperson.commission_type === 'tier' && 'Comissão baseada no tier do parceiro (Bronze $50, Silver $75, Gold $100, Platinum $150)'}
-                  {newSalesperson.commission_type === 'fixed' && 'Valor fixo por cada parceiro registrado'}
-                  {newSalesperson.commission_type === 'percentage' && 'Percentual sobre todas as vendas geradas pelo parceiro'}
-                  {newSalesperson.commission_type === 'referral_plus_commission' && 'Bônus fixo por referral + percentual sobre vendas do parceiro'}
-                </p>
-              </div>
-              {newSalesperson.commission_type === 'fixed' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Comissão Fixa ($)</label>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-md max-h-[90vh] flex flex-col">
+            <div className="p-4 border-b">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <span>👤</span> Add Salesperson
+              </h3>
+            </div>
+            <div className="p-4 overflow-y-auto flex-1 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
                   <input
-                    type="number"
-                    value={newSalesperson.commission_rate}
-                    onChange={(e) => setNewSalesperson({...newSalesperson, commission_rate: parseFloat(e.target.value) || 0})}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="50"
+                    type="text"
+                    value={newSalesperson.name}
+                    onChange={(e) => setNewSalesperson({...newSalesperson, name: e.target.value})}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="John Doe"
                   />
                 </div>
-              )}
-              {newSalesperson.commission_type === 'percentage' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Percentual de Comissão (%)</label>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
                   <input
-                    type="number"
-                    value={newSalesperson.commission_rate}
-                    onChange={(e) => setNewSalesperson({...newSalesperson, commission_rate: parseFloat(e.target.value) || 0})}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="10"
-                    min="0"
-                    max="100"
-                    step="0.5"
+                    type="email"
+                    value={newSalesperson.email}
+                    onChange={(e) => setNewSalesperson({...newSalesperson, email: e.target.value})}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="john@example.com"
                   />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Ex: 10% = $50 de comissão para cada $500 em vendas do parceiro
-                  </p>
                 </div>
-              )}
-              {newSalesperson.commission_type === 'referral_plus_commission' && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Bônus por Referral ($)</label>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                  <div className="flex gap-2">
+                    <select
+                      value={newSalesperson.country_code}
+                      onChange={(e) => setNewSalesperson({...newSalesperson, country_code: e.target.value})}
+                      className="px-2 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm w-24"
+                    >
+                      <option value="+1">🇺🇸 +1</option>
+                      <option value="+55">🇧🇷 +55</option>
+                    </select>
                     <input
-                      type="number"
-                      value={newSalesperson.referral_bonus}
-                      onChange={(e) => setNewSalesperson({...newSalesperson, referral_bonus: parseFloat(e.target.value) || 0})}
-                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                      placeholder="50"
+                      type="text"
+                      value={newSalesperson.phone}
+                      onChange={(e) => setNewSalesperson({...newSalesperson, phone: e.target.value})}
+                      className="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                      placeholder="(555) 123-4567"
                     />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Valor fixo pago por cada novo parceiro indicado
-                    </p>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Comissão sobre Vendas (%)</label>
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Comissão</label>
+                  <select
+                    value={newSalesperson.commission_type}
+                    onChange={(e) => setNewSalesperson({...newSalesperson, commission_type: e.target.value})}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                  >
+                    <option value="tier">Por Tier ($50-150/parceiro)</option>
+                    <option value="fixed">Valor Fixo por Parceiro</option>
+                    <option value="percentage">Percentual sobre Vendas</option>
+                    <option value="referral_plus_commission">Bônus Referral + Comissão %</option>
+                  </select>
+                </div>
+                {newSalesperson.commission_type === 'fixed' && (
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Comissão Fixa ($)</label>
                     <input
                       type="number"
                       value={newSalesperson.commission_rate}
                       onChange={(e) => setNewSalesperson({...newSalesperson, commission_rate: parseFloat(e.target.value) || 0})}
-                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                      placeholder="5"
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                      placeholder="50"
+                    />
+                  </div>
+                )}
+                {newSalesperson.commission_type === 'percentage' && (
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Percentual de Comissão (%)</label>
+                    <input
+                      type="number"
+                      value={newSalesperson.commission_rate}
+                      onChange={(e) => setNewSalesperson({...newSalesperson, commission_rate: parseFloat(e.target.value) || 0})}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                      placeholder="10"
                       min="0"
                       max="100"
                       step="0.5"
                     />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Percentual adicional sobre as vendas geradas pelo parceiro
-                    </p>
                   </div>
-                </>
-              )}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Base Salary ($)</label>
-                <input
-                  type="number"
-                  value={newSalesperson.base_salary}
-                  onChange={(e) => setNewSalesperson({...newSalesperson, base_salary: parseFloat(e.target.value)})}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="0"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Monthly Target (partners)</label>
-                <input
-                  type="number"
-                  value={newSalesperson.monthly_target}
-                  onChange={(e) => setNewSalesperson({...newSalesperson, monthly_target: parseInt(e.target.value)})}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="10"
-                />
+                )}
+                {newSalesperson.commission_type === 'referral_plus_commission' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Bônus Referral ($)</label>
+                      <input
+                        type="number"
+                        value={newSalesperson.referral_bonus}
+                        onChange={(e) => setNewSalesperson({...newSalesperson, referral_bonus: parseFloat(e.target.value) || 0})}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                        placeholder="50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Comissão (%)</label>
+                      <input
+                        type="number"
+                        value={newSalesperson.commission_rate}
+                        onChange={(e) => setNewSalesperson({...newSalesperson, commission_rate: parseFloat(e.target.value) || 0})}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                        placeholder="5"
+                        min="0"
+                        max="100"
+                        step="0.5"
+                      />
+                    </div>
+                  </>
+                )}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Base Salary ($)</label>
+                  <input
+                    type="number"
+                    value={newSalesperson.base_salary}
+                    onChange={(e) => setNewSalesperson({...newSalesperson, base_salary: parseFloat(e.target.value) || 0})}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Meta Mensal</label>
+                  <input
+                    type="number"
+                    value={newSalesperson.monthly_target}
+                    onChange={(e) => setNewSalesperson({...newSalesperson, monthly_target: parseInt(e.target.value) || 10})}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="10"
+                  />
+                </div>
               </div>
             </div>
-            <div className="flex justify-end gap-3 mt-6">
+            <div className="p-4 border-t flex justify-end gap-3">
               <button
                 onClick={() => setShowAddSalesperson(false)}
-                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm"
               >
-                Cancel
+                Cancelar
               </button>
               <button
                 onClick={handleAddSalesperson}
                 disabled={!newSalesperson.name || !newSalesperson.email}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 text-sm"
               >
                 Add Salesperson
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Modal - Show Referral Link */}
+      {createdSalesperson && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+            <div className="text-center mb-4">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <span className="text-3xl">✅</span>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">Salesperson Criado!</h3>
+              <p className="text-gray-600 mt-1">{createdSalesperson.name} foi cadastrado com sucesso.</p>
+            </div>
+
+            <div className="bg-gray-50 rounded-lg p-4 mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Código de Referral</label>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 bg-white px-3 py-2 rounded border text-lg font-mono font-bold text-blue-600">
+                  {createdSalesperson.referral_code}
+                </code>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(createdSalesperson.referral_code);
+                    alert('Código copiado!');
+                  }}
+                  className="px-3 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm"
+                >
+                  📋
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-blue-50 rounded-lg p-4 mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Link de Referral para Parceiros</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={`${window.location.origin}/#/partner-register?ref=${createdSalesperson.referral_code}`}
+                  className="flex-1 bg-white px-3 py-2 rounded border text-sm"
+                />
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${window.location.origin}/#/partner-register?ref=${createdSalesperson.referral_code}`);
+                    alert('Link copiado!');
+                  }}
+                  className="px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm"
+                >
+                  📋 Copiar
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Envie este link para o salesperson. Quando um parceiro se cadastrar usando este link, será automaticamente vinculado a {createdSalesperson.name}.
+              </p>
+            </div>
+
+            <button
+              onClick={() => setCreatedSalesperson(null)}
+              className="w-full px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900"
+            >
+              Fechar
+            </button>
           </div>
         </div>
       )}

@@ -22175,13 +22175,11 @@ async def get_salespeople(admin_key: str = Header(None)):
         raise HTTPException(status_code=500, detail=f"Failed to fetch salespeople: {str(e)}")
 
 # Generate unique referral code for salesperson
-def generate_referral_code(name: str) -> str:
-    """Generate a unique referral code based on name + random string"""
-    # Take first 3-4 letters of name (uppercase, no spaces)
-    name_part = ''.join(c for c in name.upper() if c.isalpha())[:4]
-    # Add random alphanumeric suffix
-    random_part = secrets.token_hex(2).upper()
-    return f"{name_part}{random_part}"
+def generate_referral_code(name: str = None) -> str:
+    """Generate a unique random referral code (6 alphanumeric characters)"""
+    # Generate fully random alphanumeric code (uppercase letters and numbers)
+    chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'  # Removed confusing chars (0, O, 1, I)
+    return ''.join(secrets.choice(chars) for _ in range(6))
 
 # Create salesperson
 @app.post("/admin/salespeople")
