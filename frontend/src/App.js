@@ -4793,7 +4793,7 @@ function App() {
             <div className="p-6">
               <div className="text-center mb-6">
                 <p className="text-gray-600 mb-4">
-                  As a new partner, you receive <strong>1 FREE Page</strong> (up to 250 words) + Certification (value: {formatPrice(24.99)})
+                  As a new partner, you receive <strong>1 FREE Page</strong> (up to 250 words) + Certification of Accuracy
                 </p>
 
                 {/* Coupon Code Box */}
