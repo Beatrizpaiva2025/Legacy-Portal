@@ -633,12 +633,12 @@ const TopBar = ({
   // Define menu items with role-based access
   const allMenuItems = [
     { id: 'projects', label: 'Projects', icon: '📋', roles: ['admin', 'sales'] },
-    { id: 'new-quote', label: 'New Quote', icon: '📝', roles: ['admin', 'sales'] },
+    { id: 'new-quote', label: 'New Quote', icon: '📝', roles: ['sales'] },
     { id: 'translation', label: 'Translation', icon: '✍️', roles: ['admin', 'pm', 'translator'] },
     { id: 'production', label: 'Reports', icon: '📊', roles: ['admin'] },
     { id: 'finances', label: 'Finances', icon: '💰', roles: ['admin'] },
     { id: 'followups', label: 'Follow-ups', icon: '🔔', roles: ['admin'] },
-    { id: 'pm-dashboard', label: 'PM Dashboard', icon: '🎯', roles: ['admin', 'pm'] },
+    { id: 'pm-dashboard', label: 'PM Dashboard', icon: '🎯', roles: ['pm'] },
     { id: 'sales-control', label: 'Sales', icon: '📈', roles: ['admin'] },
     { id: 'users', label: 'Translators', icon: '👥', roles: ['admin'] },
     { id: 'settings', label: 'Settings', icon: '⚙️', roles: ['admin'] },
