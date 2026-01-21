@@ -22168,7 +22168,7 @@ class CommissionPayment(BaseModel):
     created_at: str = None
 
 # Get all salespeople
-@app.get("/admin/salespeople")
+@app.get("/api/admin/salespeople")
 async def get_salespeople(admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
@@ -22214,7 +22214,7 @@ def generate_referral_code(name: str) -> str:
     return f"{name_part}{random_part}"
 
 # Create salesperson
-@app.post("/admin/salespeople")
+@app.post("/api/admin/salespeople")
 async def create_salesperson(salesperson: Salesperson, admin_key: str = Header(None)):
     # Validate admin key or user token
     if not admin_key:
@@ -22248,7 +22248,7 @@ async def create_salesperson(salesperson: Salesperson, admin_key: str = Header(N
         raise HTTPException(status_code=500, detail=f"Failed to create salesperson: {str(e)}")
 
 # Update salesperson
-@app.put("/admin/salespeople/{salesperson_id}")
+@app.put("/api/admin/salespeople/{salesperson_id}")
 async def update_salesperson(salesperson_id: str, salesperson: Salesperson, admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
@@ -22281,7 +22281,7 @@ async def update_salesperson(salesperson_id: str, salesperson: Salesperson, admi
         raise HTTPException(status_code=500, detail=f"Failed to update salesperson: {str(e)}")
 
 # Delete salesperson
-@app.delete("/admin/salespeople/{salesperson_id}")
+@app.delete("/api/admin/salespeople/{salesperson_id}")
 async def delete_salesperson(salesperson_id: str, admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
@@ -22324,7 +22324,7 @@ async def get_salesperson_by_referral(referral_code: str):
     }
 
 # Get sales goals
-@app.get("/admin/sales-goals")
+@app.get("/api/admin/sales-goals")
 async def get_sales_goals(admin_key: str = Header(None), month: str = None):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
@@ -22344,7 +22344,7 @@ async def get_sales_goals(admin_key: str = Header(None), month: str = None):
     return goals
 
 # Create/Update sales goal
-@app.post("/admin/sales-goals")
+@app.post("/api/admin/sales-goals")
 async def create_sales_goal(goal: SalesGoal, admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
@@ -22374,7 +22374,7 @@ async def create_sales_goal(goal: SalesGoal, admin_key: str = Header(None)):
     return {"success": True, "goal": goal.dict()}
 
 # Get partner acquisitions
-@app.get("/admin/partner-acquisitions")
+@app.get("/api/admin/partner-acquisitions")
 async def get_partner_acquisitions(admin_key: str = Header(None), salesperson_id: str = None):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
@@ -22394,7 +22394,7 @@ async def get_partner_acquisitions(admin_key: str = Header(None), salesperson_id
     return acquisitions
 
 # Record partner acquisition
-@app.post("/admin/partner-acquisitions")
+@app.post("/api/admin/partner-acquisitions")
 async def create_partner_acquisition(acquisition: PartnerAcquisition, admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
@@ -22436,7 +22436,7 @@ async def create_partner_acquisition(acquisition: PartnerAcquisition, admin_key:
     return {"success": True, "acquisition": acquisition.dict()}
 
 # Update acquisition commission status
-@app.put("/admin/partner-acquisitions/{acquisition_id}/status")
+@app.put("/api/admin/partner-acquisitions/{acquisition_id}/status")
 async def update_acquisition_status(acquisition_id: str, status: str, admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
@@ -22455,7 +22455,7 @@ async def update_acquisition_status(acquisition_id: str, status: str, admin_key:
     return {"success": True}
 
 # Get sales dashboard stats
-@app.get("/admin/sales-dashboard")
+@app.get("/api/admin/sales-dashboard")
 async def get_sales_dashboard(admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
@@ -22554,7 +22554,7 @@ async def get_sales_dashboard(admin_key: str = Header(None)):
 # ==================== SALESPERSON PORTAL ENDPOINTS ====================
 
 # Send invite to salesperson
-@app.post("/admin/salespeople/{salesperson_id}/invite")
+@app.post("/api/admin/salespeople/{salesperson_id}/invite")
 async def invite_salesperson(salesperson_id: str, admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
@@ -23085,7 +23085,7 @@ async def get_payment_history(token: str = Header(None, alias="salesperson-token
     }
 
 # Admin: Approve commission
-@app.put("/admin/acquisitions/{acquisition_id}/approve")
+@app.put("/api/admin/acquisitions/{acquisition_id}/approve")
 async def approve_acquisition(acquisition_id: str, admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
@@ -23117,7 +23117,7 @@ async def approve_acquisition(acquisition_id: str, admin_key: str = Header(None)
     return {"success": True}
 
 # Admin: Process payment for multiple acquisitions
-@app.post("/admin/commission-payments")
+@app.post("/api/admin/commission-payments")
 async def create_commission_payment(
     salesperson_id: str = Form(...),
     acquisition_ids: str = Form(...),  # Comma-separated IDs
@@ -23180,7 +23180,7 @@ async def create_commission_payment(
     return {"success": True, "payment": payment.dict()}
 
 # Admin: Get salesperson ranking
-@app.get("/admin/salesperson-ranking")
+@app.get("/api/admin/salesperson-ranking")
 async def get_salesperson_ranking(admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
@@ -23242,7 +23242,7 @@ async def get_salesperson_ranking(admin_key: str = Header(None)):
     }
 
 # Admin: Get pending commissions for payment
-@app.get("/admin/pending-commissions")
+@app.get("/api/admin/pending-commissions")
 async def get_pending_commissions(admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
@@ -23272,7 +23272,7 @@ async def get_pending_commissions(admin_key: str = Header(None)):
     return {"pending_by_salesperson": list(by_salesperson.values())}
 
 # Admin: Get payment history
-@app.get("/admin/payment-history")
+@app.get("/api/admin/payment-history")
 async def get_admin_payment_history(admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")

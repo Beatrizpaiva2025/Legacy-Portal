@@ -27602,13 +27602,13 @@ const SalesControlPage = ({ adminKey }) => {
     setLoading(true);
     try {
       const [spRes, acqRes, goalsRes, dashRes, rankRes, pendingRes, historyRes] = await Promise.all([
-        fetch(`${API_URL}/admin/salespeople`, { headers: { 'admin-key': adminKey } }),
-        fetch(`${API_URL}/admin/partner-acquisitions`, { headers: { 'admin-key': adminKey } }),
-        fetch(`${API_URL}/admin/sales-goals`, { headers: { 'admin-key': adminKey } }),
-        fetch(`${API_URL}/admin/sales-dashboard`, { headers: { 'admin-key': adminKey } }),
-        fetch(`${API_URL}/admin/salesperson-ranking`, { headers: { 'admin-key': adminKey } }),
-        fetch(`${API_URL}/admin/pending-commissions`, { headers: { 'admin-key': adminKey } }),
-        fetch(`${API_URL}/admin/payment-history`, { headers: { 'admin-key': adminKey } })
+        fetch(`${API_URL}/api/admin/salespeople`, { headers: { 'admin-key': adminKey } }),
+        fetch(`${API_URL}/api/admin/partner-acquisitions`, { headers: { 'admin-key': adminKey } }),
+        fetch(`${API_URL}/api/admin/sales-goals`, { headers: { 'admin-key': adminKey } }),
+        fetch(`${API_URL}/api/admin/sales-dashboard`, { headers: { 'admin-key': adminKey } }),
+        fetch(`${API_URL}/api/admin/salesperson-ranking`, { headers: { 'admin-key': adminKey } }),
+        fetch(`${API_URL}/api/admin/pending-commissions`, { headers: { 'admin-key': adminKey } }),
+        fetch(`${API_URL}/api/admin/payment-history`, { headers: { 'admin-key': adminKey } })
       ]);
 
       if (spRes.ok) setSalespeople(await spRes.json());
@@ -27635,7 +27635,7 @@ const SalesControlPage = ({ adminKey }) => {
 
   const handleAddSalesperson = async () => {
     try {
-      const res = await fetch(`${API_URL}/admin/salespeople`, {
+      const res = await fetch(`${API_URL}/api/admin/salespeople`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'admin-key': adminKey },
         body: JSON.stringify(newSalesperson)
@@ -27657,7 +27657,7 @@ const SalesControlPage = ({ adminKey }) => {
 
   const handleUpdateSalesperson = async () => {
     try {
-      const res = await fetch(`${API_URL}/admin/salespeople/${editingSalesperson.id}`, {
+      const res = await fetch(`${API_URL}/api/admin/salespeople/${editingSalesperson.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'admin-key': adminKey },
         body: JSON.stringify(editingSalesperson)
@@ -27679,7 +27679,7 @@ const SalesControlPage = ({ adminKey }) => {
   const handleDeleteSalesperson = async (id) => {
     if (!window.confirm('Are you sure you want to delete this salesperson?')) return;
     try {
-      const res = await fetch(`${API_URL}/admin/salespeople/${id}`, {
+      const res = await fetch(`${API_URL}/api/admin/salespeople/${id}`, {
         method: 'DELETE',
         headers: { 'admin-key': adminKey }
       });
@@ -27692,7 +27692,7 @@ const SalesControlPage = ({ adminKey }) => {
   const handleInviteSalesperson = async (id) => {
     if (!window.confirm('Enviar email de convite para este vendedor?')) return;
     try {
-      const res = await fetch(`${API_URL}/admin/salespeople/${id}/invite`, {
+      const res = await fetch(`${API_URL}/api/admin/salespeople/${id}/invite`, {
         method: 'POST',
         headers: { 'admin-key': adminKey }
       });
@@ -27711,7 +27711,7 @@ const SalesControlPage = ({ adminKey }) => {
 
   const handleApproveCommission = async (acquisitionId) => {
     try {
-      const res = await fetch(`${API_URL}/admin/acquisitions/${acquisitionId}/approve`, {
+      const res = await fetch(`${API_URL}/api/admin/acquisitions/${acquisitionId}/approve`, {
         method: 'PUT',
         headers: { 'admin-key': adminKey }
       });
@@ -27734,7 +27734,7 @@ const SalesControlPage = ({ adminKey }) => {
       formData.append('payment_reference', paymentForm.reference);
       formData.append('notes', paymentForm.notes);
 
-      const res = await fetch(`${API_URL}/admin/commission-payments`, {
+      const res = await fetch(`${API_URL}/api/admin/commission-payments`, {
         method: 'POST',
         headers: { 'admin-key': adminKey },
         body: formData
@@ -27754,7 +27754,7 @@ const SalesControlPage = ({ adminKey }) => {
 
   const handleAddAcquisition = async () => {
     try {
-      const res = await fetch(`${API_URL}/admin/partner-acquisitions`, {
+      const res = await fetch(`${API_URL}/api/admin/partner-acquisitions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'admin-key': adminKey },
         body: JSON.stringify(newAcquisition)
@@ -27771,7 +27771,7 @@ const SalesControlPage = ({ adminKey }) => {
 
   const handleSetGoal = async () => {
     try {
-      const res = await fetch(`${API_URL}/admin/sales-goals`, {
+      const res = await fetch(`${API_URL}/api/admin/sales-goals`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'admin-key': adminKey },
         body: JSON.stringify(newGoal)
@@ -27788,7 +27788,7 @@ const SalesControlPage = ({ adminKey }) => {
 
   const handleUpdateCommissionStatus = async (acquisitionId, status) => {
     try {
-      const res = await fetch(`${API_URL}/admin/partner-acquisitions/${acquisitionId}/status?status=${status}`, {
+      const res = await fetch(`${API_URL}/api/admin/partner-acquisitions/${acquisitionId}/status?status=${status}`, {
         method: 'PUT',
         headers: { 'admin-key': adminKey }
       });
