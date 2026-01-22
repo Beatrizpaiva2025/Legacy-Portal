@@ -22551,7 +22551,7 @@ async def invite_salesperson(salesperson_id: str, admin_key: str = Header(None))
         email_html = f"""
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
             <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #4F46E5, #7C3AED); border-radius: 10px;">
-                <h1 style="color: white; margin: 0;">🎉 Welcome to the Team!</h1>
+                <h1 style="color: white; margin: 0;">Welcome to the Team!</h1>
             </div>
 
             <div style="padding: 30px 20px;">
@@ -22561,9 +22561,9 @@ async def invite_salesperson(salesperson_id: str, admin_key: str = Header(None))
 
                 <p>As a sales partner, you'll be able to:</p>
                 <ul>
-                    <li>✅ Register new partners and earn commissions</li>
-                    <li>📊 Track your performance and earnings</li>
-                    <li>💰 View your monthly commission reports</li>
+                    <li>Register new partners and earn commissions</li>
+                    <li>Track your performance and earnings</li>
+                    <li>View your monthly commission reports</li>
                 </ul>
 
                 <div style="text-align: center; margin: 30px 0;">
@@ -22573,6 +22573,8 @@ async def invite_salesperson(salesperson_id: str, admin_key: str = Header(None))
                 </div>
 
                 <p style="color: #666; font-size: 14px;">This invitation link will expire in 7 days.</p>
+
+                <p style="color: #666; font-size: 14px;">Your referral code: <strong>{salesperson.get('referral_code', 'N/A')}</strong></p>
             </div>
 
             <div style="text-align: center; padding: 20px; background: #f5f5f5; border-radius: 10px;">
@@ -22581,15 +22583,12 @@ async def invite_salesperson(salesperson_id: str, admin_key: str = Header(None))
         </div>
         """
 
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = "🎉 You're Invited to Join Legacy Translations Sales Team!"
-        msg['From'] = EMAIL_USER
-        msg['To'] = salesperson['email']
-        msg.attach(MIMEText(email_html, 'html'))
-
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
-            smtp.login(EMAIL_USER, EMAIL_PASSWORD)
-            smtp.send_message(msg)
+        await email_service.send_email(
+            to=salesperson['email'],
+            subject="You're Invited to Join Legacy Translations Sales Team!",
+            content=email_html,
+            content_type="html"
+        )
 
         logger.info(f"Invite sent to salesperson: {salesperson['email']}")
 
