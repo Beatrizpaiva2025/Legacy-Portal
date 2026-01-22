@@ -186,7 +186,20 @@ const TRANSLATIONS = {
     net30Terms: 'Net 30 payment terms',
     volumeDiscounts: 'Volume discounts on translations',
     dedicatedSupport: 'Dedicated account support',
-    priorityProcessing: 'Priority order processing'
+    priorityProcessing: 'Priority order processing',
+    // Discount Structure
+    discountStructure: 'Partner Discount Structure',
+    discountDescription: 'Earn volume discounts based on your monthly page count',
+    tier: 'Tier',
+    monthlyVolume: 'Monthly Volume',
+    discount: 'Discount',
+    pricePerPage: 'Price/Page',
+    monthlySavings: 'Monthly Savings',
+    partnerMargin: 'Partner Margin*',
+    pages: 'pages',
+    page: 'page',
+    upTo: 'up to',
+    marginNote: 'Partner margin calculated based on resale at $30/page (common market rate)'
   },
   es: {
     // Login
@@ -346,7 +359,20 @@ const TRANSLATIONS = {
     net30Terms: 'Términos de pago Net 30',
     volumeDiscounts: 'Descuentos por volumen en traducciones',
     dedicatedSupport: 'Soporte de cuenta dedicado',
-    priorityProcessing: 'Procesamiento prioritario de pedidos'
+    priorityProcessing: 'Procesamiento prioritario de pedidos',
+    // Discount Structure
+    discountStructure: 'Estructura de Descuentos para Partners',
+    discountDescription: 'Obtenga descuentos por volumen según su cantidad mensual de páginas',
+    tier: 'Nivel',
+    monthlyVolume: 'Volumen Mensual',
+    discount: 'Descuento',
+    pricePerPage: 'Precio/Página',
+    monthlySavings: 'Ahorro Mensual',
+    partnerMargin: 'Margen del Partner*',
+    pages: 'páginas',
+    page: 'página',
+    upTo: 'hasta',
+    marginNote: 'Margen del partner calculado en base a reventa a $30/página (precio común de mercado)'
   },
   pt: {
     // Login
@@ -506,7 +532,20 @@ const TRANSLATIONS = {
     net30Terms: 'Condições de pagamento Net 30',
     volumeDiscounts: 'Descontos por volume em traduções',
     dedicatedSupport: 'Suporte de conta dedicado',
-    priorityProcessing: 'Processamento prioritário de pedidos'
+    priorityProcessing: 'Processamento prioritário de pedidos',
+    // Discount Structure
+    discountStructure: 'Estrutura de Descontos para Parceiros',
+    discountDescription: 'Ganhe descontos por volume com base na sua quantidade mensal de páginas',
+    tier: 'Nível',
+    monthlyVolume: 'Volume Mensal',
+    discount: 'Desconto',
+    pricePerPage: 'Preço/Página',
+    monthlySavings: 'Economia Mensal',
+    partnerMargin: 'Margem do Parceiro*',
+    pages: 'páginas',
+    page: 'página',
+    upTo: 'até',
+    marginNote: 'Margem do parceiro calculada com base na revenda a $30/página (preço comum de mercado)'
   }
 };
 
@@ -3600,6 +3639,96 @@ const PaymentPlanPage = ({ token, t }) => {
           )}
         </div>
       )}
+
+      {/* Partner Discount Tiers */}
+      <div className="bg-gradient-to-br from-blue-50 to-slate-100 rounded-lg shadow-sm border border-blue-200 p-6 mt-6">
+        <div className="flex items-center gap-2 mb-4">
+          <span className="text-2xl">💰</span>
+          <h2 className="text-lg font-bold text-slate-800">{t?.discountStructure || 'Partner Discount Structure'}</h2>
+        </div>
+        <p className="text-sm text-slate-600 mb-4">{t?.discountDescription || 'Earn volume discounts based on your monthly page count'}</p>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+                <th className="px-3 py-3 text-left rounded-tl-lg">{t?.tier || 'Tier'}</th>
+                <th className="px-3 py-3 text-center">{t?.monthlyVolume || 'Monthly Volume'}</th>
+                <th className="px-3 py-3 text-center">{t?.discount || 'Discount'}</th>
+                <th className="px-3 py-3 text-center">{t?.pricePerPage || 'Price/Page'}</th>
+                <th className="px-3 py-3 text-center">{t?.monthlySavings || 'Monthly Savings'}</th>
+                <th className="px-3 py-3 text-center rounded-tr-lg">{t?.partnerMargin || 'Partner Margin*'}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="bg-amber-50 border-b border-amber-100">
+                <td className="px-3 py-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🥉</span>
+                    <span className="font-semibold text-amber-700">Bronze</span>
+                  </div>
+                </td>
+                <td className="px-3 py-3 text-center text-slate-700">10-29 {t?.pages || 'pages'}</td>
+                <td className="px-3 py-3 text-center">
+                  <span className="px-2 py-1 bg-amber-200 text-amber-800 rounded-full text-xs font-semibold">10%</span>
+                </td>
+                <td className="px-3 py-3 text-center font-medium text-slate-700">$22.49</td>
+                <td className="px-3 py-3 text-center text-green-600">{t?.upTo || 'up to'} $72</td>
+                <td className="px-3 py-3 text-center font-semibold text-blue-600">$7.50/{t?.page || 'page'}</td>
+              </tr>
+              <tr className="bg-slate-50 border-b border-slate-100">
+                <td className="px-3 py-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🥈</span>
+                    <span className="font-semibold text-slate-600">Silver</span>
+                  </div>
+                </td>
+                <td className="px-3 py-3 text-center text-slate-700">30-59 {t?.pages || 'pages'}</td>
+                <td className="px-3 py-3 text-center">
+                  <span className="px-2 py-1 bg-slate-300 text-slate-700 rounded-full text-xs font-semibold">15%</span>
+                </td>
+                <td className="px-3 py-3 text-center font-medium text-slate-700">$21.24</td>
+                <td className="px-3 py-3 text-center text-green-600">{t?.upTo || 'up to'} $225</td>
+                <td className="px-3 py-3 text-center font-semibold text-blue-600">$8.75/{t?.page || 'page'}</td>
+              </tr>
+              <tr className="bg-yellow-50 border-b border-yellow-100">
+                <td className="px-3 py-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🥇</span>
+                    <span className="font-semibold text-yellow-700">Gold</span>
+                  </div>
+                </td>
+                <td className="px-3 py-3 text-center text-slate-700">60-99 {t?.pages || 'pages'}</td>
+                <td className="px-3 py-3 text-center">
+                  <span className="px-2 py-1 bg-yellow-300 text-yellow-800 rounded-full text-xs font-semibold">25%</span>
+                </td>
+                <td className="px-3 py-3 text-center font-medium text-slate-700">$18.74</td>
+                <td className="px-3 py-3 text-center text-green-600">{t?.upTo || 'up to'} $618</td>
+                <td className="px-3 py-3 text-center font-semibold text-blue-600">$11.25/{t?.page || 'page'}</td>
+              </tr>
+              <tr className="bg-purple-50">
+                <td className="px-3 py-3 rounded-bl-lg">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">💎</span>
+                    <span className="font-semibold text-purple-700">Platinum</span>
+                  </div>
+                </td>
+                <td className="px-3 py-3 text-center text-slate-700">100+ {t?.pages || 'pages'}</td>
+                <td className="px-3 py-3 text-center">
+                  <span className="px-2 py-1 bg-purple-300 text-purple-800 rounded-full text-xs font-semibold">35%</span>
+                </td>
+                <td className="px-3 py-3 text-center font-medium text-slate-700">$16.24</td>
+                <td className="px-3 py-3 text-center text-green-600">$875+</td>
+                <td className="px-3 py-3 text-center font-semibold text-blue-600 rounded-br-lg">$13.75/{t?.page || 'page'}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p className="text-xs text-slate-500 mt-4 italic">
+          *{t?.marginNote || 'Partner margin calculated based on resale at $30/page (common market rate)'}
+        </p>
+      </div>
     </div>
   );
 };
