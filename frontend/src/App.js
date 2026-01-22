@@ -74,16 +74,25 @@ const TRANSLATIONS = {
     paymentPlanTitle: 'Payment Plan',
     currentPlan: 'Current Plan',
     qualificationStatus: 'Qualification Status',
-    qualifiedForInvoice: 'You qualify for invoice plans!',
+    qualifiedForInvoice: 'You qualify for biweekly invoice!',
     notQualifiedYet: 'Not yet qualified',
-    ordersCompleted: 'orders completed',
-    ordersRemaining: 'more orders to qualify',
+    translationsCompleted: 'translations completed',
+    translationsRemaining: 'more translations to qualify',
     requestUpgrade: 'Request Upgrade',
     upgradeRequested: 'Upgrade Requested',
     awaitingApproval: 'Awaiting admin approval',
     selectPlanToUpgrade: 'Select the plan you want:',
     submitUpgradeRequest: 'Submit Upgrade Request',
     upgradeSuccess: 'Upgrade request submitted successfully!',
+    // Payment Plan Terms Explanation
+    paymentPlanTermsTitle: 'Payment Terms',
+    paymentPlanTerm1: 'Biweekly invoicing available upon completion of 10 paid translations.',
+    paymentPlanTerm2: 'Net 30 payment terms granted after 3 consecutive months of timely invoice settlement.',
+    currentTerms: 'Current Terms',
+    paymentDueOnInvoice: 'Payment due on invoice date',
+    net30Terms: '30-day payment terms',
+    monthsOnTime: 'months of on-time payments',
+    monthsRequired: '3 months required',
     // Invoice Page
     myInvoices: 'My Invoices',
     noInvoices: 'No invoices found',
@@ -166,7 +175,7 @@ const TRANSLATIONS = {
     monthlyInvoiceDesc: 'Receive monthly invoice',
     invoiceRequiresApproval: 'Invoice plans require account approval after registration',
     invoiceComingSoon: 'Available after qualification',
-    invoiceQualificationNote: 'Invoice plans unlock after 3 paid orders. Request upgrade from your dashboard.',
+    invoiceQualificationNote: 'Biweekly invoice unlocks after 10 paid translations. Request upgrade from your dashboard.',
     paymentMethod: 'Preferred Payment Method',
     zelle: 'Zelle',
     creditCard: 'Credit Card',
@@ -186,7 +195,15 @@ const TRANSLATIONS = {
     net30Terms: 'Net 30 payment terms',
     volumeDiscounts: 'Volume discounts on translations',
     dedicatedSupport: 'Dedicated account support',
-    priorityProcessing: 'Priority order processing'
+    priorityProcessing: 'Priority order processing',
+    // Welcome Gift Modal
+    welcomeGiftTitle: 'Welcome Gift!',
+    welcomeGiftThankYou: 'Thank you for joining Legacy Translations',
+    welcomeGiftDescription: '1 FREE Page (up to 250 words) + Certification of Accuracy',
+    welcomeGiftCouponLabel: 'Your Coupon Code',
+    welcomeGiftCouponDesc: '1 free page (up to 250 words) + certification',
+    welcomeGiftValid: 'Valid for 30 days',
+    welcomeGiftUse: 'Use at checkout on your first order'
   },
   es: {
     // Login
@@ -235,16 +252,25 @@ const TRANSLATIONS = {
     paymentPlanTitle: 'Plan de Pago',
     currentPlan: 'Plan Actual',
     qualificationStatus: 'Estado de Calificación',
-    qualifiedForInvoice: '¡Califica para planes de factura!',
+    qualifiedForInvoice: '¡Califica para factura quincenal!',
     notQualifiedYet: 'Aún no calificado',
-    ordersCompleted: 'pedidos completados',
-    ordersRemaining: 'pedidos más para calificar',
+    translationsCompleted: 'traducciones completadas',
+    translationsRemaining: 'traducciones más para calificar',
     requestUpgrade: 'Solicitar Mejora',
     upgradeRequested: 'Mejora Solicitada',
     awaitingApproval: 'Esperando aprobación del administrador',
     selectPlanToUpgrade: 'Seleccione el plan que desea:',
     submitUpgradeRequest: 'Enviar Solicitud',
     upgradeSuccess: '¡Solicitud de mejora enviada exitosamente!',
+    // Payment Plan Terms Explanation
+    paymentPlanTermsTitle: 'Condiciones de Pago',
+    paymentPlanTerm1: 'Facturación quincenal disponible tras completar 10 traducciones pagadas.',
+    paymentPlanTerm2: 'Plazo de pago Net 30 otorgado después de 3 meses consecutivos con facturas liquidadas puntualmente.',
+    currentTerms: 'Condiciones Actuales',
+    paymentDueOnInvoice: 'Pago vence en fecha de factura',
+    net30Terms: 'Plazo de pago de 30 días',
+    monthsOnTime: 'meses de pagos puntuales',
+    monthsRequired: '3 meses requeridos',
     // Invoice Page
     myInvoices: 'Mis Facturas',
     noInvoices: 'No se encontraron facturas',
@@ -326,7 +352,7 @@ const TRANSLATIONS = {
     monthlyInvoiceDesc: 'Reciba factura mensual',
     invoiceRequiresApproval: 'Planes de factura requieren aprobación después del registro',
     invoiceComingSoon: 'Disponible tras calificación',
-    invoiceQualificationNote: 'Planes de factura se desbloquean después de 3 pedidos pagados. Solicite desde su panel.',
+    invoiceQualificationNote: 'Factura quincenal se desbloquea después de 10 traducciones pagas. Solicite desde su panel.',
     paymentMethod: 'Método de Pago Preferido',
     zelle: 'Zelle',
     creditCard: 'Tarjeta de Crédito',
@@ -346,7 +372,15 @@ const TRANSLATIONS = {
     net30Terms: 'Términos de pago Net 30',
     volumeDiscounts: 'Descuentos por volumen en traducciones',
     dedicatedSupport: 'Soporte de cuenta dedicado',
-    priorityProcessing: 'Procesamiento prioritario de pedidos'
+    priorityProcessing: 'Procesamiento prioritario de pedidos',
+    // Welcome Gift Modal
+    welcomeGiftTitle: '¡Regalo de Bienvenida!',
+    welcomeGiftThankYou: 'Gracias por unirse a Legacy Translations',
+    welcomeGiftDescription: '1 Página GRATIS (hasta 250 palabras) + Certificación de Precisión',
+    welcomeGiftCouponLabel: 'Tu Código de Cupón',
+    welcomeGiftCouponDesc: '1 página gratis (hasta 250 palabras) + certificación',
+    welcomeGiftValid: 'Válido por 30 días',
+    welcomeGiftUse: 'Usar al finalizar tu primer pedido'
   },
   pt: {
     // Login
@@ -395,16 +429,25 @@ const TRANSLATIONS = {
     paymentPlanTitle: 'Plano de Pagamento',
     currentPlan: 'Plano Atual',
     qualificationStatus: 'Status de Qualificação',
-    qualifiedForInvoice: 'Você se qualifica para planos de fatura!',
+    qualifiedForInvoice: 'Você se qualifica para fatura quinzenal!',
     notQualifiedYet: 'Ainda não qualificado',
-    ordersCompleted: 'pedidos concluídos',
-    ordersRemaining: 'pedidos restantes para qualificar',
+    translationsCompleted: 'traduções concluídas',
+    translationsRemaining: 'traduções restantes para qualificar',
     requestUpgrade: 'Solicitar Upgrade',
     upgradeRequested: 'Upgrade Solicitado',
     awaitingApproval: 'Aguardando aprovação do administrador',
     selectPlanToUpgrade: 'Selecione o plano desejado:',
     submitUpgradeRequest: 'Enviar Solicitação',
     upgradeSuccess: 'Solicitação de upgrade enviada com sucesso!',
+    // Payment Plan Terms Explanation
+    paymentPlanTermsTitle: 'Condições de Pagamento',
+    paymentPlanTerm1: 'Faturamento quinzenal disponível após a conclusão de 10 traduções pagas.',
+    paymentPlanTerm2: 'Prazo de pagamento Net 30 concedido após 3 meses consecutivos com faturas quitadas pontualmente.',
+    currentTerms: 'Condições Atuais',
+    paymentDueOnInvoice: 'Pagamento vence na data da fatura',
+    net30Terms: 'Prazo de pagamento de 30 dias',
+    monthsOnTime: 'meses de pagamentos em dia',
+    monthsRequired: '3 meses necessários',
     // Invoice Page
     myInvoices: 'Minhas Faturas',
     noInvoices: 'Nenhuma fatura encontrada',
@@ -486,7 +529,7 @@ const TRANSLATIONS = {
     monthlyInvoiceDesc: 'Receba fatura mensal',
     invoiceRequiresApproval: 'Planos de fatura requerem aprovação após o cadastro',
     invoiceComingSoon: 'Disponível após qualificação',
-    invoiceQualificationNote: 'Planos de fatura são liberados após 3 pedidos pagos. Solicite pelo painel.',
+    invoiceQualificationNote: 'Fatura quinzenal é liberada após 10 traduções pagas. Solicite pelo painel.',
     paymentMethod: 'Método de Pagamento Preferido',
     zelle: 'Zelle',
     creditCard: 'Cartão de Crédito',
@@ -506,7 +549,15 @@ const TRANSLATIONS = {
     net30Terms: 'Condições de pagamento Net 30',
     volumeDiscounts: 'Descontos por volume em traduções',
     dedicatedSupport: 'Suporte de conta dedicado',
-    priorityProcessing: 'Processamento prioritário de pedidos'
+    priorityProcessing: 'Processamento prioritário de pedidos',
+    // Welcome Gift Modal
+    welcomeGiftTitle: 'Presente de Boas-vindas!',
+    welcomeGiftThankYou: 'Obrigado por se juntar à Legacy Translations',
+    welcomeGiftDescription: '1 Página GRÁTIS (até 250 palavras) + Certificação de Precisão',
+    welcomeGiftCouponLabel: 'Seu Código de Cupom',
+    welcomeGiftCouponDesc: '1 página grátis (até 250 palavras) + certificação',
+    welcomeGiftValid: 'Válido por 30 dias',
+    welcomeGiftUse: 'Use no checkout do seu primeiro pedido'
   }
 };
 
@@ -520,34 +571,36 @@ const UI_LANGUAGES = [
   { code: 'pt', countryCode: 'br', name: 'Português' }
 ];
 
-// Get user's language preference (English is default)
+// Check if user is in Brazil based on timezone
+const isInBrazil = () => {
+  try {
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return timezone.includes('Sao_Paulo') || timezone.includes('Fortaleza') ||
+           timezone.includes('Recife') || timezone.includes('Bahia') ||
+           timezone.includes('Manaus') || timezone.includes('Cuiaba') ||
+           timezone.includes('Porto_Velho') || timezone.includes('Boa_Vista') ||
+           timezone.includes('Rio_Branco') || timezone.includes('Belem') ||
+           timezone.includes('Araguaina') || timezone.includes('Maceio') ||
+           timezone.includes('Campo_Grande') || timezone.includes('Noronha');
+  } catch {
+    return false;
+  }
+};
+
+// Get user's language preference (Portuguese for Brazil, English for others)
 const getInitialLanguage = () => {
   const saved = localStorage.getItem('ui_language');
   if (saved && ['en', 'es', 'pt'].includes(saved)) return saved;
-  return 'en'; // Always default to English
+  // Auto-detect: Portuguese for Brazil, English for everyone else
+  return isInBrazil() ? 'pt' : 'en';
 };
 
 // Detect currency based on timezone (only Brazil changes to BRL)
 const getLocalCurrency = () => {
-  try {
-    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-    // Only Brazil (based on timezone, not locale)
-    if (timezone.includes('Sao_Paulo') || timezone.includes('Fortaleza') ||
-        timezone.includes('Recife') || timezone.includes('Bahia') ||
-        timezone.includes('Manaus') || timezone.includes('Cuiaba') ||
-        timezone.includes('Porto_Velho') || timezone.includes('Boa_Vista') ||
-        timezone.includes('Rio_Branco') || timezone.includes('Belem') ||
-        timezone.includes('Araguaina') || timezone.includes('Maceio') ||
-        timezone.includes('Campo_Grande') || timezone.includes('Noronha')) {
-      return { code: 'BRL', symbol: 'R$', rate: 5.0, isUSA: false };
-    }
-
-    // Default USD for everyone else
-    return { code: 'USD', symbol: '$', rate: 1, isUSA: true };
-  } catch {
-    return { code: 'USD', symbol: '$', rate: 1, isUSA: true };
+  if (isInBrazil()) {
+    return { code: 'BRL', symbol: 'R$', rate: 5.0, isUSA: false };
   }
+  return { code: 'USD', symbol: '$', rate: 1, isUSA: true };
 };
 
 // Translation stages
@@ -2859,7 +2912,7 @@ const OrdersPage = ({ token }) => {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-xl font-bold text-gray-800">${order.total_price?.toFixed(2)}</div>
+                    <div className="text-xl font-bold text-gray-800">{formatPrice(order.total_price || 0)}</div>
                     <div className="text-sm text-gray-500">
                       Due: {order.due_date ? new Date(order.due_date).toLocaleDateString('en-US', { timeZone: 'America/New_York' }) : 'N/A'}
                     </div>
@@ -2886,11 +2939,11 @@ const OrdersPage = ({ token }) => {
                     </div>
                     <div>
                       <div className="text-sm text-gray-500">Base Price</div>
-                      <div className="font-medium">${order.base_price?.toFixed(2)}</div>
+                      <div className="font-medium">{formatPrice(order.base_price || 0)}</div>
                     </div>
                     <div>
                       <div className="text-sm text-gray-500">Urgency Fee</div>
-                      <div className="font-medium">${order.urgency_fee?.toFixed(2)}</div>
+                      <div className="font-medium">{formatPrice(order.urgency_fee || 0)}</div>
                     </div>
                   </div>
                   {order.reference && (
@@ -3058,7 +3111,7 @@ const OrdersPage = ({ token }) => {
 };
 
 // ==================== INVOICES PAGE ====================
-const InvoicesPage = ({ token, t }) => {
+const InvoicesPage = ({ token, t, currency }) => {
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
@@ -3111,7 +3164,8 @@ const InvoicesPage = ({ token, t }) => {
     try {
       const response = await axios.post(`${API}/partner/invoices/${selectedInvoice.id}/pay-stripe`, {
         invoice_id: selectedInvoice.id,
-        origin_url: window.location.origin
+        origin_url: window.location.origin,
+        currency: currency?.code?.toLowerCase() || 'usd' // Pass currency for BRL/PIX support (fallback to USD)
       });
       if (response.data.checkout_url) {
         window.location.href = response.data.checkout_url;
@@ -3493,6 +3547,23 @@ const PaymentPlanPage = ({ token, t }) => {
     <div className="p-8 max-w-2xl">
       <h1 className="text-2xl font-bold text-gray-800 mb-6">{t?.paymentPlanTitle || 'Payment Plan'}</h1>
 
+      {/* Payment Plan Terms Explanation */}
+      <div className="bg-gray-50 rounded-lg border border-gray-200 p-5 mb-6">
+        <h2 className="text-sm font-semibold text-gray-700 mb-3">
+          {t?.paymentPlanTermsTitle || 'Payment Terms'}
+        </h2>
+        <ul className="space-y-2 text-sm text-gray-600">
+          <li className="flex items-start gap-2">
+            <span className="text-gray-400">•</span>
+            <span>{t?.paymentPlanTerm1 || 'Biweekly invoicing available upon completion of 10 paid translations.'}</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-gray-400">•</span>
+            <span>{t?.paymentPlanTerm2 || 'Net 30 payment terms granted after 3 consecutive months of timely invoice settlement.'}</span>
+          </li>
+        </ul>
+      </div>
+
       {/* Current Plan Card */}
       <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
         <h2 className="text-sm font-medium text-gray-500 mb-2">{t?.currentPlan || 'Current Plan'}</h2>
@@ -3514,13 +3585,13 @@ const PaymentPlanPage = ({ token, t }) => {
         {/* Progress Bar */}
         <div className="mb-4">
           <div className="flex justify-between text-sm mb-2">
-            <span className="text-gray-600">{qualification?.total_paid_orders || 0} {t?.ordersCompleted || 'orders completed'}</span>
-            <span className="text-gray-500">{qualification?.orders_required || 3} required</span>
+            <span className="text-gray-600">{qualification?.total_paid_orders || 0} {t?.translationsCompleted || 'translations completed'}</span>
+            <span className="text-gray-500">{qualification?.orders_required || 10} required</span>
           </div>
           <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
             <div
               className={`h-full transition-all duration-500 ${qualification?.qualifies_for_invoice ? 'bg-green-500' : 'bg-teal-500'}`}
-              style={{ width: `${Math.min(100, ((qualification?.total_paid_orders || 0) / (qualification?.orders_required || 3)) * 100)}%` }}
+              style={{ width: `${Math.min(100, ((qualification?.total_paid_orders || 0) / (qualification?.orders_required || 10)) * 100)}%` }}
             />
           </div>
         </div>
@@ -3530,11 +3601,11 @@ const PaymentPlanPage = ({ token, t }) => {
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
             </svg>
-            <span className="font-medium">{t?.qualifiedForInvoice || 'You qualify for invoice plans!'}</span>
+            <span className="font-medium">{t?.qualifiedForInvoice || 'You qualify for biweekly invoice!'}</span>
           </div>
         ) : (
           <div className="text-gray-600">
-            <span>{qualification?.orders_remaining || 3} {t?.ordersRemaining || 'more orders to qualify'}</span>
+            <span>{qualification?.orders_remaining || 10} {t?.translationsRemaining || 'more translations to qualify'}</span>
           </div>
         )}
       </div>
@@ -3595,7 +3666,7 @@ const PaymentPlanPage = ({ token, t }) => {
                 <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/>
               </svg>
               <p className="text-sm text-gray-600">{t?.notQualifiedYet || 'Not yet qualified'}</p>
-              <p className="text-xs text-gray-500 mt-1">{qualification?.orders_remaining} {t?.ordersRemaining || 'more orders to qualify'}</p>
+              <p className="text-xs text-gray-500 mt-1">{qualification?.orders_remaining} {t?.translationsRemaining || 'more translations to qualify'}</p>
             </div>
           )}
         </div>
@@ -4484,10 +4555,12 @@ function App() {
   const [token, setToken] = useState(null);
   const [activeTab, setActiveTab] = useState('new-order');
   const [lang, setLang] = useState(getInitialLanguage);
-  const [currency] = useState(getLocalCurrency);
+  const [currency, setCurrency] = useState(getLocalCurrency);
   const [verificationId, setVerificationId] = useState(null);
   const [resetToken, setResetToken] = useState(null);
   const [isValidatingSession, setIsValidatingSession] = useState(true);
+  const [showWelcomeCouponModal, setShowWelcomeCouponModal] = useState(false);
+  const [welcomeCouponCode, setWelcomeCouponCode] = useState(null);
 
   // Get translations for current language
   const t = TRANSLATIONS[lang];
@@ -4497,6 +4570,26 @@ function App() {
     setLang(newLang);
     localStorage.setItem('ui_language', newLang);
   };
+
+  // Fetch real-time exchange rate for BRL if user is in Brazil
+  useEffect(() => {
+    const fetchExchangeRate = async () => {
+      if (currency.code !== 'BRL') return; // Only fetch for Brazilian users
+
+      try {
+        const response = await axios.get(`${API}/exchange-rates`);
+        if (response.data?.rates?.brl) {
+          setCurrency(prev => ({
+            ...prev,
+            rate: response.data.rates.brl
+          }));
+        }
+      } catch (err) {
+        console.log('Using default BRL rate');
+      }
+    };
+    fetchExchangeRate();
+  }, [currency.code]);
 
   // Check for reset token and verification route in URL
   useEffect(() => {
@@ -4550,10 +4643,17 @@ function App() {
         // Validate token with backend
         const response = await axios.get(`${API}/partner/verify-token?token=${savedToken}`);
         if (response.data.valid && response.data.partner) {
-          setPartner(response.data.partner);
+          const partnerData = response.data.partner;
+          setPartner(partnerData);
           setToken(savedToken);
           // Update localStorage with fresh partner data
-          localStorage.setItem('partner', JSON.stringify(response.data.partner));
+          localStorage.setItem('partner', JSON.stringify(partnerData));
+
+          // Show welcome coupon modal if partner hasn't seen it yet
+          if (!partnerData.has_seen_welcome_coupon && partnerData.welcome_coupon_code) {
+            setWelcomeCouponCode(partnerData.welcome_coupon_code);
+            setShowWelcomeCouponModal(true);
+          }
         }
       } catch (err) {
         // Token is invalid or expired, clear localStorage
@@ -4572,6 +4672,29 @@ function App() {
     setToken(data.token);
     localStorage.setItem('partner', JSON.stringify(data));
     localStorage.setItem('token', data.token);
+
+    // Show welcome coupon modal if partner hasn't seen it yet
+    if (!data.has_seen_welcome_coupon && data.welcome_coupon_code) {
+      setWelcomeCouponCode(data.welcome_coupon_code);
+      setShowWelcomeCouponModal(true);
+    }
+  };
+
+  const dismissWelcomeCoupon = async () => {
+    try {
+      await axios.post(`${API}/partner/dismiss-welcome-coupon?token=${token}`);
+      setShowWelcomeCouponModal(false);
+      setWelcomeCouponCode(null);
+      // Update local partner data
+      if (partner) {
+        const updatedPartner = { ...partner, has_seen_welcome_coupon: true };
+        setPartner(updatedPartner);
+        localStorage.setItem('partner', JSON.stringify(updatedPartner));
+      }
+    } catch (err) {
+      console.error('Error dismissing welcome coupon:', err);
+      setShowWelcomeCouponModal(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -4593,7 +4716,7 @@ function App() {
       case 'orders':
         return <OrdersPage token={token} />;
       case 'invoices':
-        return <InvoicesPage token={token} t={t} />;
+        return <InvoicesPage token={token} t={t} currency={currency} />;
       case 'messages':
         return <MessagesPage token={token} />;
       case 'payment-plan':
@@ -4680,6 +4803,53 @@ function App() {
         {renderContent()}
       </div>
       <PartnerFloatingChatWidget token={token} partner={partner} onNavigateToMessages={() => setActiveTab('messages')} />
+
+      {/* Welcome Coupon Modal - First Login */}
+      {showWelcomeCouponModal && welcomeCouponCode && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-fade-in">
+            {/* Header with gradient */}
+            <div className="bg-gradient-to-r from-teal-500 to-cyan-500 p-6 text-white text-center">
+              <div className="text-5xl mb-3">🎁</div>
+              <h2 className="text-2xl font-bold">{t.welcomeGiftTitle}</h2>
+              <p className="text-teal-100 mt-2">{t.welcomeGiftThankYou}</p>
+            </div>
+
+            {/* Content */}
+            <div className="p-6">
+              <div className="text-center mb-6">
+                <p className="text-gray-600 mb-4">
+                  {t.welcomeGiftDescription}
+                </p>
+
+                {/* Coupon Code Box */}
+                <div className="bg-gradient-to-r from-teal-50 to-cyan-50 border-2 border-dashed border-teal-400 rounded-xl p-4 mb-4">
+                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">{t.welcomeGiftCouponLabel}</p>
+                  <div className="bg-white rounded-lg px-4 py-3 shadow-inner">
+                    <span className="text-2xl font-bold text-teal-600 font-mono tracking-wider">
+                      {welcomeCouponCode}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">{t.welcomeGiftCouponDesc}</p>
+                </div>
+
+                <div className="text-sm text-gray-500 space-y-1">
+                  <p>{t.welcomeGiftValid}</p>
+                  <p>{t.welcomeGiftUse}</p>
+                </div>
+              </div>
+
+              {/* Action Button */}
+              <button
+                onClick={dismissWelcomeCoupon}
+                className="w-full bg-gradient-to-r from-teal-500 to-cyan-500 text-white py-3 px-6 rounded-xl font-semibold hover:from-teal-600 hover:to-cyan-600 transition-all shadow-lg hover:shadow-xl"
+              >
+                {lang === 'es' ? '¡Entendido! Empezar a pedir' : lang === 'pt' ? 'Entendi! Começar a pedir' : 'Got it! Start ordering'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

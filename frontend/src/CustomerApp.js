@@ -1944,7 +1944,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
                     </div>
                     <div className="text-sm text-gray-500">{t.certifiedDesc}</div>
                   </div>
-                  <div className="font-semibold text-teal-600">$24.99{t.perPage}</div>
+                  <div className="font-semibold text-teal-600">{formatLocalPrice(24.99)}{t.perPage}</div>
                 </label>
 
                 {/* Standard Translation */}
@@ -1966,7 +1966,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
                     </div>
                     <div className="text-sm text-gray-500">{t.standardDesc}</div>
                   </div>
-                  <div className="font-semibold text-teal-600">$19.99{t.perPage}</div>
+                  <div className="font-semibold text-teal-600">{formatLocalPrice(19.99)}{t.perPage}</div>
                 </label>
 
                 {/* Sworn Translation */}
@@ -1988,7 +1988,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
                     </div>
                     <div className="text-sm text-gray-500">{t.swornDesc}</div>
                   </div>
-                  <div className="font-semibold text-teal-600">$55.00{t.perPage}</div>
+                  <div className="font-semibold text-teal-600">{formatLocalPrice(55.00)}{t.perPage}</div>
                 </label>
 
                 {/* RMV Certified Translation */}
@@ -2010,7 +2010,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
                     </div>
                     <div className="text-sm text-gray-500">{t.rmvDesc}</div>
                   </div>
-                  <div className="font-semibold text-teal-600">$24.99{t.perPage}</div>
+                  <div className="font-semibold text-teal-600">{formatLocalPrice(24.99)}{t.perPage}</div>
                 </label>
               </div>
 
@@ -2343,30 +2343,30 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
             <div className="border-t pt-3 mt-3">
               <div className="flex justify-between">
                 <span className="text-gray-600">{t.basePrice}</span>
-                <span className="font-medium">${(quote?.base_price || 0).toFixed(2)}</span>
+                <span className="font-medium">{formatLocalPrice(quote?.base_price || 0)}</span>
               </div>
               {quote?.urgency_fee > 0 && (
                 <div className="flex justify-between text-orange-600">
                   <span>{t.urgencyFee}</span>
-                  <span>${quote.urgency_fee.toFixed(2)}</span>
+                  <span>{formatLocalPrice(quote.urgency_fee)}</span>
                 </div>
               )}
               {quote?.certification_fee > 0 && (
                 <div className="flex justify-between text-purple-600">
                   <span>{t.certification}</span>
-                  <span>${quote.certification_fee.toFixed(2)}</span>
+                  <span>{formatLocalPrice(quote.certification_fee)}</span>
                 </div>
               )}
               {quote?.shipping_fee > 0 && (
                 <div className="flex justify-between text-blue-600">
                   <span>{t.uspsPriorityMail}</span>
-                  <span>${quote.shipping_fee.toFixed(2)}</span>
+                  <span>{formatLocalPrice(quote.shipping_fee)}</span>
                 </div>
               )}
               {quote?.discount > 0 && (
                 <div className="flex justify-between text-green-600">
                   <span>{t.discount}</span>
-                  <span>-${quote.discount.toFixed(2)}</span>
+                  <span>-{formatLocalPrice(quote.discount)}</span>
                 </div>
               )}
             </div>
@@ -2374,14 +2374,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
             <div className="border-t pt-3 mt-3">
               <div className="flex justify-between text-lg">
                 <span className="font-bold">{t.total}</span>
-                <div className="text-right">
-                  <span className="font-bold text-teal-600">${(quote?.total_price || 0).toFixed(2)}</span>
-                  {userCurrency.currency !== 'usd' && (
-                    <div className="text-sm text-gray-500">
-                      ≈ {formatLocalPrice(quote?.total_price || 0)}
-                    </div>
-                  )}
-                </div>
+                <span className="font-bold text-teal-600">{formatLocalPrice(quote?.total_price || 0)}</span>
               </div>
             </div>
 
@@ -2489,17 +2482,17 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between text-purple-700">
                   <span>Subtotal:</span>
-                  <span>${(quote?.total_price || 0).toFixed(2)}</span>
+                  <span>{formatLocalPrice(quote?.total_price || 0)}</span>
                 </div>
                 {zelleDiscount && (
                   <div className="flex justify-between text-green-600">
-                    <span>{t.discount} ({zelleDiscount.type === 'percentage' ? `${zelleDiscount.value}%` : `$${zelleDiscount.value}`}):</span>
-                    <span>-${(quote?.total_price - getZelleTotal()).toFixed(2)}</span>
+                    <span>{t.discount} ({zelleDiscount.type === 'percentage' ? `${zelleDiscount.value}%` : formatLocalPrice(zelleDiscount.value)}):</span>
+                    <span>-{formatLocalPrice(quote?.total_price - getZelleTotal())}</span>
                   </div>
                 )}
                 <div className="flex justify-between font-bold text-purple-800 text-base border-t border-purple-200 pt-2">
                   <span>{t.zelleAmountToPay}:</span>
-                  <span>${getZelleTotal().toFixed(2)}</span>
+                  <span>{formatLocalPrice(getZelleTotal())}</span>
                 </div>
               </div>
             </div>
@@ -2668,7 +2661,7 @@ const CustomerOrdersPage = ({ token, t }) => {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-xl font-bold text-gray-800">${order.total_price?.toFixed(2)}</div>
+                    <div className="text-xl font-bold text-gray-800">{formatLocalPrice(order.total_price || 0)}</div>
                     <div className="text-sm text-gray-500">
                       {new Date(order.created_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
                     </div>
@@ -2689,11 +2682,11 @@ const CustomerOrdersPage = ({ token, t }) => {
                     </div>
                     <div>
                       <div className="text-sm text-gray-500">{t.basePrice}</div>
-                      <div className="font-medium">${order.base_price?.toFixed(2)}</div>
+                      <div className="font-medium">{formatLocalPrice(order.base_price || 0)}</div>
                     </div>
                     <div>
                       <div className="text-sm text-gray-500">{t.urgencyFee}</div>
-                      <div className="font-medium">${order.urgency_fee?.toFixed(2)}</div>
+                      <div className="font-medium">{formatLocalPrice(order.urgency_fee || 0)}</div>
                     </div>
                   </div>
                   {order.reference && (
