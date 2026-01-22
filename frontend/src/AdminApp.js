@@ -27595,7 +27595,8 @@ const SalesControlPage = ({ adminKey }) => {
     salesperson_id: '', month: new Date().toISOString().slice(0, 7), target_partners: 10, target_revenue: 5000
   });
 
-  const API_URL = process.env.REACT_APP_API_URL || '';
+  // Strip trailing /api if present to avoid double /api in endpoint paths
+  const API_URL = (process.env.REACT_APP_API_URL || '').replace(/\/api\/?$/, '');
 
   useEffect(() => {
     fetchAllData();
