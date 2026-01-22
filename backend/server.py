@@ -2570,8 +2570,126 @@ def calculate_price(word_count: int, service_type: str, urgency: str) -> tuple[f
         urgency_fee = base_price * 1.00  # 100% of base price
     
     total_price = base_price + urgency_fee
-    
+
     return base_price, urgency_fee, total_price
+
+
+# ==================== PARTNER TIER SYSTEM ====================
+# Tier thresholds (pages per month) and discounts
+PARTNER_TIERS = {
+    "platinum": {"min_pages": 100, "discount": 0.35, "price_per_page": 16.24},
+    "gold": {"min_pages": 60, "discount": 0.25, "price_per_page": 18.74},
+    "silver": {"min_pages": 30, "discount": 0.15, "price_per_page": 21.24},
+    "bronze": {"min_pages": 10, "discount": 0.10, "price_per_page": 22.49},
+    "standard": {"min_pages": 0, "discount": 0.0, "price_per_page": 24.99}
+}
+
+
+async def get_partner_30day_volume(partner_id: str) -> dict:
+    """Calculate partner's total pages in the last 30 days"""
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+
+    # Aggregate pages from paid orders in the last 30 days
+    pipeline = [
+        {
+            "$match": {
+                "partner_id": partner_id,
+                "created_at": {"$gte": thirty_days_ago},
+                "payment_status": {"$in": ["paid", "pending", "pending_zelle"]}  # Include pending orders too
+            }
+        },
+        {
+            "$group": {
+                "_id": None,
+                "total_pages": {"$sum": {"$ifNull": ["$page_count", 1]}},
+                "total_orders": {"$sum": 1},
+                "paid_pages": {
+                    "$sum": {
+                        "$cond": [
+                            {"$eq": ["$payment_status", "paid"]},
+                            {"$ifNull": ["$page_count", 1]},
+                            0
+                        ]
+                    }
+                }
+            }
+        }
+    ]
+
+    result = await db.translation_orders.aggregate(pipeline).to_list(1)
+
+    if result:
+        return {
+            "total_pages": result[0].get("total_pages", 0),
+            "paid_pages": result[0].get("paid_pages", 0),
+            "total_orders": result[0].get("total_orders", 0),
+            "period_start": thirty_days_ago.isoformat(),
+            "period_end": datetime.utcnow().isoformat()
+        }
+
+    return {
+        "total_pages": 0,
+        "paid_pages": 0,
+        "total_orders": 0,
+        "period_start": thirty_days_ago.isoformat(),
+        "period_end": datetime.utcnow().isoformat()
+    }
+
+
+def get_tier_from_volume(pages: int) -> str:
+    """Determine partner tier based on monthly page volume"""
+    if pages >= PARTNER_TIERS["platinum"]["min_pages"]:
+        return "platinum"
+    elif pages >= PARTNER_TIERS["gold"]["min_pages"]:
+        return "gold"
+    elif pages >= PARTNER_TIERS["silver"]["min_pages"]:
+        return "silver"
+    elif pages >= PARTNER_TIERS["bronze"]["min_pages"]:
+        return "bronze"
+    return "standard"
+
+
+def get_tier_discount(tier: str) -> float:
+    """Get discount percentage for a tier (0.0 to 0.35)"""
+    return PARTNER_TIERS.get(tier, PARTNER_TIERS["standard"])["discount"]
+
+
+def get_tier_price_per_page(tier: str) -> float:
+    """Get price per page for a tier"""
+    return PARTNER_TIERS.get(tier, PARTNER_TIERS["standard"])["price_per_page"]
+
+
+def calculate_price_with_tier(word_count: int, service_type: str, urgency: str, tier: str = "standard") -> tuple[float, float, float, float]:
+    """Calculate pricing with tier discount applied"""
+
+    # Convert words to pages (250 words = 1 page) - round up to next page
+    pages = max(1, math.ceil(word_count / 250))
+
+    # Get tier-specific price per page for certified translations
+    if service_type == "standard":
+        price_per_page = get_tier_price_per_page(tier)
+        base_price = pages * price_per_page
+        discount_amount = pages * (24.99 - price_per_page)  # Savings from standard price
+    elif service_type == "professional":
+        # Professional translation doesn't have tier discounts
+        base_price = word_count * 0.075
+        discount_amount = 0
+    else:
+        price_per_page = get_tier_price_per_page(tier)
+        base_price = pages * price_per_page
+        discount_amount = pages * (24.99 - price_per_page)
+
+    # Urgency fees based on percentage of base price
+    urgency_fee = 0
+    if urgency == "priority":
+        urgency_fee = base_price * 0.25
+    elif urgency == "urgent":
+        urgency_fee = base_price * 1.00
+
+    total_price = base_price + urgency_fee
+
+    return base_price, urgency_fee, total_price, discount_amount
+
 
 def get_estimated_delivery(urgency: str) -> str:
     """Calculate estimated delivery date"""
@@ -5322,6 +5440,77 @@ async def get_partner_credit_qualification(token: str):
         "requested_plan": requested_plan
     }
 
+
+@api_router.get("/partner/tier-info")
+async def get_partner_tier_info(token: str):
+    """Get partner's current tier based on 30-day page volume"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    # Get 30-day volume statistics
+    volume_stats = await get_partner_30day_volume(partner["id"])
+    total_pages = volume_stats["total_pages"]
+
+    # Determine current tier
+    current_tier = get_tier_from_volume(total_pages)
+    tier_info = PARTNER_TIERS[current_tier]
+
+    # Calculate progress to next tier
+    next_tier = None
+    pages_to_next_tier = 0
+    if current_tier == "standard":
+        next_tier = "bronze"
+        pages_to_next_tier = PARTNER_TIERS["bronze"]["min_pages"] - total_pages
+    elif current_tier == "bronze":
+        next_tier = "silver"
+        pages_to_next_tier = PARTNER_TIERS["silver"]["min_pages"] - total_pages
+    elif current_tier == "silver":
+        next_tier = "gold"
+        pages_to_next_tier = PARTNER_TIERS["gold"]["min_pages"] - total_pages
+    elif current_tier == "gold":
+        next_tier = "platinum"
+        pages_to_next_tier = PARTNER_TIERS["platinum"]["min_pages"] - total_pages
+
+    # Get all tiers info for display
+    tiers_info = []
+    for tier_name, tier_data in [("bronze", PARTNER_TIERS["bronze"]),
+                                  ("silver", PARTNER_TIERS["silver"]),
+                                  ("gold", PARTNER_TIERS["gold"]),
+                                  ("platinum", PARTNER_TIERS["platinum"])]:
+        tiers_info.append({
+            "name": tier_name,
+            "min_pages": tier_data["min_pages"],
+            "max_pages": PARTNER_TIERS.get({
+                "bronze": "silver",
+                "silver": "gold",
+                "gold": "platinum"
+            }.get(tier_name, "platinum"), {}).get("min_pages", None),
+            "discount_percent": int(tier_data["discount"] * 100),
+            "price_per_page": tier_data["price_per_page"],
+            "is_current": tier_name == current_tier
+        })
+
+    # Calculate monthly savings at current tier
+    standard_price = 24.99
+    current_price = tier_info["price_per_page"]
+    savings_per_page = standard_price - current_price
+    monthly_savings = savings_per_page * total_pages
+
+    return {
+        "current_tier": current_tier,
+        "discount_percent": int(tier_info["discount"] * 100),
+        "price_per_page": tier_info["price_per_page"],
+        "standard_price": 24.99,
+        "volume_stats": volume_stats,
+        "next_tier": next_tier,
+        "pages_to_next_tier": max(0, pages_to_next_tier),
+        "next_tier_discount": int(PARTNER_TIERS.get(next_tier, {}).get("discount", 0) * 100) if next_tier else None,
+        "monthly_savings": round(monthly_savings, 2),
+        "tiers": tiers_info
+    }
+
+
 @api_router.post("/partner/request-payment-upgrade")
 async def request_payment_plan_upgrade(token: str, plan: str):
     """Request upgrade to invoice payment plan (biweekly or monthly)"""
@@ -7126,11 +7315,17 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
         if not partner:
             raise HTTPException(status_code=401, detail="Invalid or expired token")
 
-        # Calculate pricing
-        base_price, urgency_fee, total_price = calculate_price(
+        # Get partner's 30-day volume and determine tier
+        volume_stats = await get_partner_30day_volume(partner["id"])
+        current_tier = get_tier_from_volume(volume_stats["total_pages"])
+        tier_discount = get_tier_discount(current_tier)
+
+        # Calculate pricing with tier discount
+        base_price, urgency_fee, total_price, discount_amount = calculate_price_with_tier(
             order_data.word_count,
             order_data.service_type,
-            order_data.urgency
+            order_data.urgency,
+            current_tier
         )
 
         # Calculate page count
@@ -7183,7 +7378,14 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
             shipping_address=order_data.shipping_address
         )
 
-        await db.translation_orders.insert_one(order.dict())
+        # Add tier info to order dict before inserting
+        order_dict = order.dict()
+        order_dict["partner_tier"] = current_tier
+        order_dict["tier_discount_percent"] = int(tier_discount * 100)
+        order_dict["discount_amount"] = round(discount_amount, 2)
+        order_dict["original_price"] = round(page_count * 24.99 + urgency_fee, 2)  # Price without discount
+
+        await db.translation_orders.insert_one(order_dict)
 
         # Associate uploaded documents with this order
         if order_data.document_ids:

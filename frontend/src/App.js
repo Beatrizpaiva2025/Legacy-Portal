@@ -199,7 +199,13 @@ const TRANSLATIONS = {
     pages: 'pages',
     page: 'page',
     upTo: 'up to',
-    marginNote: 'Partner margin calculated based on resale at $30/page (common market rate)'
+    marginNote: 'Partner margin calculated based on resale at $30/page (common market rate)',
+    yourCurrentTier: 'Your Current Tier',
+    pagesLast30Days: 'pages in last 30 days',
+    pagesToNextTier: 'pages to',
+    youSaved: 'You saved',
+    thisMonth: 'this month',
+    current: 'Current'
   },
   es: {
     // Login
@@ -372,7 +378,13 @@ const TRANSLATIONS = {
     pages: 'páginas',
     page: 'página',
     upTo: 'hasta',
-    marginNote: 'Margen del partner calculado en base a reventa a $30/página (precio común de mercado)'
+    marginNote: 'Margen del partner calculado en base a reventa a $30/página (precio común de mercado)',
+    yourCurrentTier: 'Tu Nivel Actual',
+    pagesLast30Days: 'páginas en los últimos 30 días',
+    pagesToNextTier: 'páginas para',
+    youSaved: 'Ahorraste',
+    thisMonth: 'este mes',
+    current: 'Actual'
   },
   pt: {
     // Login
@@ -545,7 +557,13 @@ const TRANSLATIONS = {
     pages: 'páginas',
     page: 'página',
     upTo: 'até',
-    marginNote: 'Margem do parceiro calculada com base na revenda a $30/página (preço comum de mercado)'
+    marginNote: 'Margem do parceiro calculada com base na revenda a $30/página (preço comum de mercado)',
+    yourCurrentTier: 'Seu Nível Atual',
+    pagesLast30Days: 'páginas nos últimos 30 dias',
+    pagesToNextTier: 'páginas para',
+    youSaved: 'Você economizou',
+    thisMonth: 'este mês',
+    current: 'Atual'
   }
 };
 
@@ -3468,14 +3486,39 @@ const InvoicesPage = ({ token, t }) => {
 // ==================== PAYMENT PLAN PAGE ====================
 const PaymentPlanPage = ({ token, t }) => {
   const [qualification, setQualification] = useState(null);
+  const [tierInfo, setTierInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedPlan, setSelectedPlan] = useState('biweekly');
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    fetchQualification();
+    fetchData();
   }, [token]);
+
+  const fetchData = async () => {
+    try {
+      // Fetch both qualification and tier info in parallel
+      const [qualRes, tierRes] = await Promise.all([
+        fetch(`${API_BASE}/partner/credit-qualification?token=${token}`),
+        fetch(`${API_BASE}/partner/tier-info?token=${token}`)
+      ]);
+
+      if (qualRes.ok) {
+        const qualData = await qualRes.json();
+        setQualification(qualData);
+      }
+
+      if (tierRes.ok) {
+        const tierData = await tierRes.json();
+        setTierInfo(tierData);
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchQualification = async () => {
     try {
@@ -3488,6 +3531,26 @@ const PaymentPlanPage = ({ token, t }) => {
       console.error('Error fetching qualification:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const getTierIcon = (tier) => {
+    switch (tier) {
+      case 'platinum': return '💎';
+      case 'gold': return '🥇';
+      case 'silver': return '🥈';
+      case 'bronze': return '🥉';
+      default: return '📊';
+    }
+  };
+
+  const getTierColor = (tier) => {
+    switch (tier) {
+      case 'platinum': return 'text-purple-700 bg-purple-100';
+      case 'gold': return 'text-yellow-700 bg-yellow-100';
+      case 'silver': return 'text-slate-600 bg-slate-200';
+      case 'bronze': return 'text-amber-700 bg-amber-100';
+      default: return 'text-gray-600 bg-gray-100';
     }
   };
 
@@ -3640,6 +3703,52 @@ const PaymentPlanPage = ({ token, t }) => {
         </div>
       )}
 
+      {/* Current Tier Status */}
+      {tierInfo && (
+        <div className="bg-gradient-to-br from-blue-50 to-slate-100 rounded-lg shadow-sm border border-blue-200 p-6 mt-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <span className="text-3xl">{getTierIcon(tierInfo.current_tier)}</span>
+              <div>
+                <h2 className="text-lg font-bold text-slate-800">{t?.yourCurrentTier || 'Your Current Tier'}</h2>
+                <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold capitalize ${getTierColor(tierInfo.current_tier)}`}>
+                  {tierInfo.current_tier}
+                </span>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-2xl font-bold text-green-600">{tierInfo.discount_percent}% OFF</div>
+              <div className="text-sm text-slate-600">${tierInfo.price_per_page}/{t?.page || 'page'}</div>
+            </div>
+          </div>
+
+          {/* Volume Progress */}
+          <div className="bg-white rounded-lg p-4 mb-4">
+            <div className="flex justify-between text-sm mb-2">
+              <span className="text-slate-600">{tierInfo.volume_stats?.total_pages || 0} {t?.pagesLast30Days || 'pages in last 30 days'}</span>
+              {tierInfo.next_tier && (
+                <span className="text-slate-500">{tierInfo.pages_to_next_tier} {t?.pagesToNextTier || 'pages to'} {tierInfo.next_tier}</span>
+              )}
+            </div>
+            <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-blue-500 to-teal-500 transition-all duration-500"
+                style={{
+                  width: tierInfo.next_tier
+                    ? `${Math.min(100, ((tierInfo.volume_stats?.total_pages || 0) / (tierInfo.volume_stats?.total_pages + tierInfo.pages_to_next_tier)) * 100)}%`
+                    : '100%'
+                }}
+              />
+            </div>
+            {tierInfo.monthly_savings > 0 && (
+              <p className="text-sm text-green-600 mt-2">
+                {t?.youSaved || 'You saved'} <span className="font-semibold">${tierInfo.monthly_savings.toFixed(2)}</span> {t?.thisMonth || 'this month'}!
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Partner Discount Tiers */}
       <div className="bg-gradient-to-br from-blue-50 to-slate-100 rounded-lg shadow-sm border border-blue-200 p-6 mt-6">
         <div className="flex items-center gap-2 mb-4">
@@ -3661,11 +3770,12 @@ const PaymentPlanPage = ({ token, t }) => {
               </tr>
             </thead>
             <tbody>
-              <tr className="bg-amber-50 border-b border-amber-100">
+              <tr className={`border-b border-amber-100 ${tierInfo?.current_tier === 'bronze' ? 'bg-amber-100 ring-2 ring-amber-400 ring-inset' : 'bg-amber-50'}`}>
                 <td className="px-3 py-3">
                   <div className="flex items-center gap-2">
                     <span className="text-lg">🥉</span>
                     <span className="font-semibold text-amber-700">Bronze</span>
+                    {tierInfo?.current_tier === 'bronze' && <span className="text-xs bg-amber-500 text-white px-2 py-0.5 rounded-full">{t?.current || 'Current'}</span>}
                   </div>
                 </td>
                 <td className="px-3 py-3 text-center text-slate-700">10-29 {t?.pages || 'pages'}</td>
@@ -3676,11 +3786,12 @@ const PaymentPlanPage = ({ token, t }) => {
                 <td className="px-3 py-3 text-center text-green-600">{t?.upTo || 'up to'} $72</td>
                 <td className="px-3 py-3 text-center font-semibold text-blue-600">$7.50/{t?.page || 'page'}</td>
               </tr>
-              <tr className="bg-slate-50 border-b border-slate-100">
+              <tr className={`border-b border-slate-100 ${tierInfo?.current_tier === 'silver' ? 'bg-slate-200 ring-2 ring-slate-400 ring-inset' : 'bg-slate-50'}`}>
                 <td className="px-3 py-3">
                   <div className="flex items-center gap-2">
                     <span className="text-lg">🥈</span>
                     <span className="font-semibold text-slate-600">Silver</span>
+                    {tierInfo?.current_tier === 'silver' && <span className="text-xs bg-slate-500 text-white px-2 py-0.5 rounded-full">{t?.current || 'Current'}</span>}
                   </div>
                 </td>
                 <td className="px-3 py-3 text-center text-slate-700">30-59 {t?.pages || 'pages'}</td>
@@ -3691,11 +3802,12 @@ const PaymentPlanPage = ({ token, t }) => {
                 <td className="px-3 py-3 text-center text-green-600">{t?.upTo || 'up to'} $225</td>
                 <td className="px-3 py-3 text-center font-semibold text-blue-600">$8.75/{t?.page || 'page'}</td>
               </tr>
-              <tr className="bg-yellow-50 border-b border-yellow-100">
+              <tr className={`border-b border-yellow-100 ${tierInfo?.current_tier === 'gold' ? 'bg-yellow-100 ring-2 ring-yellow-400 ring-inset' : 'bg-yellow-50'}`}>
                 <td className="px-3 py-3">
                   <div className="flex items-center gap-2">
                     <span className="text-lg">🥇</span>
                     <span className="font-semibold text-yellow-700">Gold</span>
+                    {tierInfo?.current_tier === 'gold' && <span className="text-xs bg-yellow-500 text-white px-2 py-0.5 rounded-full">{t?.current || 'Current'}</span>}
                   </div>
                 </td>
                 <td className="px-3 py-3 text-center text-slate-700">60-99 {t?.pages || 'pages'}</td>
@@ -3706,11 +3818,12 @@ const PaymentPlanPage = ({ token, t }) => {
                 <td className="px-3 py-3 text-center text-green-600">{t?.upTo || 'up to'} $618</td>
                 <td className="px-3 py-3 text-center font-semibold text-blue-600">$11.25/{t?.page || 'page'}</td>
               </tr>
-              <tr className="bg-purple-50">
+              <tr className={`${tierInfo?.current_tier === 'platinum' ? 'bg-purple-100 ring-2 ring-purple-400 ring-inset' : 'bg-purple-50'}`}>
                 <td className="px-3 py-3 rounded-bl-lg">
                   <div className="flex items-center gap-2">
                     <span className="text-lg">💎</span>
                     <span className="font-semibold text-purple-700">Platinum</span>
+                    {tierInfo?.current_tier === 'platinum' && <span className="text-xs bg-purple-500 text-white px-2 py-0.5 rounded-full">{t?.current || 'Current'}</span>}
                   </div>
                 </td>
                 <td className="px-3 py-3 text-center text-slate-700">100+ {t?.pages || 'pages'}</td>
