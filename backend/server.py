@@ -10267,6 +10267,163 @@ async def admin_upload_translation(order_id: str, admin_key: str, file: UploadFi
         "filename": file.filename
     }
 
+
+@api_router.post("/admin/orders/{order_id}/upload-cover-page")
+async def admin_upload_cover_page(order_id: str, admin_key: str, file: UploadFile = File(...)):
+    """
+    Upload a separate cover page for an order.
+    The cover page is stored independently and will be used as-is (no processing)
+    to avoid formatting issues.
+    """
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Find the order
+    order = await db.translation_orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Read and encode file
+    file_content = await file.read()
+    file_base64 = base64.b64encode(file_content).decode('utf-8')
+
+    # Determine file type
+    file_extension = file.filename.split('.')[-1].lower() if '.' in file.filename else 'pdf'
+    file_types = {
+        'pdf': 'application/pdf',
+        'png': 'image/png',
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg'
+    }
+    file_type = file_types.get(file_extension, 'application/pdf')
+
+    # Update order with separate cover page
+    await db.translation_orders.update_one(
+        {"id": order_id},
+        {"$set": {
+            "cover_page_file": file_base64,
+            "cover_page_filename": file.filename,
+            "cover_page_type": file_type,
+            "use_separate_cover": True
+        }}
+    )
+
+    logger.info(f"Cover page uploaded for order {order.get('order_number')}: {file.filename}")
+    return {
+        "status": "success",
+        "message": f"Cover page '{file.filename}' uploaded successfully. It will be used as-is without modification."
+    }
+
+
+@api_router.post("/admin/orders/{order_id}/replace-translation-pages")
+async def admin_replace_translation_pages(
+    order_id: str,
+    admin_key: str,
+    file: UploadFile = File(...),
+    keep_cover_pages: int = 1
+):
+    """
+    Replace only the translation content pages while keeping the cover page(s) intact.
+
+    Parameters:
+    - keep_cover_pages: Number of pages to keep from the beginning (default: 1 = first page is cover)
+
+    This is useful when translation pages have formatting issues but the cover is fine.
+    """
+    import fitz  # PyMuPDF
+
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Find the order
+    order = await db.translation_orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Get existing translated file
+    existing_file = order.get("translated_file")
+    if not existing_file:
+        raise HTTPException(status_code=400, detail="No existing translation file to replace pages in")
+
+    try:
+        # Read the new translation pages
+        new_content = await file.read()
+        new_doc = fitz.open(stream=new_content, filetype="pdf")
+
+        # Open existing document
+        existing_bytes = base64.b64decode(existing_file)
+        existing_doc = fitz.open(stream=existing_bytes, filetype="pdf")
+
+        # Create combined document
+        combined_doc = fitz.open()
+
+        # Keep cover pages from existing document
+        pages_to_keep = min(keep_cover_pages, len(existing_doc))
+        if pages_to_keep > 0:
+            combined_doc.insert_pdf(existing_doc, from_page=0, to_page=pages_to_keep - 1)
+            logger.info(f"Kept {pages_to_keep} cover page(s) from existing document")
+
+        # Add all pages from new document (replacement translation pages)
+        combined_doc.insert_pdf(new_doc, from_page=0, to_page=len(new_doc) - 1)
+        logger.info(f"Added {len(new_doc)} new translation page(s)")
+
+        # Convert to base64
+        combined_bytes = combined_doc.tobytes()
+        combined_base64 = base64.b64encode(combined_bytes).decode('utf-8')
+
+        # Clean up
+        new_doc.close()
+        existing_doc.close()
+        combined_doc.close()
+
+        # Update order with combined file
+        await db.translation_orders.update_one(
+            {"id": order_id},
+            {"$set": {
+                "translated_file": combined_base64,
+                "translated_filename": order.get("translated_filename", "translation.pdf"),
+                "pages_replaced_at": datetime.utcnow().isoformat()
+            }}
+        )
+
+        return {
+            "status": "success",
+            "message": f"Translation pages replaced successfully. Kept {pages_to_keep} cover page(s), added {len(new_doc)} new page(s).",
+            "cover_pages_kept": pages_to_keep,
+            "new_pages_added": len(new_doc)
+        }
+
+    except Exception as e:
+        logger.error(f"Error replacing translation pages: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to replace pages: {str(e)}")
+
+
+@api_router.delete("/admin/orders/{order_id}/cover-page")
+async def admin_delete_cover_page(order_id: str, admin_key: str):
+    """Remove the separate cover page from an order"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    order = await db.translation_orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    await db.translation_orders.update_one(
+        {"id": order_id},
+        {"$unset": {
+            "cover_page_file": "",
+            "cover_page_filename": "",
+            "cover_page_type": "",
+            "use_separate_cover": ""
+        }}
+    )
+
+    return {"status": "success", "message": "Cover page removed"}
+
+
 # ==================== PAYMENT PROOF ENDPOINTS ====================
 @api_router.post("/payment-proofs/upload")
 async def upload_payment_proof(
@@ -10874,62 +11031,112 @@ async def generate_combined_delivery_pdf(
     client_name = order.get("client_name", "")
     translation_date = datetime.utcnow().strftime("%B %d, %Y")
 
-    # ==================== PAGE 1: CERTIFICATE OF ACCURACY ====================
+    # ==================== PAGE 1: COVER PAGE / CERTIFICATE ====================
     if include_certificate:
-        page = doc.new_page(width=page_width, height=page_height)
+        # Check if there's a separate cover page uploaded (use it as-is to preserve formatting)
+        use_separate_cover = order.get("use_separate_cover", False)
+        cover_page_file = order.get("cover_page_file")
 
-        # Header line
-        page.draw_rect(fitz.Rect(50, 80, page_width - 50, 83), color=blue_color, fill=blue_color)
+        if use_separate_cover and cover_page_file:
+            # Use the uploaded cover page exactly as-is (no modifications)
+            try:
+                cover_bytes = base64.b64decode(cover_page_file)
+                cover_type = order.get("cover_page_type", "application/pdf")
 
-        # Company name
-        page.insert_text((page_width/2 - 100, 60), "Legacy Translations", fontsize=18, fontname="helv", color=blue_color)
+                if cover_type == "application/pdf":
+                    # Insert PDF cover page(s) directly
+                    cover_doc = fitz.open(stream=cover_bytes, filetype="pdf")
+                    for page_num in range(len(cover_doc)):
+                        doc.insert_pdf(cover_doc, from_page=page_num, to_page=page_num)
+                    cover_doc.close()
+                    logger.info(f"Inserted {len(cover_doc)} page(s) from separate cover PDF")
+                else:
+                    # Insert image cover page
+                    from PIL import Image
+                    from io import BytesIO as PILBytesIO
+                    img = Image.open(PILBytesIO(cover_bytes))
+                    page = doc.new_page(width=page_width, height=page_height)
 
-        # Contact info
-        page.insert_text((page_width/2 - 140, 100), "867 Boylston Street · 5th Floor · #2073 · Boston, MA 02116", fontsize=8, fontname="helv", color=gray_color)
-        page.insert_text((page_width/2 - 95, 112), "(857) 316-7770 · contact@legacytranslations.com", fontsize=8, fontname="helv", color=gray_color)
+                    # Calculate scaling to fit page while maintaining aspect ratio
+                    img_width, img_height = img.size
+                    scale = min((page_width - 40) / img_width, (page_height - 40) / img_height)
+                    new_width = img_width * scale
+                    new_height = img_height * scale
+                    x_offset = (page_width - new_width) / 2
+                    y_offset = (page_height - new_height) / 2
 
-        # Order number
-        page.insert_text((page_width/2 - 40, 150), f"Order # {order_number}", fontsize=11, fontname="helv", color=gray_color)
+                    # Convert to PNG bytes for insertion
+                    img_buffer = PILBytesIO()
+                    img.save(img_buffer, format='PNG')
+                    img_buffer.seek(0)
 
-        # Main title
-        page.insert_text((page_width/2 - 130, 200), "CERTIFICATION OF TRANSLATION ACCURACY", fontsize=14, fontname="helvB", color=blue_color)
+                    page.insert_image(
+                        fitz.Rect(x_offset, y_offset, x_offset + new_width, y_offset + new_height),
+                        stream=img_buffer.getvalue()
+                    )
+                    logger.info("Inserted separate cover image")
 
-        # Subtitle
-        subtitle = f"Translation of a {document_type} from {source_lang} to {target_lang}"
-        page.insert_text((page_width/2 - len(subtitle)*2.5, 240), subtitle, fontsize=10, fontname="helv", color=gray_color)
+            except Exception as e:
+                logger.error(f"Error inserting separate cover page: {str(e)}, falling back to generated certificate")
+                # Fall back to generated certificate
+                use_separate_cover = False
 
-        # Body text
-        body_y = 300
-        body_texts = [
-            f"I, {translator_name}, hereby certify that the attached translation from {source_lang}",
-            f"to {target_lang} is a true and accurate translation of the original document.",
-            "",
-            "I further certify that I am competent to translate from the source language to the target",
-            "language, and that the translation is complete and accurate to the best of my knowledge",
-            "and ability.",
-            "",
-            "This certification is made under penalty of perjury under the laws of the United States",
-            "of America and the Commonwealth of Massachusetts."
-        ]
+        if not use_separate_cover or not cover_page_file:
+            # Generate standard Certificate of Accuracy
+            page = doc.new_page(width=page_width, height=page_height)
 
-        for text in body_texts:
-            if text:
-                page.insert_text((80, body_y), text, fontsize=10, fontname="helv", color=(0.2, 0.2, 0.2))
-            body_y += 18
+            # Header line
+            page.draw_rect(fitz.Rect(50, 80, page_width - 50, 83), color=blue_color, fill=blue_color)
 
-        # Signature section
-        sig_y = 550
-        page.insert_text((80, sig_y), "___________________________________", fontsize=10, fontname="helv", color=gray_color)
-        page.insert_text((80, sig_y + 20), translator_name, fontsize=11, fontname="helvB", color=blue_color)
-        page.insert_text((80, sig_y + 35), "Authorized Representative", fontsize=9, fontname="helv", color=gray_color)
-        page.insert_text((80, sig_y + 50), "Legacy Translations Inc.", fontsize=9, fontname="helv", color=gray_color)
-        page.insert_text((80, sig_y + 65), f"Dated: {translation_date}", fontsize=9, fontname="helv", color=gray_color)
+            # Company name
+            page.insert_text((page_width/2 - 100, 60), "Legacy Translations", fontsize=18, fontname="helv", color=blue_color)
 
-        # ATA info
-        page.insert_text((400, sig_y + 35), "ATA Member #275993", fontsize=9, fontname="helv", color=gray_color)
+            # Contact info
+            page.insert_text((page_width/2 - 140, 100), "867 Boylston Street · 5th Floor · #2073 · Boston, MA 02116", fontsize=8, fontname="helv", color=gray_color)
+            page.insert_text((page_width/2 - 95, 112), "(857) 316-7770 · contact@legacytranslations.com", fontsize=8, fontname="helv", color=gray_color)
 
-        # Footer line
-        page.draw_rect(fitz.Rect(50, page_height - 60, page_width - 50, page_height - 57), color=blue_color, fill=blue_color)
+            # Order number
+            page.insert_text((page_width/2 - 40, 150), f"Order # {order_number}", fontsize=11, fontname="helv", color=gray_color)
+
+            # Main title
+            page.insert_text((page_width/2 - 130, 200), "CERTIFICATION OF TRANSLATION ACCURACY", fontsize=14, fontname="helvB", color=blue_color)
+
+            # Subtitle
+            subtitle = f"Translation of a {document_type} from {source_lang} to {target_lang}"
+            page.insert_text((page_width/2 - len(subtitle)*2.5, 240), subtitle, fontsize=10, fontname="helv", color=gray_color)
+
+            # Body text
+            body_y = 300
+            body_texts = [
+                f"I, {translator_name}, hereby certify that the attached translation from {source_lang}",
+                f"to {target_lang} is a true and accurate translation of the original document.",
+                "",
+                "I further certify that I am competent to translate from the source language to the target",
+                "language, and that the translation is complete and accurate to the best of my knowledge",
+                "and ability.",
+                "",
+                "This certification is made under penalty of perjury under the laws of the United States",
+                "of America and the Commonwealth of Massachusetts."
+            ]
+
+            for text in body_texts:
+                if text:
+                    page.insert_text((80, body_y), text, fontsize=10, fontname="helv", color=(0.2, 0.2, 0.2))
+                body_y += 18
+
+            # Signature section
+            sig_y = 550
+            page.insert_text((80, sig_y), "___________________________________", fontsize=10, fontname="helv", color=gray_color)
+            page.insert_text((80, sig_y + 20), translator_name, fontsize=11, fontname="helvB", color=blue_color)
+            page.insert_text((80, sig_y + 35), "Authorized Representative", fontsize=9, fontname="helv", color=gray_color)
+            page.insert_text((80, sig_y + 50), "Legacy Translations Inc.", fontsize=9, fontname="helv", color=gray_color)
+            page.insert_text((80, sig_y + 65), f"Dated: {translation_date}", fontsize=9, fontname="helv", color=gray_color)
+
+            # ATA info
+            page.insert_text((400, sig_y + 35), "ATA Member #275993", fontsize=9, fontname="helv", color=gray_color)
+
+            # Footer line
+            page.draw_rect(fitz.Rect(50, page_height - 60, page_width - 50, page_height - 57), color=blue_color, fill=blue_color)
 
     # ==================== TRANSLATION PAGES ====================
     if include_translation:
@@ -15019,6 +15226,49 @@ Retorne o JSON com a análise completa."""
                 clean_result = clean_result.strip()
 
                 parsed_result = json.loads(clean_result)
+
+                # Filter out errors where original equals sugestao (no actual change)
+                # This fixes a bug where AI flags items as errors when before/after are identical
+                if parsed_result.get("erros"):
+                    original_count = len(parsed_result["erros"])
+                    filtered_errors = []
+                    for erro in parsed_result["erros"]:
+                        original_text = (erro.get("original") or "").strip()
+                        sugestao = (erro.get("sugestao") or "").strip()
+                        # Only keep errors where there's an actual difference
+                        if original_text != sugestao:
+                            filtered_errors.append(erro)
+                        else:
+                            logger.info(f"Filtered out duplicate simple proofread error: '{original_text}' == '{sugestao}'")
+
+                    parsed_result["erros"] = filtered_errors
+                    filtered_count = original_count - len(filtered_errors)
+
+                    # Recalculate counts after filtering
+                    if filtered_count > 0:
+                        parsed_result["total_erros"] = len(filtered_errors)
+                        parsed_result["criticos"] = sum(1 for e in filtered_errors if e.get("gravidade") == "CRÍTICO")
+                        parsed_result["altos"] = sum(1 for e in filtered_errors if e.get("gravidade") == "ALTO")
+                        parsed_result["medios"] = sum(1 for e in filtered_errors if e.get("gravidade") == "MÉDIO")
+                        parsed_result["baixos"] = sum(1 for e in filtered_errors if e.get("gravidade") == "BAIXO")
+
+                        # Recalculate score and classification
+                        total = len(filtered_errors)
+                        criticos = parsed_result["criticos"]
+                        altos = parsed_result["altos"]
+
+                        if criticos > 0 or altos > 2:
+                            parsed_result["classificacao"] = "REPROVADO"
+                            parsed_result["pontuacao_final"] = max(0, 70 - (criticos * 15) - (altos * 5))
+                        elif altos > 0 or total > 3:
+                            parsed_result["classificacao"] = "APROVADO_COM_OBSERVACOES"
+                            parsed_result["pontuacao_final"] = max(70, 85 - (altos * 5) - (total * 2))
+                        else:
+                            parsed_result["classificacao"] = "APROVADO"
+                            parsed_result["pontuacao_final"] = max(85, 100 - (total * 3))
+
+                        logger.info(f"Simple proofread: Filtered {filtered_count} duplicate errors, {len(filtered_errors)} remaining")
+
                 return parsed_result
 
             except json.JSONDecodeError:
@@ -15255,6 +15505,43 @@ Analise minuciosamente e retorne o JSON com todos os erros encontrados."""
                 clean_result = clean_result.strip()
 
                 parsed_result = json.loads(clean_result)
+
+                # Filter out errors where traducao_errada equals correcao (no actual change)
+                # This fixes a bug where AI flags items as errors when before/after are identical
+                if parsed_result.get("erros"):
+                    original_count = len(parsed_result["erros"])
+                    filtered_errors = []
+                    for erro in parsed_result["erros"]:
+                        traducao_errada = (erro.get("traducao_errada") or "").strip()
+                        correcao = (erro.get("correcao") or "").strip()
+                        # Only keep errors where there's an actual difference
+                        if traducao_errada != correcao:
+                            filtered_errors.append(erro)
+                        else:
+                            logger.info(f"Filtered out duplicate proofreading error: '{traducao_errada}' == '{correcao}'")
+
+                    parsed_result["erros"] = filtered_errors
+                    filtered_count = original_count - len(filtered_errors)
+
+                    # Recalculate summary counts after filtering
+                    if filtered_count > 0 and parsed_result.get("resumo"):
+                        resumo = parsed_result["resumo"]
+                        resumo["total_erros"] = len(filtered_errors)
+                        # Recalculate severity counts from filtered errors
+                        resumo["criticos"] = sum(1 for e in filtered_errors if e.get("gravidade") == "CRÍTICO")
+                        resumo["altos"] = sum(1 for e in filtered_errors if e.get("gravidade") == "ALTO")
+                        resumo["medios"] = sum(1 for e in filtered_errors if e.get("gravidade") == "MÉDIO")
+                        resumo["baixos"] = sum(1 for e in filtered_errors if e.get("gravidade") == "BAIXO")
+
+                        # Update quality classification based on new counts
+                        if resumo["criticos"] > 0 or resumo["altos"] > 2:
+                            resumo["qualidade"] = "REPROVADO"
+                        elif resumo["altos"] > 0 or resumo["medios"] > 3:
+                            resumo["qualidade"] = "APROVADO_COM_OBSERVACOES"
+                        else:
+                            resumo["qualidade"] = "APROVADO"
+
+                        logger.info(f"Proofreading: Filtered {filtered_count} duplicate errors, {len(filtered_errors)} remaining")
 
                 return {
                     "status": "success",
