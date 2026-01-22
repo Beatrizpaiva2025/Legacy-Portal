@@ -6173,7 +6173,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           { id: 'translate', label: 'TRANSLATION', icon: '📄', roles: ['admin', 'pm', 'translator'] },
           { id: 'review', label: 'REVIEW', icon: '📋', roles: ['admin', 'pm', 'translator_contractor'] }, // Hidden for in-house - merged into TRANSLATION
           { id: 'proofreading', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm', 'translator_inhouse'] },
-          { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'pm', 'translator'] },
+          { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin'] }, // Only admin can deliver to client
           { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin', 'pm', 'translator_inhouse'] },
           { id: 'tm', label: 'TM', icon: '🧠', roles: ['admin', 'pm', 'translator_inhouse'] },
           { id: 'instructions', label: 'INSTRUCTIONS', icon: '📋', roles: ['admin', 'pm', 'translator_inhouse'] }
@@ -6625,8 +6625,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 assignedOrders.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {assignedOrders.map(order => {
-                      // Check if contractor needs to accept this assignment first
-                      const isPendingAcceptance = isContractor && order.translator_assignment_status === 'pending';
+                      // Check if translator (in-house or contractor) needs to accept this assignment first
+                      const isPendingAcceptance = isTranslator && order.translator_assignment_status === 'pending';
 
                       return (
                         <div

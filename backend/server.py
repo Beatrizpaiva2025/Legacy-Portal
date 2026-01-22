@@ -7644,26 +7644,11 @@ async def get_my_projects(token: str, admin_key: str):
         # Translator sees projects assigned to them
         orders = await db.translation_orders.find({"assigned_translator_id": user_id}).sort("created_at", -1).to_list(500)
 
-        # Get translator type to determine auto-accept behavior
-        translator_user = await db.admin_users.find_one({"id": user_id})
-        translator_type = translator_user.get("translator_type", "contractor") if translator_user else "contractor"
-
-        # Auto-accept: ONLY for in-house translators
-        # Contractors must explicitly accept via email link
-        if translator_type == "in_house":
-            for order in orders:
-                if order.get("translator_assignment_status") == "pending":
-                    await db.translation_orders.update_one(
-                        {"id": order["id"]},
-                        {"$set": {"translator_assignment_status": "accepted", "translator_accepted_at": datetime.utcnow().isoformat()}}
-                    )
-                    order["translator_assignment_status"] = "accepted"
-                    logger.info(f"Auto-accepted assignment for in-house translator {user_id} on order {order.get('order_number', order['id'])}")
-        else:
-            # Contractor: Log that they accessed but keep pending status until explicit accept
-            for order in orders:
-                if order.get("translator_assignment_status") == "pending":
-                    logger.info(f"Contractor {user_id} accessed portal but assignment {order.get('order_number', order['id'])} requires explicit acceptance via email")
+        # NO auto-accept: ALL translators (in-house and contractors) must explicitly accept via email link
+        # This ensures proper tracking of assignment acceptance
+        for order in orders:
+            if order.get("translator_assignment_status") == "pending":
+                logger.info(f"Translator {user_id} accessed portal but assignment {order.get('order_number', order['id'])} requires explicit acceptance via email")
     else:
         orders = []
 
