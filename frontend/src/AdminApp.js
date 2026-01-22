@@ -1861,6 +1861,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [termSearchQuery, setTermSearchQuery] = useState(''); // Search filter for glossary terms
   const [resourcesFilter, setResourcesFilter] = useState({ language: 'All Languages', field: 'All Fields' });
 
+  // Glossary Upload Modal state
+  const [showGlossaryUploadModal, setShowGlossaryUploadModal] = useState(false);
+  const [glossaryUploadFile, setGlossaryUploadFile] = useState(null);
+  const [glossaryUploadConfig, setGlossaryUploadConfig] = useState({
+    name: '',
+    sourceLang: 'Portuguese (Brazil)',
+    targetLang: 'English',
+    field: 'All Fields',
+    bidirectional: true
+  });
+
   // Translation Memory state
   const [translationMemories, setTranslationMemories] = useState([]);
   const [tmFilter, setTmFilter] = useState({ sourceLang: '', targetLang: '' });
@@ -11054,39 +11065,19 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   type="file"
                   accept=".csv,.tmx,.xml,.xlsx,.xls,.sdltm"
                   className="hidden"
-                  onChange={async (e) => {
+                  onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
-
-                    const glossaryName = prompt('Enter a name for this glossary:', file.name.replace(/\.(csv|tmx|xml)$/i, ''));
-                    if (!glossaryName) {
-                      e.target.value = '';
-                      return;
-                    }
-
-                    const formData = new FormData();
-                    formData.append('file', file);
-                    formData.append('name', glossaryName);
-                    formData.append('sourceLang', resourcesFilter.language !== 'All Languages' ? resourcesFilter.language : 'Portuguese (Brazil)');
-                    formData.append('targetLang', 'English');
-                    formData.append('field', resourcesFilter.field !== 'All Fields' ? resourcesFilter.field : 'All Fields');
-                    formData.append('bidirectional', 'true');
-
-                    try {
-                      setProcessingStatus('Uploading glossary...');
-                      const response = await axios.post(
-                        `${API}/admin/glossaries/upload?admin_key=${adminKey}`,
-                        formData,
-                        { headers: { 'Content-Type': 'multipart/form-data' } }
-                      );
-                      setProcessingStatus(`✅ ${response.data.message}`);
-                      // Refresh glossaries list
-                      const res = await axios.get(`${API}/admin/glossaries?admin_key=${adminKey}`);
-                      setGlossaries(res.data.glossaries || []);
-                    } catch (err) {
-                      alert('Upload failed: ' + (err.response?.data?.detail || err.message));
-                      setProcessingStatus('');
-                    }
+                    // Store file and show upload config modal
+                    setGlossaryUploadFile(file);
+                    setGlossaryUploadConfig({
+                      name: file.name.replace(/\.(csv|tmx|xml|xlsx|xls|sdltm)$/i, ''),
+                      sourceLang: resourcesFilter.language !== 'All Languages' ? resourcesFilter.language : 'Portuguese (Brazil)',
+                      targetLang: 'English',
+                      field: resourcesFilter.field !== 'All Fields' ? resourcesFilter.field : 'All Fields',
+                      bidirectional: true
+                    });
+                    setShowGlossaryUploadModal(true);
                     e.target.value = ''; // Reset file input
                   }}
                 />
@@ -12022,6 +12013,147 @@ translation juramentada | certified translation`}
             <div className="p-4 border-t flex justify-end space-x-2">
               <button onClick={() => setShowGlossaryModal(false)} className="px-4 py-2 text-xs border rounded hover:bg-gray-50">Cancel</button>
               <button onClick={handleSaveGlossary} className="px-4 py-2 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">Save</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Glossary Upload Configuration Modal */}
+      {showGlossaryUploadModal && glossaryUploadFile && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="p-4 border-b bg-purple-50">
+              <h3 className="font-bold text-purple-700">Upload Glossary</h3>
+              <p className="text-xs text-purple-600 mt-1">Configure language pair for your glossary file</p>
+            </div>
+            <div className="p-4 space-y-4">
+              {/* File Info */}
+              <div className="flex items-center gap-2 p-2 bg-gray-50 rounded border">
+                <span className="text-lg">📄</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-gray-700 truncate">{glossaryUploadFile.name}</p>
+                  <p className="text-[10px] text-gray-500">{(glossaryUploadFile.size / 1024).toFixed(1)} KB</p>
+                </div>
+              </div>
+
+              {/* Glossary Name */}
+              <div>
+                <label className="block text-xs font-medium mb-1">Glossary Name</label>
+                <input
+                  type="text"
+                  value={glossaryUploadConfig.name}
+                  onChange={(e) => setGlossaryUploadConfig({ ...glossaryUploadConfig, name: e.target.value })}
+                  className="w-full px-3 py-2 text-xs border rounded focus:ring-2 focus:ring-purple-400 focus:border-purple-400"
+                  placeholder="e.g., Legal Terms ES-EN"
+                />
+              </div>
+
+              {/* Language Pair */}
+              <div className="bg-blue-50 border border-blue-200 rounded p-3">
+                <label className="block text-xs font-bold mb-2">Language Pair</label>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <label className="block text-[10px] text-gray-500 mb-1">Source Language</label>
+                    <select
+                      value={glossaryUploadConfig.sourceLang}
+                      onChange={(e) => setGlossaryUploadConfig({ ...glossaryUploadConfig, sourceLang: e.target.value })}
+                      className="w-full px-2 py-1.5 text-xs border rounded"
+                    >
+                      {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                    </select>
+                  </div>
+                  <span className="text-lg font-bold text-blue-600 mt-4">
+                    {glossaryUploadConfig.bidirectional ? '↔' : '→'}
+                  </span>
+                  <div className="flex-1">
+                    <label className="block text-[10px] text-gray-500 mb-1">Target Language</label>
+                    <select
+                      value={glossaryUploadConfig.targetLang}
+                      onChange={(e) => setGlossaryUploadConfig({ ...glossaryUploadConfig, targetLang: e.target.value })}
+                      className="w-full px-2 py-1.5 text-xs border rounded"
+                    >
+                      {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={glossaryUploadConfig.bidirectional}
+                    onChange={(e) => setGlossaryUploadConfig({ ...glossaryUploadConfig, bidirectional: e.target.checked })}
+                    className="rounded text-blue-600"
+                  />
+                  <span className="text-xs text-blue-700">
+                    <strong>Bidirectional:</strong> Terms work both ways
+                  </span>
+                </label>
+              </div>
+
+              {/* Field */}
+              <div>
+                <label className="block text-xs font-medium mb-1">Field</label>
+                <select
+                  value={glossaryUploadConfig.field}
+                  onChange={(e) => setGlossaryUploadConfig({ ...glossaryUploadConfig, field: e.target.value })}
+                  className="w-full px-3 py-2 text-xs border rounded"
+                >
+                  <option>All Fields</option>
+                  <option>Financial</option>
+                  <option>Education</option>
+                  <option>General</option>
+                  <option>Personal Documents</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="p-4 border-t flex justify-end space-x-2">
+              <button
+                onClick={() => {
+                  setShowGlossaryUploadModal(false);
+                  setGlossaryUploadFile(null);
+                }}
+                className="px-4 py-2 text-xs border rounded hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (!glossaryUploadConfig.name.trim()) {
+                    alert('Please enter a name for the glossary');
+                    return;
+                  }
+
+                  const formData = new FormData();
+                  formData.append('file', glossaryUploadFile);
+                  formData.append('name', glossaryUploadConfig.name);
+                  formData.append('sourceLang', glossaryUploadConfig.sourceLang);
+                  formData.append('targetLang', glossaryUploadConfig.targetLang);
+                  formData.append('field', glossaryUploadConfig.field);
+                  formData.append('bidirectional', glossaryUploadConfig.bidirectional.toString());
+
+                  try {
+                    setShowGlossaryUploadModal(false);
+                    setProcessingStatus('Uploading glossary...');
+                    const response = await axios.post(
+                      `${API}/admin/glossaries/upload?admin_key=${adminKey}`,
+                      formData,
+                      { headers: { 'Content-Type': 'multipart/form-data' } }
+                    );
+                    setProcessingStatus(`${response.data.message}`);
+                    // Refresh glossaries list
+                    const res = await axios.get(`${API}/admin/glossaries?admin_key=${adminKey}`);
+                    setGlossaries(res.data.glossaries || []);
+                  } catch (err) {
+                    alert('Upload failed: ' + (err.response?.data?.detail || err.message));
+                    setProcessingStatus('');
+                  }
+                  setGlossaryUploadFile(null);
+                }}
+                className="px-4 py-2 text-xs bg-purple-600 text-white rounded hover:bg-purple-700"
+              >
+                Upload
+              </button>
             </div>
           </div>
         </div>
