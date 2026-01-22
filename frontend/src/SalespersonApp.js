@@ -539,7 +539,29 @@ const SetPasswordPage = ({ inviteToken, onSuccess, lang, setLang }) => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [verifying, setVerifying] = useState(true);
   const [error, setError] = useState('');
+  const [salespersonInfo, setSalespersonInfo] = useState(null);
+
+  // Verify token on mount
+  useEffect(() => {
+    const verifyToken = async () => {
+      try {
+        const res = await fetch(`${API_URL}/salesperson/verify-invite?token=${inviteToken}`);
+        const data = await res.json();
+        if (res.ok && data.valid) {
+          setSalespersonInfo(data);
+          setError('');
+        } else {
+          setError(data.detail || 'Invalid or expired invite link');
+        }
+      } catch (err) {
+        setError('Unable to verify invite. Please check your connection and try again.');
+      }
+      setVerifying(false);
+    };
+    verifyToken();
+  }, [inviteToken]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -580,6 +602,34 @@ const SetPasswordPage = ({ inviteToken, onSuccess, lang, setLang }) => {
     setLoading(false);
   };
 
+  // Show loading while verifying
+  if (verifying) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+        <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8 text-center">
+          <div className="animate-spin w-12 h-12 border-4 border-teal-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-slate-600">Verifying invite...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error if token is invalid
+  if (error && !salespersonInfo) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+        <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8 text-center">
+          <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-red-500 text-3xl">!</span>
+          </div>
+          <h1 className="text-2xl font-bold text-slate-800 mb-2">Invalid Invite</h1>
+          <p className="text-red-600 mb-4">{error}</p>
+          <p className="text-slate-500 text-sm">Please contact your administrator to request a new invite link.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8">
@@ -593,6 +643,9 @@ const SetPasswordPage = ({ inviteToken, onSuccess, lang, setLang }) => {
           </div>
           <h1 className="text-2xl font-bold text-slate-800">{t.welcomeTeam}</h1>
           <p className="text-slate-500 mt-2">{t.setUpPassword}</p>
+          {salespersonInfo && (
+            <p className="text-teal-600 font-medium mt-1">{salespersonInfo.name}</p>
+          )}
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">

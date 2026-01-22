@@ -23121,6 +23121,30 @@ async def invite_salesperson(salesperson_id: str, admin_key: str = Header(None))
 
     return {"success": True, "message": "Invitation sent", "invite_link": invite_link}
 
+# Verify salesperson invite token (before showing set-password form)
+@app.get("/salesperson/verify-invite")
+async def verify_salesperson_invite(token: str):
+    """Verify if invite token is valid before showing the password form"""
+    salesperson = await db.salespeople.find_one({"invite_token": token})
+    if not salesperson:
+        raise HTTPException(status_code=404, detail="Invalid or expired invite token")
+
+    # Check if invite is expired (7 days)
+    if salesperson.get("invite_sent_at"):
+        try:
+            invite_date = datetime.fromisoformat(salesperson["invite_sent_at"])
+            if datetime.now() - invite_date > timedelta(days=7):
+                raise HTTPException(status_code=400, detail="Invite token has expired. Please request a new invitation.")
+        except:
+            pass  # If date parsing fails, continue
+
+    return {
+        "valid": True,
+        "name": salesperson.get("name"),
+        "email": salesperson.get("email"),
+        "referral_code": salesperson.get("referral_code")
+    }
+
 # Salesperson set password (from invite)
 @app.post("/salesperson/set-password")
 async def salesperson_set_password(invite_token: str = Form(...), password: str = Form(...)):
