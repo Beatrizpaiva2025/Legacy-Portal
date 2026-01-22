@@ -27585,7 +27585,7 @@ const SalesControlPage = ({ adminKey }) => {
 
   // Form states
   const [newSalesperson, setNewSalesperson] = useState({
-    name: '', email: '', phone: '', country_code: '+1', commission_type: 'tier', commission_rate: 0, base_salary: 0, monthly_target: 10, referral_bonus: 0
+    name: '', email: '', phone: '', country_code: '+1', commission_type: 'tier', commission_rate: 0, base_salary: 0, monthly_target: 10, referral_bonus: 0, preferred_language: 'en'
   });
   const [createdSalesperson, setCreatedSalesperson] = useState(null); // For success modal with referral link
   const [newAcquisition, setNewAcquisition] = useState({
@@ -27595,7 +27595,8 @@ const SalesControlPage = ({ adminKey }) => {
     salesperson_id: '', month: new Date().toISOString().slice(0, 7), target_partners: 10, target_revenue: 5000
   });
 
-  const API_URL = process.env.REACT_APP_API_URL || '';
+  // Strip trailing /api if present to avoid double /api in endpoint paths
+  const API_URL = (process.env.REACT_APP_API_URL || '').replace(/\/api\/?$/, '');
 
   useEffect(() => {
     fetchAllData();
@@ -27605,13 +27606,13 @@ const SalesControlPage = ({ adminKey }) => {
     setLoading(true);
     try {
       const [spRes, acqRes, goalsRes, dashRes, rankRes, pendingRes, historyRes] = await Promise.all([
-        fetch(`${API_URL}/admin/salespeople`, { headers: { 'admin-key': adminKey } }),
-        fetch(`${API_URL}/admin/partner-acquisitions`, { headers: { 'admin-key': adminKey } }),
-        fetch(`${API_URL}/admin/sales-goals`, { headers: { 'admin-key': adminKey } }),
-        fetch(`${API_URL}/admin/sales-dashboard`, { headers: { 'admin-key': adminKey } }),
-        fetch(`${API_URL}/admin/salesperson-ranking`, { headers: { 'admin-key': adminKey } }),
-        fetch(`${API_URL}/admin/pending-commissions`, { headers: { 'admin-key': adminKey } }),
-        fetch(`${API_URL}/admin/payment-history`, { headers: { 'admin-key': adminKey } })
+        fetch(`${API_URL}/api/admin/salespeople`, { headers: { 'admin-key': adminKey } }),
+        fetch(`${API_URL}/api/admin/partner-acquisitions`, { headers: { 'admin-key': adminKey } }),
+        fetch(`${API_URL}/api/admin/sales-goals`, { headers: { 'admin-key': adminKey } }),
+        fetch(`${API_URL}/api/admin/sales-dashboard`, { headers: { 'admin-key': adminKey } }),
+        fetch(`${API_URL}/api/admin/salesperson-ranking`, { headers: { 'admin-key': adminKey } }),
+        fetch(`${API_URL}/api/admin/pending-commissions`, { headers: { 'admin-key': adminKey } }),
+        fetch(`${API_URL}/api/admin/payment-history`, { headers: { 'admin-key': adminKey } })
       ]);
 
       if (spRes.ok) setSalespeople(await spRes.json());
@@ -27643,7 +27644,7 @@ const SalesControlPage = ({ adminKey }) => {
       const salespersonData = { ...newSalesperson, phone: phoneWithCode };
       delete salespersonData.country_code; // Remove country_code field before sending
 
-      const res = await fetch(`${API_URL}/admin/salespeople`, {
+      const res = await fetch(`${API_URL}/api/admin/salespeople`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'admin-key': adminKey },
         body: JSON.stringify(salespersonData)
@@ -27652,7 +27653,7 @@ const SalesControlPage = ({ adminKey }) => {
       if (res.ok) {
         setShowAddSalesperson(false);
         setCreatedSalesperson(data.salesperson); // Show success modal with referral link
-        setNewSalesperson({ name: '', email: '', phone: '', country_code: '+1', commission_type: 'tier', commission_rate: 0, base_salary: 0, monthly_target: 10, referral_bonus: 0 });
+        setNewSalesperson({ name: '', email: '', phone: '', country_code: '+1', commission_type: 'tier', commission_rate: 0, base_salary: 0, monthly_target: 10, referral_bonus: 0, preferred_language: 'en' });
         fetchAllData();
       } else {
         alert(`Error: ${data.detail || 'Failed to add salesperson'}`);
@@ -27665,7 +27666,7 @@ const SalesControlPage = ({ adminKey }) => {
 
   const handleUpdateSalesperson = async () => {
     try {
-      const res = await fetch(`${API_URL}/admin/salespeople/${editingSalesperson.id}`, {
+      const res = await fetch(`${API_URL}/api/admin/salespeople/${editingSalesperson.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'admin-key': adminKey },
         body: JSON.stringify(editingSalesperson)
@@ -27687,7 +27688,7 @@ const SalesControlPage = ({ adminKey }) => {
   const handleDeleteSalesperson = async (id) => {
     if (!window.confirm('Are you sure you want to delete this salesperson?')) return;
     try {
-      const res = await fetch(`${API_URL}/admin/salespeople/${id}`, {
+      const res = await fetch(`${API_URL}/api/admin/salespeople/${id}`, {
         method: 'DELETE',
         headers: { 'admin-key': adminKey }
       });
@@ -27700,7 +27701,7 @@ const SalesControlPage = ({ adminKey }) => {
   const handleInviteSalesperson = async (id) => {
     if (!window.confirm('Enviar email de convite para este vendedor?')) return;
     try {
-      const res = await fetch(`${API_URL}/admin/salespeople/${id}/invite`, {
+      const res = await fetch(`${API_URL}/api/admin/salespeople/${id}/invite`, {
         method: 'POST',
         headers: { 'admin-key': adminKey }
       });
@@ -27719,7 +27720,7 @@ const SalesControlPage = ({ adminKey }) => {
 
   const handleApproveCommission = async (acquisitionId) => {
     try {
-      const res = await fetch(`${API_URL}/admin/acquisitions/${acquisitionId}/approve`, {
+      const res = await fetch(`${API_URL}/api/admin/acquisitions/${acquisitionId}/approve`, {
         method: 'PUT',
         headers: { 'admin-key': adminKey }
       });
@@ -27742,7 +27743,7 @@ const SalesControlPage = ({ adminKey }) => {
       formData.append('payment_reference', paymentForm.reference);
       formData.append('notes', paymentForm.notes);
 
-      const res = await fetch(`${API_URL}/admin/commission-payments`, {
+      const res = await fetch(`${API_URL}/api/admin/commission-payments`, {
         method: 'POST',
         headers: { 'admin-key': adminKey },
         body: formData
@@ -27762,7 +27763,7 @@ const SalesControlPage = ({ adminKey }) => {
 
   const handleAddAcquisition = async () => {
     try {
-      const res = await fetch(`${API_URL}/admin/partner-acquisitions`, {
+      const res = await fetch(`${API_URL}/api/admin/partner-acquisitions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'admin-key': adminKey },
         body: JSON.stringify(newAcquisition)
@@ -27779,7 +27780,7 @@ const SalesControlPage = ({ adminKey }) => {
 
   const handleSetGoal = async () => {
     try {
-      const res = await fetch(`${API_URL}/admin/sales-goals`, {
+      const res = await fetch(`${API_URL}/api/admin/sales-goals`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'admin-key': adminKey },
         body: JSON.stringify(newGoal)
@@ -27796,7 +27797,7 @@ const SalesControlPage = ({ adminKey }) => {
 
   const handleUpdateCommissionStatus = async (acquisitionId, status) => {
     try {
-      const res = await fetch(`${API_URL}/admin/partner-acquisitions/${acquisitionId}/status?status=${status}`, {
+      const res = await fetch(`${API_URL}/api/admin/partner-acquisitions/${acquisitionId}/status?status=${status}`, {
         method: 'PUT',
         headers: { 'admin-key': adminKey }
       });
@@ -28645,6 +28646,18 @@ const SalesControlPage = ({ adminKey }) => {
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                     placeholder="10"
                   />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Idioma do Email</label>
+                  <select
+                    value={newSalesperson.preferred_language}
+                    onChange={(e) => setNewSalesperson({...newSalesperson, preferred_language: e.target.value})}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                  >
+                    <option value="en">🇺🇸 English</option>
+                    <option value="pt">🇧🇷 Português</option>
+                    <option value="es">🇪🇸 Español</option>
+                  </select>
                 </div>
               </div>
             </div>
