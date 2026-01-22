@@ -2654,6 +2654,97 @@ def get_tier_discount(tier: str) -> float:
     return PARTNER_TIERS.get(tier, PARTNER_TIERS["standard"])["discount"]
 
 
+# Tier ranking for comparison (higher number = better tier)
+TIER_RANK = {"standard": 0, "bronze": 1, "silver": 2, "gold": 3, "platinum": 4}
+
+
+def compare_tiers(tier1: str, tier2: str) -> int:
+    """Compare two tiers. Returns: 1 if tier1 > tier2, -1 if tier1 < tier2, 0 if equal"""
+    rank1 = TIER_RANK.get(tier1, 0)
+    rank2 = TIER_RANK.get(tier2, 0)
+    if rank1 > rank2:
+        return 1
+    elif rank1 < rank2:
+        return -1
+    return 0
+
+
+def get_higher_tier(tier1: str, tier2: str) -> str:
+    """Return the higher of two tiers"""
+    if compare_tiers(tier1, tier2) >= 0:
+        return tier1
+    return tier2
+
+
+async def get_effective_tier_with_grace(partner: dict, volume_tier: str) -> dict:
+    """
+    Get the effective tier considering 1-month grace period.
+    If partner had a higher tier that's still within grace period, use that.
+    """
+    achieved_tier = partner.get("achieved_tier", "standard")
+    tier_valid_until = partner.get("tier_valid_until")
+
+    # Check if grace period is still active
+    grace_active = False
+    if tier_valid_until:
+        if isinstance(tier_valid_until, str):
+            tier_valid_until = datetime.fromisoformat(tier_valid_until.replace('Z', '+00:00'))
+        grace_active = datetime.utcnow() < tier_valid_until
+
+    # If grace period is active and achieved tier is higher, use it
+    if grace_active and compare_tiers(achieved_tier, volume_tier) > 0:
+        return {
+            "effective_tier": achieved_tier,
+            "volume_tier": volume_tier,
+            "grace_active": True,
+            "grace_until": tier_valid_until.isoformat() if tier_valid_until else None,
+            "reason": f"Grace period active until {tier_valid_until.strftime('%Y-%m-%d') if tier_valid_until else 'N/A'}"
+        }
+
+    # Otherwise use volume-based tier
+    return {
+        "effective_tier": volume_tier,
+        "volume_tier": volume_tier,
+        "grace_active": False,
+        "grace_until": None,
+        "reason": "Based on current 30-day volume"
+    }
+
+
+async def update_partner_achieved_tier(partner_id: str, new_tier: str):
+    """
+    Update partner's achieved tier if they reached a higher tier.
+    Sets grace period to 1 month from now.
+    """
+    partner = await db.partners.find_one({"id": partner_id})
+    if not partner:
+        return
+
+    current_achieved = partner.get("achieved_tier", "standard")
+
+    # Only update if new tier is higher than current achieved tier
+    if compare_tiers(new_tier, current_achieved) > 0:
+        grace_until = datetime.utcnow() + timedelta(days=30)
+        await db.partners.update_one(
+            {"id": partner_id},
+            {
+                "$set": {
+                    "achieved_tier": new_tier,
+                    "tier_achieved_at": datetime.utcnow(),
+                    "tier_valid_until": grace_until
+                }
+            }
+        )
+        logger.info(f"Partner {partner_id} upgraded to {new_tier} tier, valid until {grace_until}")
+    elif compare_tiers(new_tier, current_achieved) == 0:
+        # Same tier - extend grace period
+        grace_until = datetime.utcnow() + timedelta(days=30)
+        await db.partners.update_one(
+            {"id": partner_id},
+            {"$set": {"tier_valid_until": grace_until}}
+        )
+
+
 def get_tier_price_per_page(tier: str) -> float:
     """Get price per page for a tier"""
     return PARTNER_TIERS.get(tier, PARTNER_TIERS["standard"])["price_per_page"]
