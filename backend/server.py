@@ -22074,10 +22074,6 @@ async def delete_restore_point(restore_point_id: str, admin_key: str):
         logger.error(f"Error deleting restore point: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to delete restore point")
 
-
-# Include the router in the main app
-app.include_router(api_router)
-
 # Root endpoint
 @app.get("/")
 async def root():
@@ -23406,6 +23402,9 @@ async def get_admin_payment_history(admin_key: str = Header(None)):
         "payments": payments,
         "total_paid": total_paid
     }
+
+# Include the router in the main app - MUST be after all api_router routes are defined
+app.include_router(api_router)
 
 @app.on_event("startup")
 async def create_default_partner():
