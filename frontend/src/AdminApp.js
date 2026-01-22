@@ -12845,26 +12845,42 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     try {
       const response = await axios.get(`${API}/admin/orders/${order.id}/translated-document?admin_key=${adminKey}`);
       setTranslatedDocInfo(response.data);
+
+      // Load additional documents from the translated-document endpoint
+      const additionalDocsFromResponse = response.data.additional_documents || [];
+      let allAdditionalDocs = additionalDocsFromResponse.map(d => ({
+        id: d.id,
+        filename: d.filename,
+        isExisting: true
+      }));
+
       // Also load existing order documents as potential attachments
       const docsResponse = await axios.get(`${API}/admin/orders/${order.id}/documents?admin_key=${adminKey}`);
       if (docsResponse.data.documents) {
-        // Filter to show signed/translated documents
+        // Filter to show signed/translated documents (that are not already in allAdditionalDocs)
+        const existingIds = new Set(allAdditionalDocs.map(d => d.id));
         const existingDocs = docsResponse.data.documents.filter(d =>
-          d.filename?.toLowerCase().includes('signed') ||
-          d.filename?.toLowerCase().includes('translation') ||
-          d.document_type === 'translation'
+          !existingIds.has(d.id) && (
+            d.filename?.toLowerCase().includes('signed') ||
+            d.filename?.toLowerCase().includes('translation') ||
+            d.document_type === 'translation' ||
+            d.source === 'translated_document'
+          )
         );
-        if (existingDocs.length > 0) {
-          setAdditionalAttachments(existingDocs.map(d => ({
-            id: d.id,
-            filename: d.filename,
-            isExisting: true
-          })));
-          setSelectedAttachments(prev => ({
-            ...prev,
-            uploaded: existingDocs.map(d => d.id)
-          }));
-        }
+        allAdditionalDocs = [...allAdditionalDocs, ...existingDocs.map(d => ({
+          id: d.id,
+          filename: d.filename,
+          isExisting: true
+        }))];
+      }
+
+      // Set attachments and select them by default
+      if (allAdditionalDocs.length > 0) {
+        setAdditionalAttachments(allAdditionalDocs);
+        setSelectedAttachments(prev => ({
+          ...prev,
+          uploaded: allAdditionalDocs.map(d => d.id)
+        }));
       }
     } catch (err) {
       console.error('Failed to get translated document info:', err);

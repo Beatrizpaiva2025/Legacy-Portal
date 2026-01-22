@@ -10211,7 +10211,7 @@ async def admin_mark_order_paid(order_id: str, admin_key: str):
 
 @api_router.post("/admin/orders/{order_id}/upload-translation")
 async def admin_upload_translation(order_id: str, admin_key: str, file: UploadFile = File(...)):
-    """Upload translated file for an order (admin/PM only)"""
+    """Upload translated file for an order (admin/PM only) - supports multiple files"""
     user_info = await validate_admin_or_user_token(admin_key)
     if not user_info:
         raise HTTPException(status_code=401, detail="Invalid admin key or token")
@@ -10231,11 +10231,29 @@ async def admin_upload_translation(order_id: str, admin_key: str, file: UploadFi
         'pdf': 'application/pdf',
         'doc': 'application/msword',
         'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'txt': 'text/plain'
+        'txt': 'text/plain',
+        'html': 'text/html'
     }
     file_type = file_types.get(file_extension, 'application/octet-stream')
 
-    # Update order with translated file
+    # Generate unique document ID
+    document_id = str(uuid.uuid4())
+
+    # Save to order_documents collection for multiple file support
+    document_record = {
+        "id": document_id,
+        "order_id": order_id,
+        "filename": file.filename,
+        "file_data": file_base64,
+        "content_type": file_type,
+        "source": "translated_document",
+        "document_type": "translation",
+        "uploaded_at": datetime.utcnow(),
+        "uploaded_by": user_info.get("name", "Admin")
+    }
+    await db.order_documents.insert_one(document_record)
+
+    # Also update order with latest translated file (for backwards compatibility)
     await db.translation_orders.update_one(
         {"id": order_id},
         {"$set": {
@@ -10245,7 +10263,14 @@ async def admin_upload_translation(order_id: str, admin_key: str, file: UploadFi
         }}
     )
 
-    return {"status": "success", "message": f"Translation file '{file.filename}' uploaded successfully"}
+    logger.info(f"Translation file uploaded: {file.filename} (doc_id: {document_id}) for order {order_id}")
+
+    return {
+        "status": "success",
+        "message": f"Translation file '{file.filename}' uploaded successfully",
+        "document_id": document_id,
+        "filename": file.filename
+    }
 
 # ==================== PAYMENT PROOF ENDPOINTS ====================
 @api_router.post("/payment-proofs/upload")
@@ -11911,6 +11936,32 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
             except Exception as e:
                 logger.error(f"Failed to add external attachment: {str(e)}")
 
+        # Add additional documents from selection (multiple file support)
+        additional_docs_sent = 0
+        if attachments_selection and attachments_selection.additional_document_ids:
+            logger.info(f"Processing {len(attachments_selection.additional_document_ids)} additional document(s)")
+            for doc_id in attachments_selection.additional_document_ids:
+                try:
+                    # Find document in order_documents collection
+                    doc = await db.order_documents.find_one({"id": doc_id})
+                    if doc and doc.get("file_data"):
+                        all_attachments.append({
+                            "content": doc["file_data"],  # Already base64 encoded
+                            "filename": doc.get("filename", f"document_{doc_id}.pdf"),
+                            "content_type": doc.get("content_type", "application/pdf")
+                        })
+                        attachment_filenames.append(doc.get("filename", f"document_{doc_id}.pdf"))
+                        additional_docs_sent += 1
+                        has_attachments = True
+                        logger.info(f"Added additional document: {doc.get('filename')} (id: {doc_id})")
+                    else:
+                        logger.warning(f"Additional document not found or has no data: {doc_id}")
+                except Exception as e:
+                    logger.error(f"Failed to add additional document {doc_id}: {str(e)}")
+
+            if additional_docs_sent > 0:
+                logger.info(f"Successfully added {additional_docs_sent} additional document(s) to email")
+
         # Use professional email template
         email_html = get_delivery_email_template(order['client_name'])
 
@@ -12012,6 +12063,7 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
             "attachment_sent": has_attachments,
             "attachments_sent": len(all_attachments),
             "attachment_filenames": attachment_filenames,
+            "additional_docs_sent": additional_docs_sent,
             "combined_pdf": generate_combined_pdf,
             "pm_notified": pm_notified,
             "bcc_sent": bcc_sent,
@@ -12050,8 +12102,25 @@ async def get_translated_document(order_id: str, admin_key: str):
     has_file = bool(order.get("translated_file"))
     has_html = bool(order.get("translation_html"))
 
+    # Get additional translated documents from order_documents collection
+    additional_docs = await db.order_documents.find({
+        "order_id": order_id,
+        "source": "translated_document"
+    }).to_list(50)
+
+    # Format additional docs for frontend
+    additional_documents = []
+    for doc in additional_docs:
+        additional_documents.append({
+            "id": doc.get("id"),
+            "filename": doc.get("filename"),
+            "content_type": doc.get("content_type"),
+            "uploaded_at": doc.get("uploaded_at"),
+            "uploaded_by": doc.get("uploaded_by")
+        })
+
     response = {
-        "has_translated_document": has_file or has_html,
+        "has_translated_document": has_file or has_html or len(additional_documents) > 0,
         "translated_filename": order.get("translated_filename"),
         "translated_file_type": order.get("translated_file_type"),
         "translation_ready": order.get("translation_ready", False),
@@ -12061,7 +12130,8 @@ async def get_translated_document(order_id: str, admin_key: str):
         "translation_status": order.get("translation_status"),
         "client_name": order.get("client_name"),
         "client_email": order.get("client_email"),
-        "order_number": order.get("order_number")
+        "order_number": order.get("order_number"),
+        "additional_documents": additional_documents
     }
 
     # Include translation content for review
