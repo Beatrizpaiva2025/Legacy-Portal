@@ -2636,6 +2636,118 @@ async def get_partner_30day_volume(partner_id: str) -> dict:
     }
 
 
+async def get_partner_monthly_volumes(partner_id: str) -> dict:
+    """Calculate partner's pages for each of the last 3 months separately"""
+    now = datetime.utcnow()
+
+    # Define the 3 month periods
+    month1_end = now
+    month1_start = now - timedelta(days=30)
+    month2_end = month1_start
+    month2_start = month1_start - timedelta(days=30)
+    month3_end = month2_start
+    month3_start = month2_start - timedelta(days=30)
+
+    async def get_volume_for_period(start: datetime, end: datetime) -> int:
+        pipeline = [
+            {
+                "$match": {
+                    "partner_id": partner_id,
+                    "created_at": {"$gte": start, "$lt": end},
+                    "payment_status": {"$in": ["paid", "pending", "pending_zelle"]}
+                }
+            },
+            {
+                "$group": {
+                    "_id": None,
+                    "total_pages": {"$sum": {"$ifNull": ["$page_count", 1]}}
+                }
+            }
+        ]
+        result = await db.translation_orders.aggregate(pipeline).to_list(1)
+        return result[0].get("total_pages", 0) if result else 0
+
+    # Get volumes for each month
+    month1_pages = await get_volume_for_period(month1_start, month1_end)
+    month2_pages = await get_volume_for_period(month2_start, month2_end)
+    month3_pages = await get_volume_for_period(month3_start, month3_end)
+
+    return {
+        "month1": {"pages": month1_pages, "start": month1_start.isoformat(), "end": month1_end.isoformat()},
+        "month2": {"pages": month2_pages, "start": month2_start.isoformat(), "end": month2_end.isoformat()},
+        "month3": {"pages": month3_pages, "start": month3_start.isoformat(), "end": month3_end.isoformat()},
+        "best_month_pages": max(month1_pages, month2_pages, month3_pages),
+        "total_3_months": month1_pages + month2_pages + month3_pages
+    }
+
+
+async def get_effective_partner_tier(partner: dict) -> dict:
+    """
+    Get the effective tier for a partner using the combined strategy:
+    1. Best tier from the last 3 months
+    2. Loyalty Lock: Partners with 6+ months never lose their achieved tier
+    """
+    partner_id = partner.get("id")
+    created_at = partner.get("created_at")
+    achieved_tier = partner.get("achieved_tier", "standard")
+
+    # Calculate months as partner
+    months_as_partner = 0
+    if created_at:
+        if isinstance(created_at, str):
+            created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+        days_as_partner = (datetime.utcnow() - created_at.replace(tzinfo=None)).days
+        months_as_partner = days_as_partner / 30
+
+    # Check Loyalty Lock (6+ months)
+    loyalty_lock_active = months_as_partner >= 6
+
+    # Get volumes for last 3 months
+    monthly_volumes = await get_partner_monthly_volumes(partner_id)
+    best_month_pages = monthly_volumes["best_month_pages"]
+
+    # Determine tier from best month in last 3 months
+    best_3month_tier = get_tier_from_volume(best_month_pages)
+
+    # Current month volume for display
+    current_volume = await get_partner_30day_volume(partner_id)
+    current_tier = get_tier_from_volume(current_volume["total_pages"])
+
+    # Apply Loyalty Lock if active
+    if loyalty_lock_active:
+        # Partner never loses their achieved tier
+        effective_tier = get_higher_tier(achieved_tier, best_3month_tier)
+        reason = f"Loyalty Lock active ({int(months_as_partner)} months as partner) - tier protected"
+    else:
+        # Use best tier from last 3 months
+        effective_tier = best_3month_tier
+        reason = f"Best tier from last 3 months ({best_month_pages} pages)"
+
+    # Update achieved tier if current effective is higher
+    if compare_tiers(effective_tier, achieved_tier) > 0:
+        await db.partners.update_one(
+            {"id": partner_id},
+            {
+                "$set": {
+                    "achieved_tier": effective_tier,
+                    "tier_achieved_at": datetime.utcnow()
+                }
+            }
+        )
+
+    return {
+        "effective_tier": effective_tier,
+        "current_volume_tier": current_tier,
+        "best_3month_tier": best_3month_tier,
+        "achieved_tier": achieved_tier,
+        "loyalty_lock_active": loyalty_lock_active,
+        "months_as_partner": round(months_as_partner, 1),
+        "monthly_volumes": monthly_volumes,
+        "current_volume": current_volume,
+        "reason": reason
+    }
+
+
 def get_tier_from_volume(pages: int) -> str:
     """Determine partner tier based on monthly page volume"""
     if pages >= PARTNER_TIERS["platinum"]["min_pages"]:
@@ -5534,32 +5646,33 @@ async def get_partner_credit_qualification(token: str):
 
 @api_router.get("/partner/tier-info")
 async def get_partner_tier_info(token: str):
-    """Get partner's current tier based on 30-day page volume"""
+    """Get partner's effective tier using best of last 3 months + Loyalty Lock"""
     partner = await get_current_partner(token)
     if not partner:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
-    # Get 30-day volume statistics
-    volume_stats = await get_partner_30day_volume(partner["id"])
-    total_pages = volume_stats["total_pages"]
+    # Get effective tier using new strategy
+    tier_result = await get_effective_partner_tier(partner)
+    effective_tier = tier_result["effective_tier"]
+    tier_info = PARTNER_TIERS[effective_tier]
 
-    # Determine current tier
-    current_tier = get_tier_from_volume(total_pages)
-    tier_info = PARTNER_TIERS[current_tier]
+    # Current 30-day volume for display
+    current_volume = tier_result["current_volume"]
+    total_pages = current_volume["total_pages"]
 
     # Calculate progress to next tier
     next_tier = None
     pages_to_next_tier = 0
-    if current_tier == "standard":
+    if effective_tier == "standard":
         next_tier = "bronze"
         pages_to_next_tier = PARTNER_TIERS["bronze"]["min_pages"] - total_pages
-    elif current_tier == "bronze":
+    elif effective_tier == "bronze":
         next_tier = "silver"
         pages_to_next_tier = PARTNER_TIERS["silver"]["min_pages"] - total_pages
-    elif current_tier == "silver":
+    elif effective_tier == "silver":
         next_tier = "gold"
         pages_to_next_tier = PARTNER_TIERS["gold"]["min_pages"] - total_pages
-    elif current_tier == "gold":
+    elif effective_tier == "gold":
         next_tier = "platinum"
         pages_to_next_tier = PARTNER_TIERS["platinum"]["min_pages"] - total_pages
 
@@ -5579,7 +5692,7 @@ async def get_partner_tier_info(token: str):
             }.get(tier_name, "platinum"), {}).get("min_pages", None),
             "discount_percent": int(tier_data["discount"] * 100),
             "price_per_page": tier_data["price_per_page"],
-            "is_current": tier_name == current_tier
+            "is_current": tier_name == effective_tier
         })
 
     # Calculate monthly savings at current tier
@@ -5589,16 +5702,26 @@ async def get_partner_tier_info(token: str):
     monthly_savings = savings_per_page * total_pages
 
     return {
-        "current_tier": current_tier,
+        "current_tier": effective_tier,
         "discount_percent": int(tier_info["discount"] * 100),
         "price_per_page": tier_info["price_per_page"],
         "standard_price": 24.99,
-        "volume_stats": volume_stats,
+        "volume_stats": current_volume,
         "next_tier": next_tier,
         "pages_to_next_tier": max(0, pages_to_next_tier),
         "next_tier_discount": int(PARTNER_TIERS.get(next_tier, {}).get("discount", 0) * 100) if next_tier else None,
         "monthly_savings": round(monthly_savings, 2),
-        "tiers": tiers_info
+        "tiers": tiers_info,
+        # New fields for transparency
+        "tier_strategy": {
+            "current_volume_tier": tier_result["current_volume_tier"],
+            "best_3month_tier": tier_result["best_3month_tier"],
+            "achieved_tier": tier_result["achieved_tier"],
+            "loyalty_lock_active": tier_result["loyalty_lock_active"],
+            "months_as_partner": tier_result["months_as_partner"],
+            "reason": tier_result["reason"]
+        },
+        "monthly_volumes": tier_result["monthly_volumes"]
     }
 
 
@@ -7406,17 +7529,18 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
         if not partner:
             raise HTTPException(status_code=401, detail="Invalid or expired token")
 
-        # Get partner's 30-day volume and determine tier
-        volume_stats = await get_partner_30day_volume(partner["id"])
-        current_tier = get_tier_from_volume(volume_stats["total_pages"])
-        tier_discount = get_tier_discount(current_tier)
+        # Get effective tier using best of last 3 months + Loyalty Lock
+        tier_result = await get_effective_partner_tier(partner)
+        effective_tier = tier_result["effective_tier"]
+        tier_discount = get_tier_discount(effective_tier)
+        volume_stats = tier_result["current_volume"]
 
         # Calculate pricing with tier discount
         base_price, urgency_fee, total_price, discount_amount = calculate_price_with_tier(
             order_data.word_count,
             order_data.service_type,
             order_data.urgency,
-            current_tier
+            effective_tier
         )
 
         # Calculate page count
@@ -7471,10 +7595,11 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
 
         # Add tier info to order dict before inserting
         order_dict = order.dict()
-        order_dict["partner_tier"] = current_tier
+        order_dict["partner_tier"] = effective_tier
         order_dict["tier_discount_percent"] = int(tier_discount * 100)
         order_dict["discount_amount"] = round(discount_amount, 2)
         order_dict["original_price"] = round(page_count * 24.99 + urgency_fee, 2)  # Price without discount
+        order_dict["loyalty_lock_active"] = tier_result.get("loyalty_lock_active", False)
 
         await db.translation_orders.insert_one(order_dict)
 
