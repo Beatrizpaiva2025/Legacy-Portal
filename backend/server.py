@@ -7644,16 +7644,11 @@ async def get_my_projects(token: str, admin_key: str):
         # Translator sees projects assigned to them
         orders = await db.translation_orders.find({"assigned_translator_id": user_id}).sort("created_at", -1).to_list(500)
 
-        # Auto-accept: When translator accesses their projects, auto-accept any pending assignments
-        # This fixes the issue where translator can work but status is stuck on "pending"
+        # NO auto-accept: ALL translators (in-house and contractors) must explicitly accept via email link
+        # This ensures proper tracking of assignment acceptance
         for order in orders:
             if order.get("translator_assignment_status") == "pending":
-                await db.translation_orders.update_one(
-                    {"id": order["id"]},
-                    {"$set": {"translator_assignment_status": "accepted", "translator_accepted_at": datetime.utcnow().isoformat()}}
-                )
-                order["translator_assignment_status"] = "accepted"
-                logger.info(f"Auto-accepted assignment for translator {user_id} on order {order.get('order_number', order['id'])}")
+                logger.info(f"Translator {user_id} accessed portal but assignment {order.get('order_number', order['id'])} requires explicit acceptance via email")
     else:
         orders = []
 
@@ -11915,7 +11910,34 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                     }]
                     attachment_filenames = [order["translated_filename"]]
 
+        # FINAL FALLBACK: If still no attachments, try to get any translated documents from order_documents
+        if len(all_attachments) == 0:
+            logger.warning(f"No attachments generated, trying to fetch from order_documents collection")
+            try:
+                translated_docs = await db.order_documents.find({
+                    "order_id": order_id,
+                    "source": "translated_document"
+                }).to_list(50)
+
+                if translated_docs:
+                    for doc in translated_docs:
+                        doc_data = doc.get("file_data") or doc.get("data")
+                        if doc_data:
+                            all_attachments.append({
+                                "content": doc_data,
+                                "filename": doc.get("filename", "translation.pdf"),
+                                "content_type": doc.get("content_type", "application/pdf")
+                            })
+                            attachment_filenames.append(doc.get("filename", "translation.pdf"))
+                            logger.info(f"Added fallback document from order_documents: {doc.get('filename')}")
+
+                if len(all_attachments) == 0:
+                    logger.error(f"NO ATTACHMENTS FOUND for order {order_id}! Order data: translated_file={bool(order.get('translated_file'))}, translation_html={bool(order.get('translation_html'))}")
+            except Exception as final_err:
+                logger.error(f"Final fallback failed: {str(final_err)}")
+
         has_attachments = len(all_attachments) > 0
+        logger.info(f"Final attachment count for order {order.get('order_number')}: {len(all_attachments)}, has_attachments={has_attachments}")
 
         # Add external attachment if provided (for resend)
         external_attachment_sent = False

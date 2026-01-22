@@ -6173,7 +6173,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           { id: 'translate', label: 'TRANSLATION', icon: '📄', roles: ['admin', 'pm', 'translator'] },
           { id: 'review', label: 'REVIEW', icon: '📋', roles: ['admin', 'pm', 'translator_contractor'] }, // Hidden for in-house - merged into TRANSLATION
           { id: 'proofreading', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm', 'translator_inhouse'] },
-          { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'pm', 'translator'] },
+          { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin'] }, // Only admin can deliver to client
           { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin', 'pm', 'translator_inhouse'] },
           { id: 'tm', label: 'TM', icon: '🧠', roles: ['admin', 'pm', 'translator_inhouse'] },
           { id: 'instructions', label: 'INSTRUCTIONS', icon: '📋', roles: ['admin', 'pm', 'translator_inhouse'] }
@@ -6624,48 +6624,69 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 /* PROJECTS VIEW - Original behavior */
                 assignedOrders.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {assignedOrders.map(order => (
-                      <div
-                        key={order.id}
-                        onClick={() => selectProject(order)}
-                        className={`p-3 rounded-lg cursor-pointer transition-all border ${
-                          selectedOrderId === order.id
-                            ? 'bg-blue-100 border-blue-500 shadow-md'
-                            : 'bg-white border-gray-200 hover:border-blue-400 hover:shadow'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-bold text-blue-700 text-sm">{order.order_number}</span>
-                          <span className={`text-[10px] px-2 py-0.5 rounded ${
-                            order.translation_status === 'received' ? 'bg-yellow-100 text-yellow-700' :
-                            order.translation_status === 'in_translation' ? 'bg-blue-100 text-blue-700' :
-                            order.translation_status === 'review' ? 'bg-blue-100 text-blue-700' :
-                            'bg-gray-100 text-gray-700'
-                          }`}>
-                            {order.translation_status}
-                          </span>
-                        </div>
-                        <div className="text-xs text-gray-600 mb-1">
-                          {order.translate_from} → {order.translate_to}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {order.document_type || 'Document'} • {order.page_count || 1} page(s)
-                        </div>
-                        {order.deadline && (
-                          <div className="text-[10px] text-blue-600 mt-1">
-                            ⏰ Due: {new Date(order.deadline).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
+                    {assignedOrders.map(order => {
+                      // Check if translator (in-house or contractor) needs to accept this assignment first
+                      const isPendingAcceptance = isTranslator && order.translator_assignment_status === 'pending';
+
+                      return (
+                        <div
+                          key={order.id}
+                          onClick={() => {
+                            if (isPendingAcceptance) {
+                              alert('⚠️ Please accept this assignment first!\n\nCheck your email for the assignment notification and click "Accept" to start working on this project.');
+                              return;
+                            }
+                            selectProject(order);
+                          }}
+                          className={`p-3 rounded-lg transition-all border ${
+                            isPendingAcceptance
+                              ? 'bg-yellow-50 border-yellow-400 cursor-not-allowed opacity-80'
+                              : selectedOrderId === order.id
+                                ? 'bg-blue-100 border-blue-500 shadow-md cursor-pointer'
+                                : 'bg-white border-gray-200 hover:border-blue-400 hover:shadow cursor-pointer'
+                          }`}
+                        >
+                          {/* Pending acceptance banner for contractors */}
+                          {isPendingAcceptance && (
+                            <div className="bg-yellow-100 border border-yellow-300 rounded px-2 py-1 mb-2 text-center">
+                              <span className="text-[10px] text-yellow-800 font-medium">
+                                ⚠️ Accept via email to start
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-bold text-blue-700 text-sm">{order.order_number}</span>
+                            <span className={`text-[10px] px-2 py-0.5 rounded ${
+                              order.translation_status === 'received' ? 'bg-yellow-100 text-yellow-700' :
+                              order.translation_status === 'in_translation' ? 'bg-blue-100 text-blue-700' :
+                              order.translation_status === 'review' ? 'bg-blue-100 text-blue-700' :
+                              'bg-gray-100 text-gray-700'
+                            }`}>
+                              {order.translation_status}
+                            </span>
                           </div>
-                        )}
-                        {order.internal_notes && (
-                          <div className="text-[10px] text-sky-600 mt-1">
-                            📝 Has instructions from PM
+                          <div className="text-xs text-gray-600 mb-1">
+                            {order.translate_from} → {order.translate_to}
                           </div>
-                        )}
-                        {selectedOrderId === order.id && (
-                          <div className="mt-2 text-[10px] text-blue-600 font-medium">✓ Project selected</div>
-                        )}
-                      </div>
-                    ))}
+                          <div className="text-xs text-gray-500">
+                            {order.document_type || 'Document'} • {order.page_count || 1} page(s)
+                          </div>
+                          {order.deadline && (
+                            <div className="text-[10px] text-blue-600 mt-1">
+                              ⏰ Due: {new Date(order.deadline).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
+                            </div>
+                          )}
+                          {order.internal_notes && (
+                            <div className="text-[10px] text-sky-600 mt-1">
+                              📝 Has instructions from PM
+                            </div>
+                          )}
+                          {!isPendingAcceptance && selectedOrderId === order.id && (
+                            <div className="mt-2 text-[10px] text-blue-600 font-medium">✓ Project selected</div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="text-center py-6 text-gray-500">
