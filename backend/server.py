@@ -23106,15 +23106,12 @@ async def invite_salesperson(salesperson_id: str, admin_key: str = Header(None))
         </div>
         """
 
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = content['subject']
-        msg['From'] = EMAIL_USER
-        msg['To'] = salesperson['email']
-        msg.attach(MIMEText(email_html, 'html'))
-
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
-            smtp.login(EMAIL_USER, EMAIL_PASSWORD)
-            smtp.send_message(msg)
+        await email_service.send_email(
+            to=salesperson['email'],
+            subject=content['subject'],
+            content=email_html,
+            content_type="html"
+        )
 
         logger.info(f"Invite sent to salesperson: {salesperson['email']}")
 
