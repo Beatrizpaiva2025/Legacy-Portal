@@ -1347,8 +1347,8 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
 const Sidebar = ({ activeTab, setActiveTab, partner, onLogout, t }) => {
   const menuItems = [
     { id: 'new-order', label: t.newOrder, icon: '➕' },
-    { id: 'orders', label: t.myOrders, icon: '📋' },
-    { id: 'invoices', label: t.invoices, icon: '📋' },
+    { id: 'orders', label: t.myOrders, icon: '📦' },
+    { id: 'invoices', label: t.invoices, icon: '🧾' },
     { id: 'messages', label: t.messages, icon: '✉️' },
     { id: 'payment-plan', label: t.paymentPlanMenu, icon: '💳' }
   ];
