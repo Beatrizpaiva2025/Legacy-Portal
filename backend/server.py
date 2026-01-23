@@ -11565,14 +11565,27 @@ async def generate_combined_delivery_pdf(
     # Create new PDF document
     doc = fitz.open()
 
-    # Page dimensions (Letter size)
+    # ==================== FIXED LAYOUT CONSTANTS (DO NOT CHANGE) ====================
+    # These values match the Start template and must remain consistent
+
+    # Page dimensions (Letter size - 8.5" x 11" at 72 DPI)
     page_width = 612
     page_height = 792
 
-    # Colors
-    blue_color = (0.11, 0.27, 0.53)  # #1C4587
-    gold_color = (0.85, 0.65, 0.13)  # #D9A521
-    gray_color = (0.4, 0.4, 0.4)
+    # Fixed margins for cover page (in points)
+    MARGIN_LEFT = 50          # Left margin for decorative lines
+    MARGIN_RIGHT = 50         # Right margin for decorative lines
+    MARGIN_TOP = 60           # Top margin for header
+    MARGIN_BOTTOM = 60        # Bottom margin for footer
+    BODY_MARGIN_LEFT = 80     # Left margin for body text
+    HEADER_LINE_Y = 80        # Y position of header decorative line
+    FOOTER_LINE_Y = page_height - 60  # Y position of footer line
+
+    # Colors (Legacy Translations brand)
+    blue_color = (0.11, 0.27, 0.53)  # #1C4587 - Primary brand blue
+    gold_color = (0.85, 0.65, 0.13)  # #D9A521 - Accent gold
+    gray_color = (0.4, 0.4, 0.4)     # Body text gray
+    # ==================== END FIXED LAYOUT CONSTANTS ====================
 
     # Get order details (orders may have different field names for languages/document type)
     order_number = order.get("order_number", "P0000")
@@ -11633,30 +11646,31 @@ async def generate_combined_delivery_pdf(
                 use_separate_cover = False
 
         if not use_separate_cover or not cover_page_file:
-            # Generate standard Certificate of Accuracy
+            # Generate standard Certificate of Accuracy with FIXED layout
+            # This template matches the Start tab and must not change
             page = doc.new_page(width=page_width, height=page_height)
 
-            # Header line
-            page.draw_rect(fitz.Rect(50, 80, page_width - 50, 83), color=blue_color, fill=blue_color)
+            # Header decorative line (fixed position)
+            page.draw_rect(fitz.Rect(MARGIN_LEFT, HEADER_LINE_Y, page_width - MARGIN_RIGHT, HEADER_LINE_Y + 3), color=blue_color, fill=blue_color)
 
-            # Company name
-            page.insert_text((page_width/2 - 100, 60), "Legacy Translations", fontsize=18, fontname="helv", color=blue_color)
+            # Company name (centered, fixed Y=60)
+            page.insert_text((page_width/2 - 100, MARGIN_TOP), "Legacy Translations", fontsize=18, fontname="helv", color=blue_color)
 
-            # Contact info
+            # Contact info (centered, fixed positions)
             page.insert_text((page_width/2 - 140, 100), "867 Boylston Street · 5th Floor · #2073 · Boston, MA 02116", fontsize=8, fontname="helv", color=gray_color)
             page.insert_text((page_width/2 - 95, 112), "(857) 316-7770 · contact@legacytranslations.com", fontsize=8, fontname="helv", color=gray_color)
 
-            # Order number
+            # Order number (centered, fixed Y=150)
             page.insert_text((page_width/2 - 40, 150), f"Order # {order_number}", fontsize=11, fontname="helv", color=gray_color)
 
-            # Main title
+            # Main title (centered, fixed Y=200)
             page.insert_text((page_width/2 - 130, 200), "CERTIFICATION OF TRANSLATION ACCURACY", fontsize=14, fontname="helvB", color=blue_color)
 
-            # Subtitle
+            # Subtitle (centered, fixed Y=240)
             subtitle = f"Translation of a {document_type} from {source_lang} to {target_lang}"
             page.insert_text((page_width/2 - len(subtitle)*2.5, 240), subtitle, fontsize=10, fontname="helv", color=gray_color)
 
-            # Body text
+            # Body text (fixed left margin, starting Y=300)
             body_y = 300
             body_texts = [
                 f"I, {translator_name}, hereby certify that the attached translation from {source_lang}",
@@ -11672,22 +11686,22 @@ async def generate_combined_delivery_pdf(
 
             for text in body_texts:
                 if text:
-                    page.insert_text((80, body_y), text, fontsize=10, fontname="helv", color=(0.2, 0.2, 0.2))
+                    page.insert_text((BODY_MARGIN_LEFT, body_y), text, fontsize=10, fontname="helv", color=(0.2, 0.2, 0.2))
                 body_y += 18
 
-            # Signature section
+            # Signature section (fixed position Y=550)
             sig_y = 550
-            page.insert_text((80, sig_y), "___________________________________", fontsize=10, fontname="helv", color=gray_color)
-            page.insert_text((80, sig_y + 20), translator_name, fontsize=11, fontname="helvB", color=blue_color)
-            page.insert_text((80, sig_y + 35), "Authorized Representative", fontsize=9, fontname="helv", color=gray_color)
-            page.insert_text((80, sig_y + 50), "Legacy Translations Inc.", fontsize=9, fontname="helv", color=gray_color)
-            page.insert_text((80, sig_y + 65), f"Dated: {translation_date}", fontsize=9, fontname="helv", color=gray_color)
+            page.insert_text((BODY_MARGIN_LEFT, sig_y), "___________________________________", fontsize=10, fontname="helv", color=gray_color)
+            page.insert_text((BODY_MARGIN_LEFT, sig_y + 20), translator_name, fontsize=11, fontname="helvB", color=blue_color)
+            page.insert_text((BODY_MARGIN_LEFT, sig_y + 35), "Authorized Representative", fontsize=9, fontname="helv", color=gray_color)
+            page.insert_text((BODY_MARGIN_LEFT, sig_y + 50), "Legacy Translations Inc.", fontsize=9, fontname="helv", color=gray_color)
+            page.insert_text((BODY_MARGIN_LEFT, sig_y + 65), f"Dated: {translation_date}", fontsize=9, fontname="helv", color=gray_color)
 
-            # ATA info
+            # ATA info (right side, fixed position)
             page.insert_text((400, sig_y + 35), "ATA Member #275993", fontsize=9, fontname="helv", color=gray_color)
 
-            # Footer line
-            page.draw_rect(fitz.Rect(50, page_height - 60, page_width - 50, page_height - 57), color=blue_color, fill=blue_color)
+            # Footer decorative line (fixed position)
+            page.draw_rect(fitz.Rect(MARGIN_LEFT, FOOTER_LINE_Y, page_width - MARGIN_RIGHT, FOOTER_LINE_Y + 3), color=blue_color, fill=blue_color)
 
     # ==================== TRANSLATION PAGES ====================
     if include_translation:
