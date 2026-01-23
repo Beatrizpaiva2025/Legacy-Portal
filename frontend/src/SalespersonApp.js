@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const API_URL = process.env.REACT_APP_API_URL || '';
+const API_URL = process.env.REACT_APP_API_URL || '/api';
 
 // ==================== NEW YORK TIMEZONE HELPERS ====================
 const NY_TIMEZONE = 'America/New_York';
