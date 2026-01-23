@@ -29226,12 +29226,12 @@ const SalesControlPage = ({ adminKey }) => {
                 <input
                   type="text"
                   readOnly
-                  value={`${window.location.origin}/#/partner-register?ref=${createdSalesperson.referral_code}`}
+                  value={`${window.location.origin}/#/partner/login?ref=${createdSalesperson.referral_code}`}
                   className="flex-1 bg-white px-3 py-2 rounded border text-sm"
                 />
                 <button
                   onClick={() => {
-                    navigator.clipboard.writeText(`${window.location.origin}/#/partner-register?ref=${createdSalesperson.referral_code}`);
+                    navigator.clipboard.writeText(`${window.location.origin}/#/partner/login?ref=${createdSalesperson.referral_code}`);
                     alert('Link copiado!');
                   }}
                   className="px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm"
