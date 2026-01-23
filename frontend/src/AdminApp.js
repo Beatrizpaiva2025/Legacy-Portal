@@ -2002,6 +2002,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [quickPackageLoading, setQuickPackageLoading] = useState(false); // Loading state for uploads
   const [quickPackageProgress, setQuickPackageProgress] = useState(''); // Progress message
 
+  // Cover Page & Page Management state
+  const [coverPageFile, setCoverPageFile] = useState(null); // Separate cover page file
+  const [coverPageUploading, setCoverPageUploading] = useState(false);
+  const [hasSeparateCover, setHasSeparateCover] = useState(false); // Whether order has separate cover
+  const [replacementFile, setReplacementFile] = useState(null); // File to replace translation pages
+  const [keepCoverPages, setKeepCoverPages] = useState(1); // Number of cover pages to keep when replacing
+
   // Review view mode: 'preview' shows rendered HTML, 'edit' shows raw code
   const [reviewViewMode, setReviewViewMode] = useState('preview');
 
@@ -2353,6 +2360,16 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
       // Pre-select this order for sending
       setSelectedOrderId(selectedOrder.id);
+
+      // Check if order has separate cover page
+      if (selectedOrder.use_separate_cover) {
+        setHasSeparateCover(true);
+        setCoverPageFile({ name: selectedOrder.cover_page_filename || 'cover.pdf', uploaded: true });
+      } else {
+        setHasSeparateCover(false);
+        setCoverPageFile(null);
+      }
+      setReplacementFile(null);
 
       // Show status
       setProcessingStatus(`📋 Working on order ${selectedOrder.order_number} - ${selectedOrder.client_name}`);
@@ -4921,6 +4938,83 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     setQuickPackageLoading(false);
     setQuickPackageProgress(`✅ ${processedFiles.length} original page(s) ready`);
     setTimeout(() => setQuickPackageProgress(''), 3000);
+  };
+
+  // Upload separate cover page
+  const handleCoverPageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file || !selectedOrderId) return;
+
+    setCoverPageUploading(true);
+    setQuickPackageProgress('Uploading cover page...');
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await axios.post(
+        `${API}/admin/orders/${selectedOrderId}/upload-cover-page?admin_key=${adminKey}`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
+
+      setCoverPageFile({ name: file.name, uploaded: true });
+      setHasSeparateCover(true);
+      setQuickPackageProgress(`✅ ${response.data.message}`);
+      setTimeout(() => setQuickPackageProgress(''), 3000);
+    } catch (err) {
+      console.error('Cover page upload failed:', err);
+      setQuickPackageProgress(`❌ Failed to upload cover: ${err.response?.data?.detail || err.message}`);
+      setTimeout(() => setQuickPackageProgress(''), 5000);
+    } finally {
+      setCoverPageUploading(false);
+    }
+  };
+
+  // Delete separate cover page
+  const handleDeleteCoverPage = async () => {
+    if (!selectedOrderId) return;
+
+    try {
+      await axios.delete(`${API}/admin/orders/${selectedOrderId}/cover-page?admin_key=${adminKey}`);
+      setCoverPageFile(null);
+      setHasSeparateCover(false);
+      setQuickPackageProgress('✅ Cover page removed');
+      setTimeout(() => setQuickPackageProgress(''), 3000);
+    } catch (err) {
+      console.error('Failed to delete cover page:', err);
+      setQuickPackageProgress(`❌ Failed to remove cover: ${err.response?.data?.detail || err.message}`);
+    }
+  };
+
+  // Replace translation pages (keep cover intact)
+  const handleReplaceTranslationPages = async (e) => {
+    const file = e.target.files[0];
+    if (!file || !selectedOrderId) return;
+
+    setCoverPageUploading(true);
+    setQuickPackageProgress(`Replacing translation pages (keeping ${keepCoverPages} cover page(s))...`);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await axios.post(
+        `${API}/admin/orders/${selectedOrderId}/replace-translation-pages?admin_key=${adminKey}&keep_cover_pages=${keepCoverPages}`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
+
+      setQuickPackageProgress(`✅ ${response.data.message}`);
+      setReplacementFile({ name: file.name, ...response.data });
+      setTimeout(() => setQuickPackageProgress(''), 5000);
+    } catch (err) {
+      console.error('Failed to replace translation pages:', err);
+      setQuickPackageProgress(`❌ Failed to replace pages: ${err.response?.data?.detail || err.message}`);
+      setTimeout(() => setQuickPackageProgress(''), 5000);
+    } finally {
+      setCoverPageUploading(false);
+    }
   };
 
   // Quick Package Download - generates complete certified translation package (same layout as normal flow)
@@ -10227,6 +10321,115 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   </div>
                 )}
               </div>
+
+              {/* Cover Page & Page Management - Only show if an order is selected */}
+              {selectedOrderId && (isAdmin || isPM || isInHouseTranslator) && (
+                <div className="p-4 bg-purple-50 border border-purple-200 rounded mb-4">
+                  <h3 className="text-sm font-bold text-purple-700 mb-2">📄 Gerenciar Capa e Páginas</h3>
+                  <p className="text-[10px] text-purple-600 mb-3">
+                    Upload da capa separadamente para preservar formatação, ou substitua apenas as páginas de tradução
+                  </p>
+
+                  {/* Upload Separate Cover Page */}
+                  <div className="mb-3 p-3 bg-white rounded border border-purple-100">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-purple-700">📜 Capa Separada</span>
+                      {(hasSeparateCover || coverPageFile) && (
+                        <span className="text-[10px] px-2 py-0.5 bg-green-100 text-green-700 rounded">✓ Configurada</span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="file"
+                        accept=".pdf,image/*"
+                        onChange={handleCoverPageUpload}
+                        className="hidden"
+                        id="cover-page-upload"
+                        disabled={coverPageUploading}
+                      />
+                      <label
+                        htmlFor="cover-page-upload"
+                        className={`px-3 py-1.5 text-xs rounded cursor-pointer ${
+                          coverPageUploading
+                            ? 'bg-gray-300 cursor-not-allowed'
+                            : 'bg-purple-600 text-white hover:bg-purple-700'
+                        }`}
+                      >
+                        {coverPageUploading ? 'Uploading...' : 'Upload Capa'}
+                      </label>
+
+                      {(hasSeparateCover || coverPageFile) && (
+                        <button
+                          onClick={handleDeleteCoverPage}
+                          className="px-2 py-1.5 text-xs text-red-600 hover:bg-red-50 rounded"
+                          disabled={coverPageUploading}
+                        >
+                          Remover
+                        </button>
+                      )}
+                    </div>
+
+                    {coverPageFile && (
+                      <p className="text-[10px] text-gray-500 mt-1">📎 {coverPageFile.name}</p>
+                    )}
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      A capa será usada exatamente como está, sem modificações
+                    </p>
+                  </div>
+
+                  {/* Replace Translation Pages */}
+                  <div className="p-3 bg-white rounded border border-purple-100">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-purple-700">🔄 Substituir Páginas de Tradução</span>
+                    </div>
+
+                    <div className="flex items-center gap-2 mb-2">
+                      <label className="text-[10px] text-gray-600">Manter páginas iniciais (capa):</label>
+                      <select
+                        value={keepCoverPages}
+                        onChange={(e) => setKeepCoverPages(parseInt(e.target.value))}
+                        className="text-xs border rounded px-2 py-1"
+                        disabled={coverPageUploading}
+                      >
+                        <option value={1}>1 página</option>
+                        <option value={2}>2 páginas</option>
+                        <option value={3}>3 páginas</option>
+                      </select>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="file"
+                        accept=".pdf"
+                        onChange={handleReplaceTranslationPages}
+                        className="hidden"
+                        id="replace-pages-upload"
+                        disabled={coverPageUploading}
+                      />
+                      <label
+                        htmlFor="replace-pages-upload"
+                        className={`px-3 py-1.5 text-xs rounded cursor-pointer ${
+                          coverPageUploading
+                            ? 'bg-gray-300 cursor-not-allowed'
+                            : 'bg-orange-500 text-white hover:bg-orange-600'
+                        }`}
+                      >
+                        {coverPageUploading ? 'Processing...' : 'Substituir Tradução'}
+                      </label>
+                    </div>
+
+                    {replacementFile && (
+                      <p className="text-[10px] text-green-600 mt-1">
+                        ✓ Manteve {replacementFile.cover_pages_kept} capa(s), adicionou {replacementFile.new_pages_added} página(s)
+                      </p>
+                    )}
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      Mantém a capa atual intacta e substitui apenas o conteúdo da tradução
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Options - Hidden for contractors only */}
               {(isAdmin || isPM || isInHouseTranslator) && (
