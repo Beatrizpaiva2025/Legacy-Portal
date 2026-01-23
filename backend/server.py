@@ -2576,8 +2576,329 @@ def calculate_price(word_count: int, service_type: str, urgency: str) -> tuple[f
         urgency_fee = base_price * 1.00  # 100% of base price
     
     total_price = base_price + urgency_fee
-    
+
     return base_price, urgency_fee, total_price
+
+
+# ==================== PARTNER TIER SYSTEM ====================
+# Tier thresholds (pages per month) and discounts
+PARTNER_TIERS = {
+    "platinum": {"min_pages": 100, "discount": 0.35, "price_per_page": 16.24},
+    "gold": {"min_pages": 60, "discount": 0.25, "price_per_page": 18.74},
+    "silver": {"min_pages": 30, "discount": 0.15, "price_per_page": 21.24},
+    "bronze": {"min_pages": 10, "discount": 0.10, "price_per_page": 22.49},
+    "standard": {"min_pages": 0, "discount": 0.0, "price_per_page": 24.99}
+}
+
+
+async def get_partner_30day_volume(partner_id: str) -> dict:
+    """Calculate partner's total pages in the last 30 days"""
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+
+    # Aggregate pages from paid orders in the last 30 days
+    pipeline = [
+        {
+            "$match": {
+                "partner_id": partner_id,
+                "created_at": {"$gte": thirty_days_ago},
+                "payment_status": {"$in": ["paid", "pending", "pending_zelle"]}  # Include pending orders too
+            }
+        },
+        {
+            "$group": {
+                "_id": None,
+                "total_pages": {"$sum": {"$ifNull": ["$page_count", 1]}},
+                "total_orders": {"$sum": 1},
+                "paid_pages": {
+                    "$sum": {
+                        "$cond": [
+                            {"$eq": ["$payment_status", "paid"]},
+                            {"$ifNull": ["$page_count", 1]},
+                            0
+                        ]
+                    }
+                }
+            }
+        }
+    ]
+
+    result = await db.translation_orders.aggregate(pipeline).to_list(1)
+
+    if result:
+        return {
+            "total_pages": result[0].get("total_pages", 0),
+            "paid_pages": result[0].get("paid_pages", 0),
+            "total_orders": result[0].get("total_orders", 0),
+            "period_start": thirty_days_ago.isoformat(),
+            "period_end": datetime.utcnow().isoformat()
+        }
+
+    return {
+        "total_pages": 0,
+        "paid_pages": 0,
+        "total_orders": 0,
+        "period_start": thirty_days_ago.isoformat(),
+        "period_end": datetime.utcnow().isoformat()
+    }
+
+
+async def get_partner_monthly_volumes(partner_id: str) -> dict:
+    """Calculate partner's pages for each of the last 3 months separately"""
+    now = datetime.utcnow()
+
+    # Define the 3 month periods
+    month1_end = now
+    month1_start = now - timedelta(days=30)
+    month2_end = month1_start
+    month2_start = month1_start - timedelta(days=30)
+    month3_end = month2_start
+    month3_start = month2_start - timedelta(days=30)
+
+    async def get_volume_for_period(start: datetime, end: datetime) -> int:
+        pipeline = [
+            {
+                "$match": {
+                    "partner_id": partner_id,
+                    "created_at": {"$gte": start, "$lt": end},
+                    "payment_status": {"$in": ["paid", "pending", "pending_zelle"]}
+                }
+            },
+            {
+                "$group": {
+                    "_id": None,
+                    "total_pages": {"$sum": {"$ifNull": ["$page_count", 1]}}
+                }
+            }
+        ]
+        result = await db.translation_orders.aggregate(pipeline).to_list(1)
+        return result[0].get("total_pages", 0) if result else 0
+
+    # Get volumes for each month
+    month1_pages = await get_volume_for_period(month1_start, month1_end)
+    month2_pages = await get_volume_for_period(month2_start, month2_end)
+    month3_pages = await get_volume_for_period(month3_start, month3_end)
+
+    return {
+        "month1": {"pages": month1_pages, "start": month1_start.isoformat(), "end": month1_end.isoformat()},
+        "month2": {"pages": month2_pages, "start": month2_start.isoformat(), "end": month2_end.isoformat()},
+        "month3": {"pages": month3_pages, "start": month3_start.isoformat(), "end": month3_end.isoformat()},
+        "best_month_pages": max(month1_pages, month2_pages, month3_pages),
+        "total_3_months": month1_pages + month2_pages + month3_pages
+    }
+
+
+async def get_effective_partner_tier(partner: dict) -> dict:
+    """
+    Get the effective tier for a partner using the combined strategy:
+    1. Best tier from the last 3 months
+    2. Loyalty Lock: Partners with 6+ months never lose their achieved tier
+    """
+    partner_id = partner.get("id")
+    created_at = partner.get("created_at")
+    achieved_tier = partner.get("achieved_tier", "standard")
+
+    # Calculate months as partner
+    months_as_partner = 0
+    if created_at:
+        if isinstance(created_at, str):
+            created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+        days_as_partner = (datetime.utcnow() - created_at.replace(tzinfo=None)).days
+        months_as_partner = days_as_partner / 30
+
+    # Check Loyalty Lock (6+ months)
+    loyalty_lock_active = months_as_partner >= 6
+
+    # Get volumes for last 3 months
+    monthly_volumes = await get_partner_monthly_volumes(partner_id)
+    best_month_pages = monthly_volumes["best_month_pages"]
+
+    # Determine tier from best month in last 3 months
+    best_3month_tier = get_tier_from_volume(best_month_pages)
+
+    # Current month volume for display
+    current_volume = await get_partner_30day_volume(partner_id)
+    current_tier = get_tier_from_volume(current_volume["total_pages"])
+
+    # Apply Loyalty Lock if active
+    if loyalty_lock_active:
+        # Partner never loses their achieved tier
+        effective_tier = get_higher_tier(achieved_tier, best_3month_tier)
+        reason = f"Loyalty Lock active ({int(months_as_partner)} months as partner) - tier protected"
+    else:
+        # Use best tier from last 3 months
+        effective_tier = best_3month_tier
+        reason = f"Best tier from last 3 months ({best_month_pages} pages)"
+
+    # Update achieved tier if current effective is higher
+    if compare_tiers(effective_tier, achieved_tier) > 0:
+        await db.partners.update_one(
+            {"id": partner_id},
+            {
+                "$set": {
+                    "achieved_tier": effective_tier,
+                    "tier_achieved_at": datetime.utcnow()
+                }
+            }
+        )
+
+    return {
+        "effective_tier": effective_tier,
+        "current_volume_tier": current_tier,
+        "best_3month_tier": best_3month_tier,
+        "achieved_tier": achieved_tier,
+        "loyalty_lock_active": loyalty_lock_active,
+        "months_as_partner": round(months_as_partner, 1),
+        "monthly_volumes": monthly_volumes,
+        "current_volume": current_volume,
+        "reason": reason
+    }
+
+
+def get_tier_from_volume(pages: int) -> str:
+    """Determine partner tier based on monthly page volume"""
+    if pages >= PARTNER_TIERS["platinum"]["min_pages"]:
+        return "platinum"
+    elif pages >= PARTNER_TIERS["gold"]["min_pages"]:
+        return "gold"
+    elif pages >= PARTNER_TIERS["silver"]["min_pages"]:
+        return "silver"
+    elif pages >= PARTNER_TIERS["bronze"]["min_pages"]:
+        return "bronze"
+    return "standard"
+
+
+def get_tier_discount(tier: str) -> float:
+    """Get discount percentage for a tier (0.0 to 0.35)"""
+    return PARTNER_TIERS.get(tier, PARTNER_TIERS["standard"])["discount"]
+
+
+# Tier ranking for comparison (higher number = better tier)
+TIER_RANK = {"standard": 0, "bronze": 1, "silver": 2, "gold": 3, "platinum": 4}
+
+
+def compare_tiers(tier1: str, tier2: str) -> int:
+    """Compare two tiers. Returns: 1 if tier1 > tier2, -1 if tier1 < tier2, 0 if equal"""
+    rank1 = TIER_RANK.get(tier1, 0)
+    rank2 = TIER_RANK.get(tier2, 0)
+    if rank1 > rank2:
+        return 1
+    elif rank1 < rank2:
+        return -1
+    return 0
+
+
+def get_higher_tier(tier1: str, tier2: str) -> str:
+    """Return the higher of two tiers"""
+    if compare_tiers(tier1, tier2) >= 0:
+        return tier1
+    return tier2
+
+
+async def get_effective_tier_with_grace(partner: dict, volume_tier: str) -> dict:
+    """
+    Get the effective tier considering 1-month grace period.
+    If partner had a higher tier that's still within grace period, use that.
+    """
+    achieved_tier = partner.get("achieved_tier", "standard")
+    tier_valid_until = partner.get("tier_valid_until")
+
+    # Check if grace period is still active
+    grace_active = False
+    if tier_valid_until:
+        if isinstance(tier_valid_until, str):
+            tier_valid_until = datetime.fromisoformat(tier_valid_until.replace('Z', '+00:00'))
+        grace_active = datetime.utcnow() < tier_valid_until
+
+    # If grace period is active and achieved tier is higher, use it
+    if grace_active and compare_tiers(achieved_tier, volume_tier) > 0:
+        return {
+            "effective_tier": achieved_tier,
+            "volume_tier": volume_tier,
+            "grace_active": True,
+            "grace_until": tier_valid_until.isoformat() if tier_valid_until else None,
+            "reason": f"Grace period active until {tier_valid_until.strftime('%Y-%m-%d') if tier_valid_until else 'N/A'}"
+        }
+
+    # Otherwise use volume-based tier
+    return {
+        "effective_tier": volume_tier,
+        "volume_tier": volume_tier,
+        "grace_active": False,
+        "grace_until": None,
+        "reason": "Based on current 30-day volume"
+    }
+
+
+async def update_partner_achieved_tier(partner_id: str, new_tier: str):
+    """
+    Update partner's achieved tier if they reached a higher tier.
+    Sets grace period to 1 month from now.
+    """
+    partner = await db.partners.find_one({"id": partner_id})
+    if not partner:
+        return
+
+    current_achieved = partner.get("achieved_tier", "standard")
+
+    # Only update if new tier is higher than current achieved tier
+    if compare_tiers(new_tier, current_achieved) > 0:
+        grace_until = datetime.utcnow() + timedelta(days=30)
+        await db.partners.update_one(
+            {"id": partner_id},
+            {
+                "$set": {
+                    "achieved_tier": new_tier,
+                    "tier_achieved_at": datetime.utcnow(),
+                    "tier_valid_until": grace_until
+                }
+            }
+        )
+        logger.info(f"Partner {partner_id} upgraded to {new_tier} tier, valid until {grace_until}")
+    elif compare_tiers(new_tier, current_achieved) == 0:
+        # Same tier - extend grace period
+        grace_until = datetime.utcnow() + timedelta(days=30)
+        await db.partners.update_one(
+            {"id": partner_id},
+            {"$set": {"tier_valid_until": grace_until}}
+        )
+
+
+def get_tier_price_per_page(tier: str) -> float:
+    """Get price per page for a tier"""
+    return PARTNER_TIERS.get(tier, PARTNER_TIERS["standard"])["price_per_page"]
+
+
+def calculate_price_with_tier(word_count: int, service_type: str, urgency: str, tier: str = "standard") -> tuple[float, float, float, float]:
+    """Calculate pricing with tier discount applied"""
+
+    # Convert words to pages (250 words = 1 page) - round up to next page
+    pages = max(1, math.ceil(word_count / 250))
+
+    # Get tier-specific price per page for certified translations
+    if service_type == "standard":
+        price_per_page = get_tier_price_per_page(tier)
+        base_price = pages * price_per_page
+        discount_amount = pages * (24.99 - price_per_page)  # Savings from standard price
+    elif service_type == "professional":
+        # Professional translation doesn't have tier discounts
+        base_price = word_count * 0.075
+        discount_amount = 0
+    else:
+        price_per_page = get_tier_price_per_page(tier)
+        base_price = pages * price_per_page
+        discount_amount = pages * (24.99 - price_per_page)
+
+    # Urgency fees based on percentage of base price
+    urgency_fee = 0
+    if urgency == "priority":
+        urgency_fee = base_price * 0.25
+    elif urgency == "urgent":
+        urgency_fee = base_price * 1.00
+
+    total_price = base_price + urgency_fee
+
+    return base_price, urgency_fee, total_price, discount_amount
+
 
 def get_estimated_delivery(urgency: str) -> str:
     """Calculate estimated delivery date"""
@@ -5353,6 +5674,88 @@ async def get_partner_credit_qualification(token: str):
         "requested_plan": requested_plan
     }
 
+
+@api_router.get("/partner/tier-info")
+async def get_partner_tier_info(token: str):
+    """Get partner's effective tier using best of last 3 months + Loyalty Lock"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    # Get effective tier using new strategy
+    tier_result = await get_effective_partner_tier(partner)
+    effective_tier = tier_result["effective_tier"]
+    tier_info = PARTNER_TIERS[effective_tier]
+
+    # Current 30-day volume for display
+    current_volume = tier_result["current_volume"]
+    total_pages = current_volume["total_pages"]
+
+    # Calculate progress to next tier
+    next_tier = None
+    pages_to_next_tier = 0
+    if effective_tier == "standard":
+        next_tier = "bronze"
+        pages_to_next_tier = PARTNER_TIERS["bronze"]["min_pages"] - total_pages
+    elif effective_tier == "bronze":
+        next_tier = "silver"
+        pages_to_next_tier = PARTNER_TIERS["silver"]["min_pages"] - total_pages
+    elif effective_tier == "silver":
+        next_tier = "gold"
+        pages_to_next_tier = PARTNER_TIERS["gold"]["min_pages"] - total_pages
+    elif effective_tier == "gold":
+        next_tier = "platinum"
+        pages_to_next_tier = PARTNER_TIERS["platinum"]["min_pages"] - total_pages
+
+    # Get all tiers info for display
+    tiers_info = []
+    for tier_name, tier_data in [("bronze", PARTNER_TIERS["bronze"]),
+                                  ("silver", PARTNER_TIERS["silver"]),
+                                  ("gold", PARTNER_TIERS["gold"]),
+                                  ("platinum", PARTNER_TIERS["platinum"])]:
+        tiers_info.append({
+            "name": tier_name,
+            "min_pages": tier_data["min_pages"],
+            "max_pages": PARTNER_TIERS.get({
+                "bronze": "silver",
+                "silver": "gold",
+                "gold": "platinum"
+            }.get(tier_name, "platinum"), {}).get("min_pages", None),
+            "discount_percent": int(tier_data["discount"] * 100),
+            "price_per_page": tier_data["price_per_page"],
+            "is_current": tier_name == effective_tier
+        })
+
+    # Calculate monthly savings at current tier
+    standard_price = 24.99
+    current_price = tier_info["price_per_page"]
+    savings_per_page = standard_price - current_price
+    monthly_savings = savings_per_page * total_pages
+
+    return {
+        "current_tier": effective_tier,
+        "discount_percent": int(tier_info["discount"] * 100),
+        "price_per_page": tier_info["price_per_page"],
+        "standard_price": 24.99,
+        "volume_stats": current_volume,
+        "next_tier": next_tier,
+        "pages_to_next_tier": max(0, pages_to_next_tier),
+        "next_tier_discount": int(PARTNER_TIERS.get(next_tier, {}).get("discount", 0) * 100) if next_tier else None,
+        "monthly_savings": round(monthly_savings, 2),
+        "tiers": tiers_info,
+        # New fields for transparency
+        "tier_strategy": {
+            "current_volume_tier": tier_result["current_volume_tier"],
+            "best_3month_tier": tier_result["best_3month_tier"],
+            "achieved_tier": tier_result["achieved_tier"],
+            "loyalty_lock_active": tier_result["loyalty_lock_active"],
+            "months_as_partner": tier_result["months_as_partner"],
+            "reason": tier_result["reason"]
+        },
+        "monthly_volumes": tier_result["monthly_volumes"]
+    }
+
+
 @api_router.post("/partner/request-payment-upgrade")
 async def request_payment_plan_upgrade(token: str, plan: str):
     """Request upgrade to invoice payment plan (biweekly or monthly)"""
@@ -7157,11 +7560,18 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
         if not partner:
             raise HTTPException(status_code=401, detail="Invalid or expired token")
 
-        # Calculate pricing
-        base_price, urgency_fee, total_price = calculate_price(
+        # Get effective tier using best of last 3 months + Loyalty Lock
+        tier_result = await get_effective_partner_tier(partner)
+        effective_tier = tier_result["effective_tier"]
+        tier_discount = get_tier_discount(effective_tier)
+        volume_stats = tier_result["current_volume"]
+
+        # Calculate pricing with tier discount
+        base_price, urgency_fee, total_price, discount_amount = calculate_price_with_tier(
             order_data.word_count,
             order_data.service_type,
-            order_data.urgency
+            order_data.urgency,
+            effective_tier
         )
 
         # Calculate page count
@@ -7214,7 +7624,15 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
             shipping_address=order_data.shipping_address
         )
 
-        await db.translation_orders.insert_one(order.dict())
+        # Add tier info to order dict before inserting
+        order_dict = order.dict()
+        order_dict["partner_tier"] = effective_tier
+        order_dict["tier_discount_percent"] = int(tier_discount * 100)
+        order_dict["discount_amount"] = round(discount_amount, 2)
+        order_dict["original_price"] = round(page_count * 24.99 + urgency_fee, 2)  # Price without discount
+        order_dict["loyalty_lock_active"] = tier_result.get("loyalty_lock_active", False)
+
+        await db.translation_orders.insert_one(order_dict)
 
         # Associate uploaded documents with this order
         if order_data.document_ids:
@@ -9236,6 +9654,127 @@ async def delete_partner_by_email(email: str, admin_key: str):
     except Exception as e:
         logger.error(f"Error deleting partner by email: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to delete partner")
+
+
+@api_router.get("/admin/find-email/{email}")
+async def find_email_in_system(email: str, admin_key: str):
+    """Find where an email is registered in the system (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") != "admin":
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    email_lower = email.lower().strip()
+    found_in = []
+
+    try:
+        # Check partners collection
+        partner = await db.partners.find_one({"email": {"$regex": f"^{email_lower}$", "$options": "i"}})
+        if partner:
+            found_in.append({
+                "collection": "partners",
+                "id": partner.get("id"),
+                "name": partner.get("company_name") or partner.get("name"),
+                "email": partner.get("email")
+            })
+
+        # Check customers collection
+        customer = await db.customers.find_one({"email": {"$regex": f"^{email_lower}$", "$options": "i"}})
+        if customer:
+            found_in.append({
+                "collection": "customers",
+                "id": customer.get("id"),
+                "name": customer.get("full_name") or customer.get("name"),
+                "email": customer.get("email")
+            })
+
+        # Check admin_users collection
+        admin_user = await db.admin_users.find_one({"email": {"$regex": f"^{email_lower}$", "$options": "i"}})
+        if admin_user:
+            found_in.append({
+                "collection": "admin_users",
+                "id": admin_user.get("id"),
+                "name": admin_user.get("name"),
+                "email": admin_user.get("email"),
+                "role": admin_user.get("role")
+            })
+
+        # Check salespersons collection
+        salesperson = await db.salespersons.find_one({"email": {"$regex": f"^{email_lower}$", "$options": "i"}})
+        if salesperson:
+            found_in.append({
+                "collection": "salespersons",
+                "id": salesperson.get("id"),
+                "name": salesperson.get("name"),
+                "email": salesperson.get("email")
+            })
+
+        if not found_in:
+            return {"status": "not_found", "message": f"Email '{email}' not found in any collection"}
+
+        return {"status": "found", "email": email, "found_in": found_in}
+
+    except Exception as e:
+        logger.error(f"Error finding email: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to search for email")
+
+
+@api_router.delete("/admin/delete-email/{email}")
+async def delete_email_from_system(email: str, admin_key: str, collection: str = None):
+    """Delete an email from specified collection or all collections (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") != "admin":
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    email_lower = email.lower().strip()
+    deleted_from = []
+
+    try:
+        collections_to_check = [collection] if collection else ["partners", "customers", "admin_users", "salespersons"]
+
+        for coll_name in collections_to_check:
+            if coll_name == "partners":
+                result = await db.partners.find_one_and_delete({"email": {"$regex": f"^{email_lower}$", "$options": "i"}})
+                if result:
+                    # Mark orders as orphaned
+                    await db.translation_orders.update_many(
+                        {"partner_id": result.get("id")},
+                        {"$set": {"partner_deleted": True, "partner_deleted_at": datetime.utcnow()}}
+                    )
+                    deleted_from.append({"collection": "partners", "name": result.get("company_name") or result.get("name")})
+
+            elif coll_name == "customers":
+                result = await db.customers.find_one_and_delete({"email": {"$regex": f"^{email_lower}$", "$options": "i"}})
+                if result:
+                    deleted_from.append({"collection": "customers", "name": result.get("full_name") or result.get("name")})
+
+            elif coll_name == "admin_users":
+                result = await db.admin_users.find_one_and_delete({"email": {"$regex": f"^{email_lower}$", "$options": "i"}})
+                if result:
+                    deleted_from.append({"collection": "admin_users", "name": result.get("name"), "role": result.get("role")})
+
+            elif coll_name == "salespersons":
+                result = await db.salespersons.find_one_and_delete({"email": {"$regex": f"^{email_lower}$", "$options": "i"}})
+                if result:
+                    deleted_from.append({"collection": "salespersons", "name": result.get("name")})
+
+        if not deleted_from:
+            raise HTTPException(status_code=404, detail=f"Email '{email}' not found in any collection")
+
+        logger.info(f"Email '{email}' deleted from: {[d['collection'] for d in deleted_from]}")
+
+        return {
+            "status": "success",
+            "message": f"Email '{email}' deleted successfully",
+            "deleted_from": deleted_from
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting email: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to delete email")
 
 
 # ==================== PARTNER INVOICE ENDPOINTS ====================
