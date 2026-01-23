@@ -2795,6 +2795,9 @@ const OrdersPage = ({ token }) => {
   const [messageContent, setMessageContent] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
 
+  // Format price helper
+  const formatPrice = (price) => `$${(price || 0).toFixed(2)}`;
+
   useEffect(() => {
     fetchOrders();
   }, [filter]);
