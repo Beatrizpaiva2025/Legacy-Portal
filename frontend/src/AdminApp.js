@@ -633,12 +633,12 @@ const TopBar = ({
   // Define menu items with role-based access
   const allMenuItems = [
     { id: 'projects', label: 'Projects', icon: '📋', roles: ['admin', 'sales'] },
-    { id: 'new-quote', label: 'New Quote', icon: '📝', roles: ['admin', 'sales'] },
+    { id: 'new-quote', label: 'New Quote', icon: '📝', roles: ['sales'] },
     { id: 'translation', label: 'Translation', icon: '✍️', roles: ['admin', 'pm', 'translator'] },
     { id: 'production', label: 'Reports', icon: '📊', roles: ['admin'] },
     { id: 'finances', label: 'Finances', icon: '💰', roles: ['admin'] },
     { id: 'followups', label: 'Follow-ups', icon: '🔔', roles: ['admin'] },
-    { id: 'pm-dashboard', label: 'PM Dashboard', icon: '🎯', roles: ['admin', 'pm'] },
+    { id: 'pm-dashboard', label: 'PM Dashboard', icon: '🎯', roles: ['pm'] },
     { id: 'sales-control', label: 'Sales', icon: '📈', roles: ['admin'] },
     { id: 'users', label: 'Translators', icon: '👥', roles: ['admin'] },
     { id: 'settings', label: 'Settings', icon: '⚙️', roles: ['admin'] },
@@ -1860,6 +1860,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [newTerm, setNewTerm] = useState({ source: '', target: '', notes: '' });
   const [termSearchQuery, setTermSearchQuery] = useState(''); // Search filter for glossary terms
   const [resourcesFilter, setResourcesFilter] = useState({ language: 'All Languages', field: 'All Fields' });
+
+  // Glossary Upload Modal state
+  const [showGlossaryUploadModal, setShowGlossaryUploadModal] = useState(false);
+  const [glossaryUploadFile, setGlossaryUploadFile] = useState(null);
+  const [glossaryUploadConfig, setGlossaryUploadConfig] = useState({
+    name: '',
+    sourceLang: 'Portuguese (Brazil)',
+    targetLang: 'English',
+    field: 'All Fields',
+    bidirectional: true
+  });
 
   // Translation Memory state
   const [translationMemories, setTranslationMemories] = useState([]);
@@ -6162,7 +6173,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           { id: 'translate', label: 'TRANSLATION', icon: '📄', roles: ['admin', 'pm', 'translator'] },
           { id: 'review', label: 'REVIEW', icon: '📋', roles: ['admin', 'pm', 'translator_contractor'] }, // Hidden for in-house - merged into TRANSLATION
           { id: 'proofreading', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm', 'translator_inhouse'] },
-          { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'pm', 'translator'] },
+          { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin'] }, // Only admin can deliver to client
           { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin', 'pm', 'translator_inhouse'] },
           { id: 'tm', label: 'TM', icon: '🧠', roles: ['admin', 'pm', 'translator_inhouse'] },
           { id: 'instructions', label: 'INSTRUCTIONS', icon: '📋', roles: ['admin', 'pm', 'translator_inhouse'] }
@@ -6613,48 +6624,69 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 /* PROJECTS VIEW - Original behavior */
                 assignedOrders.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {assignedOrders.map(order => (
-                      <div
-                        key={order.id}
-                        onClick={() => selectProject(order)}
-                        className={`p-3 rounded-lg cursor-pointer transition-all border ${
-                          selectedOrderId === order.id
-                            ? 'bg-blue-100 border-blue-500 shadow-md'
-                            : 'bg-white border-gray-200 hover:border-blue-400 hover:shadow'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-bold text-blue-700 text-sm">{order.order_number}</span>
-                          <span className={`text-[10px] px-2 py-0.5 rounded ${
-                            order.translation_status === 'received' ? 'bg-yellow-100 text-yellow-700' :
-                            order.translation_status === 'in_translation' ? 'bg-blue-100 text-blue-700' :
-                            order.translation_status === 'review' ? 'bg-blue-100 text-blue-700' :
-                            'bg-gray-100 text-gray-700'
-                          }`}>
-                            {order.translation_status}
-                          </span>
-                        </div>
-                        <div className="text-xs text-gray-600 mb-1">
-                          {order.translate_from} → {order.translate_to}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {order.document_type || 'Document'} • {order.page_count || 1} page(s)
-                        </div>
-                        {order.deadline && (
-                          <div className="text-[10px] text-blue-600 mt-1">
-                            ⏰ Due: {new Date(order.deadline).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
+                    {assignedOrders.map(order => {
+                      // Check if translator (in-house or contractor) needs to accept this assignment first
+                      const isPendingAcceptance = isTranslator && order.translator_assignment_status === 'pending';
+
+                      return (
+                        <div
+                          key={order.id}
+                          onClick={() => {
+                            if (isPendingAcceptance) {
+                              alert('⚠️ Please accept this assignment first!\n\nCheck your email for the assignment notification and click "Accept" to start working on this project.');
+                              return;
+                            }
+                            selectProject(order);
+                          }}
+                          className={`p-3 rounded-lg transition-all border ${
+                            isPendingAcceptance
+                              ? 'bg-yellow-50 border-yellow-400 cursor-not-allowed opacity-80'
+                              : selectedOrderId === order.id
+                                ? 'bg-blue-100 border-blue-500 shadow-md cursor-pointer'
+                                : 'bg-white border-gray-200 hover:border-blue-400 hover:shadow cursor-pointer'
+                          }`}
+                        >
+                          {/* Pending acceptance banner for contractors */}
+                          {isPendingAcceptance && (
+                            <div className="bg-yellow-100 border border-yellow-300 rounded px-2 py-1 mb-2 text-center">
+                              <span className="text-[10px] text-yellow-800 font-medium">
+                                ⚠️ Accept via email to start
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-bold text-blue-700 text-sm">{order.order_number}</span>
+                            <span className={`text-[10px] px-2 py-0.5 rounded ${
+                              order.translation_status === 'received' ? 'bg-yellow-100 text-yellow-700' :
+                              order.translation_status === 'in_translation' ? 'bg-blue-100 text-blue-700' :
+                              order.translation_status === 'review' ? 'bg-blue-100 text-blue-700' :
+                              'bg-gray-100 text-gray-700'
+                            }`}>
+                              {order.translation_status}
+                            </span>
                           </div>
-                        )}
-                        {order.internal_notes && (
-                          <div className="text-[10px] text-sky-600 mt-1">
-                            📝 Has instructions from PM
+                          <div className="text-xs text-gray-600 mb-1">
+                            {order.translate_from} → {order.translate_to}
                           </div>
-                        )}
-                        {selectedOrderId === order.id && (
-                          <div className="mt-2 text-[10px] text-blue-600 font-medium">✓ Project selected</div>
-                        )}
-                      </div>
-                    ))}
+                          <div className="text-xs text-gray-500">
+                            {order.document_type || 'Document'} • {order.page_count || 1} page(s)
+                          </div>
+                          {order.deadline && (
+                            <div className="text-[10px] text-blue-600 mt-1">
+                              ⏰ Due: {new Date(order.deadline).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
+                            </div>
+                          )}
+                          {order.internal_notes && (
+                            <div className="text-[10px] text-sky-600 mt-1">
+                              📝 Has instructions from PM
+                            </div>
+                          )}
+                          {!isPendingAcceptance && selectedOrderId === order.id && (
+                            <div className="mt-2 text-[10px] text-blue-600 font-medium">✓ Project selected</div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="text-center py-6 text-gray-500">
@@ -11054,39 +11086,19 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   type="file"
                   accept=".csv,.tmx,.xml,.xlsx,.xls,.sdltm"
                   className="hidden"
-                  onChange={async (e) => {
+                  onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
-
-                    const glossaryName = prompt('Enter a name for this glossary:', file.name.replace(/\.(csv|tmx|xml)$/i, ''));
-                    if (!glossaryName) {
-                      e.target.value = '';
-                      return;
-                    }
-
-                    const formData = new FormData();
-                    formData.append('file', file);
-                    formData.append('name', glossaryName);
-                    formData.append('sourceLang', resourcesFilter.language !== 'All Languages' ? resourcesFilter.language : 'Portuguese (Brazil)');
-                    formData.append('targetLang', 'English');
-                    formData.append('field', resourcesFilter.field !== 'All Fields' ? resourcesFilter.field : 'All Fields');
-                    formData.append('bidirectional', 'true');
-
-                    try {
-                      setProcessingStatus('Uploading glossary...');
-                      const response = await axios.post(
-                        `${API}/admin/glossaries/upload?admin_key=${adminKey}`,
-                        formData,
-                        { headers: { 'Content-Type': 'multipart/form-data' } }
-                      );
-                      setProcessingStatus(`✅ ${response.data.message}`);
-                      // Refresh glossaries list
-                      const res = await axios.get(`${API}/admin/glossaries?admin_key=${adminKey}`);
-                      setGlossaries(res.data.glossaries || []);
-                    } catch (err) {
-                      alert('Upload failed: ' + (err.response?.data?.detail || err.message));
-                      setProcessingStatus('');
-                    }
+                    // Store file and show upload config modal
+                    setGlossaryUploadFile(file);
+                    setGlossaryUploadConfig({
+                      name: file.name.replace(/\.(csv|tmx|xml|xlsx|xls|sdltm)$/i, ''),
+                      sourceLang: resourcesFilter.language !== 'All Languages' ? resourcesFilter.language : 'Portuguese (Brazil)',
+                      targetLang: 'English',
+                      field: resourcesFilter.field !== 'All Fields' ? resourcesFilter.field : 'All Fields',
+                      bidirectional: true
+                    });
+                    setShowGlossaryUploadModal(true);
                     e.target.value = ''; // Reset file input
                   }}
                 />
@@ -12027,6 +12039,147 @@ translation juramentada | certified translation`}
         </div>
       )}
 
+      {/* Glossary Upload Configuration Modal */}
+      {showGlossaryUploadModal && glossaryUploadFile && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="p-4 border-b bg-purple-50">
+              <h3 className="font-bold text-purple-700">Upload Glossary</h3>
+              <p className="text-xs text-purple-600 mt-1">Configure language pair for your glossary file</p>
+            </div>
+            <div className="p-4 space-y-4">
+              {/* File Info */}
+              <div className="flex items-center gap-2 p-2 bg-gray-50 rounded border">
+                <span className="text-lg">📄</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-gray-700 truncate">{glossaryUploadFile.name}</p>
+                  <p className="text-[10px] text-gray-500">{(glossaryUploadFile.size / 1024).toFixed(1)} KB</p>
+                </div>
+              </div>
+
+              {/* Glossary Name */}
+              <div>
+                <label className="block text-xs font-medium mb-1">Glossary Name</label>
+                <input
+                  type="text"
+                  value={glossaryUploadConfig.name}
+                  onChange={(e) => setGlossaryUploadConfig({ ...glossaryUploadConfig, name: e.target.value })}
+                  className="w-full px-3 py-2 text-xs border rounded focus:ring-2 focus:ring-purple-400 focus:border-purple-400"
+                  placeholder="e.g., Legal Terms ES-EN"
+                />
+              </div>
+
+              {/* Language Pair */}
+              <div className="bg-blue-50 border border-blue-200 rounded p-3">
+                <label className="block text-xs font-bold mb-2">Language Pair</label>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <label className="block text-[10px] text-gray-500 mb-1">Source Language</label>
+                    <select
+                      value={glossaryUploadConfig.sourceLang}
+                      onChange={(e) => setGlossaryUploadConfig({ ...glossaryUploadConfig, sourceLang: e.target.value })}
+                      className="w-full px-2 py-1.5 text-xs border rounded"
+                    >
+                      {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                    </select>
+                  </div>
+                  <span className="text-lg font-bold text-blue-600 mt-4">
+                    {glossaryUploadConfig.bidirectional ? '↔' : '→'}
+                  </span>
+                  <div className="flex-1">
+                    <label className="block text-[10px] text-gray-500 mb-1">Target Language</label>
+                    <select
+                      value={glossaryUploadConfig.targetLang}
+                      onChange={(e) => setGlossaryUploadConfig({ ...glossaryUploadConfig, targetLang: e.target.value })}
+                      className="w-full px-2 py-1.5 text-xs border rounded"
+                    >
+                      {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={glossaryUploadConfig.bidirectional}
+                    onChange={(e) => setGlossaryUploadConfig({ ...glossaryUploadConfig, bidirectional: e.target.checked })}
+                    className="rounded text-blue-600"
+                  />
+                  <span className="text-xs text-blue-700">
+                    <strong>Bidirectional:</strong> Terms work both ways
+                  </span>
+                </label>
+              </div>
+
+              {/* Field */}
+              <div>
+                <label className="block text-xs font-medium mb-1">Field</label>
+                <select
+                  value={glossaryUploadConfig.field}
+                  onChange={(e) => setGlossaryUploadConfig({ ...glossaryUploadConfig, field: e.target.value })}
+                  className="w-full px-3 py-2 text-xs border rounded"
+                >
+                  <option>All Fields</option>
+                  <option>Financial</option>
+                  <option>Education</option>
+                  <option>General</option>
+                  <option>Personal Documents</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="p-4 border-t flex justify-end space-x-2">
+              <button
+                onClick={() => {
+                  setShowGlossaryUploadModal(false);
+                  setGlossaryUploadFile(null);
+                }}
+                className="px-4 py-2 text-xs border rounded hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (!glossaryUploadConfig.name.trim()) {
+                    alert('Please enter a name for the glossary');
+                    return;
+                  }
+
+                  const formData = new FormData();
+                  formData.append('file', glossaryUploadFile);
+                  formData.append('name', glossaryUploadConfig.name);
+                  formData.append('sourceLang', glossaryUploadConfig.sourceLang);
+                  formData.append('targetLang', glossaryUploadConfig.targetLang);
+                  formData.append('field', glossaryUploadConfig.field);
+                  formData.append('bidirectional', glossaryUploadConfig.bidirectional.toString());
+
+                  try {
+                    setShowGlossaryUploadModal(false);
+                    setProcessingStatus('Uploading glossary...');
+                    const response = await axios.post(
+                      `${API}/admin/glossaries/upload?admin_key=${adminKey}`,
+                      formData,
+                      { headers: { 'Content-Type': 'multipart/form-data' } }
+                    );
+                    setProcessingStatus(`${response.data.message}`);
+                    // Refresh glossaries list
+                    const res = await axios.get(`${API}/admin/glossaries?admin_key=${adminKey}`);
+                    setGlossaries(res.data.glossaries || []);
+                  } catch (err) {
+                    alert('Upload failed: ' + (err.response?.data?.detail || err.message));
+                    setProcessingStatus('');
+                  }
+                  setGlossaryUploadFile(null);
+                }}
+                className="px-4 py-2 text-xs bg-purple-600 text-white rounded hover:bg-purple-700"
+              >
+                Upload
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Rejection Modal - PM/Admin can choose which translator to send back to */}
       {showRejectModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -12305,7 +12458,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     client_phone: '',
     translate_from: 'Portuguese',
     translate_to: 'English',
-    service_type: 'standard',
+    service_type: 'certified',
     document_type: '',
     page_count: 1,
     word_count: 0,
@@ -12713,26 +12866,42 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     try {
       const response = await axios.get(`${API}/admin/orders/${order.id}/translated-document?admin_key=${adminKey}`);
       setTranslatedDocInfo(response.data);
+
+      // Load additional documents from the translated-document endpoint
+      const additionalDocsFromResponse = response.data.additional_documents || [];
+      let allAdditionalDocs = additionalDocsFromResponse.map(d => ({
+        id: d.id,
+        filename: d.filename,
+        isExisting: true
+      }));
+
       // Also load existing order documents as potential attachments
       const docsResponse = await axios.get(`${API}/admin/orders/${order.id}/documents?admin_key=${adminKey}`);
       if (docsResponse.data.documents) {
-        // Filter to show signed/translated documents
+        // Filter to show signed/translated documents (that are not already in allAdditionalDocs)
+        const existingIds = new Set(allAdditionalDocs.map(d => d.id));
         const existingDocs = docsResponse.data.documents.filter(d =>
-          d.filename?.toLowerCase().includes('signed') ||
-          d.filename?.toLowerCase().includes('translation') ||
-          d.document_type === 'translation'
+          !existingIds.has(d.id) && (
+            d.filename?.toLowerCase().includes('signed') ||
+            d.filename?.toLowerCase().includes('translation') ||
+            d.document_type === 'translation' ||
+            d.source === 'translated_document'
+          )
         );
-        if (existingDocs.length > 0) {
-          setAdditionalAttachments(existingDocs.map(d => ({
-            id: d.id,
-            filename: d.filename,
-            isExisting: true
-          })));
-          setSelectedAttachments(prev => ({
-            ...prev,
-            uploaded: existingDocs.map(d => d.id)
-          }));
-        }
+        allAdditionalDocs = [...allAdditionalDocs, ...existingDocs.map(d => ({
+          id: d.id,
+          filename: d.filename,
+          isExisting: true
+        }))];
+      }
+
+      // Set attachments and select them by default
+      if (allAdditionalDocs.length > 0) {
+        setAdditionalAttachments(allAdditionalDocs);
+        setSelectedAttachments(prev => ({
+          ...prev,
+          uploaded: allAdditionalDocs.map(d => d.id)
+        }));
       }
     } catch (err) {
       console.error('Failed to get translated document info:', err);
@@ -13198,7 +13367,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       client_email: viewingOrder.client_email || '',
       translate_from: viewingOrder.translate_from || 'Portuguese',
       translate_to: viewingOrder.translate_to || 'English',
-      service_type: viewingOrder.service_type || 'standard',
+      service_type: viewingOrder.service_type || 'certified',
       page_count: viewingOrder.page_count || 1,
       urgency: viewingOrder.urgency || 'no',
       deadline: viewingOrder.deadline ? new Date(viewingOrder.deadline).toISOString().slice(0, 16) : '',
@@ -13673,7 +13842,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         client_email: '',
         translate_from: 'Portuguese',
         translate_to: 'English',
-        service_type: 'standard',
+        service_type: 'certified',
         document_type: '',
         page_count: 1,
         word_count: 0,
@@ -14417,8 +14586,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   onChange={(e) => setNewProject({...newProject, service_type: e.target.value})}
                   className="w-full px-2 py-1.5 text-xs border rounded"
                 >
-                  <option value="standard">Certified</option>
-                  <option value="professional">Professional</option>
+                  <option value="certified">Certified</option>
+                  <option value="standard">Standard</option>
+                  <option value="rmv">RMV</option>
+                  <option value="sworn">Sworn Translation</option>
                 </select>
               </div>
             </div>
@@ -15396,14 +15567,14 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           <div>
                             <label className="block text-xs font-medium text-gray-600 mb-1">Service Type</label>
                             <select
-                              value={editFormData.service_type || 'standard'}
+                              value={editFormData.service_type || 'certified'}
                               onChange={(e) => setEditFormData(prev => ({ ...prev, service_type: e.target.value }))}
                               className="w-full px-2 py-1.5 border rounded text-sm"
                             >
-                              <option value="standard">Standard</option>
                               <option value="certified">Certified</option>
-                              <option value="notarized">Notarized</option>
-                              <option value="apostille">Apostille</option>
+                              <option value="standard">Standard</option>
+                              <option value="rmv">RMV</option>
+                              <option value="sworn">Sworn Translation</option>
                             </select>
                           </div>
                           <div>
@@ -27693,8 +27864,9 @@ const SalesControlPage = ({ adminKey }) => {
 
   // Form states
   const [newSalesperson, setNewSalesperson] = useState({
-    name: '', email: '', phone: '', commission_type: 'tier', commission_rate: 0, base_salary: 0, monthly_target: 10, referral_bonus: 0
+    name: '', email: '', phone: '', country_code: '+1', commission_type: 'tier', commission_rate: 0, base_salary: 0, monthly_target: 10, referral_bonus: 0, preferred_language: 'en'
   });
+  const [createdSalesperson, setCreatedSalesperson] = useState(null); // For success modal with referral link
   const [newAcquisition, setNewAcquisition] = useState({
     salesperson_id: '', partner_id: '', partner_name: '', partner_tier: 'bronze', notes: ''
   });
@@ -27702,7 +27874,8 @@ const SalesControlPage = ({ adminKey }) => {
     salesperson_id: '', month: new Date().toISOString().slice(0, 7), target_partners: 10, target_revenue: 5000
   });
 
-  const API_URL = process.env.REACT_APP_API_URL || '';
+  // Strip trailing /api if present to avoid double /api in endpoint paths
+  const API_URL = (process.env.REACT_APP_API_URL || '').replace(/\/api\/?$/, '');
 
   useEffect(() => {
     fetchAllData();
@@ -27712,13 +27885,13 @@ const SalesControlPage = ({ adminKey }) => {
     setLoading(true);
     try {
       const [spRes, acqRes, goalsRes, dashRes, rankRes, pendingRes, historyRes] = await Promise.all([
-        fetch(`${API_URL}/admin/salespeople`, { headers: { 'admin-key': adminKey } }),
-        fetch(`${API_URL}/admin/partner-acquisitions`, { headers: { 'admin-key': adminKey } }),
-        fetch(`${API_URL}/admin/sales-goals`, { headers: { 'admin-key': adminKey } }),
-        fetch(`${API_URL}/admin/sales-dashboard`, { headers: { 'admin-key': adminKey } }),
-        fetch(`${API_URL}/admin/salesperson-ranking`, { headers: { 'admin-key': adminKey } }),
-        fetch(`${API_URL}/admin/pending-commissions`, { headers: { 'admin-key': adminKey } }),
-        fetch(`${API_URL}/admin/payment-history`, { headers: { 'admin-key': adminKey } })
+        fetch(`${API_URL}/api/admin/salespeople`, { headers: { 'admin-key': adminKey } }),
+        fetch(`${API_URL}/api/admin/partner-acquisitions`, { headers: { 'admin-key': adminKey } }),
+        fetch(`${API_URL}/api/admin/sales-goals`, { headers: { 'admin-key': adminKey } }),
+        fetch(`${API_URL}/api/admin/sales-dashboard`, { headers: { 'admin-key': adminKey } }),
+        fetch(`${API_URL}/api/admin/salesperson-ranking`, { headers: { 'admin-key': adminKey } }),
+        fetch(`${API_URL}/api/admin/pending-commissions`, { headers: { 'admin-key': adminKey } }),
+        fetch(`${API_URL}/api/admin/payment-history`, { headers: { 'admin-key': adminKey } })
       ]);
 
       if (spRes.ok) setSalespeople(await spRes.json());
@@ -27745,16 +27918,21 @@ const SalesControlPage = ({ adminKey }) => {
 
   const handleAddSalesperson = async () => {
     try {
-      const res = await fetch(`${API_URL}/admin/salespeople`, {
+      // Combine country code with phone number
+      const phoneWithCode = newSalesperson.phone ? `${newSalesperson.country_code} ${newSalesperson.phone}` : '';
+      const salespersonData = { ...newSalesperson, phone: phoneWithCode };
+      delete salespersonData.country_code; // Remove country_code field before sending
+
+      const res = await fetch(`${API_URL}/api/admin/salespeople`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'admin-key': adminKey },
-        body: JSON.stringify(newSalesperson)
+        body: JSON.stringify(salespersonData)
       });
       const data = await res.json();
       if (res.ok) {
-        alert('Salesperson added successfully!');
         setShowAddSalesperson(false);
-        setNewSalesperson({ name: '', email: '', phone: '', commission_type: 'tier', commission_rate: 0, base_salary: 0, monthly_target: 10, referral_bonus: 0 });
+        setCreatedSalesperson(data.salesperson); // Show success modal with referral link
+        setNewSalesperson({ name: '', email: '', phone: '', country_code: '+1', commission_type: 'tier', commission_rate: 0, base_salary: 0, monthly_target: 10, referral_bonus: 0, preferred_language: 'en' });
         fetchAllData();
       } else {
         alert(`Error: ${data.detail || 'Failed to add salesperson'}`);
@@ -27767,7 +27945,7 @@ const SalesControlPage = ({ adminKey }) => {
 
   const handleUpdateSalesperson = async () => {
     try {
-      const res = await fetch(`${API_URL}/admin/salespeople/${editingSalesperson.id}`, {
+      const res = await fetch(`${API_URL}/api/admin/salespeople/${editingSalesperson.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'admin-key': adminKey },
         body: JSON.stringify(editingSalesperson)
@@ -27789,7 +27967,7 @@ const SalesControlPage = ({ adminKey }) => {
   const handleDeleteSalesperson = async (id) => {
     if (!window.confirm('Are you sure you want to delete this salesperson?')) return;
     try {
-      const res = await fetch(`${API_URL}/admin/salespeople/${id}`, {
+      const res = await fetch(`${API_URL}/api/admin/salespeople/${id}`, {
         method: 'DELETE',
         headers: { 'admin-key': adminKey }
       });
@@ -27802,7 +27980,7 @@ const SalesControlPage = ({ adminKey }) => {
   const handleInviteSalesperson = async (id) => {
     if (!window.confirm('Enviar email de convite para este vendedor?')) return;
     try {
-      const res = await fetch(`${API_URL}/admin/salespeople/${id}/invite`, {
+      const res = await fetch(`${API_URL}/api/admin/salespeople/${id}/invite`, {
         method: 'POST',
         headers: { 'admin-key': adminKey }
       });
@@ -27821,7 +27999,7 @@ const SalesControlPage = ({ adminKey }) => {
 
   const handleApproveCommission = async (acquisitionId) => {
     try {
-      const res = await fetch(`${API_URL}/admin/acquisitions/${acquisitionId}/approve`, {
+      const res = await fetch(`${API_URL}/api/admin/acquisitions/${acquisitionId}/approve`, {
         method: 'PUT',
         headers: { 'admin-key': adminKey }
       });
@@ -27844,7 +28022,7 @@ const SalesControlPage = ({ adminKey }) => {
       formData.append('payment_reference', paymentForm.reference);
       formData.append('notes', paymentForm.notes);
 
-      const res = await fetch(`${API_URL}/admin/commission-payments`, {
+      const res = await fetch(`${API_URL}/api/admin/commission-payments`, {
         method: 'POST',
         headers: { 'admin-key': adminKey },
         body: formData
@@ -27864,7 +28042,7 @@ const SalesControlPage = ({ adminKey }) => {
 
   const handleAddAcquisition = async () => {
     try {
-      const res = await fetch(`${API_URL}/admin/partner-acquisitions`, {
+      const res = await fetch(`${API_URL}/api/admin/partner-acquisitions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'admin-key': adminKey },
         body: JSON.stringify(newAcquisition)
@@ -27881,7 +28059,7 @@ const SalesControlPage = ({ adminKey }) => {
 
   const handleSetGoal = async () => {
     try {
-      const res = await fetch(`${API_URL}/admin/sales-goals`, {
+      const res = await fetch(`${API_URL}/api/admin/sales-goals`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'admin-key': adminKey },
         body: JSON.stringify(newGoal)
@@ -27898,7 +28076,7 @@ const SalesControlPage = ({ adminKey }) => {
 
   const handleUpdateCommissionStatus = async (acquisitionId, status) => {
     try {
-      const res = await fetch(`${API_URL}/admin/partner-acquisitions/${acquisitionId}/status?status=${status}`, {
+      const res = await fetch(`${API_URL}/api/admin/partner-acquisitions/${acquisitionId}/status?status=${status}`, {
         method: 'PUT',
         headers: { 'admin-key': adminKey }
       });
@@ -28612,160 +28790,235 @@ const SalesControlPage = ({ adminKey }) => {
 
       {/* Add Salesperson Modal */}
       {showAddSalesperson && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <span>👤</span> Add Salesperson
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
-                <input
-                  type="text"
-                  value={newSalesperson.name}
-                  onChange={(e) => setNewSalesperson({...newSalesperson, name: e.target.value})}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="John Doe"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-                <input
-                  type="email"
-                  value={newSalesperson.email}
-                  onChange={(e) => setNewSalesperson({...newSalesperson, email: e.target.value})}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="john@example.com"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                <input
-                  type="text"
-                  value={newSalesperson.phone}
-                  onChange={(e) => setNewSalesperson({...newSalesperson, phone: e.target.value})}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="(555) 123-4567"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Comissão</label>
-                <select
-                  value={newSalesperson.commission_type}
-                  onChange={(e) => setNewSalesperson({...newSalesperson, commission_type: e.target.value})}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="tier">Por Tier ($50-150/parceiro)</option>
-                  <option value="fixed">Valor Fixo por Parceiro</option>
-                  <option value="percentage">Percentual sobre Vendas</option>
-                  <option value="referral_plus_commission">Bônus Referral + Comissão %</option>
-                </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  {newSalesperson.commission_type === 'tier' && 'Comissão baseada no tier do parceiro (Bronze $50, Silver $75, Gold $100, Platinum $150)'}
-                  {newSalesperson.commission_type === 'fixed' && 'Valor fixo por cada parceiro registrado'}
-                  {newSalesperson.commission_type === 'percentage' && 'Percentual sobre todas as vendas geradas pelo parceiro'}
-                  {newSalesperson.commission_type === 'referral_plus_commission' && 'Bônus fixo por referral + percentual sobre vendas do parceiro'}
-                </p>
-              </div>
-              {newSalesperson.commission_type === 'fixed' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Comissão Fixa ($)</label>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-md max-h-[90vh] flex flex-col">
+            <div className="p-4 border-b">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <span>👤</span> Add Salesperson
+              </h3>
+            </div>
+            <div className="p-4 overflow-y-auto flex-1 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
                   <input
-                    type="number"
-                    value={newSalesperson.commission_rate}
-                    onChange={(e) => setNewSalesperson({...newSalesperson, commission_rate: parseFloat(e.target.value) || 0})}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="50"
+                    type="text"
+                    value={newSalesperson.name}
+                    onChange={(e) => setNewSalesperson({...newSalesperson, name: e.target.value})}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="John Doe"
                   />
                 </div>
-              )}
-              {newSalesperson.commission_type === 'percentage' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Percentual de Comissão (%)</label>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
                   <input
-                    type="number"
-                    value={newSalesperson.commission_rate}
-                    onChange={(e) => setNewSalesperson({...newSalesperson, commission_rate: parseFloat(e.target.value) || 0})}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="10"
-                    min="0"
-                    max="100"
-                    step="0.5"
+                    type="email"
+                    value={newSalesperson.email}
+                    onChange={(e) => setNewSalesperson({...newSalesperson, email: e.target.value})}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="john@example.com"
                   />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Ex: 10% = $50 de comissão para cada $500 em vendas do parceiro
-                  </p>
                 </div>
-              )}
-              {newSalesperson.commission_type === 'referral_plus_commission' && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Bônus por Referral ($)</label>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                  <div className="flex gap-2">
+                    <select
+                      value={newSalesperson.country_code}
+                      onChange={(e) => setNewSalesperson({...newSalesperson, country_code: e.target.value})}
+                      className="px-2 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm w-24"
+                    >
+                      <option value="+1">🇺🇸 +1</option>
+                      <option value="+55">🇧🇷 +55</option>
+                    </select>
                     <input
-                      type="number"
-                      value={newSalesperson.referral_bonus}
-                      onChange={(e) => setNewSalesperson({...newSalesperson, referral_bonus: parseFloat(e.target.value) || 0})}
-                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                      placeholder="50"
+                      type="text"
+                      value={newSalesperson.phone}
+                      onChange={(e) => setNewSalesperson({...newSalesperson, phone: e.target.value})}
+                      className="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                      placeholder="(555) 123-4567"
                     />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Valor fixo pago por cada novo parceiro indicado
-                    </p>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Comissão sobre Vendas (%)</label>
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Comissão</label>
+                  <select
+                    value={newSalesperson.commission_type}
+                    onChange={(e) => setNewSalesperson({...newSalesperson, commission_type: e.target.value})}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                  >
+                    <option value="tier">Por Tier ($50-150/parceiro)</option>
+                    <option value="fixed">Valor Fixo por Parceiro</option>
+                    <option value="percentage">Percentual sobre Vendas</option>
+                    <option value="referral_plus_commission">Bônus Referral + Comissão %</option>
+                  </select>
+                </div>
+                {newSalesperson.commission_type === 'fixed' && (
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Comissão Fixa ($)</label>
                     <input
                       type="number"
                       value={newSalesperson.commission_rate}
                       onChange={(e) => setNewSalesperson({...newSalesperson, commission_rate: parseFloat(e.target.value) || 0})}
-                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                      placeholder="5"
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                      placeholder="50"
+                    />
+                  </div>
+                )}
+                {newSalesperson.commission_type === 'percentage' && (
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Percentual de Comissão (%)</label>
+                    <input
+                      type="number"
+                      value={newSalesperson.commission_rate}
+                      onChange={(e) => setNewSalesperson({...newSalesperson, commission_rate: parseFloat(e.target.value) || 0})}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                      placeholder="10"
                       min="0"
                       max="100"
                       step="0.5"
                     />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Percentual adicional sobre as vendas geradas pelo parceiro
-                    </p>
                   </div>
-                </>
-              )}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Base Salary ($)</label>
-                <input
-                  type="number"
-                  value={newSalesperson.base_salary}
-                  onChange={(e) => setNewSalesperson({...newSalesperson, base_salary: parseFloat(e.target.value)})}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="0"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Monthly Target (partners)</label>
-                <input
-                  type="number"
-                  value={newSalesperson.monthly_target}
-                  onChange={(e) => setNewSalesperson({...newSalesperson, monthly_target: parseInt(e.target.value)})}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="10"
-                />
+                )}
+                {newSalesperson.commission_type === 'referral_plus_commission' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Bônus Referral ($)</label>
+                      <input
+                        type="number"
+                        value={newSalesperson.referral_bonus}
+                        onChange={(e) => setNewSalesperson({...newSalesperson, referral_bonus: parseFloat(e.target.value) || 0})}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                        placeholder="50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Comissão (%)</label>
+                      <input
+                        type="number"
+                        value={newSalesperson.commission_rate}
+                        onChange={(e) => setNewSalesperson({...newSalesperson, commission_rate: parseFloat(e.target.value) || 0})}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                        placeholder="5"
+                        min="0"
+                        max="100"
+                        step="0.5"
+                      />
+                    </div>
+                  </>
+                )}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Base Salary ($)</label>
+                  <input
+                    type="number"
+                    value={newSalesperson.base_salary}
+                    onChange={(e) => setNewSalesperson({...newSalesperson, base_salary: parseFloat(e.target.value) || 0})}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Meta Mensal</label>
+                  <input
+                    type="number"
+                    value={newSalesperson.monthly_target}
+                    onChange={(e) => setNewSalesperson({...newSalesperson, monthly_target: parseInt(e.target.value) || 10})}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="10"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Idioma do Email</label>
+                  <select
+                    value={newSalesperson.preferred_language}
+                    onChange={(e) => setNewSalesperson({...newSalesperson, preferred_language: e.target.value})}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                  >
+                    <option value="en">🇺🇸 English</option>
+                    <option value="pt">🇧🇷 Português</option>
+                    <option value="es">🇪🇸 Español</option>
+                  </select>
+                </div>
               </div>
             </div>
-            <div className="flex justify-end gap-3 mt-6">
+            <div className="p-4 border-t flex justify-end gap-3">
               <button
                 onClick={() => setShowAddSalesperson(false)}
-                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm"
               >
-                Cancel
+                Cancelar
               </button>
               <button
                 onClick={handleAddSalesperson}
                 disabled={!newSalesperson.name || !newSalesperson.email}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 text-sm"
               >
                 Add Salesperson
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Modal - Show Referral Link */}
+      {createdSalesperson && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+            <div className="text-center mb-4">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <span className="text-3xl">✅</span>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">Salesperson Criado!</h3>
+              <p className="text-gray-600 mt-1">{createdSalesperson.name} foi cadastrado com sucesso.</p>
+            </div>
+
+            <div className="bg-gray-50 rounded-lg p-4 mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Código de Referral</label>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 bg-white px-3 py-2 rounded border text-lg font-mono font-bold text-blue-600">
+                  {createdSalesperson.referral_code}
+                </code>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(createdSalesperson.referral_code);
+                    alert('Código copiado!');
+                  }}
+                  className="px-3 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm"
+                >
+                  📋
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-blue-50 rounded-lg p-4 mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Link de Referral para Parceiros</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={`${window.location.origin}/#/partner-register?ref=${createdSalesperson.referral_code}`}
+                  className="flex-1 bg-white px-3 py-2 rounded border text-sm"
+                />
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${window.location.origin}/#/partner-register?ref=${createdSalesperson.referral_code}`);
+                    alert('Link copiado!');
+                  }}
+                  className="px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm"
+                >
+                  📋 Copiar
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Envie este link para o salesperson. Quando um parceiro se cadastrar usando este link, será automaticamente vinculado a {createdSalesperson.name}.
+              </p>
+            </div>
+
+            <button
+              onClick={() => setCreatedSalesperson(null)}
+              className="w-full px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900"
+            >
+              Fechar
+            </button>
           </div>
         </div>
       )}

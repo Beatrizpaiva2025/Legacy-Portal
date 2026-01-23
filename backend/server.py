@@ -144,10 +144,10 @@ async def get_exchange_rates():
     global exchange_rate_cache
 
     try:
-        # Check if cache is valid (less than 1 hour old)
+        # Check if cache is valid (less than 24 hours old)
         if exchange_rate_cache["last_updated"]:
             cache_age = datetime.utcnow() - exchange_rate_cache["last_updated"]
-            if cache_age.total_seconds() < 3600 and exchange_rate_cache["rates"]:
+            if cache_age.total_seconds() < 86400 and exchange_rate_cache["rates"]:
                 return {"rates": exchange_rate_cache["rates"], "base": "usd", "cached": True}
 
         # Fetch fresh rates from free API
@@ -1192,6 +1192,9 @@ class Partner(BaseModel):
     # Agreement
     agreed_to_terms: bool = False
     agreed_at: Optional[datetime] = None
+    # Welcome coupon notification
+    has_seen_welcome_coupon: bool = False  # True after partner sees the welcome coupon popup
+    welcome_coupon_code: Optional[str] = None  # Store the welcome coupon code for display
     # Dates
     created_at: datetime = Field(default_factory=datetime.utcnow)
     last_order_at: Optional[datetime] = None
@@ -1262,6 +1265,8 @@ class PartnerResponse(BaseModel):
     contact_name: str
     phone: Optional[str] = None
     token: str
+    has_seen_welcome_coupon: bool = False
+    welcome_coupon_code: Optional[str] = None
 
 # Admin User Models (with roles: admin, pm, translator)
 class AdminUser(BaseModel):
@@ -1506,6 +1511,7 @@ class PartnerInvoiceCreate(BaseModel):
 class PartnerInvoicePayStripe(BaseModel):
     invoice_id: str
     origin_url: str
+    currency: Optional[str] = "usd"  # Support multi-currency (usd, brl, etc.)
 
 class PartnerInvoicePayZelle(BaseModel):
     invoice_id: str
@@ -4912,9 +4918,15 @@ async def register_partner(partner_data: PartnerCreate):
             discount_value=1.0,  # 1 free certified page
             max_uses=1,
             first_order_only=True,
-            valid_until=datetime.utcnow() + timedelta(days=90)  # Valid for 90 days
+            valid_until=datetime.utcnow() + timedelta(days=30)  # Valid for 30 days
         )
         await db.coupons.insert_one(welcome_coupon.dict())
+
+        # Store the welcome coupon code in the partner record for first login popup
+        await db.partners.update_one(
+            {"id": partner.id},
+            {"$set": {"welcome_coupon_code": welcome_coupon.code}}
+        )
 
         # Send welcome email with coupon code
         try:
@@ -4935,7 +4947,7 @@ async def register_partner(partner_data: PartnerCreate):
                     <div style="background: white; color: #0d9488; padding: 12px 25px; border-radius: 8px; display: inline-block; font-size: 20px; font-weight: bold; letter-spacing: 2px;">
                         {welcome_coupon.code}
                     </div>
-                    <p style="margin: 15px 0 0 0; font-size: 12px; opacity: 0.9;">Valid for 90 days • Use on your first order</p>
+                    <p style="margin: 15px 0 0 0; font-size: 12px; opacity: 0.9;">Valid for 30 days • Use on your first order</p>
                 </div>
 
                 <h3 style="color: #374151;">How to use your coupon:</h3>
@@ -5079,7 +5091,9 @@ async def login_partner(login_data: PartnerLogin):
             email=partner["email"],
             contact_name=partner["contact_name"],
             phone=partner.get("phone"),
-            token=token
+            token=token,
+            has_seen_welcome_coupon=partner.get("has_seen_welcome_coupon", False),
+            welcome_coupon_code=partner.get("welcome_coupon_code")
         )
 
     except HTTPException:
@@ -5111,7 +5125,9 @@ async def verify_partner_token(token: str):
                 "email": partner["email"],
                 "contact_name": partner["contact_name"],
                 "phone": partner.get("phone"),
-                "token": token
+                "token": token,
+                "has_seen_welcome_coupon": partner.get("has_seen_welcome_coupon", False),
+                "welcome_coupon_code": partner.get("welcome_coupon_code")
             }
         }
     except HTTPException:
@@ -5235,7 +5251,7 @@ async def get_current_partner_info(token: str):
 # ==================== COUPON SYSTEM ====================
 
 # Price for one certified page (used for WELCOME coupon discount calculation)
-CERTIFIED_PAGE_PRICE = 35.00  # $35 per certified page
+CERTIFIED_PAGE_PRICE = 24.99  # $24.99 per certified page
 
 @api_router.get("/partner/coupons")
 async def get_partner_coupons(token: str):
@@ -5393,6 +5409,21 @@ async def apply_coupon_to_order(token: str, code: str, order_id: str):
     )
 
     return {"success": True, "message": "Coupon applied successfully"}
+
+@api_router.post("/partner/dismiss-welcome-coupon")
+async def dismiss_welcome_coupon(token: str):
+    """Mark the welcome coupon popup as seen by the partner"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    # Update the partner to mark welcome coupon as seen
+    await db.partners.update_one(
+        {"id": partner["id"]},
+        {"$set": {"has_seen_welcome_coupon": True}}
+    )
+
+    return {"success": True, "message": "Welcome coupon dismissed"}
 
 # ==================== ADMIN COUPON MANAGEMENT ====================
 
@@ -5611,7 +5642,7 @@ async def get_partner_assigned_coupons(partner_id: str, admin_key: str):
 
 # ==================== PARTNER CREDIT QUALIFICATION ====================
 
-CREDIT_QUALIFICATION_MIN_ORDERS = 3  # Minimum paid orders to qualify for invoice plans
+CREDIT_QUALIFICATION_MIN_TRANSLATIONS = 10  # Minimum paid translations to qualify for biweekly invoice
 
 @api_router.get("/partner/credit-qualification")
 async def get_partner_credit_qualification(token: str):
@@ -5625,8 +5656,8 @@ async def get_partner_credit_qualification(token: str):
     plan_approved = partner.get("payment_plan_approved", False)
 
     # Calculate qualification status
-    qualifies = total_paid_orders >= CREDIT_QUALIFICATION_MIN_ORDERS
-    orders_remaining = max(0, CREDIT_QUALIFICATION_MIN_ORDERS - total_paid_orders)
+    qualifies = total_paid_orders >= CREDIT_QUALIFICATION_MIN_TRANSLATIONS
+    orders_remaining = max(0, CREDIT_QUALIFICATION_MIN_TRANSLATIONS - total_paid_orders)
 
     # Check if upgrade is pending
     upgrade_pending = partner.get("payment_plan_upgrade_requested", False)
@@ -5637,7 +5668,7 @@ async def get_partner_credit_qualification(token: str):
         "plan_approved": plan_approved,
         "qualifies_for_invoice": qualifies,
         "total_paid_orders": total_paid_orders,
-        "orders_required": CREDIT_QUALIFICATION_MIN_ORDERS,
+        "orders_required": CREDIT_QUALIFICATION_MIN_TRANSLATIONS,
         "orders_remaining": orders_remaining,
         "upgrade_pending": upgrade_pending,
         "requested_plan": requested_plan
@@ -5738,10 +5769,10 @@ async def request_payment_plan_upgrade(token: str, plan: str):
 
     # Check qualification
     total_paid_orders = partner.get("total_paid_orders", 0)
-    if total_paid_orders < CREDIT_QUALIFICATION_MIN_ORDERS:
+    if total_paid_orders < CREDIT_QUALIFICATION_MIN_TRANSLATIONS:
         raise HTTPException(
             status_code=400,
-            detail=f"Not yet qualified. Complete {CREDIT_QUALIFICATION_MIN_ORDERS - total_paid_orders} more paid orders to qualify."
+            detail=f"Not yet qualified. Complete {CREDIT_QUALIFICATION_MIN_TRANSLATIONS - total_paid_orders} more paid translations to qualify."
         )
 
     # Check if already on invoice plan
@@ -8031,16 +8062,11 @@ async def get_my_projects(token: str, admin_key: str):
         # Translator sees projects assigned to them
         orders = await db.translation_orders.find({"assigned_translator_id": user_id}).sort("created_at", -1).to_list(500)
 
-        # Auto-accept: When translator accesses their projects, auto-accept any pending assignments
-        # This fixes the issue where translator can work but status is stuck on "pending"
+        # NO auto-accept: ALL translators (in-house and contractors) must explicitly accept via email link
+        # This ensures proper tracking of assignment acceptance
         for order in orders:
             if order.get("translator_assignment_status") == "pending":
-                await db.translation_orders.update_one(
-                    {"id": order["id"]},
-                    {"$set": {"translator_assignment_status": "accepted", "translator_accepted_at": datetime.utcnow().isoformat()}}
-                )
-                order["translator_assignment_status"] = "accepted"
-                logger.info(f"Auto-accepted assignment for translator {user_id} on order {order.get('order_number', order['id'])}")
+                logger.info(f"Translator {user_id} accessed portal but assignment {order.get('order_number', order['id'])} requires explicit acceptance via email")
     else:
         orders = []
 
@@ -10019,17 +10045,35 @@ async def create_invoice_stripe_checkout(invoice_id: str, request: PartnerInvoic
         if invoice.get("status") == "paid":
             raise HTTPException(status_code=400, detail="Invoice already paid")
 
+        # Get currency configuration for multi-currency support (BRL includes PIX)
+        currency = request.currency.lower() if request.currency else "usd"
+        if currency not in CURRENCY_CONFIG:
+            currency = "usd"
+
+        currency_info = CURRENCY_CONFIG[currency]
+        payment_methods = currency_info["payment_methods"]
+
+        # Calculate amount in target currency
+        base_amount_usd = invoice.get("total_amount", 0)
+        if currency != "usd":
+            rates_response = await get_exchange_rates()
+            rates = rates_response.get("rates", {"usd": 1.0, "brl": 5.0, "eur": 0.92, "gbp": 0.79})
+            exchange_rate = rates.get(currency, 1.0)
+            amount_in_currency = base_amount_usd * exchange_rate
+        else:
+            amount_in_currency = base_amount_usd
+
         # Create Stripe checkout session
         checkout_params = {
-            'payment_method_types': ['card'],
+            'payment_method_types': payment_methods,
             'line_items': [{
                 'price_data': {
-                    'currency': 'usd',
+                    'currency': currency,
                     'product_data': {
                         'name': f'Invoice {invoice.get("invoice_number")}',
                         'description': f'Partner Invoice - {invoice.get("partner_company")} - {len(invoice.get("order_ids", []))} orders',
                     },
-                    'unit_amount': int(invoice.get("total_amount", 0) * 100),
+                    'unit_amount': int(amount_in_currency * 100),
                 },
                 'quantity': 1,
             }],
@@ -10701,7 +10745,7 @@ async def admin_mark_order_paid(order_id: str, admin_key: str):
 
 @api_router.post("/admin/orders/{order_id}/upload-translation")
 async def admin_upload_translation(order_id: str, admin_key: str, file: UploadFile = File(...)):
-    """Upload translated file for an order (admin/PM only)"""
+    """Upload translated file for an order (admin/PM only) - supports multiple files"""
     user_info = await validate_admin_or_user_token(admin_key)
     if not user_info:
         raise HTTPException(status_code=401, detail="Invalid admin key or token")
@@ -10721,11 +10765,29 @@ async def admin_upload_translation(order_id: str, admin_key: str, file: UploadFi
         'pdf': 'application/pdf',
         'doc': 'application/msword',
         'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'txt': 'text/plain'
+        'txt': 'text/plain',
+        'html': 'text/html'
     }
     file_type = file_types.get(file_extension, 'application/octet-stream')
 
-    # Update order with translated file
+    # Generate unique document ID
+    document_id = str(uuid.uuid4())
+
+    # Save to order_documents collection for multiple file support
+    document_record = {
+        "id": document_id,
+        "order_id": order_id,
+        "filename": file.filename,
+        "file_data": file_base64,
+        "content_type": file_type,
+        "source": "translated_document",
+        "document_type": "translation",
+        "uploaded_at": datetime.utcnow(),
+        "uploaded_by": user_info.get("name", "Admin")
+    }
+    await db.order_documents.insert_one(document_record)
+
+    # Also update order with latest translated file (for backwards compatibility)
     await db.translation_orders.update_one(
         {"id": order_id},
         {"$set": {
@@ -10735,7 +10797,171 @@ async def admin_upload_translation(order_id: str, admin_key: str, file: UploadFi
         }}
     )
 
-    return {"status": "success", "message": f"Translation file '{file.filename}' uploaded successfully"}
+    logger.info(f"Translation file uploaded: {file.filename} (doc_id: {document_id}) for order {order_id}")
+
+    return {
+        "status": "success",
+        "message": f"Translation file '{file.filename}' uploaded successfully",
+        "document_id": document_id,
+        "filename": file.filename
+    }
+
+
+@api_router.post("/admin/orders/{order_id}/upload-cover-page")
+async def admin_upload_cover_page(order_id: str, admin_key: str, file: UploadFile = File(...)):
+    """
+    Upload a separate cover page for an order.
+    The cover page is stored independently and will be used as-is (no processing)
+    to avoid formatting issues.
+    """
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Find the order
+    order = await db.translation_orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Read and encode file
+    file_content = await file.read()
+    file_base64 = base64.b64encode(file_content).decode('utf-8')
+
+    # Determine file type
+    file_extension = file.filename.split('.')[-1].lower() if '.' in file.filename else 'pdf'
+    file_types = {
+        'pdf': 'application/pdf',
+        'png': 'image/png',
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg'
+    }
+    file_type = file_types.get(file_extension, 'application/pdf')
+
+    # Update order with separate cover page
+    await db.translation_orders.update_one(
+        {"id": order_id},
+        {"$set": {
+            "cover_page_file": file_base64,
+            "cover_page_filename": file.filename,
+            "cover_page_type": file_type,
+            "use_separate_cover": True
+        }}
+    )
+
+    logger.info(f"Cover page uploaded for order {order.get('order_number')}: {file.filename}")
+    return {
+        "status": "success",
+        "message": f"Cover page '{file.filename}' uploaded successfully. It will be used as-is without modification."
+    }
+
+
+@api_router.post("/admin/orders/{order_id}/replace-translation-pages")
+async def admin_replace_translation_pages(
+    order_id: str,
+    admin_key: str,
+    file: UploadFile = File(...),
+    keep_cover_pages: int = 1
+):
+    """
+    Replace only the translation content pages while keeping the cover page(s) intact.
+
+    Parameters:
+    - keep_cover_pages: Number of pages to keep from the beginning (default: 1 = first page is cover)
+
+    This is useful when translation pages have formatting issues but the cover is fine.
+    """
+    import fitz  # PyMuPDF
+
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Find the order
+    order = await db.translation_orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Get existing translated file
+    existing_file = order.get("translated_file")
+    if not existing_file:
+        raise HTTPException(status_code=400, detail="No existing translation file to replace pages in")
+
+    try:
+        # Read the new translation pages
+        new_content = await file.read()
+        new_doc = fitz.open(stream=new_content, filetype="pdf")
+
+        # Open existing document
+        existing_bytes = base64.b64decode(existing_file)
+        existing_doc = fitz.open(stream=existing_bytes, filetype="pdf")
+
+        # Create combined document
+        combined_doc = fitz.open()
+
+        # Keep cover pages from existing document
+        pages_to_keep = min(keep_cover_pages, len(existing_doc))
+        if pages_to_keep > 0:
+            combined_doc.insert_pdf(existing_doc, from_page=0, to_page=pages_to_keep - 1)
+            logger.info(f"Kept {pages_to_keep} cover page(s) from existing document")
+
+        # Add all pages from new document (replacement translation pages)
+        combined_doc.insert_pdf(new_doc, from_page=0, to_page=len(new_doc) - 1)
+        logger.info(f"Added {len(new_doc)} new translation page(s)")
+
+        # Convert to base64
+        combined_bytes = combined_doc.tobytes()
+        combined_base64 = base64.b64encode(combined_bytes).decode('utf-8')
+
+        # Clean up
+        new_doc.close()
+        existing_doc.close()
+        combined_doc.close()
+
+        # Update order with combined file
+        await db.translation_orders.update_one(
+            {"id": order_id},
+            {"$set": {
+                "translated_file": combined_base64,
+                "translated_filename": order.get("translated_filename", "translation.pdf"),
+                "pages_replaced_at": datetime.utcnow().isoformat()
+            }}
+        )
+
+        return {
+            "status": "success",
+            "message": f"Translation pages replaced successfully. Kept {pages_to_keep} cover page(s), added {len(new_doc)} new page(s).",
+            "cover_pages_kept": pages_to_keep,
+            "new_pages_added": len(new_doc)
+        }
+
+    except Exception as e:
+        logger.error(f"Error replacing translation pages: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to replace pages: {str(e)}")
+
+
+@api_router.delete("/admin/orders/{order_id}/cover-page")
+async def admin_delete_cover_page(order_id: str, admin_key: str):
+    """Remove the separate cover page from an order"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    order = await db.translation_orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    await db.translation_orders.update_one(
+        {"id": order_id},
+        {"$unset": {
+            "cover_page_file": "",
+            "cover_page_filename": "",
+            "cover_page_type": "",
+            "use_separate_cover": ""
+        }}
+    )
+
+    return {"status": "success", "message": "Cover page removed"}
+
 
 # ==================== PAYMENT PROOF ENDPOINTS ====================
 @api_router.post("/payment-proofs/upload")
@@ -11344,62 +11570,112 @@ async def generate_combined_delivery_pdf(
     client_name = order.get("client_name", "")
     translation_date = datetime.utcnow().strftime("%B %d, %Y")
 
-    # ==================== PAGE 1: CERTIFICATE OF ACCURACY ====================
+    # ==================== PAGE 1: COVER PAGE / CERTIFICATE ====================
     if include_certificate:
-        page = doc.new_page(width=page_width, height=page_height)
+        # Check if there's a separate cover page uploaded (use it as-is to preserve formatting)
+        use_separate_cover = order.get("use_separate_cover", False)
+        cover_page_file = order.get("cover_page_file")
 
-        # Header line
-        page.draw_rect(fitz.Rect(50, 80, page_width - 50, 83), color=blue_color, fill=blue_color)
+        if use_separate_cover and cover_page_file:
+            # Use the uploaded cover page exactly as-is (no modifications)
+            try:
+                cover_bytes = base64.b64decode(cover_page_file)
+                cover_type = order.get("cover_page_type", "application/pdf")
 
-        # Company name
-        page.insert_text((page_width/2 - 100, 60), "Legacy Translations", fontsize=18, fontname="helv", color=blue_color)
+                if cover_type == "application/pdf":
+                    # Insert PDF cover page(s) directly
+                    cover_doc = fitz.open(stream=cover_bytes, filetype="pdf")
+                    for page_num in range(len(cover_doc)):
+                        doc.insert_pdf(cover_doc, from_page=page_num, to_page=page_num)
+                    cover_doc.close()
+                    logger.info(f"Inserted {len(cover_doc)} page(s) from separate cover PDF")
+                else:
+                    # Insert image cover page
+                    from PIL import Image
+                    from io import BytesIO as PILBytesIO
+                    img = Image.open(PILBytesIO(cover_bytes))
+                    page = doc.new_page(width=page_width, height=page_height)
 
-        # Contact info
-        page.insert_text((page_width/2 - 140, 100), "867 Boylston Street · 5th Floor · #2073 · Boston, MA 02116", fontsize=8, fontname="helv", color=gray_color)
-        page.insert_text((page_width/2 - 95, 112), "(857) 316-7770 · contact@legacytranslations.com", fontsize=8, fontname="helv", color=gray_color)
+                    # Calculate scaling to fit page while maintaining aspect ratio
+                    img_width, img_height = img.size
+                    scale = min((page_width - 40) / img_width, (page_height - 40) / img_height)
+                    new_width = img_width * scale
+                    new_height = img_height * scale
+                    x_offset = (page_width - new_width) / 2
+                    y_offset = (page_height - new_height) / 2
 
-        # Order number
-        page.insert_text((page_width/2 - 40, 150), f"Order # {order_number}", fontsize=11, fontname="helv", color=gray_color)
+                    # Convert to PNG bytes for insertion
+                    img_buffer = PILBytesIO()
+                    img.save(img_buffer, format='PNG')
+                    img_buffer.seek(0)
 
-        # Main title
-        page.insert_text((page_width/2 - 130, 200), "CERTIFICATION OF TRANSLATION ACCURACY", fontsize=14, fontname="helvB", color=blue_color)
+                    page.insert_image(
+                        fitz.Rect(x_offset, y_offset, x_offset + new_width, y_offset + new_height),
+                        stream=img_buffer.getvalue()
+                    )
+                    logger.info("Inserted separate cover image")
 
-        # Subtitle
-        subtitle = f"Translation of a {document_type} from {source_lang} to {target_lang}"
-        page.insert_text((page_width/2 - len(subtitle)*2.5, 240), subtitle, fontsize=10, fontname="helv", color=gray_color)
+            except Exception as e:
+                logger.error(f"Error inserting separate cover page: {str(e)}, falling back to generated certificate")
+                # Fall back to generated certificate
+                use_separate_cover = False
 
-        # Body text
-        body_y = 300
-        body_texts = [
-            f"I, {translator_name}, hereby certify that the attached translation from {source_lang}",
-            f"to {target_lang} is a true and accurate translation of the original document.",
-            "",
-            "I further certify that I am competent to translate from the source language to the target",
-            "language, and that the translation is complete and accurate to the best of my knowledge",
-            "and ability.",
-            "",
-            "This certification is made under penalty of perjury under the laws of the United States",
-            "of America and the Commonwealth of Massachusetts."
-        ]
+        if not use_separate_cover or not cover_page_file:
+            # Generate standard Certificate of Accuracy
+            page = doc.new_page(width=page_width, height=page_height)
 
-        for text in body_texts:
-            if text:
-                page.insert_text((80, body_y), text, fontsize=10, fontname="helv", color=(0.2, 0.2, 0.2))
-            body_y += 18
+            # Header line
+            page.draw_rect(fitz.Rect(50, 80, page_width - 50, 83), color=blue_color, fill=blue_color)
 
-        # Signature section
-        sig_y = 550
-        page.insert_text((80, sig_y), "___________________________________", fontsize=10, fontname="helv", color=gray_color)
-        page.insert_text((80, sig_y + 20), translator_name, fontsize=11, fontname="helvB", color=blue_color)
-        page.insert_text((80, sig_y + 35), "Authorized Representative", fontsize=9, fontname="helv", color=gray_color)
-        page.insert_text((80, sig_y + 50), "Legacy Translations Inc.", fontsize=9, fontname="helv", color=gray_color)
-        page.insert_text((80, sig_y + 65), f"Dated: {translation_date}", fontsize=9, fontname="helv", color=gray_color)
+            # Company name
+            page.insert_text((page_width/2 - 100, 60), "Legacy Translations", fontsize=18, fontname="helv", color=blue_color)
 
-        # ATA info
-        page.insert_text((400, sig_y + 35), "ATA Member #275993", fontsize=9, fontname="helv", color=gray_color)
+            # Contact info
+            page.insert_text((page_width/2 - 140, 100), "867 Boylston Street · 5th Floor · #2073 · Boston, MA 02116", fontsize=8, fontname="helv", color=gray_color)
+            page.insert_text((page_width/2 - 95, 112), "(857) 316-7770 · contact@legacytranslations.com", fontsize=8, fontname="helv", color=gray_color)
 
-        # Footer line
-        page.draw_rect(fitz.Rect(50, page_height - 60, page_width - 50, page_height - 57), color=blue_color, fill=blue_color)
+            # Order number
+            page.insert_text((page_width/2 - 40, 150), f"Order # {order_number}", fontsize=11, fontname="helv", color=gray_color)
+
+            # Main title
+            page.insert_text((page_width/2 - 130, 200), "CERTIFICATION OF TRANSLATION ACCURACY", fontsize=14, fontname="helvB", color=blue_color)
+
+            # Subtitle
+            subtitle = f"Translation of a {document_type} from {source_lang} to {target_lang}"
+            page.insert_text((page_width/2 - len(subtitle)*2.5, 240), subtitle, fontsize=10, fontname="helv", color=gray_color)
+
+            # Body text
+            body_y = 300
+            body_texts = [
+                f"I, {translator_name}, hereby certify that the attached translation from {source_lang}",
+                f"to {target_lang} is a true and accurate translation of the original document.",
+                "",
+                "I further certify that I am competent to translate from the source language to the target",
+                "language, and that the translation is complete and accurate to the best of my knowledge",
+                "and ability.",
+                "",
+                "This certification is made under penalty of perjury under the laws of the United States",
+                "of America and the Commonwealth of Massachusetts."
+            ]
+
+            for text in body_texts:
+                if text:
+                    page.insert_text((80, body_y), text, fontsize=10, fontname="helv", color=(0.2, 0.2, 0.2))
+                body_y += 18
+
+            # Signature section
+            sig_y = 550
+            page.insert_text((80, sig_y), "___________________________________", fontsize=10, fontname="helv", color=gray_color)
+            page.insert_text((80, sig_y + 20), translator_name, fontsize=11, fontname="helvB", color=blue_color)
+            page.insert_text((80, sig_y + 35), "Authorized Representative", fontsize=9, fontname="helv", color=gray_color)
+            page.insert_text((80, sig_y + 50), "Legacy Translations Inc.", fontsize=9, fontname="helv", color=gray_color)
+            page.insert_text((80, sig_y + 65), f"Dated: {translation_date}", fontsize=9, fontname="helv", color=gray_color)
+
+            # ATA info
+            page.insert_text((400, sig_y + 35), "ATA Member #275993", fontsize=9, fontname="helv", color=gray_color)
+
+            # Footer line
+            page.draw_rect(fitz.Rect(50, page_height - 60, page_width - 50, page_height - 57), color=blue_color, fill=blue_color)
 
     # ==================== TRANSLATION PAGES ====================
     if include_translation:
@@ -12380,7 +12656,34 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                     }]
                     attachment_filenames = [order["translated_filename"]]
 
+        # FINAL FALLBACK: If still no attachments, try to get any translated documents from order_documents
+        if len(all_attachments) == 0:
+            logger.warning(f"No attachments generated, trying to fetch from order_documents collection")
+            try:
+                translated_docs = await db.order_documents.find({
+                    "order_id": order_id,
+                    "source": "translated_document"
+                }).to_list(50)
+
+                if translated_docs:
+                    for doc in translated_docs:
+                        doc_data = doc.get("file_data") or doc.get("data")
+                        if doc_data:
+                            all_attachments.append({
+                                "content": doc_data,
+                                "filename": doc.get("filename", "translation.pdf"),
+                                "content_type": doc.get("content_type", "application/pdf")
+                            })
+                            attachment_filenames.append(doc.get("filename", "translation.pdf"))
+                            logger.info(f"Added fallback document from order_documents: {doc.get('filename')}")
+
+                if len(all_attachments) == 0:
+                    logger.error(f"NO ATTACHMENTS FOUND for order {order_id}! Order data: translated_file={bool(order.get('translated_file'))}, translation_html={bool(order.get('translation_html'))}")
+            except Exception as final_err:
+                logger.error(f"Final fallback failed: {str(final_err)}")
+
         has_attachments = len(all_attachments) > 0
+        logger.info(f"Final attachment count for order {order.get('order_number')}: {len(all_attachments)}, has_attachments={has_attachments}")
 
         # Add external attachment if provided (for resend)
         external_attachment_sent = False
@@ -12400,6 +12703,32 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                 logger.info(f"Added external attachment for resend: {ext_att.filename}")
             except Exception as e:
                 logger.error(f"Failed to add external attachment: {str(e)}")
+
+        # Add additional documents from selection (multiple file support)
+        additional_docs_sent = 0
+        if attachments_selection and attachments_selection.additional_document_ids:
+            logger.info(f"Processing {len(attachments_selection.additional_document_ids)} additional document(s)")
+            for doc_id in attachments_selection.additional_document_ids:
+                try:
+                    # Find document in order_documents collection
+                    doc = await db.order_documents.find_one({"id": doc_id})
+                    if doc and doc.get("file_data"):
+                        all_attachments.append({
+                            "content": doc["file_data"],  # Already base64 encoded
+                            "filename": doc.get("filename", f"document_{doc_id}.pdf"),
+                            "content_type": doc.get("content_type", "application/pdf")
+                        })
+                        attachment_filenames.append(doc.get("filename", f"document_{doc_id}.pdf"))
+                        additional_docs_sent += 1
+                        has_attachments = True
+                        logger.info(f"Added additional document: {doc.get('filename')} (id: {doc_id})")
+                    else:
+                        logger.warning(f"Additional document not found or has no data: {doc_id}")
+                except Exception as e:
+                    logger.error(f"Failed to add additional document {doc_id}: {str(e)}")
+
+            if additional_docs_sent > 0:
+                logger.info(f"Successfully added {additional_docs_sent} additional document(s) to email")
 
         # Use professional email template
         email_html = get_delivery_email_template(order['client_name'])
@@ -12502,6 +12831,7 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
             "attachment_sent": has_attachments,
             "attachments_sent": len(all_attachments),
             "attachment_filenames": attachment_filenames,
+            "additional_docs_sent": additional_docs_sent,
             "combined_pdf": generate_combined_pdf,
             "pm_notified": pm_notified,
             "bcc_sent": bcc_sent,
@@ -12540,8 +12870,25 @@ async def get_translated_document(order_id: str, admin_key: str):
     has_file = bool(order.get("translated_file"))
     has_html = bool(order.get("translation_html"))
 
+    # Get additional translated documents from order_documents collection
+    additional_docs = await db.order_documents.find({
+        "order_id": order_id,
+        "source": "translated_document"
+    }).to_list(50)
+
+    # Format additional docs for frontend
+    additional_documents = []
+    for doc in additional_docs:
+        additional_documents.append({
+            "id": doc.get("id"),
+            "filename": doc.get("filename"),
+            "content_type": doc.get("content_type"),
+            "uploaded_at": doc.get("uploaded_at"),
+            "uploaded_by": doc.get("uploaded_by")
+        })
+
     response = {
-        "has_translated_document": has_file or has_html,
+        "has_translated_document": has_file or has_html or len(additional_documents) > 0,
         "translated_filename": order.get("translated_filename"),
         "translated_file_type": order.get("translated_file_type"),
         "translation_ready": order.get("translation_ready", False),
@@ -12551,7 +12898,8 @@ async def get_translated_document(order_id: str, admin_key: str):
         "translation_status": order.get("translation_status"),
         "client_name": order.get("client_name"),
         "client_email": order.get("client_email"),
-        "order_number": order.get("order_number")
+        "order_number": order.get("order_number"),
+        "additional_documents": additional_documents
     }
 
     # Include translation content for review
@@ -15417,6 +15765,49 @@ Retorne o JSON com a análise completa."""
                 clean_result = clean_result.strip()
 
                 parsed_result = json.loads(clean_result)
+
+                # Filter out errors where original equals sugestao (no actual change)
+                # This fixes a bug where AI flags items as errors when before/after are identical
+                if parsed_result.get("erros"):
+                    original_count = len(parsed_result["erros"])
+                    filtered_errors = []
+                    for erro in parsed_result["erros"]:
+                        original_text = (erro.get("original") or "").strip()
+                        sugestao = (erro.get("sugestao") or "").strip()
+                        # Only keep errors where there's an actual difference
+                        if original_text != sugestao:
+                            filtered_errors.append(erro)
+                        else:
+                            logger.info(f"Filtered out duplicate simple proofread error: '{original_text}' == '{sugestao}'")
+
+                    parsed_result["erros"] = filtered_errors
+                    filtered_count = original_count - len(filtered_errors)
+
+                    # Recalculate counts after filtering
+                    if filtered_count > 0:
+                        parsed_result["total_erros"] = len(filtered_errors)
+                        parsed_result["criticos"] = sum(1 for e in filtered_errors if e.get("gravidade") == "CRÍTICO")
+                        parsed_result["altos"] = sum(1 for e in filtered_errors if e.get("gravidade") == "ALTO")
+                        parsed_result["medios"] = sum(1 for e in filtered_errors if e.get("gravidade") == "MÉDIO")
+                        parsed_result["baixos"] = sum(1 for e in filtered_errors if e.get("gravidade") == "BAIXO")
+
+                        # Recalculate score and classification
+                        total = len(filtered_errors)
+                        criticos = parsed_result["criticos"]
+                        altos = parsed_result["altos"]
+
+                        if criticos > 0 or altos > 2:
+                            parsed_result["classificacao"] = "REPROVADO"
+                            parsed_result["pontuacao_final"] = max(0, 70 - (criticos * 15) - (altos * 5))
+                        elif altos > 0 or total > 3:
+                            parsed_result["classificacao"] = "APROVADO_COM_OBSERVACOES"
+                            parsed_result["pontuacao_final"] = max(70, 85 - (altos * 5) - (total * 2))
+                        else:
+                            parsed_result["classificacao"] = "APROVADO"
+                            parsed_result["pontuacao_final"] = max(85, 100 - (total * 3))
+
+                        logger.info(f"Simple proofread: Filtered {filtered_count} duplicate errors, {len(filtered_errors)} remaining")
+
                 return parsed_result
 
             except json.JSONDecodeError:
@@ -15653,6 +16044,43 @@ Analise minuciosamente e retorne o JSON com todos os erros encontrados."""
                 clean_result = clean_result.strip()
 
                 parsed_result = json.loads(clean_result)
+
+                # Filter out errors where traducao_errada equals correcao (no actual change)
+                # This fixes a bug where AI flags items as errors when before/after are identical
+                if parsed_result.get("erros"):
+                    original_count = len(parsed_result["erros"])
+                    filtered_errors = []
+                    for erro in parsed_result["erros"]:
+                        traducao_errada = (erro.get("traducao_errada") or "").strip()
+                        correcao = (erro.get("correcao") or "").strip()
+                        # Only keep errors where there's an actual difference
+                        if traducao_errada != correcao:
+                            filtered_errors.append(erro)
+                        else:
+                            logger.info(f"Filtered out duplicate proofreading error: '{traducao_errada}' == '{correcao}'")
+
+                    parsed_result["erros"] = filtered_errors
+                    filtered_count = original_count - len(filtered_errors)
+
+                    # Recalculate summary counts after filtering
+                    if filtered_count > 0 and parsed_result.get("resumo"):
+                        resumo = parsed_result["resumo"]
+                        resumo["total_erros"] = len(filtered_errors)
+                        # Recalculate severity counts from filtered errors
+                        resumo["criticos"] = sum(1 for e in filtered_errors if e.get("gravidade") == "CRÍTICO")
+                        resumo["altos"] = sum(1 for e in filtered_errors if e.get("gravidade") == "ALTO")
+                        resumo["medios"] = sum(1 for e in filtered_errors if e.get("gravidade") == "MÉDIO")
+                        resumo["baixos"] = sum(1 for e in filtered_errors if e.get("gravidade") == "BAIXO")
+
+                        # Update quality classification based on new counts
+                        if resumo["criticos"] > 0 or resumo["altos"] > 2:
+                            resumo["qualidade"] = "REPROVADO"
+                        elif resumo["altos"] > 0 or resumo["medios"] > 3:
+                            resumo["qualidade"] = "APROVADO_COM_OBSERVACOES"
+                        else:
+                            resumo["qualidade"] = "APROVADO"
+
+                        logger.info(f"Proofreading: Filtered {filtered_count} duplicate errors, {len(filtered_errors)} remaining")
 
                 return {
                     "status": "success",
@@ -22564,10 +22992,6 @@ async def delete_restore_point(restore_point_id: str, admin_key: str):
         logger.error(f"Error deleting restore point: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to delete restore point")
 
-
-# Include the router in the main app
-app.include_router(api_router)
-
 # Root endpoint
 @app.get("/")
 async def root():
@@ -22607,7 +23031,7 @@ async def aws_diagnostic():
 # ==================== SALES CONTROL ENDPOINTS ====================
 
 class Salesperson(BaseModel):
-    id: str = None
+    id: Optional[str] = None
     name: str
     email: str
     phone: str = ""
@@ -22617,15 +23041,16 @@ class Salesperson(BaseModel):
     base_salary: float = 0
     monthly_target: int = 10  # partners per month
     status: str = "active"  # active, inactive, pending
-    hired_date: str = None
+    hired_date: Optional[str] = None
     notes: str = ""
-    referral_code: str = None  # Unique referral code for tracking partner acquisitions
-    created_at: str = None
+    referral_code: Optional[str] = None  # Unique referral code for tracking partner acquisitions
+    preferred_language: str = "en"  # en, pt, es - for email communications
+    created_at: Optional[str] = None
     # Authentication fields
-    password_hash: str = None
-    token: str = None
-    invite_token: str = None
-    invite_sent_at: str = None
+    password_hash: Optional[str] = None
+    token: Optional[str] = None
+    invite_token: Optional[str] = None
+    invite_sent_at: Optional[str] = None
 
 class SalesGoal(BaseModel):
     id: str = None
@@ -22677,89 +23102,141 @@ class CommissionPayment(BaseModel):
     created_at: str = None
 
 # Get all salespeople
-@app.get("/admin/salespeople")
+@api_router.get("/admin/salespeople")
 async def get_salespeople(admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
 
-    salespeople = await db.salespeople.find().sort("created_at", -1).to_list(100)
+    # Validate admin key or user token
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm", "sales"]:
+            raise HTTPException(status_code=401, detail="Invalid admin key or insufficient permissions")
 
-    # Get acquisition counts for each salesperson
-    for sp in salespeople:
-        sp["_id"] = str(sp["_id"])
-        acquisitions = await db.partner_acquisitions.count_documents({"salesperson_id": sp["id"]})
-        sp["total_acquisitions"] = acquisitions
+    try:
+        salespeople = await db.salespeople.find().sort("created_at", -1).to_list(100)
 
-        # Get current month acquisitions
-        current_month = datetime.now().strftime("%Y-%m")
-        month_acquisitions = await db.partner_acquisitions.count_documents({
-            "salesperson_id": sp["id"],
-            "acquisition_date": {"$regex": f"^{current_month}"}
-        })
-        sp["month_acquisitions"] = month_acquisitions
+        # Get acquisition counts for each salesperson
+        for sp in salespeople:
+            sp["_id"] = str(sp["_id"])
+            acquisitions = await db.partner_acquisitions.count_documents({"salesperson_id": sp["id"]})
+            sp["total_acquisitions"] = acquisitions
 
-    return salespeople
+            # Get current month acquisitions
+            current_month = datetime.now().strftime("%Y-%m")
+            month_acquisitions = await db.partner_acquisitions.count_documents({
+                "salesperson_id": sp["id"],
+                "acquisition_date": {"$regex": f"^{current_month}"}
+            })
+            sp["month_acquisitions"] = month_acquisitions
+
+        return salespeople
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching salespeople: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch salespeople: {str(e)}")
 
 # Generate unique referral code for salesperson
-def generate_referral_code(name: str) -> str:
-    """Generate a unique referral code based on name + random string"""
-    # Take first 3-4 letters of name (uppercase, no spaces)
-    name_part = ''.join(c for c in name.upper() if c.isalpha())[:4]
-    # Add random alphanumeric suffix
-    random_part = secrets.token_hex(2).upper()
-    return f"{name_part}{random_part}"
+def generate_referral_code(name: str = None) -> str:
+    """Generate a unique random referral code (6 alphanumeric characters)"""
+    # Generate fully random alphanumeric code (uppercase letters and numbers)
+    chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'  # Removed confusing chars (0, O, 1, I)
+    return ''.join(secrets.choice(chars) for _ in range(6))
 
 # Create salesperson
-@app.post("/admin/salespeople")
+@api_router.post("/admin/salespeople")
 async def create_salesperson(salesperson: Salesperson, admin_key: str = Header(None)):
+    # Validate admin key or user token
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
 
-    salesperson.id = str(uuid.uuid4())[:8]
-    salesperson.created_at = datetime.now(ZoneInfo("America/New_York")).isoformat()
-    salesperson.hired_date = salesperson.hired_date or datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm", "sales"]:
+            raise HTTPException(status_code=401, detail="Invalid admin key or insufficient permissions")
 
-    # Generate unique referral code
-    referral_code = generate_referral_code(salesperson.name)
-    # Ensure uniqueness
-    while await db.salespeople.find_one({"referral_code": referral_code}):
+    try:
+        salesperson.id = str(uuid.uuid4())[:8]
+        salesperson.created_at = datetime.now(ZoneInfo("America/New_York")).isoformat()
+        salesperson.hired_date = salesperson.hired_date or datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
+
+        # Generate unique referral code
         referral_code = generate_referral_code(salesperson.name)
-    salesperson.referral_code = referral_code
+        # Ensure uniqueness
+        while await db.salespeople.find_one({"referral_code": referral_code}):
+            referral_code = generate_referral_code(salesperson.name)
+        salesperson.referral_code = referral_code
 
-    await db.salespeople.insert_one(salesperson.dict())
+        await db.salespeople.insert_one(salesperson.dict())
 
-    return {"success": True, "salesperson": salesperson.dict()}
+        return {"success": True, "salesperson": salesperson.dict()}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating salesperson: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create salesperson: {str(e)}")
 
 # Update salesperson
-@app.put("/admin/salespeople/{salesperson_id}")
+@api_router.put("/admin/salespeople/{salesperson_id}")
 async def update_salesperson(salesperson_id: str, salesperson: Salesperson, admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
 
-    update_data = {k: v for k, v in salesperson.dict().items() if v is not None and k != "id"}
+    # Validate admin key or user token
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm", "sales"]:
+            raise HTTPException(status_code=401, detail="Invalid admin key or insufficient permissions")
 
-    result = await db.salespeople.update_one(
-        {"id": salesperson_id},
-        {"$set": update_data}
-    )
+    try:
+        # First check if salesperson exists
+        existing = await db.salespeople.find_one({"id": salesperson_id})
+        if not existing:
+            raise HTTPException(status_code=404, detail="Salesperson not found")
 
-    if result.modified_count == 0:
-        raise HTTPException(status_code=404, detail="Salesperson not found")
+        update_data = {k: v for k, v in salesperson.dict().items() if v is not None and k != "id"}
 
-    return {"success": True}
+        await db.salespeople.update_one(
+            {"id": salesperson_id},
+            {"$set": update_data}
+        )
+
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating salesperson: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update salesperson: {str(e)}")
 
 # Delete salesperson
-@app.delete("/admin/salespeople/{salesperson_id}")
+@api_router.delete("/admin/salespeople/{salesperson_id}")
 async def delete_salesperson(salesperson_id: str, admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
 
-    result = await db.salespeople.delete_one({"id": salesperson_id})
+    # Validate admin key or user token
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm", "sales"]:
+            raise HTTPException(status_code=401, detail="Invalid admin key or insufficient permissions")
 
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Salesperson not found")
+    try:
+        result = await db.salespeople.delete_one({"id": salesperson_id})
 
-    return {"success": True}
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Salesperson not found")
+
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting salesperson: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete salesperson: {str(e)}")
 
 # Get salesperson by referral code (public endpoint for partner registration)
 @app.get("/api/referral/{referral_code}")
@@ -22779,7 +23256,7 @@ async def get_salesperson_by_referral(referral_code: str):
     }
 
 # Get sales goals
-@app.get("/admin/sales-goals")
+@api_router.get("/admin/sales-goals")
 async def get_sales_goals(admin_key: str = Header(None), month: str = None):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
@@ -22799,7 +23276,7 @@ async def get_sales_goals(admin_key: str = Header(None), month: str = None):
     return goals
 
 # Create/Update sales goal
-@app.post("/admin/sales-goals")
+@api_router.post("/admin/sales-goals")
 async def create_sales_goal(goal: SalesGoal, admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
@@ -22829,7 +23306,7 @@ async def create_sales_goal(goal: SalesGoal, admin_key: str = Header(None)):
     return {"success": True, "goal": goal.dict()}
 
 # Get partner acquisitions
-@app.get("/admin/partner-acquisitions")
+@api_router.get("/admin/partner-acquisitions")
 async def get_partner_acquisitions(admin_key: str = Header(None), salesperson_id: str = None):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
@@ -22849,7 +23326,7 @@ async def get_partner_acquisitions(admin_key: str = Header(None), salesperson_id
     return acquisitions
 
 # Record partner acquisition
-@app.post("/admin/partner-acquisitions")
+@api_router.post("/admin/partner-acquisitions")
 async def create_partner_acquisition(acquisition: PartnerAcquisition, admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
@@ -22891,7 +23368,7 @@ async def create_partner_acquisition(acquisition: PartnerAcquisition, admin_key:
     return {"success": True, "acquisition": acquisition.dict()}
 
 # Update acquisition commission status
-@app.put("/admin/partner-acquisitions/{acquisition_id}/status")
+@api_router.put("/admin/partner-acquisitions/{acquisition_id}/status")
 async def update_acquisition_status(acquisition_id: str, status: str, admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
@@ -22910,7 +23387,7 @@ async def update_acquisition_status(acquisition_id: str, status: str, admin_key:
     return {"success": True}
 
 # Get sales dashboard stats
-@app.get("/admin/sales-dashboard")
+@api_router.get("/admin/sales-dashboard")
 async def get_sales_dashboard(admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
@@ -23009,7 +23486,7 @@ async def get_sales_dashboard(admin_key: str = Header(None)):
 # ==================== SALESPERSON PORTAL ENDPOINTS ====================
 
 # Send invite to salesperson
-@app.post("/admin/salespeople/{salesperson_id}/invite")
+@api_router.post("/admin/salespeople/{salesperson_id}/invite")
 async def invite_salesperson(salesperson_id: str, admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
@@ -23035,48 +23512,145 @@ async def invite_salesperson(salesperson_id: str, admin_key: str = Header(None))
         frontend_url = os.environ.get('FRONTEND_URL', 'https://portal.legacytranslations.com')
         invite_link = f"{frontend_url}/#/sales-invite?token={invite_token}"
 
+        # Get preferred language (default to English)
+        lang = salesperson.get('preferred_language', 'en')
+
+        # Email content by language
+        email_content = {
+            'en': {
+                'subject': '🚀 Welcome to Finder Fee Program! - Legacy Translations',
+                'congrats': f'🎉 CONGRATULATIONS, {salesperson["name"].upper()}!',
+                'welcome': 'You have just joined the <strong>Legacy Translations</strong> partner team!',
+                'how_earn_title': '💰 HOW YOU EARN (as agreed in the "Finder\'s Agreement"):',
+                'how_earn_items': [
+                    '$100 bonus* for each new partner you refer',
+                    'Commission on your referrals\' orders',
+                    'Hit monthly goal? +$100 extra bonus!',
+                    'Monthly payments via Zelle or transfer'
+                ],
+                'bonus_note': '*Partner referrals are exclusively for businesses with recurring demand for certified translations, such as law firms, accounting offices, financial institutions, real estate agencies, hospitals, and other companies that regularly need translation services.',
+                'link_title': '🔗 YOUR EXCLUSIVE REFERRAL LINK:',
+                'link_desc': 'After setting up your account, you\'ll get a personalized link. Every partner who signs up through it will be automatically linked to you!',
+                'dashboard_title': '📊 IN YOUR DASHBOARD YOU CAN:',
+                'dashboard_desc': '✓ Track referrals in real time &nbsp; ✓ View pending and received commissions<br>✓ Monitor your monthly goal progress &nbsp; ✓ Access complete payment history',
+                'cta_button': 'CONFIGURE MY ACCOUNT',
+                'expires': '⏰ This invite expires in 7 days',
+                'footer': 'We\'re excited to have you on the team!',
+                'footer_love': 'With love ❤️'
+            },
+            'pt': {
+                'subject': '🚀 Bem-vindo ao Programa Finder Fee! - Legacy Translations',
+                'congrats': f'🎉 PARABÉNS, {salesperson["name"].upper()}!',
+                'welcome': 'Você acaba de entrar para o time de parceiros da <strong>Legacy Translations</strong>!',
+                'how_earn_title': '💰 COMO VOCÊ GANHA (conforme acordado no "Finder\'s Agreement"):',
+                'how_earn_items': [
+                    '$100 de bônus* por cada novo parceiro que você indicar',
+                    'Comissão sobre os pedidos dos seus indicados',
+                    'Bateu a meta mensal? +$100 de bônus extra!',
+                    'Pagamentos mensais via Zelle ou transferência'
+                ],
+                'bonus_note': '*As indicações de parceiros são exclusivamente para empresas com demanda recorrente por traduções certificadas, como escritórios de advocacia, contabilidade, instituições financeiras, imobiliárias, hospitais e outras empresas que necessitam regularmente de serviços de tradução.',
+                'link_title': '🔗 SEU LINK EXCLUSIVO DE INDICAÇÃO:',
+                'link_desc': 'Após configurar sua conta, você terá acesso ao seu link personalizado. Cada parceiro que se cadastrar através dele será automaticamente vinculado a você!',
+                'dashboard_title': '📊 NO SEU PAINEL VOCÊ PODE:',
+                'dashboard_desc': '✓ Acompanhar indicações em tempo real &nbsp; ✓ Visualizar comissões pendentes e recebidas<br>✓ Monitorar o progresso da meta mensal &nbsp; ✓ Acessar histórico completo de pagamentos',
+                'cta_button': 'CONFIGURAR MINHA CONTA',
+                'expires': '⏰ Este convite expira em 7 dias',
+                'footer': 'Estamos muito felizes em ter você no time!',
+                'footer_love': 'Com carinho ❤️'
+            },
+            'es': {
+                'subject': '🚀 ¡Bienvenido al Programa Finder Fee! - Legacy Translations',
+                'congrats': f'🎉 ¡FELICIDADES, {salesperson["name"].upper()}!',
+                'welcome': '¡Acabas de unirte al equipo de socios de <strong>Legacy Translations</strong>!',
+                'how_earn_title': '💰 CÓMO GANAS (según lo acordado en el "Finder\'s Agreement"):',
+                'how_earn_items': [
+                    '$100 de bono* por cada nuevo socio que refieras',
+                    'Comisión sobre los pedidos de tus referidos',
+                    '¿Alcanzaste la meta mensual? ¡+$100 de bono extra!',
+                    'Pagos mensuales vía Zelle o transferencia'
+                ],
+                'bonus_note': '*Las referencias de socios son exclusivamente para empresas con demanda recurrente de traducciones certificadas, como bufetes de abogados, oficinas contables, instituciones financieras, agencias inmobiliarias, hospitales y otras empresas que necesitan regularmente servicios de traducción.',
+                'link_title': '🔗 TU ENLACE EXCLUSIVO DE REFERIDOS:',
+                'link_desc': 'Después de configurar tu cuenta, tendrás acceso a tu enlace personalizado. ¡Cada socio que se registre a través de él quedará automáticamente vinculado a ti!',
+                'dashboard_title': '📊 EN TU PANEL PUEDES:',
+                'dashboard_desc': '✓ Seguir referidos en tiempo real &nbsp; ✓ Ver comisiones pendientes y recibidas<br>✓ Monitorear el progreso de tu meta mensual &nbsp; ✓ Acceder al historial completo de pagos',
+                'cta_button': 'CONFIGURAR MI CUENTA',
+                'expires': '⏰ Esta invitación expira en 7 días',
+                'footer': '¡Estamos emocionados de tenerte en el equipo!',
+                'footer_love': 'Con cariño ❤️'
+            }
+        }
+
+        # Get content for selected language
+        content = email_content.get(lang, email_content['en'])
+
+        # Build items list HTML
+        items_html = ''.join([f'<li>{item}</li>' for item in content['how_earn_items']])
+
         email_html = f"""
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #4F46E5, #7C3AED); border-radius: 10px;">
-                <h1 style="color: white; margin: 0;">🎉 Welcome to the Team!</h1>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #ffffff;">
+            <!-- Header -->
+            <div style="text-align: center; padding: 30px 20px; background: linear-gradient(135deg, #4F46E5, #7C3AED); border-radius: 15px 15px 0 0;">
+                <h1 style="color: white; margin: 0; font-size: 28px;">🚀 Finder Fee Program</h1>
+                <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 16px;">Legacy Translations</p>
             </div>
 
-            <div style="padding: 30px 20px;">
-                <p>Hi <strong>{salesperson['name']}</strong>,</p>
+            <!-- Congratulations Banner -->
+            <div style="background: linear-gradient(135deg, #10B981, #059669); padding: 20px; text-align: center;">
+                <h2 style="color: white; margin: 0; font-size: 24px;">{content['congrats']}</h2>
+            </div>
 
-                <p>You've been invited to join <strong>Legacy Translations</strong> as a Sales Partner!</p>
+            <!-- Main Content -->
+            <div style="padding: 30px 25px; background: #f8fafc; border-left: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0;">
+                <p style="color: #1e293b; font-size: 16px; line-height: 1.6;">
+                    {content['welcome']}
+                </p>
 
-                <p>As a sales partner, you'll be able to:</p>
-                <ul>
-                    <li>✅ Register new partners and earn commissions</li>
-                    <li>📊 Track your performance and earnings</li>
-                    <li>💰 View your monthly commission reports</li>
-                </ul>
-
-                <div style="text-align: center; margin: 30px 0;">
-                    <a href="{invite_link}" style="background: linear-gradient(135deg, #4F46E5, #7C3AED); color: white; padding: 15px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
-                        Set Up Your Account
-                    </a>
+                <div style="background: white; border-radius: 10px; padding: 20px; margin: 20px 0; border-left: 4px solid #4F46E5;">
+                    <h3 style="color: #4F46E5; margin: 0 0 15px 0; font-size: 16px;">{content['how_earn_title']}</h3>
+                    <ul style="color: #475569; margin: 0; padding-left: 20px; line-height: 2;">
+                        {items_html}
+                    </ul>
+                    <p style="color: #64748b; font-size: 12px; margin: 15px 0 0 0; font-style: italic; line-height: 1.5;">
+                        {content['bonus_note']}
+                    </p>
                 </div>
 
-                <p style="color: #666; font-size: 14px;">This invitation link will expire in 7 days.</p>
+                <div style="background: white; border-radius: 10px; padding: 20px; margin: 20px 0; border-left: 4px solid #10B981;">
+                    <h3 style="color: #10B981; margin: 0 0 10px 0; font-size: 16px;">{content['link_title']}</h3>
+                    <p style="color: #475569; margin: 0; font-size: 14px;">{content['link_desc']}</p>
+                </div>
+
+                <div style="background: white; border-radius: 10px; padding: 20px; margin: 20px 0; border-left: 4px solid #F59E0B;">
+                    <h3 style="color: #F59E0B; margin: 0 0 10px 0; font-size: 16px;">{content['dashboard_title']}</h3>
+                    <p style="color: #475569; margin: 0; font-size: 14px;">{content['dashboard_desc']}</p>
+                </div>
             </div>
 
-            <div style="text-align: center; padding: 20px; background: #f5f5f5; border-radius: 10px;">
-                <p style="margin: 0; color: #666;">Legacy Translation Services</p>
+            <!-- CTA Button -->
+            <div style="text-align: center; padding: 30px; background: #f8fafc; border-left: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0;">
+                <a href="{invite_link}" style="background: linear-gradient(135deg, #4F46E5, #7C3AED); color: white; padding: 18px 50px; text-decoration: none; border-radius: 10px; font-weight: bold; display: inline-block; font-size: 16px; box-shadow: 0 4px 15px rgba(79, 70, 229, 0.4);">
+                    {content['cta_button']}
+                </a>
+                <p style="color: #94a3b8; font-size: 13px; margin: 15px 0 0 0;">{content['expires']}</p>
+            </div>
+
+            <!-- Footer -->
+            <div style="text-align: center; padding: 25px; background: linear-gradient(135deg, #1e293b, #334155); border-radius: 0 0 15px 15px;">
+                <p style="margin: 0; color: rgba(255,255,255,0.9); font-size: 14px;">{content['footer']}</p>
+                <p style="margin: 10px 0 0 0; color: rgba(255,255,255,0.7); font-size: 12px;">{content['footer_love']}</p>
+                <p style="margin: 10px 0 0 0; color: white; font-weight: bold;">Legacy Translations 🌎</p>
             </div>
         </div>
         """
 
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = "🎉 You're Invited to Join Legacy Translations Sales Team!"
-        msg['From'] = EMAIL_USER
-        msg['To'] = salesperson['email']
-        msg.attach(MIMEText(email_html, 'html'))
-
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
-            smtp.login(EMAIL_USER, EMAIL_PASSWORD)
-            smtp.send_message(msg)
+        await email_service.send_email(
+            to=salesperson['email'],
+            subject=content['subject'],
+            content=email_html,
+            content_type="html"
+        )
 
         logger.info(f"Invite sent to salesperson: {salesperson['email']}")
 
@@ -23085,6 +23659,30 @@ async def invite_salesperson(salesperson_id: str, admin_key: str = Header(None))
         # Don't fail the request, invite token is still set
 
     return {"success": True, "message": "Invitation sent", "invite_link": invite_link}
+
+# Verify salesperson invite token (before showing set-password form)
+@app.get("/salesperson/verify-invite")
+async def verify_salesperson_invite(token: str):
+    """Verify if invite token is valid before showing the password form"""
+    salesperson = await db.salespeople.find_one({"invite_token": token})
+    if not salesperson:
+        raise HTTPException(status_code=404, detail="Invalid or expired invite token")
+
+    # Check if invite is expired (7 days)
+    if salesperson.get("invite_sent_at"):
+        try:
+            invite_date = datetime.fromisoformat(salesperson["invite_sent_at"])
+            if datetime.now() - invite_date > timedelta(days=7):
+                raise HTTPException(status_code=400, detail="Invite token has expired. Please request a new invitation.")
+        except:
+            pass  # If date parsing fails, continue
+
+    return {
+        "valid": True,
+        "name": salesperson.get("name"),
+        "email": salesperson.get("email"),
+        "referral_code": salesperson.get("referral_code")
+    }
 
 # Salesperson set password (from invite)
 @app.post("/salesperson/set-password")
@@ -23540,7 +24138,7 @@ async def get_payment_history(token: str = Header(None, alias="salesperson-token
     }
 
 # Admin: Approve commission
-@app.put("/admin/acquisitions/{acquisition_id}/approve")
+@api_router.put("/admin/acquisitions/{acquisition_id}/approve")
 async def approve_acquisition(acquisition_id: str, admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
@@ -23572,7 +24170,7 @@ async def approve_acquisition(acquisition_id: str, admin_key: str = Header(None)
     return {"success": True}
 
 # Admin: Process payment for multiple acquisitions
-@app.post("/admin/commission-payments")
+@api_router.post("/admin/commission-payments")
 async def create_commission_payment(
     salesperson_id: str = Form(...),
     acquisition_ids: str = Form(...),  # Comma-separated IDs
@@ -23635,7 +24233,7 @@ async def create_commission_payment(
     return {"success": True, "payment": payment.dict()}
 
 # Admin: Get salesperson ranking
-@app.get("/admin/salesperson-ranking")
+@api_router.get("/admin/salesperson-ranking")
 async def get_salesperson_ranking(admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
@@ -23697,7 +24295,7 @@ async def get_salesperson_ranking(admin_key: str = Header(None)):
     }
 
 # Admin: Get pending commissions for payment
-@app.get("/admin/pending-commissions")
+@api_router.get("/admin/pending-commissions")
 async def get_pending_commissions(admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
@@ -23727,7 +24325,7 @@ async def get_pending_commissions(admin_key: str = Header(None)):
     return {"pending_by_salesperson": list(by_salesperson.values())}
 
 # Admin: Get payment history
-@app.get("/admin/payment-history")
+@api_router.get("/admin/payment-history")
 async def get_admin_payment_history(admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
@@ -23743,6 +24341,9 @@ async def get_admin_payment_history(admin_key: str = Header(None)):
         "payments": payments,
         "total_paid": total_paid
     }
+
+# Include the router in the main app - MUST be after all api_router routes are defined
+app.include_router(api_router)
 
 @app.on_event("startup")
 async def create_default_partner():
