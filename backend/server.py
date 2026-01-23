@@ -4294,11 +4294,24 @@ async def stripe_webhook(request: Request):
                         }}
                     )
 
+                    # Count orders that weren't already paid (to update partner stats)
+                    unpaid_order_count = await db.translation_orders.count_documents({
+                        "id": {"$in": invoice.get("order_ids", [])},
+                        "payment_status": {"$ne": "paid"}
+                    })
+
                     # Update associated orders to paid
                     await db.translation_orders.update_many(
                         {"id": {"$in": invoice.get("order_ids", [])}},
                         {"$set": {"payment_status": "paid", "payment_date": datetime.utcnow()}}
                     )
+
+                    # Increment partner's total_paid_orders counter
+                    if unpaid_order_count > 0 and invoice.get("partner_id"):
+                        await db.partners.update_one(
+                            {"id": invoice["partner_id"]},
+                            {"$inc": {"total_paid_orders": unpaid_order_count}}
+                        )
 
                     # Create admin notification for Stripe payment
                     admin_notification = {
@@ -9466,7 +9479,10 @@ async def get_partner_statistics(admin_key: str):
                 "total_pending": 0,
                 "orders_paid": 0,
                 "orders_pending": 0,
-                "created_at": partner_info.get("created_at", "")
+                "created_at": partner_info.get("created_at", ""),
+                "payment_plan": partner_info.get("payment_plan", "pay_per_order"),
+                "payment_plan_approved": partner_info.get("payment_plan_approved", False),
+                "total_paid_orders": partner_info.get("total_paid_orders", 0)
             }
 
         total_price = order.get("total_price", 0)
@@ -9580,6 +9596,67 @@ async def approve_partner_payment_upgrade(partner_id: str, admin_key: str, appro
     except Exception as e:
         logger.error(f"Error processing payment upgrade: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to process upgrade request")
+
+
+@api_router.post("/admin/partners/{partner_id}/set-payment-plan")
+async def admin_set_partner_payment_plan(partner_id: str, admin_key: str, plan: str, send_notification: bool = True):
+    """Admin: Directly set a partner's payment plan (biweekly, monthly, or pay_per_order)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    if plan not in ["pay_per_order", "biweekly", "monthly"]:
+        raise HTTPException(status_code=400, detail="Invalid payment plan. Must be 'pay_per_order', 'biweekly', or 'monthly'")
+
+    try:
+        partner = await db.partners.find_one({"id": partner_id})
+        if not partner:
+            raise HTTPException(status_code=404, detail="Partner not found")
+
+        # Update partner's payment plan
+        update_data = {
+            "payment_plan": plan,
+            "payment_plan_approved": plan != "pay_per_order",  # Approved if not pay_per_order
+            "payment_plan_upgrade_requested": False,
+            "requested_payment_plan": None
+        }
+        if plan != "pay_per_order":
+            update_data["payment_plan_approved_at"] = datetime.utcnow().isoformat()
+
+        await db.partners.update_one(
+            {"id": partner_id},
+            {"$set": update_data}
+        )
+
+        # Send notification email to partner if requested
+        if send_notification and partner.get("email") and plan != "pay_per_order":
+            try:
+                plan_name = "Biweekly Invoice" if plan == "biweekly" else "Monthly Invoice"
+                email_html = f"""
+                <h2>Payment Plan Updated!</h2>
+                <p>Dear {partner.get('contact_name', 'Partner')},</p>
+                <p>Your payment plan has been updated to <strong>{plan_name}</strong>.</p>
+                <p>You can now receive invoices for your orders instead of paying per order.</p>
+                <p>Thank you for being a valued partner!</p>
+                <p>Best regards,<br>Legacy Translations Team</p>
+                """
+                await send_email(
+                    to_email=partner.get("email"),
+                    subject="Payment Plan Updated - Legacy Translations",
+                    html_content=email_html
+                )
+            except Exception as e:
+                logger.warning(f"Failed to send payment plan update email: {e}")
+
+        plan_display = {"pay_per_order": "Pay Per Order", "biweekly": "Biweekly Invoice", "monthly": "Monthly Invoice"}
+        return {"success": True, "message": f"Partner payment plan set to {plan_display.get(plan, plan)}"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error setting partner payment plan: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update payment plan")
 
 
 @api_router.delete("/admin/partners/{partner_id}")
@@ -9960,6 +10037,12 @@ async def mark_invoice_paid(invoice_id: str, admin_key: str, payment_method: str
         if not invoice:
             raise HTTPException(status_code=404, detail="Invoice not found")
 
+        # Count orders that weren't already paid (to update partner stats)
+        unpaid_order_count = await db.translation_orders.count_documents({
+            "id": {"$in": invoice.get("order_ids", [])},
+            "payment_status": {"$ne": "paid"}
+        })
+
         # Update invoice
         await db.partner_invoices.update_one(
             {"id": invoice_id},
@@ -9976,6 +10059,13 @@ async def mark_invoice_paid(invoice_id: str, admin_key: str, payment_method: str
             {"id": {"$in": invoice.get("order_ids", [])}},
             {"$set": {"payment_status": "paid", "payment_date": datetime.utcnow()}}
         )
+
+        # Increment partner's total_paid_orders counter
+        if unpaid_order_count > 0 and invoice.get("partner_id"):
+            await db.partners.update_one(
+                {"id": invoice["partner_id"]},
+                {"$inc": {"total_paid_orders": unpaid_order_count}}
+            )
 
         logger.info(f"Marked invoice {invoice.get('invoice_number')} as paid")
         return {"status": "success", "message": "Invoice marked as paid"}
@@ -10218,6 +10308,12 @@ async def approve_zelle_invoice_payment(invoice_id: str, admin_key: str):
         if not invoice:
             raise HTTPException(status_code=404, detail="Invoice not found")
 
+        # Count orders that weren't already paid (to update partner stats)
+        unpaid_order_count = await db.translation_orders.count_documents({
+            "id": {"$in": invoice.get("order_ids", [])},
+            "payment_status": {"$ne": "paid"}
+        })
+
         # Update invoice to paid
         await db.partner_invoices.update_one(
             {"id": invoice_id},
@@ -10234,6 +10330,13 @@ async def approve_zelle_invoice_payment(invoice_id: str, admin_key: str):
             {"id": {"$in": invoice.get("order_ids", [])}},
             {"$set": {"payment_status": "paid", "payment_date": datetime.utcnow()}}
         )
+
+        # Increment partner's total_paid_orders counter
+        if unpaid_order_count > 0 and invoice.get("partner_id"):
+            await db.partners.update_one(
+                {"id": invoice["partner_id"]},
+                {"$inc": {"total_paid_orders": unpaid_order_count}}
+            )
 
         # Record payment in history
         payment_record = {
@@ -10736,6 +10839,9 @@ async def admin_mark_order_paid(order_id: str, admin_key: str):
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
+    # Check if order was already paid (to avoid double counting)
+    was_already_paid = order.get("payment_status") == "paid"
+
     # Build the update fields
     update_fields = {"payment_status": "paid", "payment_date": datetime.utcnow()}
 
@@ -10752,6 +10858,13 @@ async def admin_mark_order_paid(order_id: str, admin_key: str):
 
     if result.modified_count == 0:
         raise HTTPException(status_code=404, detail="Order not updated")
+
+    # Increment partner's total_paid_orders counter if not already paid
+    if not was_already_paid and order.get("partner_id"):
+        await db.partners.update_one(
+            {"id": order["partner_id"]},
+            {"$inc": {"total_paid_orders": 1}}
+        )
 
     return {"status": "success", "message": "Order marked as paid"}
 
@@ -11284,6 +11397,10 @@ async def review_payment_proof(
     if status == "approved" and proof.get("order_id"):
         # First get the order to check its current status
         order = await db.translation_orders.find_one({"id": proof["order_id"]})
+
+        # Check if order was already paid (to avoid double counting)
+        was_already_paid = order and order.get("payment_status") == "paid"
+
         update_fields = {
             "payment_status": "paid",
             "payment_date": datetime.utcnow(),
@@ -11299,6 +11416,14 @@ async def review_payment_proof(
             {"id": proof["order_id"]},
             {"$set": update_fields}
         )
+
+        # Increment partner's total_paid_orders counter if not already paid
+        if not was_already_paid and order and order.get("partner_id"):
+            await db.partners.update_one(
+                {"id": order["partner_id"]},
+                {"$inc": {"total_paid_orders": 1}}
+            )
+
         logger.info(f"Order {proof['order_id']} marked as paid via {proof['payment_method']}")
 
     # Send email notification to customer

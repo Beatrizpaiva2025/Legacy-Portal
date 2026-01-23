@@ -21534,6 +21534,17 @@ const FinancesPage = ({ adminKey }) => {
     }
   };
 
+  const setPartnerPaymentPlan = async (partnerId, plan) => {
+    try {
+      await axios.post(`${API}/admin/partners/${partnerId}/set-payment-plan?admin_key=${adminKey}&plan=${plan}&send_notification=true`);
+      const planNames = { pay_per_order: 'Pay Per Order', biweekly: 'Biweekly Invoice', monthly: 'Monthly Invoice' };
+      alert(`Payment plan set to ${planNames[plan] || plan}`);
+      fetchPartnerStats(); // Refresh the list
+    } catch (err) {
+      alert('Error setting payment plan: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
   const findEmailInSystem = async () => {
     if (!emailSearchQuery.trim()) {
       alert('Please enter an email to search');
@@ -22813,6 +22824,7 @@ const FinancesPage = ({ adminKey }) => {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Orders Paid</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Orders Pending</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Payment Plan</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Received</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Pending</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
@@ -22822,7 +22834,7 @@ const FinancesPage = ({ adminKey }) => {
                 <tbody className="divide-y">
                   {partnerStats.partners?.length === 0 ? (
                     <tr>
-                      <td colSpan="8" className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan="9" className="px-4 py-8 text-center text-gray-500">
                         No partner orders found
                       </td>
                     </tr>
@@ -22867,6 +22879,25 @@ const FinancesPage = ({ adminKey }) => {
                           <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-yellow-100 text-yellow-700">
                             {partner.orders_pending}
                           </span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <select
+                            value={partner.payment_plan || 'pay_per_order'}
+                            onChange={(e) => {
+                              if (window.confirm(`Change payment plan for ${partner.company_name} to ${e.target.options[e.target.selectedIndex].text}?`)) {
+                                setPartnerPaymentPlan(partner.partner_id, e.target.value);
+                              }
+                            }}
+                            className={`text-xs px-2 py-1 rounded border ${
+                              partner.payment_plan === 'monthly' ? 'bg-purple-100 border-purple-300 text-purple-700' :
+                              partner.payment_plan === 'biweekly' ? 'bg-blue-100 border-blue-300 text-blue-700' :
+                              'bg-gray-100 border-gray-300 text-gray-700'
+                            }`}
+                          >
+                            <option value="pay_per_order">Pay Per Order</option>
+                            <option value="biweekly">Biweekly Invoice</option>
+                            <option value="monthly">Monthly Invoice</option>
+                          </select>
                         </td>
                         <td className="px-4 py-3 text-right font-medium text-green-600">
                           {formatCurrency(partner.total_received)}

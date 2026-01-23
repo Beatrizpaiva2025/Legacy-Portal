@@ -3826,7 +3826,8 @@ const PaymentPlanPage = ({ token, t }) => {
           <span className="text-2xl">💰</span>
           <h2 className="text-lg font-bold text-slate-800">{t?.discountStructure || 'Partner Discount Structure'}</h2>
         </div>
-        <p className="text-sm text-slate-600 mb-4">{t?.discountDescription || 'Earn volume discounts based on your monthly page count'}</p>
+        <p className="text-sm text-slate-600 mb-2">{t?.discountDescription || 'Earn volume discounts based on your monthly page count'}</p>
+        <p className="text-xs text-slate-500 mb-4 italic">{t?.certifiedTranslationNote || 'Prices shown are for "Certified Translation" services'}</p>
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -3835,7 +3836,7 @@ const PaymentPlanPage = ({ token, t }) => {
                 <th className="px-3 py-3 text-left rounded-tl-lg">{t?.tier || 'Tier'}</th>
                 <th className="px-3 py-3 text-center">{t?.monthlyVolume || 'Monthly Volume'}</th>
                 <th className="px-3 py-3 text-center">{t?.discount || 'Discount'}</th>
-                <th className="px-3 py-3 text-center">{t?.pricePerPage || 'Price/Page'}</th>
+                <th className="px-3 py-3 text-center">{t?.pricePerPage || 'Price/Page'}<br/><span className="text-xs font-normal opacity-80">"Certified Translation"</span></th>
                 <th className="px-3 py-3 text-center">{t?.monthlySavings || 'Monthly Savings'}</th>
                 <th className="px-3 py-3 text-center rounded-tr-lg">{t?.partnerMargin || 'Partner Margin*'}</th>
               </tr>
