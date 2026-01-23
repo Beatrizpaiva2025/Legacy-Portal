@@ -12687,6 +12687,23 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     }
   };
 
+  // Reopen delivered order for corrections/new uploads
+  const reopenOrder = async (orderId) => {
+    if (!window.confirm('Reopen this order for corrections? This will change the status back to "Ready" so you can make changes and re-deliver.')) return;
+    try {
+      await axios.put(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`, {
+        translation_status: 'ready',
+        reopened_at: new Date().toISOString(),
+        reopened_for_corrections: true
+      });
+      alert('✅ Order reopened! You can now upload new documents and re-deliver to the client.');
+      fetchOrders();
+    } catch (err) {
+      console.error('Failed to reopen order:', err);
+      alert('Error reopening order');
+    }
+  };
+
   // Open delivery modal with translation preview
   const openDeliveryModal = async (order) => {
     setDeliveryModalOrder(order);
@@ -15348,6 +15365,17 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             >
                               <CheckIcon className="w-4 h-4 text-purple-500" />
                               Mark as Final
+                            </button>
+                          )}
+
+                          {/* Admin only: Reopen delivered/final order for corrections */}
+                          {isAdmin && (order.translation_status === 'delivered' || order.translation_status === 'final') && (
+                            <button
+                              onClick={() => { reopenOrder(order.id); setOpenActionsDropdown(null); }}
+                              className="w-full px-3 py-2 text-left text-sm text-yellow-700 hover:bg-yellow-50 flex items-center gap-2"
+                            >
+                              <RefreshIcon className="w-4 h-4 text-yellow-500" />
+                              Reopen for Corrections
                             </button>
                           )}
 

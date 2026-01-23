@@ -1465,6 +1465,9 @@ class TranslationOrderUpdate(BaseModel):
     skip_email: Optional[bool] = False
     # Translator assignment status (Admin/PM can manually change pending to accepted)
     translator_assignment_status: Optional[str] = None
+    # Reopen order for corrections
+    reopened_at: Optional[str] = None
+    reopened_for_corrections: Optional[bool] = None
 
 # Partner Invoice Models
 class PartnerInvoice(BaseModel):
@@ -10605,6 +10608,15 @@ async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate,
             # Also update the responded_at timestamp when status changes
             if update_data.translator_assignment_status in ["accepted", "declined"]:
                 update_dict["translator_assignment_responded_at"] = datetime.utcnow()
+
+        # Handle reopening order for corrections
+        if update_data.reopened_at is not None:
+            update_dict["reopened_at"] = update_data.reopened_at
+        if update_data.reopened_for_corrections is not None:
+            update_dict["reopened_for_corrections"] = update_data.reopened_for_corrections
+            if update_data.reopened_for_corrections:
+                # Log the reopen action
+                logger.info(f"Order {order_id} reopened for corrections")
 
         # Add updated_at timestamp
         update_dict["updated_at"] = datetime.utcnow()
