@@ -23182,9 +23182,145 @@ async def create_salesperson(salesperson: Salesperson, admin_key: str = Header(N
             referral_code = generate_referral_code(salesperson.name)
         salesperson.referral_code = referral_code
 
+        # Generate invite token automatically so the invite link works immediately
+        invite_token = str(uuid.uuid4())
+        salesperson.invite_token = invite_token
+        salesperson.invite_sent_at = datetime.now(ZoneInfo("America/New_York")).isoformat()
+        salesperson.status = "pending"
+
         await db.salespeople.insert_one(salesperson.dict())
 
-        return {"success": True, "salesperson": salesperson.dict()}
+        # Generate invite link
+        frontend_url = os.environ.get('FRONTEND_URL', 'https://portal.legacytranslations.com')
+        invite_link = f"{frontend_url}/#/sales-invite?token={invite_token}"
+
+        salesperson_data = salesperson.dict()
+        salesperson_data['invite_link'] = invite_link
+
+        # Send invite email automatically
+        try:
+            # Get preferred language (default to English)
+            lang = salesperson.preferred_language or 'en'
+
+            # Email content by language
+            email_content = {
+                'en': {
+                    'subject': '🚀 Welcome to Finder Fee Program! - Legacy Translations',
+                    'congrats': f'🎉 CONGRATULATIONS, {salesperson.name.upper()}!',
+                    'welcome': 'You have just joined the <strong>Legacy Translations</strong> partner team!',
+                    'how_earn_title': '💰 HOW YOU EARN (as agreed in the "Finder\'s Agreement"):',
+                    'how_earn_items': [
+                        '$100 bonus* for each new partner you refer',
+                        'Commission on your referrals\' orders',
+                        'Hit monthly goal? +$100 extra bonus!',
+                        'Monthly payments via Zelle or transfer'
+                    ],
+                    'bonus_note': '*Partner referrals are exclusively for businesses with recurring demand for certified translations, such as law firms, accounting offices, financial institutions, real estate agencies, hospitals, and other companies that regularly need translation services.',
+                    'link_title': '🔗 YOUR EXCLUSIVE REFERRAL LINK:',
+                    'link_desc': 'After setting up your account, you\'ll get a personalized link. Every partner who signs up through it will be automatically linked to you!',
+                    'dashboard_title': '📊 IN YOUR DASHBOARD YOU CAN:',
+                    'dashboard_desc': '✓ Track referrals in real time &nbsp; ✓ View pending and received commissions<br>✓ Monitor your monthly goal progress &nbsp; ✓ Access complete payment history',
+                    'cta_button': 'CONFIGURE MY ACCOUNT',
+                    'expires': '⏰ This invite expires in 7 days',
+                    'footer': 'We\'re excited to have you on the team!',
+                    'footer_love': 'With love ❤️'
+                },
+                'pt': {
+                    'subject': '🚀 Bem-vindo ao Programa Finder Fee! - Legacy Translations',
+                    'congrats': f'🎉 PARABÉNS, {salesperson.name.upper()}!',
+                    'welcome': 'Você acaba de entrar para o time de parceiros da <strong>Legacy Translations</strong>!',
+                    'how_earn_title': '💰 COMO VOCÊ GANHA (conforme acordado no "Finder\'s Agreement"):',
+                    'how_earn_items': [
+                        '$100 de bônus* por cada novo parceiro que você indicar',
+                        'Comissão sobre os pedidos dos seus indicados',
+                        'Bateu a meta mensal? +$100 de bônus extra!',
+                        'Pagamentos mensais via Zelle ou transferência'
+                    ],
+                    'bonus_note': '*As indicações de parceiros são exclusivamente para empresas com demanda recorrente por traduções certificadas, como escritórios de advocacia, contabilidade, instituições financeiras, imobiliárias, hospitais e outras empresas que necessitam regularmente de serviços de tradução.',
+                    'link_title': '🔗 SEU LINK EXCLUSIVO DE INDICAÇÃO:',
+                    'link_desc': 'Após configurar sua conta, você terá acesso ao seu link personalizado. Cada parceiro que se cadastrar através dele será automaticamente vinculado a você!',
+                    'dashboard_title': '📊 NO SEU PAINEL VOCÊ PODE:',
+                    'dashboard_desc': '✓ Acompanhar indicações em tempo real &nbsp; ✓ Visualizar comissões pendentes e recebidas<br>✓ Monitorar o progresso da meta mensal &nbsp; ✓ Acessar histórico completo de pagamentos',
+                    'cta_button': 'CONFIGURAR MINHA CONTA',
+                    'expires': '⏰ Este convite expira em 7 dias',
+                    'footer': 'Estamos muito felizes em ter você no time!',
+                    'footer_love': 'Com carinho ❤️'
+                },
+                'es': {
+                    'subject': '🚀 ¡Bienvenido al Programa Finder Fee! - Legacy Translations',
+                    'congrats': f'🎉 ¡FELICIDADES, {salesperson.name.upper()}!',
+                    'welcome': '¡Acabas de unirte al equipo de socios de <strong>Legacy Translations</strong>!',
+                    'how_earn_title': '💰 CÓMO GANAS (según lo acordado en el "Finder\'s Agreement"):',
+                    'how_earn_items': [
+                        '$100 de bono* por cada nuevo socio que refieras',
+                        'Comisión sobre los pedidos de tus referidos',
+                        '¿Alcanzaste la meta mensual? ¡+$100 de bono extra!',
+                        'Pagos mensuales vía Zelle o transferencia'
+                    ],
+                    'bonus_note': '*Las referencias de socios son exclusivamente para empresas con demanda recurrente de traducciones certificadas, como bufetes de abogados, oficinas contables, instituciones financieras, agencias inmobiliarias, hospitales y otras empresas que necesitan regularmente servicios de traducción.',
+                    'link_title': '🔗 TU ENLACE EXCLUSIVO DE REFERIDOS:',
+                    'link_desc': 'Después de configurar tu cuenta, tendrás acceso a tu enlace personalizado. ¡Cada socio que se registre a través de él quedará automáticamente vinculado a ti!',
+                    'dashboard_title': '📊 EN TU PANEL PUEDES:',
+                    'dashboard_desc': '✓ Seguir referidos en tiempo real &nbsp; ✓ Ver comisiones pendientes y recibidas<br>✓ Monitorear el progreso de tu meta mensual &nbsp; ✓ Acceder al historial completo de pagos',
+                    'cta_button': 'CONFIGURAR MI CUENTA',
+                    'expires': '⏰ Esta invitación expira en 7 días',
+                    'footer': '¡Estamos emocionados de tenerte en el equipo!',
+                    'footer_love': 'Con cariño ❤️'
+                }
+            }
+
+            content = email_content.get(lang, email_content['en'])
+            items_html = ''.join([f'<li>{item}</li>' for item in content['how_earn_items']])
+
+            email_html = f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #ffffff;">
+                <div style="text-align: center; padding: 30px 20px; background: linear-gradient(135deg, #4F46E5, #7C3AED); border-radius: 15px 15px 0 0;">
+                    <h1 style="color: white; margin: 0; font-size: 28px;">🚀 Finder Fee Program</h1>
+                    <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 16px;">Legacy Translations</p>
+                </div>
+                <div style="background: linear-gradient(135deg, #10B981, #059669); padding: 20px; text-align: center;">
+                    <h2 style="color: white; margin: 0; font-size: 24px;">{content['congrats']}</h2>
+                </div>
+                <div style="padding: 30px 25px; background: #f8fafc; border-left: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0;">
+                    <p style="color: #1e293b; font-size: 16px; line-height: 1.6;">{content['welcome']}</p>
+                    <div style="background: white; border-radius: 10px; padding: 20px; margin: 20px 0; border-left: 4px solid #4F46E5;">
+                        <h3 style="color: #4F46E5; margin: 0 0 15px 0; font-size: 16px;">{content['how_earn_title']}</h3>
+                        <ul style="color: #475569; margin: 0; padding-left: 20px; line-height: 2;">{items_html}</ul>
+                        <p style="color: #64748b; font-size: 12px; margin: 15px 0 0 0; font-style: italic; line-height: 1.5;">{content['bonus_note']}</p>
+                    </div>
+                    <div style="background: white; border-radius: 10px; padding: 20px; margin: 20px 0; border-left: 4px solid #10B981;">
+                        <h3 style="color: #10B981; margin: 0 0 10px 0; font-size: 16px;">{content['link_title']}</h3>
+                        <p style="color: #475569; margin: 0; font-size: 14px;">{content['link_desc']}</p>
+                    </div>
+                    <div style="background: white; border-radius: 10px; padding: 20px; margin: 20px 0; border-left: 4px solid #F59E0B;">
+                        <h3 style="color: #F59E0B; margin: 0 0 10px 0; font-size: 16px;">{content['dashboard_title']}</h3>
+                        <p style="color: #475569; margin: 0; font-size: 14px;">{content['dashboard_desc']}</p>
+                    </div>
+                </div>
+                <div style="text-align: center; padding: 30px; background: #f8fafc; border-left: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0;">
+                    <a href="{invite_link}" style="background: linear-gradient(135deg, #4F46E5, #7C3AED); color: white; padding: 18px 50px; text-decoration: none; border-radius: 10px; font-weight: bold; display: inline-block; font-size: 16px; box-shadow: 0 4px 15px rgba(79, 70, 229, 0.4);">{content['cta_button']}</a>
+                    <p style="color: #94a3b8; font-size: 13px; margin: 15px 0 0 0;">{content['expires']}</p>
+                </div>
+                <div style="text-align: center; padding: 25px; background: linear-gradient(135deg, #1e293b, #334155); border-radius: 0 0 15px 15px;">
+                    <p style="margin: 0; color: rgba(255,255,255,0.9); font-size: 14px;">{content['footer']}</p>
+                    <p style="margin: 10px 0 0 0; color: rgba(255,255,255,0.7); font-size: 12px;">{content['footer_love']}</p>
+                    <p style="margin: 10px 0 0 0; color: white; font-weight: bold;">Legacy Translations 🌎</p>
+                </div>
+            </div>
+            """
+
+            await email_service.send_email(
+                to=salesperson.email,
+                subject=content['subject'],
+                content=email_html,
+                content_type="html"
+            )
+            logger.info(f"Invite email sent to salesperson: {salesperson.email}")
+        except Exception as email_error:
+            logger.error(f"Error sending invite email: {str(email_error)}")
+            # Don't fail the request, salesperson is already created
+
+        return {"success": True, "salesperson": salesperson_data, "invite_link": invite_link}
     except HTTPException:
         raise
     except Exception as e:
