@@ -140,10 +140,10 @@ export const THEMES = {
     // Company Info
     company: {
       name: 'TRADUX',
-      email: 'contact@tradux.com',
+      email: 'contact@tradux.online',
       phone: '(857) 208-1139',
       address: '',
-      website: 'https://tradux.com',
+      website: 'https://tradux.online',
       vercelSite: 'https://tradux-site.vercel.app',
       whatsapp: '(857) 208-1139',
     },

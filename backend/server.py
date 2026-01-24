@@ -782,7 +782,7 @@ def get_tradux_email_footer() -> str:
                                 <tr>
                                     <td align="center">
                                         <p style="color: #a0aec0; font-size: 12px; line-height: 1.8; margin: 0;">
-                                            <a href="mailto:contact@tradux.com" style="color: #f97316; text-decoration: none;">contact@tradux.com</a>
+                                            <a href="mailto:contact@tradux.online" style="color: #f97316; text-decoration: none;">contact@tradux.online</a>
                                             &nbsp;|&nbsp;
                                             <a href="https://wa.me/18572081139" style="color: #f97316; text-decoration: none;">WhatsApp: (857) 208-1139</a>
                                         </p>
@@ -1138,7 +1138,7 @@ def generate_tradux_certification_cover(
         <div class="footer">
             <p>
                 This certification can be verified online using the certification ID above.<br>
-                TRADUX · contact@tradux.com
+                TRADUX · contact@tradux.online
             </p>
         </div>
     </div>
@@ -1212,7 +1212,7 @@ Professional Translation Services
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 This certification can be verified using the ID above.
-TRADUX · contact@tradux.com
+TRADUX · contact@tradux.online
 """
         # Insert text
         fontsize = 11
@@ -3004,9 +3004,9 @@ BRAND_CONFIGS = {
         "accent_color": "#ea580c",        # Dark orange
         "gold_color": "#D4AF37",          # Gold (from icons)
         "company_name": "TRADUX",
-        "company_email": "contact@tradux.com",
+        "company_email": "contact@tradux.online",
         "company_phone": "(857) 208-1139",
-        "website_url": "https://tradux.com",
+        "website_url": "https://tradux.online",
         "vercel_url": "https://tradux-site.vercel.app",
         "whatsapp_url": "https://wa.me/18572081139",
         "default_certifier_name": "TRADUX Translations",
