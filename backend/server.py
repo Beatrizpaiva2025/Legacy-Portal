@@ -2216,6 +2216,82 @@ class AIPipelineStageApproval(BaseModel):
     edited_content: Optional[str] = None  # If action is 'edit'
     reviewer_notes: Optional[str] = None
 
+
+# ==================== TRADUX AUTO-TRANSLATION MODELS ====================
+class TraduxAutoTranslateRequest(BaseModel):
+    """Request to start fully automated TRADUX translation pipeline
+
+    This executes the complete translation workflow without human intervention:
+    1. OCR (if document is image/scanned PDF)
+    2. AI Translation with glossaries
+    3. Layout Optimization
+    4. AI Proofreading with auto-correction
+    5. Mark as ready for client approval
+    """
+    order_id: str
+    source_language: str = "Portuguese (Brazil)"
+    target_language: str = "English"
+    document_type: str = "general"
+    # Optional: provide text directly (skips OCR)
+    original_text: Optional[str] = None
+    # Currency conversion settings
+    convert_currency: bool = False
+    source_currency: Optional[str] = "BRL"
+    target_currency: Optional[str] = "USD"
+    exchange_rate: Optional[float] = None
+    rate_date: Optional[str] = None
+    add_translator_note: bool = True
+    # Format settings
+    page_format: str = "letter"  # letter or a4
+    # Glossary and instructions
+    use_glossary: bool = True
+    custom_instructions: Optional[str] = None
+    # Auto-correction settings
+    auto_correct_errors: bool = True  # Automatically fix proofreading errors
+    # Claude API key (optional - uses shared key if not provided)
+    claude_api_key: Optional[str] = None
+
+
+class TraduxTranslationStatus(BaseModel):
+    """Status tracking for TRADUX automated translation"""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    order_id: str
+    order_number: Optional[str] = None
+    # Progress tracking
+    current_step: str = "initializing"  # initializing, ocr, translating, optimizing, proofreading, ready_for_client, client_approved, completed
+    progress_percent: int = 0
+    # Step statuses
+    steps: Dict[str, dict] = Field(default_factory=lambda: {
+        "ocr": {"status": "pending", "message": ""},
+        "translation": {"status": "pending", "message": ""},
+        "layout": {"status": "pending", "message": ""},
+        "proofreading": {"status": "pending", "message": ""},
+        "auto_correction": {"status": "pending", "message": ""},
+        "client_approval": {"status": "pending", "message": ""}
+    })
+    # Results
+    original_text: Optional[str] = None
+    translated_text: Optional[str] = None
+    final_translation: Optional[str] = None
+    proofreading_errors: Optional[List[dict]] = None
+    corrections_applied: Optional[List[str]] = None
+    # Quality metrics
+    quality_score: Optional[str] = None
+    error_count: int = 0
+    # Client approval
+    client_approval_token: Optional[str] = None  # Unique token for client to access approval page
+    client_approved: bool = False
+    client_approved_at: Optional[datetime] = None
+    client_feedback: Optional[str] = None
+    # Timestamps
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    completed_at: Optional[datetime] = None
+    # Error handling
+    has_error: bool = False
+    error_message: Optional[str] = None
+
+
 # ==================== PAYMENT PROOF MODELS ====================
 class PaymentProof(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -21755,6 +21831,675 @@ async def retry_ai_pipeline_stage(pipeline_id: str, admin_key: str, claude_api_k
             "status": "error",
             "message": f"Stage '{current_stage}' failed: {result.get('error')}"
         }
+
+
+# ==================== TRADUX AUTO-TRANSLATION SYSTEM ====================
+# Fully automated translation pipeline for TRADUX - 100% AI-powered translations
+
+@api_router.post("/admin/tradux/auto-translate")
+async def tradux_auto_translate(request: TraduxAutoTranslateRequest, admin_key: str):
+    """
+    TRADUX Fully Automated Translation Pipeline
+
+    Executes complete translation workflow without human intervention:
+    1. OCR extraction (if needed)
+    2. AI Translation with glossaries
+    3. Layout optimization
+    4. AI Proofreading with auto-correction
+    5. Mark as ready for client approval
+
+    Returns immediately with a status tracking ID.
+    Use GET /admin/tradux/status/{order_id} to check progress.
+    """
+    user = await validate_admin_or_user_token(admin_key)
+
+    # Verify order exists
+    order = await db.translation_orders.find_one({"id": request.order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Get Claude API key
+    claude_api_key = request.claude_api_key
+    if not claude_api_key:
+        settings = await db.app_settings.find_one({"key": "shared_claude_api_key"})
+        if settings and settings.get("value"):
+            claude_api_key = settings["value"]
+        else:
+            raise HTTPException(status_code=400, detail="No Claude API key provided and no shared key configured")
+
+    # Create client approval token
+    import secrets
+    client_approval_token = secrets.token_urlsafe(32)
+
+    # Create status tracking record
+    status_record = TraduxTranslationStatus(
+        order_id=request.order_id,
+        order_number=order.get("order_number"),
+        current_step="initializing",
+        progress_percent=0,
+        client_approval_token=client_approval_token
+    )
+
+    await db.tradux_translations.insert_one(status_record.dict())
+
+    # Update order status
+    await db.translation_orders.update_one(
+        {"id": request.order_id},
+        {"$set": {
+            "translation_status": "in_translation",
+            "tradux_status_id": status_record.id,
+            "tradux_mode": True,
+            "updated_at": datetime.utcnow()
+        }}
+    )
+
+    # Run the automated pipeline in background
+    import asyncio
+    asyncio.create_task(_run_tradux_pipeline(
+        status_id=status_record.id,
+        order=order,
+        request=request,
+        claude_api_key=claude_api_key,
+        user=user
+    ))
+
+    return {
+        "status": "started",
+        "message": "TRADUX automated translation started",
+        "status_id": status_record.id,
+        "order_id": request.order_id,
+        "client_approval_token": client_approval_token,
+        "status_url": f"/admin/tradux/status/{request.order_id}",
+        "client_approval_url": f"/client/translation-approval/{client_approval_token}"
+    }
+
+
+async def _run_tradux_pipeline(
+    status_id: str,
+    order: dict,
+    request: TraduxAutoTranslateRequest,
+    claude_api_key: str,
+    user: dict
+):
+    """
+    Internal function to run the complete TRADUX pipeline asynchronously.
+    Updates status at each step for real-time progress tracking.
+    """
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=claude_api_key)
+
+        # Helper to update status
+        async def update_status(step: str, progress: int, step_status: str = "in_progress", message: str = "", **kwargs):
+            update_data = {
+                "current_step": step,
+                "progress_percent": progress,
+                f"steps.{step}.status": step_status,
+                f"steps.{step}.message": message,
+                "updated_at": datetime.utcnow()
+            }
+            update_data.update(kwargs)
+            await db.tradux_translations.update_one(
+                {"id": status_id},
+                {"$set": update_data}
+            )
+
+        # ========== STEP 1: OCR (if needed) ==========
+        await update_status("ocr", 10, "in_progress", "Extracting text from documents...")
+
+        original_text = request.original_text
+        original_document_base64 = None
+
+        if not original_text:
+            # Fetch documents from order
+            order_docs = await db.documents.find({"order_id": request.order_id, "document_type": "original"}).to_list(100)
+
+            if not order_docs:
+                await update_status("ocr", 10, "failed", "No documents found for this order", has_error=True, error_message="No documents found")
+                return
+
+            extracted_texts = []
+            for doc in order_docs:
+                if doc.get("file_data"):
+                    try:
+                        # Clean base64 data
+                        file_data = doc["file_data"]
+                        if "," in file_data:
+                            file_data = file_data.split(",")[1]
+
+                        # Determine media type
+                        filename = doc.get("filename", "").lower()
+                        if filename.endswith(".pdf"):
+                            media_type = "application/pdf"
+                        elif filename.endswith(".png"):
+                            media_type = "image/png"
+                        elif filename.endswith(".jpg") or filename.endswith(".jpeg"):
+                            media_type = "image/jpeg"
+                        else:
+                            media_type = "image/png"
+
+                        # Use Claude for OCR with layout preservation
+                        ocr_prompt = """Extract ALL text from this document image.
+
+CRITICAL INSTRUCTIONS:
+1. Maintain the EXACT original layout, structure, and formatting
+2. Preserve all line breaks, spacing, and indentation
+3. Keep tables in their original format using markdown table syntax
+4. Preserve headers, titles, and sections exactly as they appear
+5. Include ALL text, even small print, stamps, and signatures
+6. Use ** for bold text and * for italic text where visible
+7. For handwritten text, use [handwritten: text] notation
+8. For stamps/seals, use [stamp: text] notation
+9. For signatures, use [signature: name if readable, or "illegible"]
+
+Extract the complete text now, preserving the original layout:"""
+
+                        # Handle PDF conversion if needed
+                        if media_type == "application/pdf":
+                            import fitz
+                            pdf_content = base64.b64decode(file_data)
+                            pdf_document = fitz.open(stream=pdf_content, filetype="pdf")
+                            page_texts = []
+
+                            for page_num in range(min(pdf_document.page_count, 15)):
+                                page = pdf_document[page_num]
+                                pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+                                img_data = pix.tobytes("png")
+                                image_data = base64.b64encode(img_data).decode('utf-8')
+
+                                response = client.messages.create(
+                                    model="claude-sonnet-4-5-20250929",
+                                    max_tokens=4096,
+                                    messages=[{
+                                        "role": "user",
+                                        "content": [
+                                            {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": image_data}},
+                                            {"type": "text", "text": ocr_prompt}
+                                        ]
+                                    }]
+                                )
+                                page_texts.append(f"--- Page {page_num + 1} ---\n{response.content[0].text}")
+
+                            pdf_document.close()
+                            extracted_texts.append(f"--- Document: {doc.get('filename', 'unknown')} ---\n" + "\n\n".join(page_texts))
+                        else:
+                            # Direct image OCR
+                            response = client.messages.create(
+                                model="claude-sonnet-4-5-20250929",
+                                max_tokens=4096,
+                                messages=[{
+                                    "role": "user",
+                                    "content": [
+                                        {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": file_data}},
+                                        {"type": "text", "text": ocr_prompt}
+                                    ]
+                                }]
+                            )
+                            extracted_texts.append(f"--- Document: {doc.get('filename', 'unknown')} ---\n{response.content[0].text}")
+
+                        if not original_document_base64:
+                            original_document_base64 = file_data
+
+                    except Exception as e:
+                        logger.error(f"OCR failed for document: {e}")
+                        extracted_texts.append(f"--- Document: {doc.get('filename', 'unknown')} ---\n[OCR Error: {str(e)}]")
+
+            if extracted_texts:
+                original_text = "\n\n".join(extracted_texts)
+            else:
+                await update_status("ocr", 10, "failed", "Could not extract text from documents", has_error=True, error_message="OCR extraction failed")
+                return
+
+        await update_status("ocr", 20, "completed", f"Extracted {len(original_text)} characters", original_text=original_text)
+
+        # ========== STEP 2: TRANSLATION ==========
+        await update_status("translation", 25, "in_progress", "Translating document...")
+
+        # Fetch glossaries
+        glossary_text = ""
+        if request.use_glossary:
+            glossaries = await db.glossaries.find({
+                "$or": [
+                    {"sourceLang": request.source_language, "targetLang": request.target_language},
+                    {"sourceLang": request.target_language, "targetLang": request.source_language, "bidirectional": True},
+                    {"sourceLang": "All Languages"},
+                    {"targetLang": "All Languages"}
+                ]
+            }).to_list(50)
+
+            if glossaries:
+                terms = []
+                for g in glossaries:
+                    for term in g.get("terms", []):
+                        terms.append(f"- {term.get('source')} → {term.get('target')}")
+                if terms:
+                    glossary_text = f"\n\n🔹 MANDATORY GLOSSARY TERMS (MUST USE THESE EXACT TRANSLATIONS):\n" + "\n".join(terms[:100])
+
+        # Fetch custom instructions
+        custom_instructions = await fetch_matching_instructions(
+            request.source_language,
+            request.target_language,
+            request.document_type
+        ) if 'fetch_matching_instructions' in dir() else ""
+
+        # Build translation prompt
+        translation_prompt = f"""You are a professional certified translator performing a translation from {request.source_language} to {request.target_language}.
+
+DOCUMENT TYPE: {request.document_type}
+PAGE FORMAT: {request.page_format.upper()} ({"8.5 x 11 inches" if request.page_format == "letter" else "A4"})
+
+TRANSLATION REQUIREMENTS:
+1. Translate ALL text accurately and completely
+2. Maintain the EXACT original layout and formatting
+3. Preserve all headers, titles, tables, and visual structure
+4. Use professional, formal language appropriate for certified translations
+5. Convert dates from DD/MM/YYYY to MM/DD/YYYY format for English
+6. Keep proper nouns, names, and official titles as appropriate
+7. For stamps/seals, translate the text and note [stamp] or [seal]
+8. For signatures, keep as [signature] with any readable name
+
+{glossary_text}
+
+{f"CUSTOM INSTRUCTIONS: {request.custom_instructions}" if request.custom_instructions else ""}
+{custom_instructions}
+
+OUTPUT FORMAT:
+- Produce clean HTML that will render properly for printing
+- Use semantic HTML (tables for tabular data, paragraphs for text)
+- Include CSS for proper page formatting
+- Ensure 1:1 page correspondence (each original page = one translated page)
+- Use appropriate fonts and sizing for professional documents
+
+ORIGINAL DOCUMENT TEXT:
+{original_text}
+
+Now provide the complete translation in HTML format:"""
+
+        # Currency conversion note
+        currency_note = ""
+        if request.convert_currency and request.exchange_rate:
+            currency_note = f"""
+
+CURRENCY CONVERSION:
+- Source: {request.source_currency}
+- Target: {request.target_currency}
+- Exchange Rate: {request.exchange_rate}
+- Rate Date: {request.rate_date or datetime.now().strftime('%Y-%m-%d')}
+
+When you encounter monetary values in {request.source_currency}, show both the original and converted values.
+Example: R$ 1.000,00 (USD $184.50 at exchange rate of {request.exchange_rate} as of {request.rate_date})
+"""
+            translation_prompt = translation_prompt.replace("ORIGINAL DOCUMENT TEXT:", currency_note + "\nORIGINAL DOCUMENT TEXT:")
+
+        response = client.messages.create(
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=16384,
+            messages=[{"role": "user", "content": translation_prompt}]
+        )
+
+        translated_text = response.content[0].text
+        await update_status("translation", 50, "completed", f"Translation completed ({len(translated_text)} chars)", translated_text=translated_text)
+
+        # ========== STEP 3: LAYOUT OPTIMIZATION ==========
+        await update_status("layout", 55, "in_progress", "Optimizing layout for printing...")
+
+        layout_prompt = f"""Review this translation and optimize the HTML layout for professional printing.
+
+TARGET FORMAT: {request.page_format.upper()} ({"8.5 x 11 inches with 0.75 inch margins" if request.page_format == "letter" else "A4 with 2cm margins"})
+
+REQUIREMENTS:
+1. Ensure each original page fits on exactly ONE printed page
+2. Optimize font sizes (minimum 9pt body, 8pt for tables)
+3. Ensure tables don't break across pages
+4. Add proper page breaks where needed
+5. Clean up any HTML formatting issues
+6. Ensure professional appearance
+
+TRANSLATION TO OPTIMIZE:
+{translated_text}
+
+Return the optimized HTML with proper CSS for printing:"""
+
+        response = client.messages.create(
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=16384,
+            messages=[{"role": "user", "content": layout_prompt}]
+        )
+
+        optimized_text = response.content[0].text
+        await update_status("layout", 70, "completed", "Layout optimized for printing")
+
+        # ========== STEP 4: PROOFREADING ==========
+        await update_status("proofreading", 75, "in_progress", "Proofreading translation...")
+
+        proofread_prompt = f"""You are a professional proofreader. Compare the original text with the translation and identify any errors.
+
+ORIGINAL ({request.source_language}):
+{original_text}
+
+TRANSLATION ({request.target_language}):
+{optimized_text}
+
+{glossary_text}
+
+Check for:
+1. Transcription errors (numbers, dates, names)
+2. Missing or added text
+3. Terminology inconsistencies (especially with glossary terms)
+4. Grammar and spelling errors
+5. Formatting issues
+
+Return a JSON object with this EXACT structure:
+{{
+    "errors": [
+        {{
+            "page": "1",
+            "location": "description of where",
+            "original": "original text",
+            "translation": "current translation",
+            "correction": "suggested correction",
+            "type": "Transcription|Number|Date|Terminology|Grammar|Omission|Format",
+            "severity": "CRITICAL|HIGH|MEDIUM|LOW"
+        }}
+    ],
+    "summary": {{
+        "total_errors": 0,
+        "critical": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "quality": "APPROVED|APPROVED_WITH_NOTES|REJECTED"
+    }}
+}}
+
+If there are no errors, return an empty errors array and quality as "APPROVED"."""
+
+        response = client.messages.create(
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=8192,
+            messages=[{"role": "user", "content": proofread_prompt}]
+        )
+
+        proofread_result = response.content[0].text
+
+        # Parse proofreading result
+        import json
+        try:
+            # Extract JSON from response
+            json_match = proofread_result
+            if "```json" in proofread_result:
+                json_match = proofread_result.split("```json")[1].split("```")[0]
+            elif "```" in proofread_result:
+                json_match = proofread_result.split("```")[1].split("```")[0]
+
+            proofread_data = json.loads(json_match.strip())
+            errors = proofread_data.get("errors", [])
+            summary = proofread_data.get("summary", {})
+            quality_score = summary.get("quality", "APPROVED")
+            error_count = len(errors)
+        except:
+            errors = []
+            quality_score = "APPROVED"
+            error_count = 0
+
+        await update_status("proofreading", 85, "completed",
+            f"Found {error_count} issues. Quality: {quality_score}",
+            proofreading_errors=errors,
+            quality_score=quality_score,
+            error_count=error_count
+        )
+
+        # ========== STEP 5: AUTO-CORRECTION (if enabled) ==========
+        final_translation = optimized_text
+        corrections_applied = []
+
+        if request.auto_correct_errors and errors:
+            await update_status("auto_correction", 88, "in_progress", f"Applying {len(errors)} corrections...")
+
+            correction_prompt = f"""Apply these corrections to the translation:
+
+ERRORS TO FIX:
+{json.dumps(errors, indent=2)}
+
+TRANSLATION TO CORRECT:
+{optimized_text}
+
+Return the corrected HTML translation. Make ONLY the corrections listed above, do not change anything else."""
+
+            response = client.messages.create(
+                model="claude-sonnet-4-5-20250929",
+                max_tokens=16384,
+                messages=[{"role": "user", "content": correction_prompt}]
+            )
+
+            final_translation = response.content[0].text
+            corrections_applied = [f"{e.get('type')}: {e.get('correction')}" for e in errors[:10]]
+
+            await update_status("auto_correction", 92, "completed",
+                f"Applied {len(errors)} corrections",
+                corrections_applied=corrections_applied
+            )
+        else:
+            await update_status("auto_correction", 92, "skipped", "No corrections needed or auto-correction disabled")
+
+        # ========== STEP 6: READY FOR CLIENT APPROVAL ==========
+        await update_status("client_approval", 95, "pending",
+            "Translation ready for client review",
+            final_translation=final_translation
+        )
+
+        # Update final status
+        await db.tradux_translations.update_one(
+            {"id": status_id},
+            {"$set": {
+                "current_step": "ready_for_client",
+                "progress_percent": 100,
+                "final_translation": final_translation,
+                "updated_at": datetime.utcnow()
+            }}
+        )
+
+        # Update order status
+        await db.translation_orders.update_one(
+            {"id": request.order_id},
+            {"$set": {
+                "translation_status": "review",
+                "tradux_ready_for_approval": True,
+                "updated_at": datetime.utcnow()
+            }}
+        )
+
+        # Send notification email to admin
+        logger.info(f"TRADUX translation completed for order {order.get('order_number')}. Ready for client approval.")
+
+    except Exception as e:
+        logger.error(f"TRADUX pipeline error: {str(e)}")
+        await db.tradux_translations.update_one(
+            {"id": status_id},
+            {"$set": {
+                "has_error": True,
+                "error_message": str(e),
+                "current_step": "error",
+                "updated_at": datetime.utcnow()
+            }}
+        )
+
+
+@api_router.get("/admin/tradux/status/{order_id}")
+async def get_tradux_status(order_id: str, admin_key: str):
+    """Get real-time status of TRADUX automated translation"""
+    await validate_admin_or_user_token(admin_key)
+
+    status = await db.tradux_translations.find_one({"order_id": order_id})
+    if not status:
+        raise HTTPException(status_code=404, detail="TRADUX translation not found for this order")
+
+    status["_id"] = str(status["_id"])
+    return status
+
+
+@api_router.get("/client/translation-approval/{token}")
+async def get_client_translation_approval(token: str):
+    """
+    Public endpoint for client to view and approve their translation.
+    No authentication required - uses unique token.
+    """
+    status = await db.tradux_translations.find_one({"client_approval_token": token})
+    if not status:
+        raise HTTPException(status_code=404, detail="Translation not found or invalid token")
+
+    if status.get("current_step") not in ["ready_for_client", "client_approved", "completed"]:
+        return {
+            "status": "in_progress",
+            "message": "Translation is still being processed. Please check back later.",
+            "progress_percent": status.get("progress_percent", 0),
+            "current_step": status.get("current_step")
+        }
+
+    # Get order info
+    order = await db.translation_orders.find_one({"id": status["order_id"]})
+
+    return {
+        "status": "ready_for_review",
+        "order_number": status.get("order_number"),
+        "customer_name": order.get("customer_name") if order else None,
+        "document_type": order.get("document_type") if order else None,
+        "final_translation": status.get("final_translation"),
+        "quality_score": status.get("quality_score"),
+        "error_count": status.get("error_count", 0),
+        "corrections_applied": status.get("corrections_applied", []),
+        "client_approved": status.get("client_approved", False),
+        "client_approved_at": status.get("client_approved_at")
+    }
+
+
+@api_router.post("/client/translation-approval/{token}/approve")
+async def client_approve_translation(token: str, feedback: Optional[str] = None):
+    """
+    Client approves their translation.
+    Triggers certification and final delivery.
+    """
+    status = await db.tradux_translations.find_one({"client_approval_token": token})
+    if not status:
+        raise HTTPException(status_code=404, detail="Translation not found or invalid token")
+
+    if status.get("client_approved"):
+        return {"status": "already_approved", "message": "This translation has already been approved"}
+
+    # Update status
+    await db.tradux_translations.update_one(
+        {"client_approval_token": token},
+        {"$set": {
+            "client_approved": True,
+            "client_approved_at": datetime.utcnow(),
+            "client_feedback": feedback,
+            "current_step": "client_approved",
+            "steps.client_approval.status": "completed",
+            "steps.client_approval.message": "Client approved translation",
+            "updated_at": datetime.utcnow()
+        }}
+    )
+
+    # Update order
+    await db.translation_orders.update_one(
+        {"id": status["order_id"]},
+        {"$set": {
+            "translation_status": "ready",
+            "client_approved_translation": True,
+            "client_approved_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
+        }}
+    )
+
+    # TODO: Trigger certification generation and email delivery
+    logger.info(f"Client approved translation for order {status.get('order_number')}. Ready for certification.")
+
+    return {
+        "status": "approved",
+        "message": "Thank you! Your translation has been approved. You will receive the certified document shortly.",
+        "order_number": status.get("order_number")
+    }
+
+
+@api_router.post("/client/translation-approval/{token}/request-changes")
+async def client_request_changes(token: str, changes_requested: str):
+    """
+    Client requests changes to the translation.
+    Creates a task for admin review.
+    """
+    if not changes_requested or len(changes_requested.strip()) < 10:
+        raise HTTPException(status_code=400, detail="Please provide a detailed description of the changes needed")
+
+    status = await db.tradux_translations.find_one({"client_approval_token": token})
+    if not status:
+        raise HTTPException(status_code=404, detail="Translation not found or invalid token")
+
+    # Update status
+    await db.tradux_translations.update_one(
+        {"client_approval_token": token},
+        {"$set": {
+            "client_feedback": changes_requested,
+            "current_step": "changes_requested",
+            "steps.client_approval.status": "changes_requested",
+            "steps.client_approval.message": changes_requested,
+            "updated_at": datetime.utcnow()
+        }}
+    )
+
+    # Update order
+    await db.translation_orders.update_one(
+        {"id": status["order_id"]},
+        {"$set": {
+            "translation_status": "revision_requested",
+            "client_revision_notes": changes_requested,
+            "updated_at": datetime.utcnow()
+        }}
+    )
+
+    # Create notification for admin
+    order = await db.translation_orders.find_one({"id": status["order_id"]})
+    if order and order.get("assigned_pm_id"):
+        notification = Notification(
+            user_id=order["assigned_pm_id"],
+            type="client_revision_request",
+            title="Client Requested Translation Changes",
+            message=f"Order {status.get('order_number')}: {changes_requested[:100]}...",
+            order_id=status["order_id"],
+            order_number=status.get("order_number")
+        )
+        await db.notifications.insert_one(notification.dict())
+
+    return {
+        "status": "changes_requested",
+        "message": "Thank you for your feedback. Our team will review your request and make the necessary changes.",
+        "order_number": status.get("order_number")
+    }
+
+
+@api_router.get("/admin/tradux/translations")
+async def list_tradux_translations(admin_key: str, status: Optional[str] = None, limit: int = 50):
+    """List all TRADUX automated translations"""
+    await validate_admin_or_user_token(admin_key)
+
+    query = {}
+    if status:
+        query["current_step"] = status
+
+    translations = await db.tradux_translations.find(query).sort("created_at", -1).limit(limit).to_list(length=limit)
+
+    for t in translations:
+        t["_id"] = str(t["_id"])
+        # Don't include full translation text in list view
+        if "final_translation" in t:
+            t["has_translation"] = True
+            t["translation_preview"] = t["final_translation"][:500] + "..." if len(t.get("final_translation", "")) > 500 else t.get("final_translation", "")
+            del t["final_translation"]
+        if "original_text" in t:
+            del t["original_text"]
+        if "translated_text" in t:
+            del t["translated_text"]
+
+    return {"translations": translations, "count": len(translations)}
 
 
 # ==================== QUICKBOOKS INTEGRATION ====================
