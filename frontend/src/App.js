@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useDropzone } from 'react-dropzone';
 import axios from 'axios';
 import './App.css';
@@ -60,13 +60,57 @@ const TRANSLATIONS = {
     benefit2: 'Dedicated B2B support chat',
     benefit3: 'Priority processing',
     benefit4: 'Exclusive: Digital Verification with QR Code',
+    welcomeGift: '🎁 1 FREE Certified Page on signup!',
     // Navigation
     newOrder: 'New Order',
     createNewOrder: 'Create New Order',
     myOrders: 'My Orders',
     messages: 'Messages',
+    invoices: 'Invoices',
+    paymentPlanMenu: 'Payment Plan',
     welcome: 'Welcome',
     logout: 'Logout',
+    // Payment Plan Page
+    paymentPlanTitle: 'Payment Plan',
+    currentPlan: 'Current Plan',
+    qualificationStatus: 'Qualification Status',
+    qualifiedForInvoice: 'You qualify for biweekly invoice!',
+    notQualifiedYet: 'Not yet qualified',
+    translationsCompleted: 'translations completed',
+    translationsRemaining: 'more translations to qualify',
+    requestUpgrade: 'Request Upgrade',
+    upgradeRequested: 'Upgrade Requested',
+    awaitingApproval: 'Awaiting admin approval',
+    selectPlanToUpgrade: 'Select the plan you want:',
+    submitUpgradeRequest: 'Submit Upgrade Request',
+    upgradeSuccess: 'Upgrade request submitted successfully!',
+    // Payment Plan Terms Explanation
+    paymentPlanTermsTitle: 'Payment Terms',
+    paymentPlanTerm1: 'Biweekly invoicing available upon completion of 10 paid translations.',
+    paymentPlanTerm2: 'Net 30 payment terms granted after 3 consecutive months of timely invoice settlement.',
+    currentTerms: 'Current Terms',
+    paymentDueOnInvoice: 'Payment due on invoice date',
+    net30Terms: '30-day payment terms',
+    monthsOnTime: 'months of on-time payments',
+    monthsRequired: '3 months required',
+    // Invoice Page
+    myInvoices: 'My Invoices',
+    noInvoices: 'No invoices found',
+    invoiceNumber: 'Invoice #',
+    dueDate: 'Due Date',
+    status: 'Status',
+    amount: 'Amount',
+    payNow: 'Pay Now',
+    payWithCard: 'Pay with Card',
+    payWithZelle: 'Pay with Zelle',
+    uploadReceipt: 'Upload Receipt',
+    zelleInstructions: 'Send payment via Zelle to: payments@legacytranslations.com',
+    receiptUploaded: 'Receipt uploaded successfully. Payment will be verified shortly.',
+    invoicePaid: 'Paid',
+    invoicePending: 'Pending',
+    invoiceOverdue: 'Overdue',
+    viewDetails: 'View Details',
+    ordersIncluded: 'Orders Included',
     // Service Types
     serviceType: 'Service Type',
     certifiedTranslation: 'Certified Translation',
@@ -114,15 +158,24 @@ const TRANSLATIONS = {
     country: 'Country',
     taxId: 'Tax ID (EIN/CNPJ) - Optional',
     taxIdPlaceholder: 'XX-XXXXXXX',
+    // Estimated Volume
+    estimatedVolume: 'Estimated Monthly Volume',
+    selectVolume: 'Select estimated volume',
+    volume1to10: '1-10 pages per month',
+    volume11to50: '11-50 pages per month',
+    volume51to100: '51-100 pages per month',
+    volume100plus: '100+ pages per month',
     // Payment Plan
     paymentPlan: 'How would you like to pay?',
     payPerOrder: 'Pay Per Order',
     payPerOrderDesc: 'Pay for each order via Zelle or card',
     biweeklyInvoice: 'Biweekly Invoice',
-    biweeklyInvoiceDesc: 'Receive invoice every 2 weeks (requires approval)',
+    biweeklyInvoiceDesc: 'Receive invoice every 2 weeks',
     monthlyInvoice: 'Monthly Invoice',
-    monthlyInvoiceDesc: 'Receive monthly invoice (requires approval)',
+    monthlyInvoiceDesc: 'Receive monthly invoice',
     invoiceRequiresApproval: 'Invoice plans require account approval after registration',
+    invoiceComingSoon: 'Available after qualification',
+    invoiceQualificationNote: 'Biweekly invoice unlocks after 10 paid translations. Request upgrade from your dashboard.',
     paymentMethod: 'Preferred Payment Method',
     zelle: 'Zelle',
     creditCard: 'Credit Card',
@@ -142,7 +195,34 @@ const TRANSLATIONS = {
     net30Terms: 'Net 30 payment terms',
     volumeDiscounts: 'Volume discounts on translations',
     dedicatedSupport: 'Dedicated account support',
-    priorityProcessing: 'Priority order processing'
+    priorityProcessing: 'Priority order processing',
+    // Discount Structure
+    discountStructure: 'Partner Discount Structure',
+    discountDescription: 'Earn volume discounts based on your monthly page count',
+    tier: 'Tier',
+    monthlyVolume: 'Monthly Volume',
+    discount: 'Discount',
+    pricePerPage: 'Price/Page',
+    monthlySavings: 'Monthly Savings',
+    partnerMargin: 'Partner Margin*',
+    pages: 'pages',
+    page: 'page',
+    upTo: 'up to',
+    marginNote: 'Partner margin calculated based on resale at $30/page (common market rate)',
+    yourCurrentTier: 'Your Current Tier',
+    pagesLast30Days: 'pages in last 30 days',
+    pagesToNextTier: 'pages to',
+    youSaved: 'You saved',
+    thisMonth: 'this month',
+    current: 'Current',
+    // Welcome Gift Modal
+    welcomeGiftTitle: 'Welcome Gift!',
+    welcomeGiftThankYou: 'Thank you for joining Legacy Translations',
+    welcomeGiftDescription: '1 FREE Page (up to 250 words) + Certification of Accuracy',
+    welcomeGiftCouponLabel: 'Your Coupon Code',
+    welcomeGiftCouponDesc: '1 free page (up to 250 words) + certification',
+    welcomeGiftValid: 'Valid for 30 days',
+    welcomeGiftUse: 'Use at checkout on your first order'
   },
   es: {
     // Login
@@ -177,13 +257,57 @@ const TRANSLATIONS = {
     benefit2: 'Chat de soporte B2B dedicado',
     benefit3: 'Procesamiento prioritario',
     benefit4: 'Exclusivo: Verificación Digital con Código QR',
+    welcomeGift: '🎁 1 Página Certificada GRATIS al registrarse!',
     // Navigation
     newOrder: 'Nuevo Pedido',
     createNewOrder: 'Crear Nuevo Pedido',
     myOrders: 'Mis Pedidos',
     messages: 'Mensajes',
+    invoices: 'Facturas',
+    paymentPlanMenu: 'Plan de Pago',
     welcome: 'Bienvenido',
     logout: 'Cerrar Sesión',
+    // Payment Plan Page
+    paymentPlanTitle: 'Plan de Pago',
+    currentPlan: 'Plan Actual',
+    qualificationStatus: 'Estado de Calificación',
+    qualifiedForInvoice: '¡Califica para factura quincenal!',
+    notQualifiedYet: 'Aún no calificado',
+    translationsCompleted: 'traducciones completadas',
+    translationsRemaining: 'traducciones más para calificar',
+    requestUpgrade: 'Solicitar Mejora',
+    upgradeRequested: 'Mejora Solicitada',
+    awaitingApproval: 'Esperando aprobación del administrador',
+    selectPlanToUpgrade: 'Seleccione el plan que desea:',
+    submitUpgradeRequest: 'Enviar Solicitud',
+    upgradeSuccess: '¡Solicitud de mejora enviada exitosamente!',
+    // Payment Plan Terms Explanation
+    paymentPlanTermsTitle: 'Condiciones de Pago',
+    paymentPlanTerm1: 'Facturación quincenal disponible tras completar 10 traducciones pagadas.',
+    paymentPlanTerm2: 'Plazo de pago Net 30 otorgado después de 3 meses consecutivos con facturas liquidadas puntualmente.',
+    currentTerms: 'Condiciones Actuales',
+    paymentDueOnInvoice: 'Pago vence en fecha de factura',
+    net30Terms: 'Plazo de pago de 30 días',
+    monthsOnTime: 'meses de pagos puntuales',
+    monthsRequired: '3 meses requeridos',
+    // Invoice Page
+    myInvoices: 'Mis Facturas',
+    noInvoices: 'No se encontraron facturas',
+    invoiceNumber: 'Factura #',
+    dueDate: 'Fecha de Vencimiento',
+    status: 'Estado',
+    amount: 'Monto',
+    payNow: 'Pagar Ahora',
+    payWithCard: 'Pagar con Tarjeta',
+    payWithZelle: 'Pagar con Zelle',
+    uploadReceipt: 'Subir Recibo',
+    zelleInstructions: 'Enviar pago via Zelle a: payments@legacytranslations.com',
+    receiptUploaded: 'Recibo subido exitosamente. El pago sera verificado pronto.',
+    invoicePaid: 'Pagado',
+    invoicePending: 'Pendiente',
+    invoiceOverdue: 'Vencido',
+    viewDetails: 'Ver Detalles',
+    ordersIncluded: 'Pedidos Incluidos',
     serviceType: 'Tipo de Servicio',
     certifiedTranslation: 'Traducción Certificada',
     certifiedDesc: 'Documentos oficiales, USCIS, propósitos legales',
@@ -230,15 +354,24 @@ const TRANSLATIONS = {
     country: 'País',
     taxId: 'ID Fiscal (EIN/RFC) - Opcional',
     taxIdPlaceholder: 'XX-XXXXXXX',
+    // Estimated Volume
+    estimatedVolume: 'Volumen Mensual Estimado',
+    selectVolume: 'Seleccione volumen estimado',
+    volume1to10: '1-10 páginas por mes',
+    volume11to50: '11-50 páginas por mes',
+    volume51to100: '51-100 páginas por mes',
+    volume100plus: '100+ páginas por mes',
     // Payment Plan
     paymentPlan: '¿Cómo prefiere pagar?',
     payPerOrder: 'Pago Por Pedido',
     payPerOrderDesc: 'Pague cada pedido vía Zelle o tarjeta',
     biweeklyInvoice: 'Factura Quincenal',
-    biweeklyInvoiceDesc: 'Reciba factura cada 2 semanas (requiere aprobación)',
+    biweeklyInvoiceDesc: 'Reciba factura cada 2 semanas',
     monthlyInvoice: 'Factura Mensual',
-    monthlyInvoiceDesc: 'Reciba factura mensual (requiere aprobación)',
+    monthlyInvoiceDesc: 'Reciba factura mensual',
     invoiceRequiresApproval: 'Planes de factura requieren aprobación después del registro',
+    invoiceComingSoon: 'Disponible tras calificación',
+    invoiceQualificationNote: 'Factura quincenal se desbloquea después de 10 traducciones pagas. Solicite desde su panel.',
     paymentMethod: 'Método de Pago Preferido',
     zelle: 'Zelle',
     creditCard: 'Tarjeta de Crédito',
@@ -258,7 +391,34 @@ const TRANSLATIONS = {
     net30Terms: 'Términos de pago Net 30',
     volumeDiscounts: 'Descuentos por volumen en traducciones',
     dedicatedSupport: 'Soporte de cuenta dedicado',
-    priorityProcessing: 'Procesamiento prioritario de pedidos'
+    priorityProcessing: 'Procesamiento prioritario de pedidos',
+    // Discount Structure
+    discountStructure: 'Estructura de Descuentos para Partners',
+    discountDescription: 'Obtenga descuentos por volumen según su cantidad mensual de páginas',
+    tier: 'Nivel',
+    monthlyVolume: 'Volumen Mensual',
+    discount: 'Descuento',
+    pricePerPage: 'Precio/Página',
+    monthlySavings: 'Ahorro Mensual',
+    partnerMargin: 'Margen del Partner*',
+    pages: 'páginas',
+    page: 'página',
+    upTo: 'hasta',
+    marginNote: 'Margen del partner calculado en base a reventa a $30/página (precio común de mercado)',
+    yourCurrentTier: 'Tu Nivel Actual',
+    pagesLast30Days: 'páginas en los últimos 30 días',
+    pagesToNextTier: 'páginas para',
+    youSaved: 'Ahorraste',
+    thisMonth: 'este mes',
+    current: 'Actual',
+    // Welcome Gift Modal
+    welcomeGiftTitle: '¡Regalo de Bienvenida!',
+    welcomeGiftThankYou: 'Gracias por unirse a Legacy Translations',
+    welcomeGiftDescription: '1 Página GRATIS (hasta 250 palabras) + Certificación de Precisión',
+    welcomeGiftCouponLabel: 'Tu Código de Cupón',
+    welcomeGiftCouponDesc: '1 página gratis (hasta 250 palabras) + certificación',
+    welcomeGiftValid: 'Válido por 30 días',
+    welcomeGiftUse: 'Usar al finalizar tu primer pedido'
   },
   pt: {
     // Login
@@ -293,13 +453,57 @@ const TRANSLATIONS = {
     benefit2: 'Chat de suporte exclusivo para B2B',
     benefit3: 'Processamento prioritário',
     benefit4: 'Exclusivo: Verificação Digital com QR Code',
+    welcomeGift: '🎁 1 Página Certificada GRÁTIS no cadastro!',
     // Navigation
     newOrder: 'Novo Pedido',
     createNewOrder: 'Criar Novo Pedido',
     myOrders: 'Meus Pedidos',
     messages: 'Mensagens',
+    invoices: 'Faturas',
+    paymentPlanMenu: 'Plano de Pagamento',
     welcome: 'Bem-vindo',
     logout: 'Sair',
+    // Payment Plan Page
+    paymentPlanTitle: 'Plano de Pagamento',
+    currentPlan: 'Plano Atual',
+    qualificationStatus: 'Status de Qualificação',
+    qualifiedForInvoice: 'Você se qualifica para fatura quinzenal!',
+    notQualifiedYet: 'Ainda não qualificado',
+    translationsCompleted: 'traduções concluídas',
+    translationsRemaining: 'traduções restantes para qualificar',
+    requestUpgrade: 'Solicitar Upgrade',
+    upgradeRequested: 'Upgrade Solicitado',
+    awaitingApproval: 'Aguardando aprovação do administrador',
+    selectPlanToUpgrade: 'Selecione o plano desejado:',
+    submitUpgradeRequest: 'Enviar Solicitação',
+    upgradeSuccess: 'Solicitação de upgrade enviada com sucesso!',
+    // Payment Plan Terms Explanation
+    paymentPlanTermsTitle: 'Condições de Pagamento',
+    paymentPlanTerm1: 'Faturamento quinzenal disponível após a conclusão de 10 traduções pagas.',
+    paymentPlanTerm2: 'Prazo de pagamento Net 30 concedido após 3 meses consecutivos com faturas quitadas pontualmente.',
+    currentTerms: 'Condições Atuais',
+    paymentDueOnInvoice: 'Pagamento vence na data da fatura',
+    net30Terms: 'Prazo de pagamento de 30 dias',
+    monthsOnTime: 'meses de pagamentos em dia',
+    monthsRequired: '3 meses necessários',
+    // Invoice Page
+    myInvoices: 'Minhas Faturas',
+    noInvoices: 'Nenhuma fatura encontrada',
+    invoiceNumber: 'Fatura #',
+    dueDate: 'Data de Vencimento',
+    status: 'Status',
+    amount: 'Valor',
+    payNow: 'Pagar Agora',
+    payWithCard: 'Pagar com Cartao',
+    payWithZelle: 'Pagar com Zelle',
+    uploadReceipt: 'Enviar Comprovante',
+    zelleInstructions: 'Enviar pagamento via Zelle para: payments@legacytranslations.com',
+    receiptUploaded: 'Comprovante enviado com sucesso. O pagamento sera verificado em breve.',
+    invoicePaid: 'Pago',
+    invoicePending: 'Pendente',
+    invoiceOverdue: 'Vencido',
+    viewDetails: 'Ver Detalhes',
+    ordersIncluded: 'Pedidos Incluidos',
     serviceType: 'Tipo de Serviço',
     certifiedTranslation: 'Tradução Certificada',
     certifiedDesc: 'Documentos oficiais, USCIS, fins legais',
@@ -346,15 +550,24 @@ const TRANSLATIONS = {
     country: 'País',
     taxId: 'CNPJ/CPF - Opcional',
     taxIdPlaceholder: 'XX.XXX.XXX/0001-XX',
+    // Estimated Volume
+    estimatedVolume: 'Volume Mensal Estimado',
+    selectVolume: 'Selecione o volume estimado',
+    volume1to10: '1-10 páginas por mês',
+    volume11to50: '11-50 páginas por mês',
+    volume51to100: '51-100 páginas por mês',
+    volume100plus: '100+ páginas por mês',
     // Payment Plan
     paymentPlan: 'Como prefere pagar?',
     payPerOrder: 'Pagar Por Pedido',
     payPerOrderDesc: 'Pague cada pedido via Zelle ou cartão',
     biweeklyInvoice: 'Fatura Quinzenal',
-    biweeklyInvoiceDesc: 'Receba fatura a cada 2 semanas (requer aprovação)',
+    biweeklyInvoiceDesc: 'Receba fatura a cada 2 semanas',
     monthlyInvoice: 'Fatura Mensal',
-    monthlyInvoiceDesc: 'Receba fatura mensal (requer aprovação)',
+    monthlyInvoiceDesc: 'Receba fatura mensal',
     invoiceRequiresApproval: 'Planos de fatura requerem aprovação após o cadastro',
+    invoiceComingSoon: 'Disponível após qualificação',
+    invoiceQualificationNote: 'Fatura quinzenal é liberada após 10 traduções pagas. Solicite pelo painel.',
     paymentMethod: 'Método de Pagamento Preferido',
     zelle: 'Zelle',
     creditCard: 'Cartão de Crédito',
@@ -374,7 +587,34 @@ const TRANSLATIONS = {
     net30Terms: 'Condições de pagamento Net 30',
     volumeDiscounts: 'Descontos por volume em traduções',
     dedicatedSupport: 'Suporte de conta dedicado',
-    priorityProcessing: 'Processamento prioritário de pedidos'
+    priorityProcessing: 'Processamento prioritário de pedidos',
+    // Discount Structure
+    discountStructure: 'Estrutura de Descontos para Parceiros',
+    discountDescription: 'Ganhe descontos por volume com base na sua quantidade mensal de páginas',
+    tier: 'Nível',
+    monthlyVolume: 'Volume Mensal',
+    discount: 'Desconto',
+    pricePerPage: 'Preço/Página',
+    monthlySavings: 'Economia Mensal',
+    partnerMargin: 'Margem do Parceiro*',
+    pages: 'páginas',
+    page: 'página',
+    upTo: 'até',
+    marginNote: 'Margem do parceiro calculada com base na revenda a $30/página (preço comum de mercado)',
+    yourCurrentTier: 'Seu Nível Atual',
+    pagesLast30Days: 'páginas nos últimos 30 dias',
+    pagesToNextTier: 'páginas para',
+    youSaved: 'Você economizou',
+    thisMonth: 'este mês',
+    current: 'Atual',
+    // Welcome Gift Modal
+    welcomeGiftTitle: 'Presente de Boas-vindas!',
+    welcomeGiftThankYou: 'Obrigado por se juntar à Legacy Translations',
+    welcomeGiftDescription: '1 Página GRÁTIS (até 250 palavras) + Certificação de Precisão',
+    welcomeGiftCouponLabel: 'Seu Código de Cupom',
+    welcomeGiftCouponDesc: '1 página grátis (até 250 palavras) + certificação',
+    welcomeGiftValid: 'Válido por 30 dias',
+    welcomeGiftUse: 'Use no checkout do seu primeiro pedido'
   }
 };
 
@@ -388,34 +628,36 @@ const UI_LANGUAGES = [
   { code: 'pt', countryCode: 'br', name: 'Português' }
 ];
 
-// Get user's language preference (English is default)
+// Check if user is in Brazil based on timezone
+const isInBrazil = () => {
+  try {
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return timezone.includes('Sao_Paulo') || timezone.includes('Fortaleza') ||
+           timezone.includes('Recife') || timezone.includes('Bahia') ||
+           timezone.includes('Manaus') || timezone.includes('Cuiaba') ||
+           timezone.includes('Porto_Velho') || timezone.includes('Boa_Vista') ||
+           timezone.includes('Rio_Branco') || timezone.includes('Belem') ||
+           timezone.includes('Araguaina') || timezone.includes('Maceio') ||
+           timezone.includes('Campo_Grande') || timezone.includes('Noronha');
+  } catch {
+    return false;
+  }
+};
+
+// Get user's language preference (Portuguese for Brazil, English for others)
 const getInitialLanguage = () => {
   const saved = localStorage.getItem('ui_language');
   if (saved && ['en', 'es', 'pt'].includes(saved)) return saved;
-  return 'en'; // Always default to English
+  // Auto-detect: Portuguese for Brazil, English for everyone else
+  return isInBrazil() ? 'pt' : 'en';
 };
 
 // Detect currency based on timezone (only Brazil changes to BRL)
 const getLocalCurrency = () => {
-  try {
-    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-    // Only Brazil (based on timezone, not locale)
-    if (timezone.includes('Sao_Paulo') || timezone.includes('Fortaleza') ||
-        timezone.includes('Recife') || timezone.includes('Bahia') ||
-        timezone.includes('Manaus') || timezone.includes('Cuiaba') ||
-        timezone.includes('Porto_Velho') || timezone.includes('Boa_Vista') ||
-        timezone.includes('Rio_Branco') || timezone.includes('Belem') ||
-        timezone.includes('Araguaina') || timezone.includes('Maceio') ||
-        timezone.includes('Campo_Grande') || timezone.includes('Noronha')) {
-      return { code: 'BRL', symbol: 'R$', rate: 5.0, isUSA: false };
-    }
-
-    // Default USD for everyone else
-    return { code: 'USD', symbol: '$', rate: 1, isUSA: true };
-  } catch {
-    return { code: 'USD', symbol: '$', rate: 1, isUSA: true };
+  if (isInBrazil()) {
+    return { code: 'BRL', symbol: 'R$', rate: 5.0, isUSA: false };
   }
+  return { code: 'USD', symbol: '$', rate: 1, isUSA: true };
 };
 
 // Translation stages
@@ -513,18 +755,19 @@ const LANGUAGES = TO_LANGUAGES;
 
 // ==================== LOGIN PAGE ====================
 const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
-  // Check for registration params from B2B form
+  // Check for registration params from B2B form or referral link
   const getInitialState = () => {
     const hash = window.location.hash;
     const queryString = hash.includes('?') ? hash.split('?')[1] : '';
     const params = new URLSearchParams(queryString);
-    const isRegister = params.get('register') === 'true';
+    const isRegister = params.get('register') === 'true' || params.get('ref');
     return {
       isLogin: !isRegister,
       email: params.get('email') || '',
       company: params.get('company') || '',
       name: params.get('name') || '',
-      phone: params.get('phone') || ''
+      phone: params.get('phone') || '',
+      referral_code: params.get('ref') || ''
     };
   };
 
@@ -547,11 +790,15 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
     address_zip: '',
     address_country: 'USA',
     tax_id: '',
+    // Estimated Volume
+    estimated_volume: '',
     // Payment
     payment_plan: 'pay_per_order',
     default_payment_method: 'zelle',
     // Agreement
-    agreed_to_terms: false
+    agreed_to_terms: false,
+    // Referral
+    referral_code: initialState.referral_code || ''
   });
   const [showAgreement, setShowAgreement] = useState(false);
   const [error, setError] = useState('');
@@ -604,11 +851,15 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
           address_zip: formData.address_zip || null,
           address_country: formData.address_country || 'USA',
           tax_id: formData.tax_id || null,
+          // Estimated Volume
+          estimated_volume: formData.estimated_volume || null,
           // Payment
           payment_plan: formData.payment_plan,
           default_payment_method: formData.default_payment_method,
           // Agreement
-          agreed_to_terms: formData.agreed_to_terms
+          agreed_to_terms: formData.agreed_to_terms,
+          // Referral
+          referral_code: formData.referral_code || null
         });
         onLogin(response.data);
       }
@@ -633,6 +884,19 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
             />
             <h1 className="text-xl font-bold mb-1 text-gray-800">{t.createAccount}</h1>
             <p className="text-gray-500 text-xs mb-4">{t.corporateOnly}</p>
+
+            {/* Welcome Gift Highlight */}
+            <div className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-lg p-3 mb-4 text-center">
+              <span className="font-semibold text-sm">{t.welcomeGift}</span>
+            </div>
+
+            {/* Referral Indicator */}
+            {formData.referral_code && (
+              <div className="bg-purple-100 text-purple-700 rounded-lg p-3 mb-4 text-center text-sm">
+                <span>🤝 Você foi indicado! Código: </span>
+                <span className="font-mono font-bold">{formData.referral_code.toUpperCase()}</span>
+              </div>
+            )}
 
             <div className="space-y-2 text-xs text-gray-700">
               <div className="flex items-center gap-2">
@@ -724,26 +988,52 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
                 </div>
               </div>
 
+              {/* Estimated Monthly Volume */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">{t.estimatedVolume} *</label>
+                <select
+                  required
+                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                  value={formData.estimated_volume}
+                  onChange={(e) => setFormData({...formData, estimated_volume: e.target.value})}
+                >
+                  <option value="">{t.selectVolume}</option>
+                  <option value="1-10">{t.volume1to10}</option>
+                  <option value="11-50">{t.volume11to50}</option>
+                  <option value="51-100">{t.volume51to100}</option>
+                  <option value="100+">{t.volume100plus}</option>
+                </select>
+              </div>
+
               {/* Payment Plan */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">{t.paymentPlan}</label>
                 <div className="grid grid-cols-3 gap-2">
-                  <label className={`flex flex-col p-2 rounded border-2 cursor-pointer transition-all text-center ${formData.payment_plan === 'pay_per_order' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`}>
-                    <input type="radio" name="payment_plan" value="pay_per_order" checked={formData.payment_plan === 'pay_per_order'} onChange={(e) => setFormData({...formData, payment_plan: e.target.value})} className="sr-only" />
+                  {/* Pay Per Order - Always available */}
+                  <label className={`flex flex-col p-2 rounded border-2 cursor-pointer transition-all text-center border-blue-500 bg-blue-50`}>
+                    <input type="radio" name="payment_plan" value="pay_per_order" checked={true} readOnly className="sr-only" />
                     <span className="font-medium text-xs text-gray-800">{t.payPerOrder}</span>
                     <span className="text-[10px] text-gray-500">{t.payPerOrderDesc}</span>
                   </label>
-                  <label className={`flex flex-col p-2 rounded border-2 cursor-pointer transition-all text-center ${formData.payment_plan === 'biweekly' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`}>
-                    <input type="radio" name="payment_plan" value="biweekly" checked={formData.payment_plan === 'biweekly'} onChange={(e) => setFormData({...formData, payment_plan: e.target.value})} className="sr-only" />
-                    <span className="font-medium text-xs text-gray-800">{t.biweeklyInvoice}</span>
-                    <span className="text-[10px] text-gray-500">{t.biweeklyInvoiceDesc}</span>
-                  </label>
-                  <label className={`flex flex-col p-2 rounded border-2 cursor-pointer transition-all text-center ${formData.payment_plan === 'monthly' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`}>
-                    <input type="radio" name="payment_plan" value="monthly" checked={formData.payment_plan === 'monthly'} onChange={(e) => setFormData({...formData, payment_plan: e.target.value})} className="sr-only" />
-                    <span className="font-medium text-xs text-gray-800">{t.monthlyInvoice}</span>
-                    <span className="text-[10px] text-gray-500">{t.monthlyInvoiceDesc}</span>
-                  </label>
+                  {/* Biweekly Invoice - Disabled for new signups */}
+                  <div className="flex flex-col p-2 rounded border-2 border-gray-200 text-center opacity-50 cursor-not-allowed relative" title={t.invoiceQualificationNote}>
+                    <div className="absolute -top-1 -right-1 bg-amber-100 rounded-full p-0.5">
+                      <svg className="w-3 h-3 text-amber-600" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/></svg>
+                    </div>
+                    <span className="font-medium text-xs text-gray-500">{t.biweeklyInvoice}</span>
+                    <span className="text-[10px] text-gray-400">{t.invoiceComingSoon}</span>
+                  </div>
+                  {/* Monthly Invoice - Disabled for new signups */}
+                  <div className="flex flex-col p-2 rounded border-2 border-gray-200 text-center opacity-50 cursor-not-allowed relative" title={t.invoiceQualificationNote}>
+                    <div className="absolute -top-1 -right-1 bg-amber-100 rounded-full p-0.5">
+                      <svg className="w-3 h-3 text-amber-600" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/></svg>
+                    </div>
+                    <span className="font-medium text-xs text-gray-500">{t.monthlyInvoice}</span>
+                    <span className="text-[10px] text-gray-400">{t.invoiceComingSoon}</span>
+                  </div>
                 </div>
+                {/* Qualification note */}
+                <p className="text-[10px] text-gray-500 mt-1 italic">{t.invoiceQualificationNote}</p>
               </div>
 
               {/* Password */}
@@ -1057,8 +1347,10 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
 const Sidebar = ({ activeTab, setActiveTab, partner, onLogout, t }) => {
   const menuItems = [
     { id: 'new-order', label: t.newOrder, icon: '➕' },
-    { id: 'orders', label: t.myOrders, icon: '📋' },
-    { id: 'messages', label: t.messages, icon: '✉️' }
+    { id: 'orders', label: t.myOrders, icon: '📦' },
+    { id: 'invoices', label: t.invoices, icon: '🧾' },
+    { id: 'messages', label: t.messages, icon: '✉️' },
+    { id: 'payment-plan', label: t.paymentPlanMenu, icon: '💳' }
   ];
 
   return (
@@ -1123,6 +1415,13 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
   const [success, setSuccess] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
 
+  // Coupon states
+  const [availableCoupons, setAvailableCoupons] = useState([]);
+  const [selectedCoupon, setSelectedCoupon] = useState('');
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponError, setCouponError] = useState('');
+
   // Refs for scroll-to-error
   const clientNameRef = useRef(null);
   const clientEmailRef = useRef(null);
@@ -1159,6 +1458,20 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
       }
     };
     fetchPartnerOrders();
+  }, [token]);
+
+  // Fetch available coupons for this partner
+  useEffect(() => {
+    const fetchAvailableCoupons = async () => {
+      if (!token) return;
+      try {
+        const response = await axios.get(`${API}/partner/coupons?token=${token}`);
+        setAvailableCoupons(response.data || []);
+      } catch (err) {
+        console.error('Failed to fetch available coupons:', err);
+      }
+    };
+    fetchAvailableCoupons();
   }, [token]);
 
   // Get unique PMs from orders
@@ -1287,6 +1600,47 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
       total_price: basePrice + urgencyFee + shippingFee,
       pages: pages
     });
+  };
+
+  // Validate and apply coupon
+  const validateCoupon = async () => {
+    if (!selectedCoupon) {
+      setCouponError('Please select a coupon');
+      return;
+    }
+
+    setCouponLoading(true);
+    setCouponError('');
+
+    try {
+      const orderTotal = quote?.total_price || 0;
+      const res = await fetch(`${API}/partner/validate-coupon?token=${token}&code=${encodeURIComponent(selectedCoupon)}&order_total=${orderTotal}`, {
+        method: 'POST'
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setAppliedCoupon(data);
+        setCouponError('');
+      } else {
+        const err = await res.json();
+        setCouponError(err.detail || 'Invalid coupon');
+        setAppliedCoupon(null);
+      }
+    } catch (error) {
+      console.error('Error validating coupon:', error);
+      setCouponError('Failed to validate coupon');
+      setAppliedCoupon(null);
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  // Remove applied coupon
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCode('');
+    setCouponError('');
   };
 
   const [processingStatus, setProcessingStatus] = useState('');
@@ -2090,13 +2444,78 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                   <span>{formatPrice(quote.shipping_fee)}</span>
                 </div>
               )}
+
+              {/* Applied Coupon Discount */}
+              {appliedCoupon && (
+                <div className="flex justify-between text-green-600">
+                  <span>Discount ({appliedCoupon.code})</span>
+                  <span>-{formatPrice(appliedCoupon.discount_amount)}</span>
+                </div>
+              )}
             </div>
 
             <div className="border-t pt-3 mt-3">
               <div className="flex justify-between text-lg">
                 <span className="font-bold">Total</span>
-                <span className="font-bold text-teal-600">{formatPrice(quote?.total_price || 0)}</span>
+                <span className="font-bold text-teal-600">
+                  {formatPrice(Math.max(0, (quote?.total_price || 0) - (appliedCoupon?.discount_amount || 0)))}
+                </span>
               </div>
+              {appliedCoupon && (
+                <div className="text-xs text-green-600 text-right mt-1">
+                  You save {formatPrice(appliedCoupon.discount_amount)}!
+                </div>
+              )}
+            </div>
+
+            {/* Coupon/Discount Section */}
+            <div className="border-t pt-4 mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Coupon
+              </label>
+              {appliedCoupon ? (
+                /* Coupon Applied - Show discount */
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                  <div className="flex items-center">
+                    <span className="text-green-600 mr-2">✓</span>
+                    <span className="text-green-700 font-medium">{appliedCoupon.code}</span>
+                    <span className="text-green-600 text-sm ml-2">({appliedCoupon.discount_description})</span>
+                  </div>
+                </div>
+              ) : (
+                /* Coupon Selection - Dropdown + Apply Button */
+                <div className="flex gap-2">
+                  <select
+                    value={selectedCoupon}
+                    onChange={(e) => setSelectedCoupon(e.target.value)}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-teal-500 focus:border-teal-500 bg-white"
+                  >
+                    {availableCoupons.length > 0 ? (
+                      <>
+                        <option value="">Select coupon...</option>
+                        {availableCoupons.map((coupon) => (
+                          <option key={coupon.code} value={coupon.code}>
+                            {coupon.code}
+                          </option>
+                        ))}
+                      </>
+                    ) : (
+                      <option value="">No Coupon available now</option>
+                    )}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={validateCoupon}
+                    disabled={couponLoading || !selectedCoupon || availableCoupons.length === 0}
+                    className="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  >
+                    {couponLoading ? '...' : 'Apply'}
+                  </button>
+                </div>
+              )}
+              {couponError && (
+                <p className="text-red-500 text-xs mt-1">{couponError}</p>
+              )}
             </div>
 
             <div className="text-xs text-gray-500 mt-4">
@@ -2376,6 +2795,9 @@ const OrdersPage = ({ token }) => {
   const [messageContent, setMessageContent] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
 
+  // Format price helper
+  const formatPrice = (price) => `$${(price || 0).toFixed(2)}`;
+
   useEffect(() => {
     fetchOrders();
   }, [filter]);
@@ -2550,7 +2972,7 @@ const OrdersPage = ({ token }) => {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-xl font-bold text-gray-800">${order.total_price?.toFixed(2)}</div>
+                    <div className="text-xl font-bold text-gray-800">{formatPrice(order.total_price || 0)}</div>
                     <div className="text-sm text-gray-500">
                       Due: {order.due_date ? new Date(order.due_date).toLocaleDateString('en-US', { timeZone: 'America/New_York' }) : 'N/A'}
                     </div>
@@ -2577,11 +2999,11 @@ const OrdersPage = ({ token }) => {
                     </div>
                     <div>
                       <div className="text-sm text-gray-500">Base Price</div>
-                      <div className="font-medium">${order.base_price?.toFixed(2)}</div>
+                      <div className="font-medium">{formatPrice(order.base_price || 0)}</div>
                     </div>
                     <div>
                       <div className="text-sm text-gray-500">Urgency Fee</div>
-                      <div className="font-medium">${order.urgency_fee?.toFixed(2)}</div>
+                      <div className="font-medium">{formatPrice(order.urgency_fee || 0)}</div>
                     </div>
                   </div>
                   {order.reference && (
@@ -2748,26 +3170,791 @@ const OrdersPage = ({ token }) => {
   );
 };
 
+// ==================== INVOICES PAGE ====================
+const InvoicesPage = ({ token, t, currency }) => {
+  const [invoices, setInvoices] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [invoiceOrders, setInvoiceOrders] = useState([]);
+  const [showPayModal, setShowPayModal] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState('card');
+  const [zelleReceipt, setZelleReceipt] = useState(null);
+  const [uploadingReceipt, setUploadingReceipt] = useState(false);
+  const [submittingPayment, setSubmittingPayment] = useState(false);
+
+  useEffect(() => {
+    fetchInvoices();
+  }, []);
+
+  const fetchInvoices = async () => {
+    try {
+      const response = await axios.get(`${API}/partner/invoices?token=${token}`);
+      setInvoices(response.data.invoices || []);
+    } catch (err) {
+      console.error('Error fetching invoices:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchInvoiceDetails = async (invoiceId) => {
+    try {
+      const response = await axios.get(`${API}/partner/invoices/${invoiceId}?token=${token}`);
+      setSelectedInvoice(response.data.invoice);
+      setInvoiceOrders(response.data.orders || []);
+    } catch (err) {
+      console.error('Error fetching invoice details:', err);
+    }
+  };
+
+  const handleViewDetails = async (invoice) => {
+    await fetchInvoiceDetails(invoice.id);
+  };
+
+  const handlePayNow = (invoice) => {
+    setSelectedInvoice(invoice);
+    setPaymentMethod('card');
+    setZelleReceipt(null);
+    setShowPayModal(true);
+  };
+
+  const handlePayWithStripe = async () => {
+    if (!selectedInvoice) return;
+    setSubmittingPayment(true);
+    try {
+      const response = await axios.post(`${API}/partner/invoices/${selectedInvoice.id}/pay-stripe`, {
+        invoice_id: selectedInvoice.id,
+        origin_url: window.location.origin,
+        currency: currency?.code?.toLowerCase() || 'usd' // Pass currency for BRL/PIX support (fallback to USD)
+      });
+      if (response.data.checkout_url) {
+        window.location.href = response.data.checkout_url;
+      }
+    } catch (err) {
+      alert('Error creating payment: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setSubmittingPayment(false);
+    }
+  };
+
+  const handleReceiptUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploadingReceipt(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await axios.post(`${API}/upload-document`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      setZelleReceipt({
+        id: response.data.document_id,
+        filename: file.name
+      });
+    } catch (err) {
+      alert('Error uploading receipt: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setUploadingReceipt(false);
+    }
+  };
+
+  const handleSubmitZellePayment = async () => {
+    if (!selectedInvoice || !zelleReceipt) {
+      alert('Please upload a receipt');
+      return;
+    }
+
+    setSubmittingPayment(true);
+    try {
+      await axios.post(`${API}/partner/invoices/${selectedInvoice.id}/pay-zelle?token=${token}`, {
+        invoice_id: selectedInvoice.id,
+        zelle_receipt_id: zelleReceipt.id
+      });
+      alert(t?.receiptUploaded || 'Receipt uploaded successfully. Payment will be verified shortly.');
+      setShowPayModal(false);
+      setZelleReceipt(null);
+      fetchInvoices();
+    } catch (err) {
+      alert('Error submitting payment: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setSubmittingPayment(false);
+    }
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'paid': return 'bg-green-100 text-green-700';
+      case 'overdue': return 'bg-red-100 text-red-700';
+      default: return 'bg-yellow-100 text-yellow-700';
+    }
+  };
+
+  const getStatusLabel = (status) => {
+    switch (status) {
+      case 'paid': return t?.invoicePaid || 'Paid';
+      case 'overdue': return t?.invoiceOverdue || 'Overdue';
+      default: return t?.invoicePending || 'Pending';
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-8">
+      <h1 className="text-2xl font-bold text-gray-800 mb-6">{t?.myInvoices || 'My Invoices'}</h1>
+
+      {invoices.length === 0 ? (
+        <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+          <span className="text-4xl mb-4 block">📋</span>
+          {t?.noInvoices || 'No invoices found'}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {invoices.map((invoice) => (
+            <div key={invoice.id} className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <div className="font-mono font-bold text-lg">{invoice.invoice_number}</div>
+                    <div className="text-sm text-gray-500">
+                      {t?.dueDate || 'Due Date'}: {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : '-'}
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(invoice.status)}`}>
+                      {getStatusLabel(invoice.status)}
+                    </span>
+                    <span className="text-2xl font-bold text-gray-800">{formatCurrency(invoice.total_amount)}</span>
+                  </div>
+                </div>
+
+                <div className="text-sm text-gray-500 mb-4">
+                  {invoice.order_ids?.length || 0} {t?.ordersIncluded || 'orders'} |
+                  {t?.invoiceNumber || 'Created'}: {new Date(invoice.created_at).toLocaleDateString()}
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <button
+                    onClick={() => handleViewDetails(invoice)}
+                    className="text-teal-600 hover:text-teal-800 text-sm font-medium"
+                  >
+                    {t?.viewDetails || 'View Details'}
+                  </button>
+
+                  {invoice.status !== 'paid' && (
+                    <button
+                      onClick={() => handlePayNow(invoice)}
+                      className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-medium"
+                    >
+                      {t?.payNow || 'Pay Now'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Invoice Details Modal */}
+      {selectedInvoice && !showPayModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
+            <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+              <div>
+                <h2 className="font-bold text-lg">{selectedInvoice.invoice_number}</h2>
+                <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${getStatusColor(selectedInvoice.status)}`}>
+                  {getStatusLabel(selectedInvoice.status)}
+                </span>
+              </div>
+              <button onClick={() => setSelectedInvoice(null)} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div>
+                  <div className="text-sm text-gray-500">{t?.dueDate || 'Due Date'}</div>
+                  <div className="font-medium">{selectedInvoice.due_date ? new Date(selectedInvoice.due_date).toLocaleDateString() : '-'}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-500">{t?.amount || 'Amount'}</div>
+                  <div className="font-bold text-xl">{formatCurrency(selectedInvoice.total_amount)}</div>
+                </div>
+              </div>
+
+              <h3 className="font-bold text-gray-700 mb-3">{t?.ordersIncluded || 'Orders Included'}</h3>
+              <div className="space-y-2">
+                {invoiceOrders.map((order) => (
+                  <div key={order.id} className="border rounded-lg p-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium">{order.order_number}</div>
+                        <div className="text-sm text-gray-500">
+                          {order.client_name} - {order.translate_from} to {order.translate_to}
+                        </div>
+                        <div className="text-xs text-gray-400">{new Date(order.created_at).toLocaleDateString()}</div>
+                      </div>
+                      <div className="font-medium">{formatCurrency(order.total_price)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {selectedInvoice.notes && (
+                <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                  <div className="text-sm text-gray-600">{selectedInvoice.notes}</div>
+                </div>
+              )}
+            </div>
+            <div className="p-4 border-t bg-gray-50 flex justify-between items-center">
+              <button
+                onClick={() => setSelectedInvoice(null)}
+                className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+              >
+                Close
+              </button>
+              {selectedInvoice.status !== 'paid' && (
+                <button
+                  onClick={() => { setShowPayModal(true); }}
+                  className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+                >
+                  {t?.payNow || 'Pay Now'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Modal */}
+      {showPayModal && selectedInvoice && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+              <h2 className="font-bold">{t?.payNow || 'Pay Invoice'}</h2>
+              <button onClick={() => { setShowPayModal(false); setZelleReceipt(null); }} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            <div className="p-6">
+              <div className="text-center mb-6">
+                <div className="text-sm text-gray-500">{t?.amount || 'Amount'}</div>
+                <div className="text-3xl font-bold text-gray-800">{formatCurrency(selectedInvoice.total_amount)}</div>
+                <div className="text-xs text-gray-500 mt-1">{selectedInvoice.invoice_number}</div>
+              </div>
+
+              <div className="space-y-3 mb-6">
+                <button
+                  onClick={() => setPaymentMethod('card')}
+                  className={`w-full p-4 border rounded-lg flex items-center justify-between ${
+                    paymentMethod === 'card' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="flex items-center">
+                    <span className="text-2xl mr-3">💳</span>
+                    <span className="font-medium">{t?.payWithCard || 'Pay with Card'}</span>
+                  </div>
+                  {paymentMethod === 'card' && <span className="text-teal-600">✓</span>}
+                </button>
+
+                <button
+                  onClick={() => setPaymentMethod('zelle')}
+                  className={`w-full p-4 border rounded-lg flex items-center justify-between ${
+                    paymentMethod === 'zelle' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="flex items-center">
+                    <span className="text-2xl mr-3">🏦</span>
+                    <span className="font-medium">{t?.payWithZelle || 'Pay with Zelle'}</span>
+                  </div>
+                  {paymentMethod === 'zelle' && <span className="text-teal-600">✓</span>}
+                </button>
+              </div>
+
+              {paymentMethod === 'card' && (
+                <button
+                  onClick={handlePayWithStripe}
+                  disabled={submittingPayment}
+                  className="w-full py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-medium disabled:bg-gray-300"
+                >
+                  {submittingPayment ? 'Processing...' : `${t?.payNow || 'Pay'} ${formatCurrency(selectedInvoice.total_amount)}`}
+                </button>
+              )}
+
+              {paymentMethod === 'zelle' && (
+                <div className="space-y-4">
+                  <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                    <div className="text-sm font-medium text-purple-800 mb-2">Zelle Payment Instructions:</div>
+                    <div className="text-sm text-purple-700">
+                      {t?.zelleInstructions || 'Send payment via Zelle to: payments@legacytranslations.com'}
+                    </div>
+                    <div className="text-sm text-purple-600 mt-2">Amount: {formatCurrency(selectedInvoice.total_amount)}</div>
+                    <div className="text-xs text-purple-500 mt-1">Reference: {selectedInvoice.invoice_number}</div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {t?.uploadReceipt || 'Upload Payment Receipt'}
+                    </label>
+                    <input
+                      type="file"
+                      onChange={handleReceiptUpload}
+                      accept="image/*,.pdf"
+                      className="w-full border rounded-lg p-2 text-sm"
+                      disabled={uploadingReceipt}
+                    />
+                    {uploadingReceipt && (
+                      <div className="text-sm text-gray-500 mt-1">Uploading...</div>
+                    )}
+                    {zelleReceipt && (
+                      <div className="text-sm text-green-600 mt-1">
+                        ✓ {zelleReceipt.filename}
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={handleSubmitZellePayment}
+                    disabled={!zelleReceipt || submittingPayment}
+                    className="w-full py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium disabled:bg-gray-300"
+                  >
+                    {submittingPayment ? 'Submitting...' : 'Submit Zelle Payment'}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ==================== PAYMENT PLAN PAGE ====================
+const PaymentPlanPage = ({ token, t }) => {
+  const [qualification, setQualification] = useState(null);
+  const [tierInfo, setTierInfo] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedPlan, setSelectedPlan] = useState('biweekly');
+  const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    fetchData();
+  }, [token]);
+
+  const fetchData = async () => {
+    try {
+      // Fetch both qualification and tier info in parallel
+      const [qualRes, tierRes] = await Promise.all([
+        fetch(`${API_BASE}/partner/credit-qualification?token=${token}`),
+        fetch(`${API_BASE}/partner/tier-info?token=${token}`)
+      ]);
+
+      if (qualRes.ok) {
+        const qualData = await qualRes.json();
+        setQualification(qualData);
+      }
+
+      if (tierRes.ok) {
+        const tierData = await tierRes.json();
+        setTierInfo(tierData);
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchQualification = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/partner/credit-qualification?token=${token}`);
+      if (res.ok) {
+        const data = await res.json();
+        setQualification(data);
+      }
+    } catch (error) {
+      console.error('Error fetching qualification:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getTierIcon = (tier) => {
+    switch (tier) {
+      case 'platinum': return '💎';
+      case 'gold': return '🥇';
+      case 'silver': return '🥈';
+      case 'bronze': return '🥉';
+      default: return '📊';
+    }
+  };
+
+  const getTierColor = (tier) => {
+    switch (tier) {
+      case 'platinum': return 'text-purple-700 bg-purple-100';
+      case 'gold': return 'text-yellow-700 bg-yellow-100';
+      case 'silver': return 'text-slate-600 bg-slate-200';
+      case 'bronze': return 'text-amber-700 bg-amber-100';
+      default: return 'text-gray-600 bg-gray-100';
+    }
+  };
+
+  const handleRequestUpgrade = async () => {
+    setSubmitting(true);
+    try {
+      const res = await fetch(`${API_BASE}/partner/request-payment-upgrade?token=${token}&plan=${selectedPlan}`, {
+        method: 'POST'
+      });
+      if (res.ok) {
+        setSuccess(true);
+        fetchQualification();
+      } else {
+        const err = await res.json();
+        alert(err.detail || 'Error submitting request');
+      }
+    } catch (error) {
+      console.error('Error requesting upgrade:', error);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const getPlanDisplayName = (plan) => {
+    switch (plan) {
+      case 'pay_per_order': return t?.payPerOrder || 'Pay Per Order';
+      case 'biweekly': return t?.biweeklyInvoice || 'Biweekly Invoice';
+      case 'monthly': return t?.monthlyInvoice || 'Monthly Invoice';
+      default: return plan;
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="p-8 flex justify-center items-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-8">
+      <h1 className="text-2xl font-bold text-gray-800 mb-6">{t?.paymentPlanTitle || 'Payment Plan'}</h1>
+
+      {/* Two Column Layout */}
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* Left Column - Payment Plan Info */}
+        <div className="lg:w-1/2 space-y-6">
+          {/* Payment Plan Terms Explanation */}
+          <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
+            <h2 className="text-sm font-semibold text-gray-700 mb-3">
+              {t?.paymentPlanTermsTitle || 'Payment Terms'}
+            </h2>
+            <ul className="space-y-2 text-sm text-gray-600">
+              <li className="flex items-start gap-2">
+                <span className="text-gray-400">•</span>
+                <span>{t?.paymentPlanTerm1 || 'Biweekly invoicing available upon completion of 10 paid translations.'}</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-gray-400">•</span>
+                <span>{t?.paymentPlanTerm2 || 'Net 30 payment terms granted after 3 consecutive months of timely invoice settlement.'}</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* Current Plan Card */}
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <h2 className="text-sm font-medium text-gray-500 mb-2">{t?.currentPlan || 'Current Plan'}</h2>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                </svg>
+              </div>
+              <div>
+                <div className="text-xl font-semibold text-gray-800">{getPlanDisplayName(qualification?.current_plan)}</div>
+                {qualification?.plan_approved && qualification?.current_plan !== 'pay_per_order' && (
+                  <span className="inline-block mt-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">Approved</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Qualification Status */}
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <h2 className="text-sm font-medium text-gray-500 mb-4">{t?.qualificationStatus || 'Qualification Status'}</h2>
+
+            {/* Progress Bar */}
+            <div className="mb-4">
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-gray-600">{qualification?.total_paid_orders || 0} {t?.translationsCompleted || 'translations completed'}</span>
+                <span className="text-gray-500">{qualification?.orders_required || 10} required</span>
+              </div>
+              <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+                <div
+                  className={`h-full transition-all duration-500 ${qualification?.qualifies_for_invoice ? 'bg-green-500' : 'bg-blue-500'}`}
+                  style={{ width: `${Math.min(100, ((qualification?.total_paid_orders || 0) / (qualification?.orders_required || 10)) * 100)}%` }}
+                />
+              </div>
+            </div>
+
+            {qualification?.qualifies_for_invoice ? (
+              <div className="flex items-center gap-2 text-green-600">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+                </svg>
+                <span className="font-medium">{t?.qualifiedForInvoice || 'You qualify for biweekly invoice!'}</span>
+              </div>
+            ) : (
+              <div className="text-gray-600">
+                <span>{qualification?.orders_remaining || 10} {t?.translationsRemaining || 'more translations to qualify'}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Upgrade Section */}
+          {qualification?.current_plan === 'pay_per_order' && (
+            <div className="bg-white rounded-lg shadow-sm border p-6">
+              <h2 className="text-sm font-medium text-gray-500 mb-4">{t?.requestUpgrade || 'Request Upgrade'}</h2>
+
+              {qualification?.upgrade_pending ? (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 text-amber-700">
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd"/>
+                    </svg>
+                    <span className="font-medium">{t?.upgradeRequested || 'Upgrade Requested'}</span>
+                  </div>
+                  <p className="text-sm text-amber-600 mt-2">{t?.awaitingApproval || 'Awaiting admin approval'}</p>
+                  <p className="text-sm text-amber-600 mt-1">Requested: {getPlanDisplayName(qualification?.requested_plan)}</p>
+                </div>
+              ) : success ? (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 text-green-700">
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+                    </svg>
+                    <span className="font-medium">{t?.upgradeSuccess || 'Upgrade request submitted successfully!'}</span>
+                  </div>
+                </div>
+              ) : qualification?.qualifies_for_invoice ? (
+                <div className="space-y-4">
+                  <p className="text-sm text-gray-600">{t?.selectPlanToUpgrade || 'Select the plan you want:'}</p>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className={`flex flex-col p-4 rounded-lg border-2 cursor-pointer transition-all ${selectedPlan === 'biweekly' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`}>
+                      <input type="radio" name="upgrade_plan" value="biweekly" checked={selectedPlan === 'biweekly'} onChange={(e) => setSelectedPlan(e.target.value)} className="sr-only" />
+                      <span className="font-medium text-gray-800">{t?.biweeklyInvoice || 'Biweekly Invoice'}</span>
+                      <span className="text-xs text-gray-500 mt-1">{t?.biweeklyInvoiceDesc || 'Receive invoice every 2 weeks'}</span>
+                    </label>
+                    <label className={`flex flex-col p-4 rounded-lg border-2 cursor-pointer transition-all ${selectedPlan === 'monthly' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`}>
+                      <input type="radio" name="upgrade_plan" value="monthly" checked={selectedPlan === 'monthly'} onChange={(e) => setSelectedPlan(e.target.value)} className="sr-only" />
+                      <span className="font-medium text-gray-800">{t?.monthlyInvoice || 'Monthly Invoice'}</span>
+                      <span className="text-xs text-gray-500 mt-1">{t?.monthlyInvoiceDesc || 'Receive monthly invoice'}</span>
+                    </label>
+                  </div>
+
+                  <button
+                    onClick={handleRequestUpgrade}
+                    disabled={submitting}
+                    className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-gray-300 transition-colors"
+                  >
+                    {submitting ? '...' : (t?.submitUpgradeRequest || 'Submit Upgrade Request')}
+                  </button>
+                </div>
+              ) : (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
+                  <svg className="w-8 h-8 text-gray-400 mx-auto mb-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/>
+                  </svg>
+                  <p className="text-sm text-gray-600">{t?.notQualifiedYet || 'Not yet qualified'}</p>
+                  <p className="text-xs text-gray-500 mt-1">{qualification?.orders_remaining} {t?.translationsRemaining || 'more translations to qualify'}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Current Tier Status */}
+          {tierInfo && (
+            <div className="bg-white rounded-lg shadow-sm border p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-sm font-medium text-gray-500 mb-1">{t?.yourCurrentTier || 'Your Current Tier'}</h2>
+                  <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold capitalize ${getTierColor(tierInfo.current_tier)}`}>
+                    {tierInfo.current_tier}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <div className="text-2xl font-bold text-blue-600">{tierInfo.discount_percent}% OFF</div>
+                  <div className="text-sm text-gray-600">${tierInfo.price_per_page}/{t?.page || 'page'}</div>
+                </div>
+              </div>
+
+              {/* Volume Progress */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-gray-600">{tierInfo.volume_stats?.total_pages || 0} {t?.pagesLast30Days || 'pages in last 30 days'}</span>
+                  {tierInfo.next_tier && (
+                    <span className="text-gray-500">{tierInfo.pages_to_next_tier} {t?.pagesToNextTier || 'pages to'} {tierInfo.next_tier}</span>
+                  )}
+                </div>
+                <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-blue-500 transition-all duration-500"
+                    style={{
+                      width: tierInfo.next_tier
+                        ? `${Math.min(100, ((tierInfo.volume_stats?.total_pages || 0) / (tierInfo.volume_stats?.total_pages + tierInfo.pages_to_next_tier)) * 100)}%`
+                        : '100%'
+                    }}
+                  />
+                </div>
+                {tierInfo.monthly_savings > 0 && (
+                  <p className="text-sm text-green-600 mt-2">
+                    {t?.youSaved || 'You saved'} <span className="font-semibold">${tierInfo.monthly_savings.toFixed(2)}</span> {t?.thisMonth || 'this month'}!
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right Column - Partner Discount Structure */}
+        <div className="lg:w-1/2">
+          <div className="bg-white rounded-lg shadow-sm border p-6 h-full">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-gray-800">{t?.discountStructure || 'Partner Discount Structure'}</h2>
+                <p className="text-xs text-gray-500">{t?.certifiedTranslationNote || 'Prices for "Certified Translation" services'}</p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">{t?.discountDescription || 'Earn volume discounts based on your monthly page count'}</p>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-blue-600 text-white">
+                    <th className="px-3 py-3 text-left rounded-tl-lg">{t?.tier || 'Tier'}</th>
+                    <th className="px-3 py-3 text-center">{t?.monthlyVolume || 'Monthly Volume'}</th>
+                    <th className="px-3 py-3 text-center">{t?.discount || 'Discount'}</th>
+                    <th className="px-3 py-3 text-center">{t?.pricePerPage || 'Price/Page'}</th>
+                    <th className="px-3 py-3 text-center">{t?.monthlySavings || 'Savings'}</th>
+                    <th className="px-3 py-3 text-center rounded-tr-lg">{t?.partnerMargin || 'Margin*'}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className={`border-b border-gray-100 ${tierInfo?.current_tier === 'bronze' ? 'bg-blue-50 ring-2 ring-blue-400 ring-inset' : 'hover:bg-gray-50'}`}>
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 bg-amber-100 rounded-full flex items-center justify-center">
+                          <span className="text-xs font-bold text-amber-700">B</span>
+                        </div>
+                        <span className="font-semibold text-gray-700">Bronze</span>
+                        {tierInfo?.current_tier === 'bronze' && <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full">{t?.current || 'Current'}</span>}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 text-center text-gray-600">10-29</td>
+                    <td className="px-3 py-3 text-center">
+                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-semibold">10%</span>
+                    </td>
+                    <td className="px-3 py-3 text-center font-medium text-gray-700">$22.49</td>
+                    <td className="px-3 py-3 text-center text-green-600 text-xs">{t?.upTo || 'up to'} $72</td>
+                    <td className="px-3 py-3 text-center font-semibold text-blue-600">$7.50</td>
+                  </tr>
+                  <tr className={`border-b border-gray-100 ${tierInfo?.current_tier === 'silver' ? 'bg-blue-50 ring-2 ring-blue-400 ring-inset' : 'hover:bg-gray-50'}`}>
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 bg-slate-200 rounded-full flex items-center justify-center">
+                          <span className="text-xs font-bold text-slate-600">S</span>
+                        </div>
+                        <span className="font-semibold text-gray-700">Silver</span>
+                        {tierInfo?.current_tier === 'silver' && <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full">{t?.current || 'Current'}</span>}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 text-center text-gray-600">30-59</td>
+                    <td className="px-3 py-3 text-center">
+                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-semibold">15%</span>
+                    </td>
+                    <td className="px-3 py-3 text-center font-medium text-gray-700">$21.24</td>
+                    <td className="px-3 py-3 text-center text-green-600 text-xs">{t?.upTo || 'up to'} $225</td>
+                    <td className="px-3 py-3 text-center font-semibold text-blue-600">$8.75</td>
+                  </tr>
+                  <tr className={`border-b border-gray-100 ${tierInfo?.current_tier === 'gold' ? 'bg-blue-50 ring-2 ring-blue-400 ring-inset' : 'hover:bg-gray-50'}`}>
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 bg-yellow-100 rounded-full flex items-center justify-center">
+                          <span className="text-xs font-bold text-yellow-700">G</span>
+                        </div>
+                        <span className="font-semibold text-gray-700">Gold</span>
+                        {tierInfo?.current_tier === 'gold' && <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full">{t?.current || 'Current'}</span>}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 text-center text-gray-600">60-99</td>
+                    <td className="px-3 py-3 text-center">
+                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-semibold">25%</span>
+                    </td>
+                    <td className="px-3 py-3 text-center font-medium text-gray-700">$18.74</td>
+                    <td className="px-3 py-3 text-center text-green-600 text-xs">{t?.upTo || 'up to'} $618</td>
+                    <td className="px-3 py-3 text-center font-semibold text-blue-600">$11.25</td>
+                  </tr>
+                  <tr className={`${tierInfo?.current_tier === 'platinum' ? 'bg-blue-50 ring-2 ring-blue-400 ring-inset' : 'hover:bg-gray-50'}`}>
+                    <td className="px-3 py-3 rounded-bl-lg">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+                          <span className="text-xs font-bold text-blue-700">P</span>
+                        </div>
+                        <span className="font-semibold text-gray-700">Platinum</span>
+                        {tierInfo?.current_tier === 'platinum' && <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full">{t?.current || 'Current'}</span>}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 text-center text-gray-600">100+</td>
+                    <td className="px-3 py-3 text-center">
+                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-semibold">35%</span>
+                    </td>
+                    <td className="px-3 py-3 text-center font-medium text-gray-700">$16.24</td>
+                    <td className="px-3 py-3 text-center text-green-600 text-xs">$875+</td>
+                    <td className="px-3 py-3 text-center font-semibold text-blue-600 rounded-br-lg">$13.75</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <p className="text-xs text-gray-500 mt-4">
+              *{t?.marginNote || 'Partner margin calculated based on resale at $30/page (common market rate)'}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ==================== MESSAGES PAGE ====================
 const MessagesPage = ({ token }) => {
   const [conversations, setConversations] = useState([]);
   const [systemMessages, setSystemMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('conversations');
+  const [expandedThreads, setExpandedThreads] = useState({});
 
   useEffect(() => {
     fetchAllMessages();
   }, []);
-
-  // Auto-mark unread conversations as read when viewing conversation tab
-  useEffect(() => {
-    if (activeTab === 'conversations' && conversations.length > 0) {
-      const unreadConvs = conversations.filter(c => c.direction === 'received' && !c.read);
-      unreadConvs.forEach(conv => {
-        markConversationAsRead(conv.id);
-      });
-    }
-  }, [activeTab, conversations.length]);
 
   // Auto-mark unread system messages as read when viewing notifications tab
   useEffect(() => {
@@ -2820,6 +4007,21 @@ const MessagesPage = ({ token }) => {
   const formatDate = (dateString) => {
     if (!dateString) return '';
     const date = new Date(dateString);
+    const now = new Date();
+    const isToday = date.toDateString() === now.toDateString();
+    const isThisYear = date.getFullYear() === now.getFullYear();
+
+    if (isToday) {
+      return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    } else if (isThisYear) {
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const formatFullDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
@@ -2838,6 +4040,68 @@ const MessagesPage = ({ token }) => {
       case 'partner_message': return '📤';
       default: return '✉️';
     }
+  };
+
+  // Group conversations by order_number or thread
+  const groupedConversations = useMemo(() => {
+    const groups = {};
+
+    conversations.forEach(conv => {
+      // Use order_number as key, or 'general' for messages without order
+      const key = conv.order_number || 'general';
+      if (!groups[key]) {
+        groups[key] = {
+          order_number: conv.order_number,
+          messages: [],
+          hasUnread: false,
+          lastMessage: null,
+          lastDate: null
+        };
+      }
+      groups[key].messages.push(conv);
+
+      // Track unread status
+      if (conv.direction === 'received' && !conv.read) {
+        groups[key].hasUnread = true;
+      }
+
+      // Track last message date
+      const msgDate = new Date(conv.created_at);
+      if (!groups[key].lastDate || msgDate > groups[key].lastDate) {
+        groups[key].lastDate = msgDate;
+        groups[key].lastMessage = conv;
+      }
+    });
+
+    // Sort messages within each group by date (newest first for display, oldest first for thread)
+    Object.values(groups).forEach(group => {
+      group.messages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    });
+
+    // Convert to array and sort by last message date (newest first)
+    return Object.entries(groups)
+      .map(([key, group]) => ({ key, ...group }))
+      .sort((a, b) => b.lastDate - a.lastDate);
+  }, [conversations]);
+
+  const toggleThread = (key) => {
+    setExpandedThreads(prev => {
+      const newExpanded = { ...prev, [key]: !prev[key] };
+
+      // Mark unread messages as read when expanding
+      if (newExpanded[key]) {
+        const group = groupedConversations.find(g => g.key === key);
+        if (group) {
+          group.messages.forEach(msg => {
+            if (msg.direction === 'received' && !msg.read) {
+              markConversationAsRead(msg.id);
+            }
+          });
+        }
+      }
+
+      return newExpanded;
+    });
   };
 
   const unreadConversations = conversations.filter(c => c.direction === 'received' && !c.read).length;
@@ -2890,78 +4154,151 @@ const MessagesPage = ({ token }) => {
         </button>
       </div>
 
-      {/* Conversations Tab */}
+      {/* Conversations Tab - Compact Inbox Style */}
       {activeTab === 'conversations' && (
         <>
-          {conversations.length === 0 ? (
+          {groupedConversations.length === 0 ? (
             <div className="bg-white rounded-lg shadow-sm p-8 text-center">
               <div className="text-4xl mb-4">💬</div>
               <h2 className="text-xl font-semibold text-gray-800 mb-2">No conversations</h2>
               <p className="text-gray-600">Your messages with Legacy Translations will appear here</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {conversations.map((conv) => (
-                <div
-                  key={conv.id}
-                  className={`bg-white rounded-lg shadow-sm p-6 border-l-4 ${
-                    conv.direction === 'sent'
-                      ? 'border-blue-400'
-                      : conv.read
-                        ? 'border-gray-300'
-                        : 'border-teal-500'
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start space-x-4 flex-1">
-                      <div className="text-2xl">
-                        {conv.direction === 'sent' ? '📤' : '📥'}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-2 flex-wrap">
-                          <span className={`px-2 py-0.5 text-xs rounded-full ${
-                            conv.direction === 'sent'
-                              ? 'bg-blue-100 text-blue-700'
-                              : 'bg-green-100 text-green-700'
-                          }`}>
-                            {conv.direction === 'sent' ? 'Sent' : 'Received'}
-                          </span>
-                          {conv.direction === 'received' && !conv.read && (
-                            <span className="px-2 py-0.5 bg-teal-100 text-teal-700 text-xs rounded-full">New</span>
-                          )}
-                          {conv.order_number && (
-                            <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full">
-                              Order: {conv.order_number}
-                            </span>
-                          )}
-                          {conv.replied && (
-                            <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">
-                              Replied
-                            </span>
-                          )}
-                        </div>
+            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+              {groupedConversations.map((group) => (
+                <div key={group.key} className="border-b last:border-b-0">
+                  {/* Compact Row - One line per conversation thread */}
+                  <div
+                    onClick={() => toggleThread(group.key)}
+                    className={`flex items-center px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors ${
+                      group.hasUnread ? 'bg-teal-50' : ''
+                    }`}
+                  >
+                    {/* Unread indicator */}
+                    <div className="w-2 mr-3">
+                      {group.hasUnread && (
+                        <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
+                      )}
+                    </div>
 
-                        {conv.direction === 'sent' ? (
-                          <div className="mt-2">
-                            <p className="text-sm text-gray-500">To: {conv.recipient_name || 'Admin'}</p>
-                            <p className="text-gray-700 mt-1">{conv.content}</p>
-                          </div>
+                    {/* Direction icon */}
+                    <div className="text-lg mr-3">
+                      {group.lastMessage?.direction === 'sent' ? '📤' : '📥'}
+                    </div>
+
+                    {/* Order/Project badge */}
+                    <div className="w-28 flex-shrink-0 mr-3">
+                      {group.order_number ? (
+                        <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full font-medium">
+                          #{group.order_number}
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
+                          General
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Message preview */}
+                    <div className="flex-1 min-w-0 mr-3">
+                      <p className={`text-sm truncate ${group.hasUnread ? 'font-semibold text-gray-900' : 'text-gray-600'}`}>
+                        {group.lastMessage?.direction === 'sent' ? (
+                          <span className="text-gray-400">You: </span>
                         ) : (
-                          <div className="mt-2">
-                            <p className="text-sm text-gray-500">From: {conv.from_admin_name || 'Admin'}</p>
-                            {conv.original_message_content && (
-                              <div className="bg-gray-50 border-l-2 border-gray-300 pl-3 py-2 my-2 text-sm text-gray-500">
-                                <span className="font-medium">Your message:</span> {conv.original_message_content}
-                              </div>
-                            )}
-                            <p className="text-gray-700 mt-1">{conv.content}</p>
-                          </div>
+                          <span className="text-gray-400">Admin: </span>
                         )}
+                        {group.lastMessage?.content}
+                      </p>
+                    </div>
 
-                        <p className="text-sm text-gray-400 mt-2">{formatDate(conv.created_at)}</p>
-                      </div>
+                    {/* Message count */}
+                    <div className="flex-shrink-0 mr-3">
+                      <span className="px-2 py-0.5 bg-gray-100 text-gray-500 text-xs rounded-full">
+                        {group.messages.length} msg{group.messages.length > 1 ? 's' : ''}
+                      </span>
+                    </div>
+
+                    {/* Status badges */}
+                    <div className="flex-shrink-0 mr-3 flex items-center space-x-1">
+                      {group.lastMessage?.replied && (
+                        <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">
+                          Replied
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Date */}
+                    <div className="w-20 text-right flex-shrink-0 mr-2">
+                      <span className="text-xs text-gray-400">
+                        {formatDate(group.lastMessage?.created_at)}
+                      </span>
+                    </div>
+
+                    {/* Expand/Collapse icon */}
+                    <div className="flex-shrink-0 text-gray-400">
+                      <svg
+                        className={`w-4 h-4 transition-transform ${expandedThreads[group.key] ? 'rotate-180' : ''}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
                     </div>
                   </div>
+
+                  {/* Expanded Thread View */}
+                  {expandedThreads[group.key] && (
+                    <div className="bg-gray-50 px-4 py-3 border-t">
+                      <div className="space-y-3 max-h-96 overflow-y-auto">
+                        {group.messages.map((msg, idx) => (
+                          <div
+                            key={msg.id}
+                            className={`flex ${msg.direction === 'sent' ? 'justify-end' : 'justify-start'}`}
+                          >
+                            <div
+                              className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                                msg.direction === 'sent'
+                                  ? 'bg-blue-500 text-white'
+                                  : 'bg-white border border-gray-200'
+                              }`}
+                            >
+                              {/* Show original message context for replies */}
+                              {msg.direction === 'received' && msg.original_message_content && (
+                                <div className="text-xs text-gray-400 border-l-2 border-gray-300 pl-2 mb-2 italic">
+                                  Re: {msg.original_message_content.substring(0, 50)}...
+                                </div>
+                              )}
+                              <p className={`text-sm ${msg.direction === 'sent' ? 'text-white' : 'text-gray-700'}`}>
+                                {msg.content}
+                              </p>
+                              <div className={`flex items-center justify-between mt-1 text-xs ${
+                                msg.direction === 'sent' ? 'text-blue-100' : 'text-gray-400'
+                              }`}>
+                                <span>{formatFullDate(msg.created_at)}</span>
+                                {msg.direction === 'sent' && msg.replied && (
+                                  <span className="ml-2 flex items-center">
+                                    <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                    Replied
+                                  </span>
+                                )}
+                                {msg.direction === 'received' && msg.read && (
+                                  <span className="ml-2 flex items-center text-green-500">
+                                    <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                    Read
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -2969,7 +4306,7 @@ const MessagesPage = ({ token }) => {
         </>
       )}
 
-      {/* System Notifications Tab */}
+      {/* System Notifications Tab - Compact Style */}
       {activeTab === 'notifications' && (
         <>
           {systemMessages.length === 0 ? (
@@ -2979,25 +4316,38 @@ const MessagesPage = ({ token }) => {
               <p className="text-gray-600">System notifications will appear here</p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
               {systemMessages.map((message) => (
                 <div
                   key={message.id}
-                  className="bg-white rounded-lg shadow-sm p-6 border-l-4 border-gray-300"
+                  className={`flex items-center px-4 py-3 border-b last:border-b-0 hover:bg-gray-50 ${
+                    !message.read ? 'bg-blue-50' : ''
+                  }`}
                 >
-                  <div className="flex items-start">
-                    <div className="flex items-start space-x-4">
-                      <div className="text-2xl">{getMessageIcon(message.type)}</div>
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <h3 className="font-semibold text-gray-800">
-                            {message.title}
-                          </h3>
-                        </div>
-                        <p className="text-gray-600 mt-1">{message.content}</p>
-                        <p className="text-sm text-gray-400 mt-2">{formatDate(message.created_at)}</p>
-                      </div>
-                    </div>
+                  {/* Unread indicator */}
+                  <div className="w-2 mr-3">
+                    {!message.read && (
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    )}
+                  </div>
+
+                  {/* Icon */}
+                  <div className="text-lg mr-3">{getMessageIcon(message.type)}</div>
+
+                  {/* Title and content */}
+                  <div className="flex-1 min-w-0 mr-3">
+                    <p className={`text-sm ${!message.read ? 'font-semibold text-gray-900' : 'text-gray-600'}`}>
+                      <span className="font-medium">{message.title}</span>
+                      <span className="text-gray-400 mx-2">-</span>
+                      <span className="text-gray-500 truncate">{message.content}</span>
+                    </p>
+                  </div>
+
+                  {/* Date */}
+                  <div className="flex-shrink-0">
+                    <span className="text-xs text-gray-400">
+                      {formatDate(message.created_at)}
+                    </span>
                   </div>
                 </div>
               ))}
@@ -3474,9 +4824,12 @@ function App() {
   const [token, setToken] = useState(null);
   const [activeTab, setActiveTab] = useState('new-order');
   const [lang, setLang] = useState(getInitialLanguage);
-  const [currency] = useState(getLocalCurrency);
+  const [currency, setCurrency] = useState(getLocalCurrency);
   const [verificationId, setVerificationId] = useState(null);
   const [resetToken, setResetToken] = useState(null);
+  const [isValidatingSession, setIsValidatingSession] = useState(true);
+  const [showWelcomeCouponModal, setShowWelcomeCouponModal] = useState(false);
+  const [welcomeCouponCode, setWelcomeCouponCode] = useState(null);
 
   // Get translations for current language
   const t = TRANSLATIONS[lang];
@@ -3486,6 +4839,26 @@ function App() {
     setLang(newLang);
     localStorage.setItem('ui_language', newLang);
   };
+
+  // Fetch real-time exchange rate for BRL if user is in Brazil
+  useEffect(() => {
+    const fetchExchangeRate = async () => {
+      if (currency.code !== 'BRL') return; // Only fetch for Brazilian users
+
+      try {
+        const response = await axios.get(`${API}/exchange-rates`);
+        if (response.data?.rates?.brl) {
+          setCurrency(prev => ({
+            ...prev,
+            rate: response.data.rates.brl
+          }));
+        }
+      } catch (err) {
+        console.log('Using default BRL rate');
+      }
+    };
+    fetchExchangeRate();
+  }, [currency.code]);
 
   // Check for reset token and verification route in URL
   useEffect(() => {
@@ -3526,14 +4899,41 @@ function App() {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  // Check for saved session
+  // Check for saved session and validate token
   useEffect(() => {
-    const savedPartner = localStorage.getItem('partner');
-    const savedToken = localStorage.getItem('token');
-    if (savedPartner && savedToken) {
-      setPartner(JSON.parse(savedPartner));
-      setToken(savedToken);
-    }
+    const validateSession = async () => {
+      const savedToken = localStorage.getItem('token');
+      if (!savedToken) {
+        setIsValidatingSession(false);
+        return;
+      }
+
+      try {
+        // Validate token with backend
+        const response = await axios.get(`${API}/partner/verify-token?token=${savedToken}`);
+        if (response.data.valid && response.data.partner) {
+          const partnerData = response.data.partner;
+          setPartner(partnerData);
+          setToken(savedToken);
+          // Update localStorage with fresh partner data
+          localStorage.setItem('partner', JSON.stringify(partnerData));
+
+          // Show welcome coupon modal if partner hasn't seen it yet
+          if (!partnerData.has_seen_welcome_coupon && partnerData.welcome_coupon_code) {
+            setWelcomeCouponCode(partnerData.welcome_coupon_code);
+            setShowWelcomeCouponModal(true);
+          }
+        }
+      } catch (err) {
+        // Token is invalid or expired, clear localStorage
+        console.log('Session expired, clearing localStorage');
+        localStorage.removeItem('partner');
+        localStorage.removeItem('token');
+      } finally {
+        setIsValidatingSession(false);
+      }
+    };
+    validateSession();
   }, []);
 
   const handleLogin = (data) => {
@@ -3541,6 +4941,29 @@ function App() {
     setToken(data.token);
     localStorage.setItem('partner', JSON.stringify(data));
     localStorage.setItem('token', data.token);
+
+    // Show welcome coupon modal if partner hasn't seen it yet
+    if (!data.has_seen_welcome_coupon && data.welcome_coupon_code) {
+      setWelcomeCouponCode(data.welcome_coupon_code);
+      setShowWelcomeCouponModal(true);
+    }
+  };
+
+  const dismissWelcomeCoupon = async () => {
+    try {
+      await axios.post(`${API}/partner/dismiss-welcome-coupon?token=${token}`);
+      setShowWelcomeCouponModal(false);
+      setWelcomeCouponCode(null);
+      // Update local partner data
+      if (partner) {
+        const updatedPartner = { ...partner, has_seen_welcome_coupon: true };
+        setPartner(updatedPartner);
+        localStorage.setItem('partner', JSON.stringify(updatedPartner));
+      }
+    } catch (err) {
+      console.error('Error dismissing welcome coupon:', err);
+      setShowWelcomeCouponModal(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -3561,8 +4984,12 @@ function App() {
         return <NewOrderPage partner={partner} token={token} onOrderCreated={() => setActiveTab('orders')} t={t} currency={currency} />;
       case 'orders':
         return <OrdersPage token={token} />;
+      case 'invoices':
+        return <InvoicesPage token={token} t={t} currency={currency} />;
       case 'messages':
         return <MessagesPage token={token} />;
+      case 'payment-plan':
+        return <PaymentPlanPage token={token} t={t} />;
       default:
         return <NewOrderPage partner={partner} token={token} t={t} currency={currency} />;
     }
@@ -3590,6 +5017,18 @@ function App() {
           window.location.href = '/#/partner';
         }}
       />
+    );
+  }
+
+  // Show loading while validating session
+  if (isValidatingSession) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
     );
   }
 
@@ -3633,6 +5072,53 @@ function App() {
         {renderContent()}
       </div>
       <PartnerFloatingChatWidget token={token} partner={partner} onNavigateToMessages={() => setActiveTab('messages')} />
+
+      {/* Welcome Coupon Modal - First Login */}
+      {showWelcomeCouponModal && welcomeCouponCode && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-fade-in">
+            {/* Header with gradient */}
+            <div className="bg-gradient-to-r from-teal-500 to-cyan-500 p-6 text-white text-center">
+              <div className="text-5xl mb-3">🎁</div>
+              <h2 className="text-2xl font-bold">{t.welcomeGiftTitle}</h2>
+              <p className="text-teal-100 mt-2">{t.welcomeGiftThankYou}</p>
+            </div>
+
+            {/* Content */}
+            <div className="p-6">
+              <div className="text-center mb-6">
+                <p className="text-gray-600 mb-4">
+                  {t.welcomeGiftDescription}
+                </p>
+
+                {/* Coupon Code Box */}
+                <div className="bg-gradient-to-r from-teal-50 to-cyan-50 border-2 border-dashed border-teal-400 rounded-xl p-4 mb-4">
+                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">{t.welcomeGiftCouponLabel}</p>
+                  <div className="bg-white rounded-lg px-4 py-3 shadow-inner">
+                    <span className="text-2xl font-bold text-teal-600 font-mono tracking-wider">
+                      {welcomeCouponCode}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">{t.welcomeGiftCouponDesc}</p>
+                </div>
+
+                <div className="text-sm text-gray-500 space-y-1">
+                  <p>{t.welcomeGiftValid}</p>
+                  <p>{t.welcomeGiftUse}</p>
+                </div>
+              </div>
+
+              {/* Action Button */}
+              <button
+                onClick={dismissWelcomeCoupon}
+                className="w-full bg-gradient-to-r from-teal-500 to-cyan-500 text-white py-3 px-6 rounded-xl font-semibold hover:from-teal-600 hover:to-cyan-600 transition-all shadow-lg hover:shadow-xl"
+              >
+                {lang === 'es' ? '¡Entendido! Empezar a pedir' : lang === 'pt' ? 'Entendi! Começar a pedir' : 'Got it! Start ordering'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

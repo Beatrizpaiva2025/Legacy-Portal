@@ -8,6 +8,7 @@ import CustomerApp from "./CustomerApp";
 import SalespersonApp from "./SalespersonApp";
 import B2BLandingPage from "./B2BLandingPage";
 import AssignmentPage from "./AssignmentPage";
+import VerificationPage from "./VerificationPage";
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
@@ -18,16 +19,22 @@ root.render(
         <Route path="/admin/*" element={<AdminApp />} />
         {/* Customer Portal - /#/customer */}
         <Route path="/customer/*" element={<CustomerApp />} />
-        {/* Partner Portal - /#/partner (only for registered partners) */}
+        {/* Partner Portal - /#/partner (landing page for partners) */}
+        <Route path="/partner" element={<B2BLandingPage />} />
+        {/* Partner Dashboard - /#/partner/dashboard (for logged in partners) */}
         <Route path="/partner/*" element={<App />} />
         {/* Salesperson Portal - /#/sales */}
         <Route path="/sales/*" element={<SalespersonApp />} />
         <Route path="/sales-invite" element={<SalespersonApp />} />
         {/* Assignment Accept/Decline - /#/assignment/:token/:action */}
         <Route path="/assignment/:token/:action" element={<AssignmentPage />} />
-        {/* B2B Landing Page - Default page for visitors */}
+        {/* Document Verification - /#/verify/:certificationId */}
+        <Route path="/verify/:certificationId" element={<VerificationPage />} />
+        <Route path="/verify" element={<VerificationPage />} />
+        {/* B2B Landing Page - Alternative route */}
         <Route path="/b2b" element={<B2BLandingPage />} />
-        <Route path="/*" element={<B2BLandingPage />} />
+        {/* Customer Portal - Default page for visitors to request quotes */}
+        <Route path="/*" element={<CustomerApp />} />
       </Routes>
     </HashRouter>
   </React.StrictMode>,

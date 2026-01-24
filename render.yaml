@@ -40,5 +40,5 @@ services:
         source: /*
         destination: /index.html
     envVars:
-      - key: REACT_APP_BACKEND_URL
+      - key: REACT_APP_API_URL
         value: https://legacy-portal.onrender.com

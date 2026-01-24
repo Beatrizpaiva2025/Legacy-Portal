@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const API_URL = process.env.REACT_APP_API_URL || '';
+const API_URL = process.env.REACT_APP_API_URL || '/api';
 
 // ==================== NEW YORK TIMEZONE HELPERS ====================
 const NY_TIMEZONE = 'America/New_York';
@@ -144,7 +144,11 @@ const translations = {
     // Status
     pending: 'Pending',
     approved: 'Approved',
-    paid: 'Paid'
+    paid: 'Paid',
+
+    // Partner Referral Notice
+    partnerReferralNotice: 'Partner referrals are exclusively for companies with recurring demand for certified translations, such as law firms, accounting offices, financial institutions, real estate agencies, hospitals, and other businesses that regularly require translation services.',
+    partnerReferralImportant: 'Important: Individuals (natural persons) cannot be registered as partners.'
   },
   pt: {
     // Login
@@ -267,7 +271,11 @@ const translations = {
     // Status
     pending: 'Pendente',
     approved: 'Aprovado',
-    paid: 'Pago'
+    paid: 'Pago',
+
+    // Partner Referral Notice
+    partnerReferralNotice: 'As indicações de parceiros são exclusivamente para empresas com demanda recorrente por traduções certificadas, como escritórios de advocacia, contabilidade, instituições financeiras, imobiliárias, hospitais e outras empresas que necessitam regularmente de serviços de tradução.',
+    partnerReferralImportant: 'Importante: Pessoas físicas não poderão ser cadastradas como partners.'
   },
   es: {
     // Login
@@ -300,41 +308,41 @@ const translations = {
 
     // Tabs
     dashboard: 'Panel',
-    registerPartner: 'Registrar Socio',
+    registerPartner: 'Registrar Partner',
     myCommissions: 'Mis Comisiones',
     paymentHistory: 'Historial de Pagos',
     howItWorks: 'Cómo Funciona',
 
     // Dashboard
     thisMonth: 'Este Mes',
-    partnersRegistered: 'socios registrados',
+    partnersRegistered: 'partners registrados',
     pendingCommission: 'Comisión Pendiente',
     awaitingPayment: 'esperando pago',
     totalEarned: 'Total Ganado',
     allTime: 'desde el inicio',
-    totalPartners: 'Total de Socios',
+    totalPartners: 'Total de Partners',
     registeredByYou: 'registrados por usted',
     monthlyGoal: 'Progreso de Meta Mensual',
     progress: 'Progreso',
-    partners: 'socios',
+    partners: 'partners',
     recentRegistrations: 'Registros Recientes',
     date: 'Fecha',
-    partner: 'Socio',
+    partner: 'Partner',
     tier: 'Nivel',
     commission: 'Comisión',
     status: 'Estado',
-    noRegistrations: '¡Sin registros aún. Comience registrando su primer socio!',
+    noRegistrations: '¡Sin registros aún. Comience registrando su primer partner!',
 
     // Register Partner
-    registerNewPartner: 'Registrar Nuevo Socio',
+    registerNewPartner: 'Registrar Nuevo Partner',
     companyName: 'Nombre de Empresa',
     contactName: 'Nombre de Contacto',
     phone: 'Teléfono',
-    expectedTier: 'Nivel Esperado del Socio',
+    expectedTier: 'Nivel Esperado del Partner',
     notes: 'Notas',
-    register: 'Registrar Socio',
+    register: 'Registrar Partner',
     registering: 'Registrando...',
-    partnerRegistered: '¡Socio Registrado!',
+    partnerRegistered: '¡Partner Registrado!',
     addedSuccessfully: 'fue agregado exitosamente.',
     yourCommission: 'Su comisión',
 
@@ -344,7 +352,7 @@ const translations = {
     gold: 'Oro',
     platinum: 'Platino',
     pagesMonth: 'páginas/mes',
-    perPartner: 'por socio',
+    perPartner: 'por partner',
 
     // Commissions
     monthlyEarnings: 'Ganancias Mensuales',
@@ -357,7 +365,7 @@ const translations = {
     sinceStart: 'desde el inicio',
     payments: 'Pagos',
     transactionsCompleted: 'transacciones completadas',
-    partnersPaid: 'Socios Pagados',
+    partnersPaid: 'Partners Pagados',
     commissionsPaid: 'comisiones pagadas',
     paymentHistoryReceived: 'Historial de Pagos Recibidos',
     value: 'Valor',
@@ -372,7 +380,7 @@ const translations = {
     // How It Works
     commissionStructure: 'Estructura de Comisiones',
     yourCommissionType: 'Su Tipo de Comisión:',
-    byPartnerTier: 'Por Nivel del Socio',
+    byPartnerTier: 'Por Nivel del Partner',
     fixedValue: 'Valor Fijo',
     percentageOfSales: 'Porcentaje de Ventas',
     paymentInformation: 'Información de Pago',
@@ -381,7 +389,7 @@ const translations = {
     minimumPayout: 'Pago Mínimo',
     bonusOpportunities: 'Oportunidades de Bonificación',
     howTiersWork: 'Cómo Funcionan los Niveles',
-    tiersExplanation: 'Los niveles de socios se basan en el volumen mensual esperado de traducción. Al registrar un socio, estime el nivel según las necesidades del negocio:',
+    tiersExplanation: 'Los niveles de partners se basan en el volumen mensual esperado de traducción. Al registrar un partner, estime el nivel según las necesidades del negocio:',
     bronzeDesc: 'Pequeños negocios, abogados individuales, necesidades ocasionales',
     silverDesc: 'Firmas en crecimiento, pequeñas oficinas de inmigración, volumen regular',
     goldDesc: 'Oficinas medianas, contadores en época de impuestos, volumen constante',
@@ -390,7 +398,11 @@ const translations = {
     // Status
     pending: 'Pendiente',
     approved: 'Aprobado',
-    paid: 'Pagado'
+    paid: 'Pagado',
+
+    // Partner Referral Notice
+    partnerReferralNotice: 'Las indicaciones de partners son exclusivamente para empresas con demanda recurrente de traducciones certificadas, como despachos de abogados, oficinas de contabilidad, instituciones financieras, inmobiliarias, hospitales y otras empresas que requieren regularmente servicios de traducción.',
+    partnerReferralImportant: 'Importante: Las personas físicas no pueden ser registradas como partners.'
   }
 };
 
@@ -527,7 +539,29 @@ const SetPasswordPage = ({ inviteToken, onSuccess, lang, setLang }) => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [verifying, setVerifying] = useState(true);
   const [error, setError] = useState('');
+  const [salespersonInfo, setSalespersonInfo] = useState(null);
+
+  // Verify token on mount
+  useEffect(() => {
+    const verifyToken = async () => {
+      try {
+        const res = await fetch(`${API_URL}/salesperson/verify-invite?token=${inviteToken}`);
+        const data = await res.json();
+        if (res.ok && data.valid) {
+          setSalespersonInfo(data);
+          setError('');
+        } else {
+          setError(data.detail || 'Invalid or expired invite link');
+        }
+      } catch (err) {
+        setError('Unable to verify invite. Please check your connection and try again.');
+      }
+      setVerifying(false);
+    };
+    verifyToken();
+  }, [inviteToken]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -568,6 +602,34 @@ const SetPasswordPage = ({ inviteToken, onSuccess, lang, setLang }) => {
     setLoading(false);
   };
 
+  // Show loading while verifying
+  if (verifying) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+        <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8 text-center">
+          <div className="animate-spin w-12 h-12 border-4 border-teal-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-slate-600">Verifying invite...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error if token is invalid
+  if (error && !salespersonInfo) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+        <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8 text-center">
+          <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-red-500 text-3xl">!</span>
+          </div>
+          <h1 className="text-2xl font-bold text-slate-800 mb-2">Invalid Invite</h1>
+          <p className="text-red-600 mb-4">{error}</p>
+          <p className="text-slate-500 text-sm">Please contact your administrator to request a new invite link.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8">
@@ -581,6 +643,9 @@ const SetPasswordPage = ({ inviteToken, onSuccess, lang, setLang }) => {
           </div>
           <h1 className="text-2xl font-bold text-slate-800">{t.welcomeTeam}</h1>
           <p className="text-slate-500 mt-2">{t.setUpPassword}</p>
+          {salespersonInfo && (
+            <p className="text-teal-600 font-medium mt-1">{salespersonInfo.name}</p>
+          )}
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -917,6 +982,12 @@ const SalespersonPortal = ({ token, salesperson, onLogout, lang, setLang }) => {
           <div className="max-w-2xl mx-auto">
             <div className="bg-white rounded-xl shadow-sm p-6">
               <h2 className="text-xl font-semibold text-slate-800 mb-6">{t.registerNewPartner}</h2>
+
+              {/* Partner Referral Notice */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6">
+                <p className="text-slate-600 text-sm mb-3">{t.partnerReferralNotice}</p>
+                <p className="text-slate-700 text-sm font-semibold bg-slate-100 px-3 py-2 rounded-lg">{t.partnerReferralImportant}</p>
+              </div>
 
               {registerSuccess ? (
                 <div className="bg-teal-50 border border-teal-200 rounded-xl p-6 text-center">

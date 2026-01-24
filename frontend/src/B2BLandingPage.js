@@ -3,7 +3,279 @@ import axios from 'axios';
 
 const API = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
+// ==================== INTERNATIONALIZATION ====================
+const TRANSLATIONS = {
+  en: {
+    // Header
+    home: 'Home',
+    services: 'Services',
+    partnerLogin: 'Partner Login',
+    // Hero
+    yearsExperience: '15+ Years of Experience',
+    heroTitle1: 'Certified Excellence',
+    heroTitle2: 'Powered by Technology',
+    heroDescription: 'Enterprise-grade translation services powered by certified professionals and cutting-edge technology. Trusted by law firms and immigration agencies.',
+    requestPartnership: 'Request Partnership',
+    viewBenefits: 'View Benefits',
+    uscisAccepted: 'USCIS Accepted',
+    ataMember: 'ATA Member',
+    turnaround24h: '24h Turnaround',
+    // Free Translation Banner
+    freeTranslationTitle: 'First Certified Translation FREE!',
+    freeTranslationSubtitle: '1 page - No commitment required',
+    claimFreeTranslation: 'Claim Your Free Translation',
+    // Stats
+    yearsExperienceStats: 'Years Experience',
+    languages: 'Languages',
+    uscisAcceptedStats: 'USCIS Accepted',
+    // Benefits Section
+    partnershipBenefits: 'Partnership Benefits',
+    benefitsDescription: 'Join our B2B program and enjoy exclusive advantages designed for businesses with ongoing translation needs.',
+    monthlyInvoicing: 'Monthly Invoicing',
+    monthlyInvoicingDesc: 'Net 30 payment terms for approved partners. Simplify your accounting with consolidated monthly billing.',
+    volumeDiscounts: 'Volume Discounts',
+    volumeDiscountsDesc: 'Special pricing based on your monthly translation volume. The more you translate, the more you save.',
+    priorityProcessing: 'Priority Processing',
+    priorityProcessingDesc: 'Your projects receive priority in our queue. Fast turnaround times to meet your business deadlines.',
+    dedicatedSupport: 'Dedicated Support',
+    dedicatedSupportDesc: 'Direct access to your account manager for personalized service and quick issue resolution.',
+    onlineDashboard: 'Online Dashboard',
+    onlineDashboardDesc: 'Track all your orders, download completed translations, and manage your account from one place.',
+    certifiedQuality: 'Certified Quality',
+    certifiedQualityDesc: 'ATA member. Certified translations in full compliance with strict USCIS standards.',
+    // How It Works
+    howItWorks: 'How It Works',
+    gettingStartedSimple: 'Getting started is simple',
+    step1Title: 'Create Your Account',
+    step1Desc: 'Sign up in minutes with your company information. No approval needed!',
+    step2Title: 'Get Your Free Page',
+    step2Desc: 'Receive a welcome coupon for 1 FREE certified translation page instantly via email.',
+    step3Title: 'Start Translating',
+    step3Desc: 'Access your dashboard immediately and submit your first order with pay-per-order pricing.',
+    // CTA Section
+    readyToGetStarted: 'Ready to Get Started?',
+    ctaDescription: 'Create your account in minutes and start translating today. No approval process, no waiting!',
+    instantActivation: 'Instant account activation',
+    payPerOrder: 'Pay per order - no commitments',
+    invoicePlansAvailable: 'Invoice plans available after qualification',
+    digitalVerificationTitle: 'Exclusive: Digital Verification System',
+    digitalVerificationDesc: 'Each document includes QR code & unique serial number for instant authenticity verification by any institution',
+    firstTranslationFree: 'First Certified Translation FREE (1 page)',
+    firstTranslationFreeDesc: 'We trust our quality — enjoy one free certified page of any document type',
+    createFreeAccount: 'Create Your Free Account',
+    signUpReceiveCoupon: 'Sign up now and receive a coupon for',
+    oneFreePageBold: '1 FREE certified translation page!',
+    noCreditCard: 'No credit card required',
+    setupTime: 'Setup takes less than 2 minutes',
+    cancelAnytime: 'Cancel anytime - no fees',
+    createAccountGetFree: 'Create Account & Get Free Page',
+    alreadyHaveAccount: 'Already have an account?',
+    signInHere: 'Sign in here',
+    // Footer
+    professionalServices: 'Professional Certified Translation Services',
+    contact: 'Contact',
+    quickLinks: 'Quick Links',
+    partnerPortal: 'Partner Portal',
+    allRightsReserved: 'All rights reserved.',
+    // Already Partner
+    alreadyPartner: 'Already a partner?',
+    accessPartnerPortal: 'Access Partner Portal',
+  },
+  es: {
+    // Header
+    home: 'Inicio',
+    services: 'Servicios',
+    partnerLogin: 'Acceso Socios',
+    // Hero
+    yearsExperience: '15+ Años de Experiencia',
+    heroTitle1: 'Excelencia Certificada',
+    heroTitle2: 'Impulsada por Tecnología',
+    heroDescription: 'Servicios de traducción de nivel empresarial impulsados por profesionales certificados y tecnología de vanguardia. Confianza de bufetes de abogados y agencias de inmigración.',
+    requestPartnership: 'Solicitar Asociación',
+    viewBenefits: 'Ver Beneficios',
+    uscisAccepted: 'Aceptado por USCIS',
+    ataMember: 'Miembro de ATA',
+    turnaround24h: 'Entrega en 24h',
+    // Free Translation Banner
+    freeTranslationTitle: '¡Primera Traducción Certificada GRATIS!',
+    freeTranslationSubtitle: '1 página - Sin compromiso',
+    claimFreeTranslation: 'Obtener Traducción Gratis',
+    // Stats
+    yearsExperienceStats: 'Años de Experiencia',
+    languages: 'Idiomas',
+    uscisAcceptedStats: 'Aceptado por USCIS',
+    // Benefits Section
+    partnershipBenefits: 'Beneficios de la Asociación',
+    benefitsDescription: 'Únase a nuestro programa B2B y disfrute de ventajas exclusivas diseñadas para empresas con necesidades continuas de traducción.',
+    monthlyInvoicing: 'Facturación Mensual',
+    monthlyInvoicingDesc: 'Condiciones de pago Net 30 para socios aprobados. Simplifique su contabilidad con facturación mensual consolidada.',
+    volumeDiscounts: 'Descuentos por Volumen',
+    volumeDiscountsDesc: 'Precios especiales según su volumen mensual de traducción. Cuanto más traduce, más ahorra.',
+    priorityProcessing: 'Procesamiento Prioritario',
+    priorityProcessingDesc: 'Sus proyectos reciben prioridad en nuestra cola. Tiempos de entrega rápidos para cumplir con sus plazos comerciales.',
+    dedicatedSupport: 'Soporte Dedicado',
+    dedicatedSupportDesc: 'Acceso directo a su gerente de cuenta para servicio personalizado y resolución rápida de problemas.',
+    onlineDashboard: 'Panel en Línea',
+    onlineDashboardDesc: 'Rastree todos sus pedidos, descargue traducciones completadas y administre su cuenta desde un solo lugar.',
+    certifiedQuality: 'Calidad Certificada',
+    certifiedQualityDesc: 'Miembro de ATA. Traducciones certificadas en total cumplimiento con los estrictos estándares de USCIS.',
+    // How It Works
+    howItWorks: 'Cómo Funciona',
+    gettingStartedSimple: 'Comenzar es simple',
+    step1Title: 'Cree Su Cuenta',
+    step1Desc: '¡Regístrese en minutos con la información de su empresa. No necesita aprobación!',
+    step2Title: 'Obtenga Su Página Gratis',
+    step2Desc: 'Reciba un cupón de bienvenida para 1 página de traducción certificada GRATIS al instante por correo.',
+    step3Title: 'Comience a Traducir',
+    step3Desc: 'Acceda a su panel de inmediato y envíe su primer pedido con precios de pago por pedido.',
+    // CTA Section
+    readyToGetStarted: '¿Listo para Comenzar?',
+    ctaDescription: 'Cree su cuenta en minutos y comience a traducir hoy. ¡Sin proceso de aprobación, sin esperas!',
+    instantActivation: 'Activación instantánea de cuenta',
+    payPerOrder: 'Pago por pedido - sin compromisos',
+    invoicePlansAvailable: 'Planes de factura disponibles tras calificación',
+    digitalVerificationTitle: 'Exclusivo: Sistema de Verificación Digital',
+    digitalVerificationDesc: 'Cada documento incluye código QR y número de serie único para verificación instantánea de autenticidad por cualquier institución',
+    firstTranslationFree: 'Primera Traducción Certificada GRATIS (1 página)',
+    firstTranslationFreeDesc: 'Confiamos en nuestra calidad — disfrute una página certificada gratis de cualquier tipo de documento',
+    createFreeAccount: 'Cree Su Cuenta Gratis',
+    signUpReceiveCoupon: 'Regístrese ahora y reciba un cupón por',
+    oneFreePageBold: '¡1 página de traducción certificada GRATIS!',
+    noCreditCard: 'No requiere tarjeta de crédito',
+    setupTime: 'Configuración en menos de 2 minutos',
+    cancelAnytime: 'Cancele cuando quiera - sin cargos',
+    createAccountGetFree: 'Crear Cuenta y Obtener Página Gratis',
+    alreadyHaveAccount: '¿Ya tiene una cuenta?',
+    signInHere: 'Inicie sesión aquí',
+    // Footer
+    professionalServices: 'Servicios Profesionales de Traducción Certificada',
+    contact: 'Contacto',
+    quickLinks: 'Enlaces Rápidos',
+    partnerPortal: 'Portal de Socios',
+    allRightsReserved: 'Todos los derechos reservados.',
+    // Already Partner
+    alreadyPartner: '¿Ya es socio?',
+    accessPartnerPortal: 'Acceder al Portal de Socios',
+  },
+  pt: {
+    // Header
+    home: 'Início',
+    services: 'Serviços',
+    partnerLogin: 'Login Parceiro',
+    // Hero
+    yearsExperience: '15+ Anos de Experiência',
+    heroTitle1: 'Excelência Certificada',
+    heroTitle2: 'Impulsionada por Tecnologia',
+    heroDescription: 'Serviços de tradução de nível empresarial impulsionados por profissionais certificados e tecnologia de ponta. Confiança de escritórios de advocacia e agências de imigração.',
+    requestPartnership: 'Solicitar Parceria',
+    viewBenefits: 'Ver Benefícios',
+    uscisAccepted: 'Aceito pelo USCIS',
+    ataMember: 'Membro da ATA',
+    turnaround24h: 'Entrega em 24h',
+    // Free Translation Banner
+    freeTranslationTitle: 'Primeira Tradução Certificada GRÁTIS!',
+    freeTranslationSubtitle: '1 página - Sem compromisso',
+    claimFreeTranslation: 'Obter Tradução Grátis',
+    // Stats
+    yearsExperienceStats: 'Anos de Experiência',
+    languages: 'Idiomas',
+    uscisAcceptedStats: 'Aceito pelo USCIS',
+    // Benefits Section
+    partnershipBenefits: 'Benefícios da Parceria',
+    benefitsDescription: 'Junte-se ao nosso programa B2B e aproveite vantagens exclusivas projetadas para empresas com necessidades contínuas de tradução.',
+    monthlyInvoicing: 'Faturamento Mensal',
+    monthlyInvoicingDesc: 'Condições de pagamento Net 30 para parceiros aprovados. Simplifique sua contabilidade com faturamento mensal consolidado.',
+    volumeDiscounts: 'Descontos por Volume',
+    volumeDiscountsDesc: 'Preços especiais com base no seu volume mensal de tradução. Quanto mais você traduz, mais economiza.',
+    priorityProcessing: 'Processamento Prioritário',
+    priorityProcessingDesc: 'Seus projetos recebem prioridade em nossa fila. Tempos de entrega rápidos para cumprir seus prazos comerciais.',
+    dedicatedSupport: 'Suporte Dedicado',
+    dedicatedSupportDesc: 'Acesso direto ao seu gerente de conta para serviço personalizado e resolução rápida de problemas.',
+    onlineDashboard: 'Painel Online',
+    onlineDashboardDesc: 'Acompanhe todos os seus pedidos, baixe traduções concluídas e gerencie sua conta em um só lugar.',
+    certifiedQuality: 'Qualidade Certificada',
+    certifiedQualityDesc: 'Membro da ATA. Traduções certificadas em total conformidade com os rigorosos padrões do USCIS.',
+    // How It Works
+    howItWorks: 'Como Funciona',
+    gettingStartedSimple: 'Começar é simples',
+    step1Title: 'Crie Sua Conta',
+    step1Desc: 'Cadastre-se em minutos com as informações da sua empresa. Não precisa de aprovação!',
+    step2Title: 'Receba Sua Página Grátis',
+    step2Desc: 'Receba um cupom de boas-vindas para 1 página de tradução certificada GRÁTIS instantaneamente por e-mail.',
+    step3Title: 'Comece a Traduzir',
+    step3Desc: 'Acesse seu painel imediatamente e envie seu primeiro pedido com preços de pagamento por pedido.',
+    // CTA Section
+    readyToGetStarted: 'Pronto para Começar?',
+    ctaDescription: 'Crie sua conta em minutos e comece a traduzir hoje. Sem processo de aprovação, sem espera!',
+    instantActivation: 'Ativação instantânea da conta',
+    payPerOrder: 'Pague por pedido - sem compromissos',
+    invoicePlansAvailable: 'Planos de fatura disponíveis após qualificação',
+    digitalVerificationTitle: 'Exclusivo: Sistema de Verificação Digital',
+    digitalVerificationDesc: 'Cada documento inclui código QR e número de série único para verificação instantânea de autenticidade por qualquer instituição',
+    firstTranslationFree: 'Primeira Tradução Certificada GRÁTIS (1 página)',
+    firstTranslationFreeDesc: 'Confiamos em nossa qualidade — aproveite uma página certificada grátis de qualquer tipo de documento',
+    createFreeAccount: 'Crie Sua Conta Grátis',
+    signUpReceiveCoupon: 'Cadastre-se agora e receba um cupom por',
+    oneFreePageBold: '1 página de tradução certificada GRÁTIS!',
+    noCreditCard: 'Não requer cartão de crédito',
+    setupTime: 'Configuração em menos de 2 minutos',
+    cancelAnytime: 'Cancele quando quiser - sem taxas',
+    createAccountGetFree: 'Criar Conta e Obter Página Grátis',
+    alreadyHaveAccount: 'Já tem uma conta?',
+    signInHere: 'Entrar aqui',
+    // Footer
+    professionalServices: 'Serviços Profissionais de Tradução Certificada',
+    contact: 'Contato',
+    quickLinks: 'Links Rápidos',
+    partnerPortal: 'Portal do Parceiro',
+    allRightsReserved: 'Todos os direitos reservados.',
+    // Already Partner
+    alreadyPartner: 'Já é parceiro?',
+    accessPartnerPortal: 'Acessar Portal do Parceiro',
+  }
+};
+
+// UI Languages with flags
+const getFlagUrl = (countryCode) => `https://flagcdn.com/w40/${countryCode.toLowerCase()}.png`;
+
+const UI_LANGUAGES = [
+  { code: 'en', countryCode: 'us', name: 'English' },
+  { code: 'es', countryCode: 'es', name: 'Español' },
+  { code: 'pt', countryCode: 'br', name: 'Português' }
+];
+
+// Check if user is in Brazil based on timezone
+const isInBrazil = () => {
+  try {
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return timezone.includes('Sao_Paulo') || timezone.includes('Fortaleza') ||
+           timezone.includes('Recife') || timezone.includes('Bahia') ||
+           timezone.includes('Manaus') || timezone.includes('Cuiaba') ||
+           timezone.includes('Porto_Velho') || timezone.includes('Boa_Vista') ||
+           timezone.includes('Rio_Branco') || timezone.includes('Belem') ||
+           timezone.includes('Araguaina') || timezone.includes('Maceio') ||
+           timezone.includes('Campo_Grande') || timezone.includes('Noronha');
+  } catch {
+    return false;
+  }
+};
+
+// Get user's language preference
+const getInitialLanguage = () => {
+  const saved = localStorage.getItem('ui_language');
+  if (saved && ['en', 'es', 'pt'].includes(saved)) return saved;
+  return isInBrazil() ? 'pt' : 'en';
+};
+
 const B2BLandingPage = () => {
+  const [lang, setLang] = useState(getInitialLanguage);
+  const t = TRANSLATIONS[lang];
+
+  const changeLanguage = (newLang) => {
+    setLang(newLang);
+    localStorage.setItem('ui_language', newLang);
+  };
+
   // Check for reset_token, verify route, or orders path and redirect appropriately
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -37,6 +309,14 @@ const B2BLandingPage = () => {
       return;
     }
   }, []);
+
+  // Scroll to section helper (avoids HashRouter conflict)
+  const scrollToSection = (sectionId) => {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
 
   const [formData, setFormData] = useState({
     company_name: '',
@@ -93,62 +373,81 @@ Message: ${formData.message}
             alt="Legacy Translations"
             className="h-10 md:h-12"
           />
-          <nav className="flex items-center space-x-6">
+          <nav className="flex items-center space-x-4 md:space-x-6">
+            {/* Language Flags */}
+            <div className="flex items-center space-x-1 md:space-x-2">
+              {UI_LANGUAGES.map((uiLang) => (
+                <button
+                  key={uiLang.code}
+                  onClick={() => changeLanguage(uiLang.code)}
+                  className={`hover:scale-110 transition-transform ${
+                    lang === uiLang.code ? 'opacity-100 scale-110 ring-2 ring-blue-500 rounded' : 'opacity-60'
+                  }`}
+                  title={uiLang.name}
+                >
+                  <img
+                    src={getFlagUrl(uiLang.countryCode)}
+                    alt={uiLang.name}
+                    className="w-6 h-4 md:w-7 md:h-5 object-cover rounded-sm"
+                  />
+                </button>
+              ))}
+            </div>
             <a href="https://legacytranslations.com" className="text-gray-600 hover:text-blue-900 text-sm font-medium hidden md:block">
-              Home
+              {t.home}
             </a>
             <a href="https://legacytranslations.com/services" className="text-gray-600 hover:text-blue-900 text-sm font-medium hidden md:block">
-              Services
+              {t.services}
             </a>
-            <a href="#/partner" className="bg-blue-900 text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-blue-800 transition-colors">
-              Partner Login
+            <a href="#/partner/login" className="bg-blue-900 text-white px-4 md:px-5 py-2 rounded-full text-sm font-medium hover:bg-blue-800 transition-colors">
+              {t.partnerLogin}
             </a>
           </nav>
         </div>
       </header>
 
       {/* Hero Section - Clean Professional */}
-      <section className="pt-24 bg-gradient-to-b from-slate-50 to-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
+      <section className="pt-20 bg-gradient-to-b from-slate-50 to-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div>
               <div className="inline-flex items-center px-4 py-2 bg-blue-50 text-blue-900 rounded-full text-sm font-medium mb-6">
                 <span className="w-2 h-2 bg-blue-600 rounded-full mr-2"></span>
-                15+ Years of Experience
+                {t.yearsExperience}
               </div>
               <h1 className="text-4xl md:text-5xl font-bold text-slate-900 leading-tight mb-6">
-                Certified Excellence
-                <span className="block text-blue-900 italic">Powered by Technology</span>
+                {t.heroTitle1}
+                <span className="block text-blue-900 italic">{t.heroTitle2}</span>
               </h1>
               <p className="text-lg text-slate-600 mb-8 leading-relaxed">
-                Enterprise-grade translation services powered by certified professionals and cutting-edge technology. Trusted by law firms and immigration agencies.
+                {t.heroDescription}
               </p>
               <div className="flex flex-wrap gap-4 mb-8">
-                <a href="#contact-form" className="bg-blue-900 text-white px-8 py-4 rounded-lg font-semibold hover:bg-blue-800 transition-colors shadow-lg shadow-blue-900/25">
-                  Request Partnership
-                </a>
-                <a href="#benefits" className="border-2 border-slate-300 text-slate-700 px-8 py-4 rounded-lg font-semibold hover:border-blue-900 hover:text-blue-900 transition-colors">
-                  View Benefits
-                </a>
+                <button onClick={() => scrollToSection('contact-form')} className="bg-blue-900 text-white px-8 py-4 rounded-lg font-semibold hover:bg-blue-800 transition-colors shadow-lg shadow-blue-900/25">
+                  {t.requestPartnership}
+                </button>
+                <button onClick={() => scrollToSection('benefits')} className="border-2 border-slate-300 text-slate-700 px-8 py-4 rounded-lg font-semibold hover:border-blue-900 hover:text-blue-900 transition-colors">
+                  {t.viewBenefits}
+                </button>
               </div>
               <div className="flex items-center gap-6 text-sm text-slate-500">
                 <div className="flex items-center">
                   <svg className="w-5 h-5 text-green-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                   </svg>
-                  USCIS Accepted
+                  {t.uscisAccepted}
                 </div>
                 <div className="flex items-center">
                   <svg className="w-5 h-5 text-green-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                   </svg>
-                  ATA Member
+                  {t.ataMember}
                 </div>
                 <div className="flex items-center">
                   <svg className="w-5 h-5 text-green-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                   </svg>
-                  24h Turnaround
+                  {t.turnaround24h}
                 </div>
               </div>
             </div>
@@ -175,16 +474,16 @@ Message: ${formData.message}
                 </svg>
               </div>
               <div>
-                <div className="text-xl md:text-2xl font-bold">First Certified Translation FREE!</div>
-                <div className="text-green-100 text-sm md:text-base">1 page - No commitment required</div>
+                <div className="text-xl md:text-2xl font-bold">{t.freeTranslationTitle}</div>
+                <div className="text-green-100 text-sm md:text-base">{t.freeTranslationSubtitle}</div>
               </div>
             </div>
-            <a
-              href="#contact-form"
+            <button
+              onClick={() => scrollToSection('contact-form')}
               className="px-6 py-3 bg-white text-green-600 rounded-full font-semibold hover:bg-green-50 transition-colors shadow-lg"
             >
-              Claim Your Free Translation
-            </a>
+              {t.claimFreeTranslation}
+            </button>
           </div>
         </div>
       </section>
@@ -195,15 +494,15 @@ Message: ${formData.message}
           <div className="grid grid-cols-3 gap-8 text-center">
             <div className="p-6">
               <div className="text-4xl md:text-5xl font-bold text-white">15+</div>
-              <div className="text-slate-400 mt-2 text-sm uppercase tracking-wide">Years Experience</div>
+              <div className="text-slate-400 mt-2 text-sm uppercase tracking-wide">{t.yearsExperienceStats}</div>
             </div>
             <div className="p-6">
               <div className="text-4xl md:text-5xl font-bold text-white">50+</div>
-              <div className="text-slate-400 mt-2 text-sm uppercase tracking-wide">Languages</div>
+              <div className="text-slate-400 mt-2 text-sm uppercase tracking-wide">{t.languages}</div>
             </div>
             <div className="p-6">
               <div className="text-4xl md:text-5xl font-bold text-white">100%</div>
-              <div className="text-slate-400 mt-2 text-sm uppercase tracking-wide">USCIS Accepted</div>
+              <div className="text-slate-400 mt-2 text-sm uppercase tracking-wide">{t.uscisAcceptedStats}</div>
             </div>
           </div>
         </div>
@@ -214,10 +513,10 @@ Message: ${formData.message}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-blue-900 mb-4">
-              Partnership Benefits
+              {t.partnershipBenefits}
             </h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Join our B2B program and enjoy exclusive advantages designed for businesses with ongoing translation needs.
+              {t.benefitsDescription}
             </p>
           </div>
 
@@ -228,8 +527,8 @@ Message: ${formData.message}
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-blue-900 mb-3">Monthly Invoicing</h3>
-              <p className="text-gray-600">Net 30 payment terms for approved partners. Simplify your accounting with consolidated monthly billing.</p>
+              <h3 className="text-xl font-bold text-blue-900 mb-3">{t.monthlyInvoicing}</h3>
+              <p className="text-gray-600">{t.monthlyInvoicingDesc}</p>
             </div>
 
             <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow">
@@ -238,8 +537,8 @@ Message: ${formData.message}
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-blue-900 mb-3">Volume Discounts</h3>
-              <p className="text-gray-600">Special pricing based on your monthly translation volume. The more you translate, the more you save.</p>
+              <h3 className="text-xl font-bold text-blue-900 mb-3">{t.volumeDiscounts}</h3>
+              <p className="text-gray-600">{t.volumeDiscountsDesc}</p>
             </div>
 
             <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow">
@@ -248,8 +547,8 @@ Message: ${formData.message}
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-blue-900 mb-3">Priority Processing</h3>
-              <p className="text-gray-600">Your projects receive priority in our queue. Fast turnaround times to meet your business deadlines.</p>
+              <h3 className="text-xl font-bold text-blue-900 mb-3">{t.priorityProcessing}</h3>
+              <p className="text-gray-600">{t.priorityProcessingDesc}</p>
             </div>
 
             <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow">
@@ -258,8 +557,8 @@ Message: ${formData.message}
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-blue-900 mb-3">Dedicated Support</h3>
-              <p className="text-gray-600">Direct access to your account manager for personalized service and quick issue resolution.</p>
+              <h3 className="text-xl font-bold text-blue-900 mb-3">{t.dedicatedSupport}</h3>
+              <p className="text-gray-600">{t.dedicatedSupportDesc}</p>
             </div>
 
             <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow">
@@ -268,8 +567,8 @@ Message: ${formData.message}
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-blue-900 mb-3">Online Dashboard</h3>
-              <p className="text-gray-600">Track all your orders, download completed translations, and manage your account from one place.</p>
+              <h3 className="text-xl font-bold text-blue-900 mb-3">{t.onlineDashboard}</h3>
+              <p className="text-gray-600">{t.onlineDashboardDesc}</p>
             </div>
 
             <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow">
@@ -278,8 +577,8 @@ Message: ${formData.message}
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-blue-900 mb-3">Certified Quality</h3>
-              <p className="text-gray-600">ATA member. Certified translations in full compliance with strict USCIS standards.</p>
+              <h3 className="text-xl font-bold text-blue-900 mb-3">{t.certifiedQuality}</h3>
+              <p className="text-gray-600">{t.certifiedQualityDesc}</p>
             </div>
           </div>
         </div>
@@ -290,70 +589,70 @@ Message: ${formData.message}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-blue-900 mb-4">
-              How It Works
+              {t.howItWorks}
             </h2>
             <p className="text-xl text-gray-600">
-              Getting started is simple
+              {t.gettingStartedSimple}
             </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
             <div className="text-center">
               <div className="w-16 h-16 bg-blue-900 text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-6">1</div>
-              <h3 className="text-xl font-bold text-blue-900 mb-3">Submit Interest</h3>
-              <p className="text-gray-600">Fill out the form below with your company information and translation needs.</p>
+              <h3 className="text-xl font-bold text-blue-900 mb-3">{t.step1Title}</h3>
+              <p className="text-gray-600">{t.step1Desc}</p>
             </div>
             <div className="text-center">
               <div className="w-16 h-16 bg-blue-900 text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-6">2</div>
-              <h3 className="text-xl font-bold text-blue-900 mb-3">Get Approved</h3>
-              <p className="text-gray-600">Our team will review your application and set up your corporate account within 24 hours.</p>
+              <h3 className="text-xl font-bold text-blue-900 mb-3">{t.step2Title}</h3>
+              <p className="text-gray-600">{t.step2Desc}</p>
             </div>
             <div className="text-center">
               <div className="w-16 h-16 bg-blue-900 text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-6">3</div>
-              <h3 className="text-xl font-bold text-blue-900 mb-3">Start Translating</h3>
-              <p className="text-gray-600">Access your dashboard, submit orders, and enjoy all partnership benefits.</p>
+              <h3 className="text-xl font-bold text-blue-900 mb-3">{t.step3Title}</h3>
+              <p className="text-gray-600">{t.step3Desc}</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Contact Form Section */}
+      {/* Signup CTA Section */}
       <section id="contact-form" className="py-20 bg-gradient-to-br from-blue-900 to-blue-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="text-white">
               <h2 className="text-3xl md:text-4xl font-bold mb-6">
-                Ready to Get Started?
+                {t.readyToGetStarted}
               </h2>
               <p className="text-xl text-blue-100 mb-8">
-                Fill out the form and our partnership team will contact you within 24 hours to discuss your company's needs.
+                {t.ctaDescription}
               </p>
               <div className="space-y-4">
                 <div className="flex items-center">
                   <svg className="w-6 h-6 text-blue-300 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
-                  <span className="text-blue-100">No commitment required</span>
+                  <span className="text-blue-100">{t.instantActivation}</span>
                 </div>
                 <div className="flex items-center">
                   <svg className="w-6 h-6 text-blue-300 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
-                  <span className="text-blue-100">Free consultation</span>
+                  <span className="text-blue-100">{t.payPerOrder}</span>
                 </div>
                 <div className="flex items-center">
                   <svg className="w-6 h-6 text-blue-300 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
-                  <span className="text-blue-100">Custom pricing available</span>
+                  <span className="text-blue-100">{t.invoicePlansAvailable}</span>
                 </div>
                 <div className="flex items-start bg-gradient-to-r from-blue-800/50 to-purple-800/50 rounded-lg p-3 border border-blue-400/30">
                   <svg className="w-6 h-6 text-yellow-300 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                   </svg>
                   <div>
-                    <span className="text-yellow-200 font-bold block">Exclusive: Digital Verification System</span>
-                    <span className="text-blue-200 text-sm">Each document includes QR code & unique serial number for instant authenticity verification by any institution</span>
+                    <span className="text-yellow-200 font-bold block">{t.digitalVerificationTitle}</span>
+                    <span className="text-blue-200 text-sm">{t.digitalVerificationDesc}</span>
                   </div>
                 </div>
                 <div className="flex items-start">
@@ -361,132 +660,58 @@ Message: ${formData.message}
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
                   </svg>
                   <div>
-                    <span className="text-yellow-200 font-semibold block">First Certified Translation FREE (1 page)</span>
-                    <span className="text-blue-200 text-xs">We trust our quality — enjoy one free certified page of any document type</span>
+                    <span className="text-yellow-200 font-semibold block">{t.firstTranslationFree}</span>
+                    <span className="text-blue-200 text-xs">{t.firstTranslationFreeDesc}</span>
                   </div>
                 </div>
               </div>
             </div>
 
             <div className="bg-white rounded-2xl p-8 shadow-2xl">
-              {success ? (
-                <div className="text-center py-8">
-                  <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">Check Your Email!</h3>
-                  <p className="text-gray-600 mb-4">
-                    Your partnership request has been submitted successfully!
-                  </p>
-                  <p className="text-blue-600 font-medium mb-4">
-                    We've sent you an email with a link to complete your registration.
-                  </p>
-                  <p className="text-sm text-gray-500 mb-6">
-                    Our team will also contact you within 24 hours to discuss your needs.
-                  </p>
-                  <a
-                    href="/#/partner"
-                    className="inline-block px-6 py-3 bg-blue-900 text-white rounded-lg font-medium hover:bg-blue-800 transition-colors"
-                  >
-                    Go to Partner Login
-                  </a>
+              {/* Direct Signup CTA */}
+              <div className="text-center py-6">
+                <div className="w-20 h-20 bg-gradient-to-br from-teal-400 to-cyan-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+                  </svg>
                 </div>
-              ) : (
-                <form onSubmit={handleSubmit} className="space-y-5">
-                  <h3 className="text-2xl font-bold text-blue-900 mb-6">Partnership Inquiry</h3>
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">{t.createFreeAccount}</h3>
+                <p className="text-gray-600 mb-6">
+                  {t.signUpReceiveCoupon} <span className="font-bold text-teal-600">{t.oneFreePageBold}</span>
+                </p>
 
-                  {error && (
-                    <div className="p-4 bg-red-50 text-red-700 rounded-lg text-sm">
-                      {error}
-                    </div>
-                  )}
-
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Company Name *</label>
-                      <input
-                        type="text"
-                        required
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
-                        value={formData.company_name}
-                        onChange={(e) => setFormData({...formData, company_name: e.target.value})}
-                        placeholder="Your Company Inc."
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Contact Name *</label>
-                      <input
-                        type="text"
-                        required
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
-                        value={formData.contact_name}
-                        onChange={(e) => setFormData({...formData, contact_name: e.target.value})}
-                        placeholder="John Smith"
-                      />
-                    </div>
+                <div className="space-y-4 mb-8">
+                  <div className="flex items-center justify-center text-sm text-gray-600">
+                    <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    {t.noCreditCard}
                   </div>
-
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Business Email *</label>
-                      <input
-                        type="email"
-                        required
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
-                        value={formData.email}
-                        onChange={(e) => setFormData({...formData, email: e.target.value})}
-                        placeholder="john@company.com"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                      <input
-                        type="tel"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
-                        value={formData.phone}
-                        onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                        placeholder="+1 (555) 123-4567"
-                      />
-                    </div>
+                  <div className="flex items-center justify-center text-sm text-gray-600">
+                    <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    {t.setupTime}
                   </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Estimated Monthly Volume</label>
-                    <select
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
-                      value={formData.estimated_volume}
-                      onChange={(e) => setFormData({...formData, estimated_volume: e.target.value})}
-                    >
-                      <option value="">Select estimated volume</option>
-                      <option value="1-10 pages">1-10 pages per month</option>
-                      <option value="11-50 pages">11-50 pages per month</option>
-                      <option value="51-100 pages">51-100 pages per month</option>
-                      <option value="100+ pages">100+ pages per month</option>
-                    </select>
+                  <div className="flex items-center justify-center text-sm text-gray-600">
+                    <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    {t.cancelAnytime}
                   </div>
+                </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
-                    <textarea
-                      rows={3}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
-                      value={formData.message}
-                      onChange={(e) => setFormData({...formData, message: e.target.value})}
-                      placeholder="Tell us about your translation needs..."
-                    />
-                  </div>
+                <a
+                  href="/#/partner/login?register=true"
+                  className="block w-full py-4 bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-lg hover:from-teal-600 hover:to-cyan-600 font-bold text-lg transition-all transform hover:scale-105 shadow-lg"
+                >
+                  {t.createAccountGetFree}
+                </a>
 
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full py-4 bg-blue-900 text-white rounded-lg hover:bg-blue-800 disabled:bg-gray-400 font-semibold text-lg transition-colors"
-                  >
-                    {loading ? 'Submitting...' : 'Submit Partnership Request'}
-                  </button>
-                </form>
-              )}
+                <p className="text-sm text-gray-500 mt-4">
+                  {t.alreadyHaveAccount} <a href="/#/partner/login" className="text-blue-600 hover:underline font-medium">{t.signInHere}</a>
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -546,12 +771,12 @@ Message: ${formData.message}
       {/* Already a Partner */}
       <section className="py-12 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p className="text-gray-600 mb-4">Already a partner?</p>
+          <p className="text-gray-600 mb-4">{t.alreadyPartner}</p>
           <a
-            href="#/partner"
+            href="#/partner/login"
             className="inline-block px-8 py-3 border-2 border-blue-900 text-blue-900 rounded-full hover:bg-blue-900 hover:text-white font-semibold transition-colors"
           >
-            Access Partner Portal
+            {t.accessPartnerPortal}
           </a>
         </div>
       </section>
@@ -567,11 +792,11 @@ Message: ${formData.message}
                 className="h-10 mb-4 brightness-0 invert"
               />
               <p className="text-blue-200">
-                Professional Certified Translation Services
+                {t.professionalServices}
               </p>
             </div>
             <div>
-              <h4 className="font-bold mb-4">Contact</h4>
+              <h4 className="font-bold mb-4">{t.contact}</h4>
               <p className="text-blue-200">contact@legacytranslations.com</p>
               <a href="https://wa.me/18573167770" className="flex items-center gap-2 text-blue-200 hover:text-green-400 transition-colors">
                 <svg className="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 24 24">
@@ -581,16 +806,16 @@ Message: ${formData.message}
               </a>
             </div>
             <div>
-              <h4 className="font-bold mb-4">Quick Links</h4>
+              <h4 className="font-bold mb-4">{t.quickLinks}</h4>
               <div className="space-y-2">
-                <a href="https://legacytranslations.com" className="block text-blue-200 hover:text-white">Home</a>
-                <a href="https://legacytranslations.com/services" className="block text-blue-200 hover:text-white">Services</a>
-                <a href="#/partner" className="block text-blue-200 hover:text-white">Partner Portal</a>
+                <a href="https://legacytranslations.com" className="block text-blue-200 hover:text-white">{t.home}</a>
+                <a href="https://legacytranslations.com/services" className="block text-blue-200 hover:text-white">{t.services}</a>
+                <a href="#/partner/login" className="block text-blue-200 hover:text-white">{t.partnerPortal}</a>
               </div>
             </div>
           </div>
           <div className="border-t border-blue-800 mt-8 pt-8 text-center text-blue-300">
-            <p>&copy; {new Date().getFullYear()} Legacy Translations. All rights reserved.</p>
+            <p>&copy; {new Date().getFullYear()} Legacy Translations. {t.allRightsReserved}</p>
           </div>
         </div>
       </footer>

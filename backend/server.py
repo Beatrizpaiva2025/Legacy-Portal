@@ -84,6 +84,115 @@ async def health_check():
     """Health check endpoint for monitoring and keeping service alive"""
     return {"status": "healthy", "service": "legacy-portal-backend"}
 
+# ==================== MULTI-CURRENCY SUPPORT ====================
+
+# Currency configuration with Stripe payment methods
+CURRENCY_CONFIG = {
+    "usd": {"symbol": "$", "name": "US Dollar", "payment_methods": ["card"], "country_codes": ["US"]},
+    "brl": {"symbol": "R$", "name": "Brazilian Real", "payment_methods": ["card", "pix"], "country_codes": ["BR"]},
+    "eur": {"symbol": "€", "name": "Euro", "payment_methods": ["card"], "country_codes": ["DE", "FR", "IT", "ES", "PT", "NL", "BE", "AT", "IE", "FI", "GR"]},
+    "gbp": {"symbol": "£", "name": "British Pound", "payment_methods": ["card"], "country_codes": ["GB"]},
+}
+
+# Cache for exchange rates (refresh every hour)
+exchange_rate_cache = {"rates": {}, "last_updated": None}
+
+@api_router.get("/geo/detect")
+async def detect_country(request: Request):
+    """Detect user's country from IP address"""
+    try:
+        # Get client IP
+        forwarded = request.headers.get("X-Forwarded-For")
+        if forwarded:
+            client_ip = forwarded.split(",")[0].strip()
+        else:
+            client_ip = request.client.host
+
+        # Skip for localhost/private IPs
+        if client_ip in ["127.0.0.1", "localhost"] or client_ip.startswith("192.168.") or client_ip.startswith("10."):
+            return {"country_code": "US", "currency": "usd", "symbol": "$"}
+
+        # Use free IP geolocation API
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"http://ip-api.com/json/{client_ip}?fields=countryCode", timeout=5.0)
+            if response.status_code == 200:
+                data = response.json()
+                country_code = data.get("countryCode", "US")
+
+                # Map country to currency
+                currency = "usd"  # Default
+                for curr, config in CURRENCY_CONFIG.items():
+                    if country_code in config["country_codes"]:
+                        currency = curr
+                        break
+
+                return {
+                    "country_code": country_code,
+                    "currency": currency,
+                    "symbol": CURRENCY_CONFIG[currency]["symbol"],
+                    "payment_methods": CURRENCY_CONFIG[currency]["payment_methods"]
+                }
+
+        return {"country_code": "US", "currency": "usd", "symbol": "$", "payment_methods": ["card"]}
+    except Exception as e:
+        logger.error(f"Error detecting country: {str(e)}")
+        return {"country_code": "US", "currency": "usd", "symbol": "$", "payment_methods": ["card"]}
+
+@api_router.get("/exchange-rates")
+async def get_exchange_rates():
+    """Get current exchange rates (USD as base)"""
+    global exchange_rate_cache
+
+    try:
+        # Check if cache is valid (less than 24 hours old)
+        if exchange_rate_cache["last_updated"]:
+            cache_age = datetime.utcnow() - exchange_rate_cache["last_updated"]
+            if cache_age.total_seconds() < 86400 and exchange_rate_cache["rates"]:
+                return {"rates": exchange_rate_cache["rates"], "base": "usd", "cached": True}
+
+        # Fetch fresh rates from free API
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://api.exchangerate-api.com/v4/latest/USD",
+                timeout=10.0
+            )
+            if response.status_code == 200:
+                data = response.json()
+                rates = {
+                    "usd": 1.0,
+                    "brl": data["rates"].get("BRL", 5.0),
+                    "eur": data["rates"].get("EUR", 0.92),
+                    "gbp": data["rates"].get("GBP", 0.79)
+                }
+
+                # Update cache
+                exchange_rate_cache = {
+                    "rates": rates,
+                    "last_updated": datetime.utcnow()
+                }
+
+                return {"rates": rates, "base": "usd", "cached": False}
+
+        # Fallback rates if API fails
+        return {
+            "rates": {"usd": 1.0, "brl": 5.0, "eur": 0.92, "gbp": 0.79},
+            "base": "usd",
+            "cached": False,
+            "fallback": True
+        }
+    except Exception as e:
+        logger.error(f"Error fetching exchange rates: {str(e)}")
+        return {
+            "rates": {"usd": 1.0, "brl": 5.0, "eur": 0.92, "gbp": 0.79},
+            "base": "usd",
+            "error": str(e)
+        }
+
+@api_router.get("/currency/config")
+async def get_currency_config():
+    """Get currency configuration"""
+    return {"currencies": CURRENCY_CONFIG}
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -1026,6 +1135,7 @@ class PaymentCheckoutRequest(BaseModel):
     origin_url: str
     customer_email: Optional[str] = None
     customer_name: Optional[str] = None
+    currency: Optional[str] = "usd"  # usd, brl, eur, gbp
 
 class ZelleOrderRequest(BaseModel):
     quote_id: str
@@ -1064,6 +1174,8 @@ class Partner(BaseModel):
     address_zip: Optional[str] = None
     address_country: Optional[str] = "USA"
     tax_id: Optional[str] = None  # EIN/CNPJ
+    # Estimated monthly volume
+    estimated_volume: Optional[str] = None  # e.g., "1-10", "11-50", "51-100", "100+"
     # Payment & Billing
     payment_plan: str = "pay_per_order"  # pay_per_order, biweekly, monthly
     default_payment_method: str = "zelle"  # zelle, card, invoice
@@ -1080,10 +1192,37 @@ class Partner(BaseModel):
     # Agreement
     agreed_to_terms: bool = False
     agreed_at: Optional[datetime] = None
+    # Welcome coupon notification
+    has_seen_welcome_coupon: bool = False  # True after partner sees the welcome coupon popup
+    welcome_coupon_code: Optional[str] = None  # Store the welcome coupon code for display
     # Dates
     created_at: datetime = Field(default_factory=datetime.utcnow)
     last_order_at: Optional[datetime] = None
     last_payment_at: Optional[datetime] = None
+
+# ==================== COUPON MODEL ====================
+class Coupon(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    code: str  # e.g., "WELCOME-ABC123" or "PROMO50"
+    partner_id: Optional[str] = None  # If tied to specific partner
+    # Discount details
+    discount_type: str = "certified_page"  # certified_page, percentage, fixed_amount
+    discount_value: float = 1.0  # 1 page, or percentage, or dollar amount
+    max_discount: Optional[float] = None  # Maximum discount in dollars
+    # Usage limits
+    max_uses: int = 1  # How many times can be used total
+    times_used: int = 0
+    # Validity
+    is_active: bool = True
+    valid_from: datetime = Field(default_factory=datetime.utcnow)
+    valid_until: Optional[datetime] = None
+    # Restrictions
+    min_order_value: float = 0.0  # Minimum order value to apply
+    first_order_only: bool = True  # Only valid for first order
+    # Tracking
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    used_at: Optional[datetime] = None
+    used_on_order_id: Optional[str] = None
 
 class PartnerCreate(BaseModel):
     company_name: str
@@ -1098,11 +1237,15 @@ class PartnerCreate(BaseModel):
     address_zip: Optional[str] = None
     address_country: Optional[str] = "USA"
     tax_id: Optional[str] = None
+    # Estimated monthly volume
+    estimated_volume: Optional[str] = None  # e.g., "1-10", "11-50", "51-100", "100+"
     # Payment preferences
     payment_plan: str = "pay_per_order"
     default_payment_method: str = "zelle"
     # Agreement
     agreed_to_terms: bool = False
+    # Referral tracking
+    referral_code: Optional[str] = None  # Salesperson referral code
 
 class PartnerLogin(BaseModel):
     email: EmailStr
@@ -1122,6 +1265,8 @@ class PartnerResponse(BaseModel):
     contact_name: str
     phone: Optional[str] = None
     token: str
+    has_seen_welcome_coupon: bool = False
+    welcome_coupon_code: Optional[str] = None
 
 # Admin User Models (with roles: admin, pm, translator)
 class AdminUser(BaseModel):
@@ -1316,6 +1461,64 @@ class TranslationOrderUpdate(BaseModel):
     document_type: Optional[str] = None
     total_price: Optional[float] = None
     base_price: Optional[float] = None
+    # Skip automatic email when using dedicated project email endpoint
+    skip_email: Optional[bool] = False
+    # Translator assignment status (Admin/PM can manually change pending to accepted)
+    translator_assignment_status: Optional[str] = None
+    # Reopen order for corrections
+    reopened_at: Optional[str] = None
+    reopened_for_corrections: Optional[bool] = None
+
+# Partner Invoice Models
+class PartnerInvoice(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    invoice_number: str = Field(default_factory=lambda: f"INV-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:6].upper()}")
+    partner_id: str
+    partner_company: str
+    partner_email: Optional[str] = None
+    # Order IDs included in this invoice
+    order_ids: List[str] = []
+    # Financial info
+    subtotal: float = 0.0
+    tax: float = 0.0
+    total_amount: float = 0.0
+    # Status
+    status: str = "pending"  # pending, paid, partial, overdue, cancelled
+    # Payment tracking
+    payment_method: Optional[str] = None  # stripe, zelle
+    stripe_session_id: Optional[str] = None
+    stripe_payment_intent: Optional[str] = None
+    zelle_receipt_id: Optional[str] = None
+    zelle_receipt_url: Optional[str] = None
+    amount_paid: float = 0.0
+    # Dates
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    due_date: Optional[datetime] = None
+    paid_at: Optional[datetime] = None
+    # Notes
+    notes: Optional[str] = None
+    admin_notes: Optional[str] = None
+    # QuickBooks integration
+    quickbooks_invoice_id: Optional[str] = None
+    quickbooks_invoice_number: Optional[str] = None
+    quickbooks_synced_at: Optional[datetime] = None
+    quickbooks_customer_id: Optional[str] = None
+    quickbooks_invoice_link: Optional[str] = None  # Payment link for partner
+
+class PartnerInvoiceCreate(BaseModel):
+    partner_id: str
+    order_ids: List[str]
+    due_days: int = 30  # Days until due
+    notes: Optional[str] = None
+
+class PartnerInvoicePayStripe(BaseModel):
+    invoice_id: str
+    origin_url: str
+    currency: Optional[str] = "usd"  # Support multi-currency (usd, brl, etc.)
+
+class PartnerInvoicePayZelle(BaseModel):
+    invoice_id: str
+    zelle_receipt_id: str
 
 # Manual Project Creation (by Admin)
 class ManualProjectCreate(BaseModel):
@@ -1417,6 +1620,8 @@ class CertificationVerifyResponse(BaseModel):
     document_type: Optional[str] = None
     source_language: Optional[str] = None
     target_language: Optional[str] = None
+    page_count: Optional[int] = None
+    order_number: Optional[str] = None
     certifier_name: Optional[str] = None
     certifier_title: Optional[str] = None
     certifier_credentials: Optional[str] = None
@@ -2242,8 +2447,8 @@ async def get_current_admin_user(token: str = None) -> Optional[dict]:
     # Fallback: check database for persisted token
     user = await db.admin_users.find_one({"token": token, "is_active": True})
     if user:
-        # Restore token to memory cache
-        active_admin_tokens[token] = {"user_id": user["id"], "role": user["role"]}
+        # Restore token to memory cache (including translator_type for in-house translators)
+        active_admin_tokens[token] = {"user_id": user["id"], "role": user["role"], "translator_type": user.get("translator_type")}
         return user
 
     return None
@@ -2273,14 +2478,29 @@ async def validate_admin_or_user_token(admin_key: str) -> dict:
 
     # Check if it's a valid user token in memory
     if admin_key in active_admin_tokens:
-        return {"role": active_admin_tokens[admin_key]["role"], "user_id": active_admin_tokens[admin_key]["user_id"], "is_master": False}
+        cached = active_admin_tokens[admin_key]
+        return {
+            "role": cached["role"],
+            "user_id": cached["user_id"],
+            "translator_type": cached.get("translator_type"),
+            "is_master": False
+        }
 
     # Check database for valid token
     user = await db.admin_users.find_one({"token": admin_key, "is_active": True})
     if user:
-        # Cache the token
-        active_admin_tokens[admin_key] = {"user_id": user["id"], "role": user["role"]}
-        return {"role": user["role"], "user_id": user["id"], "is_master": False}
+        # Cache the token (including translator_type)
+        active_admin_tokens[admin_key] = {
+            "user_id": user["id"],
+            "role": user["role"],
+            "translator_type": user.get("translator_type")
+        }
+        return {
+            "role": user["role"],
+            "user_id": user["id"],
+            "translator_type": user.get("translator_type"),
+            "is_master": False
+        }
 
     return None
 
@@ -2359,8 +2579,329 @@ def calculate_price(word_count: int, service_type: str, urgency: str) -> tuple[f
         urgency_fee = base_price * 1.00  # 100% of base price
     
     total_price = base_price + urgency_fee
-    
+
     return base_price, urgency_fee, total_price
+
+
+# ==================== PARTNER TIER SYSTEM ====================
+# Tier thresholds (pages per month) and discounts
+PARTNER_TIERS = {
+    "platinum": {"min_pages": 100, "discount": 0.35, "price_per_page": 16.24},
+    "gold": {"min_pages": 60, "discount": 0.25, "price_per_page": 18.74},
+    "silver": {"min_pages": 30, "discount": 0.15, "price_per_page": 21.24},
+    "bronze": {"min_pages": 10, "discount": 0.10, "price_per_page": 22.49},
+    "standard": {"min_pages": 0, "discount": 0.0, "price_per_page": 24.99}
+}
+
+
+async def get_partner_30day_volume(partner_id: str) -> dict:
+    """Calculate partner's total pages in the last 30 days"""
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+
+    # Aggregate pages from paid orders in the last 30 days
+    pipeline = [
+        {
+            "$match": {
+                "partner_id": partner_id,
+                "created_at": {"$gte": thirty_days_ago},
+                "payment_status": {"$in": ["paid", "pending", "pending_zelle"]}  # Include pending orders too
+            }
+        },
+        {
+            "$group": {
+                "_id": None,
+                "total_pages": {"$sum": {"$ifNull": ["$page_count", 1]}},
+                "total_orders": {"$sum": 1},
+                "paid_pages": {
+                    "$sum": {
+                        "$cond": [
+                            {"$eq": ["$payment_status", "paid"]},
+                            {"$ifNull": ["$page_count", 1]},
+                            0
+                        ]
+                    }
+                }
+            }
+        }
+    ]
+
+    result = await db.translation_orders.aggregate(pipeline).to_list(1)
+
+    if result:
+        return {
+            "total_pages": result[0].get("total_pages", 0),
+            "paid_pages": result[0].get("paid_pages", 0),
+            "total_orders": result[0].get("total_orders", 0),
+            "period_start": thirty_days_ago.isoformat(),
+            "period_end": datetime.utcnow().isoformat()
+        }
+
+    return {
+        "total_pages": 0,
+        "paid_pages": 0,
+        "total_orders": 0,
+        "period_start": thirty_days_ago.isoformat(),
+        "period_end": datetime.utcnow().isoformat()
+    }
+
+
+async def get_partner_monthly_volumes(partner_id: str) -> dict:
+    """Calculate partner's pages for each of the last 3 months separately"""
+    now = datetime.utcnow()
+
+    # Define the 3 month periods
+    month1_end = now
+    month1_start = now - timedelta(days=30)
+    month2_end = month1_start
+    month2_start = month1_start - timedelta(days=30)
+    month3_end = month2_start
+    month3_start = month2_start - timedelta(days=30)
+
+    async def get_volume_for_period(start: datetime, end: datetime) -> int:
+        pipeline = [
+            {
+                "$match": {
+                    "partner_id": partner_id,
+                    "created_at": {"$gte": start, "$lt": end},
+                    "payment_status": {"$in": ["paid", "pending", "pending_zelle"]}
+                }
+            },
+            {
+                "$group": {
+                    "_id": None,
+                    "total_pages": {"$sum": {"$ifNull": ["$page_count", 1]}}
+                }
+            }
+        ]
+        result = await db.translation_orders.aggregate(pipeline).to_list(1)
+        return result[0].get("total_pages", 0) if result else 0
+
+    # Get volumes for each month
+    month1_pages = await get_volume_for_period(month1_start, month1_end)
+    month2_pages = await get_volume_for_period(month2_start, month2_end)
+    month3_pages = await get_volume_for_period(month3_start, month3_end)
+
+    return {
+        "month1": {"pages": month1_pages, "start": month1_start.isoformat(), "end": month1_end.isoformat()},
+        "month2": {"pages": month2_pages, "start": month2_start.isoformat(), "end": month2_end.isoformat()},
+        "month3": {"pages": month3_pages, "start": month3_start.isoformat(), "end": month3_end.isoformat()},
+        "best_month_pages": max(month1_pages, month2_pages, month3_pages),
+        "total_3_months": month1_pages + month2_pages + month3_pages
+    }
+
+
+async def get_effective_partner_tier(partner: dict) -> dict:
+    """
+    Get the effective tier for a partner using the combined strategy:
+    1. Best tier from the last 3 months
+    2. Loyalty Lock: Partners with 6+ months never lose their achieved tier
+    """
+    partner_id = partner.get("id")
+    created_at = partner.get("created_at")
+    achieved_tier = partner.get("achieved_tier", "standard")
+
+    # Calculate months as partner
+    months_as_partner = 0
+    if created_at:
+        if isinstance(created_at, str):
+            created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+        days_as_partner = (datetime.utcnow() - created_at.replace(tzinfo=None)).days
+        months_as_partner = days_as_partner / 30
+
+    # Check Loyalty Lock (6+ months)
+    loyalty_lock_active = months_as_partner >= 6
+
+    # Get volumes for last 3 months
+    monthly_volumes = await get_partner_monthly_volumes(partner_id)
+    best_month_pages = monthly_volumes["best_month_pages"]
+
+    # Determine tier from best month in last 3 months
+    best_3month_tier = get_tier_from_volume(best_month_pages)
+
+    # Current month volume for display
+    current_volume = await get_partner_30day_volume(partner_id)
+    current_tier = get_tier_from_volume(current_volume["total_pages"])
+
+    # Apply Loyalty Lock if active
+    if loyalty_lock_active:
+        # Partner never loses their achieved tier
+        effective_tier = get_higher_tier(achieved_tier, best_3month_tier)
+        reason = f"Loyalty Lock active ({int(months_as_partner)} months as partner) - tier protected"
+    else:
+        # Use best tier from last 3 months
+        effective_tier = best_3month_tier
+        reason = f"Best tier from last 3 months ({best_month_pages} pages)"
+
+    # Update achieved tier if current effective is higher
+    if compare_tiers(effective_tier, achieved_tier) > 0:
+        await db.partners.update_one(
+            {"id": partner_id},
+            {
+                "$set": {
+                    "achieved_tier": effective_tier,
+                    "tier_achieved_at": datetime.utcnow()
+                }
+            }
+        )
+
+    return {
+        "effective_tier": effective_tier,
+        "current_volume_tier": current_tier,
+        "best_3month_tier": best_3month_tier,
+        "achieved_tier": achieved_tier,
+        "loyalty_lock_active": loyalty_lock_active,
+        "months_as_partner": round(months_as_partner, 1),
+        "monthly_volumes": monthly_volumes,
+        "current_volume": current_volume,
+        "reason": reason
+    }
+
+
+def get_tier_from_volume(pages: int) -> str:
+    """Determine partner tier based on monthly page volume"""
+    if pages >= PARTNER_TIERS["platinum"]["min_pages"]:
+        return "platinum"
+    elif pages >= PARTNER_TIERS["gold"]["min_pages"]:
+        return "gold"
+    elif pages >= PARTNER_TIERS["silver"]["min_pages"]:
+        return "silver"
+    elif pages >= PARTNER_TIERS["bronze"]["min_pages"]:
+        return "bronze"
+    return "standard"
+
+
+def get_tier_discount(tier: str) -> float:
+    """Get discount percentage for a tier (0.0 to 0.35)"""
+    return PARTNER_TIERS.get(tier, PARTNER_TIERS["standard"])["discount"]
+
+
+# Tier ranking for comparison (higher number = better tier)
+TIER_RANK = {"standard": 0, "bronze": 1, "silver": 2, "gold": 3, "platinum": 4}
+
+
+def compare_tiers(tier1: str, tier2: str) -> int:
+    """Compare two tiers. Returns: 1 if tier1 > tier2, -1 if tier1 < tier2, 0 if equal"""
+    rank1 = TIER_RANK.get(tier1, 0)
+    rank2 = TIER_RANK.get(tier2, 0)
+    if rank1 > rank2:
+        return 1
+    elif rank1 < rank2:
+        return -1
+    return 0
+
+
+def get_higher_tier(tier1: str, tier2: str) -> str:
+    """Return the higher of two tiers"""
+    if compare_tiers(tier1, tier2) >= 0:
+        return tier1
+    return tier2
+
+
+async def get_effective_tier_with_grace(partner: dict, volume_tier: str) -> dict:
+    """
+    Get the effective tier considering 1-month grace period.
+    If partner had a higher tier that's still within grace period, use that.
+    """
+    achieved_tier = partner.get("achieved_tier", "standard")
+    tier_valid_until = partner.get("tier_valid_until")
+
+    # Check if grace period is still active
+    grace_active = False
+    if tier_valid_until:
+        if isinstance(tier_valid_until, str):
+            tier_valid_until = datetime.fromisoformat(tier_valid_until.replace('Z', '+00:00'))
+        grace_active = datetime.utcnow() < tier_valid_until
+
+    # If grace period is active and achieved tier is higher, use it
+    if grace_active and compare_tiers(achieved_tier, volume_tier) > 0:
+        return {
+            "effective_tier": achieved_tier,
+            "volume_tier": volume_tier,
+            "grace_active": True,
+            "grace_until": tier_valid_until.isoformat() if tier_valid_until else None,
+            "reason": f"Grace period active until {tier_valid_until.strftime('%Y-%m-%d') if tier_valid_until else 'N/A'}"
+        }
+
+    # Otherwise use volume-based tier
+    return {
+        "effective_tier": volume_tier,
+        "volume_tier": volume_tier,
+        "grace_active": False,
+        "grace_until": None,
+        "reason": "Based on current 30-day volume"
+    }
+
+
+async def update_partner_achieved_tier(partner_id: str, new_tier: str):
+    """
+    Update partner's achieved tier if they reached a higher tier.
+    Sets grace period to 1 month from now.
+    """
+    partner = await db.partners.find_one({"id": partner_id})
+    if not partner:
+        return
+
+    current_achieved = partner.get("achieved_tier", "standard")
+
+    # Only update if new tier is higher than current achieved tier
+    if compare_tiers(new_tier, current_achieved) > 0:
+        grace_until = datetime.utcnow() + timedelta(days=30)
+        await db.partners.update_one(
+            {"id": partner_id},
+            {
+                "$set": {
+                    "achieved_tier": new_tier,
+                    "tier_achieved_at": datetime.utcnow(),
+                    "tier_valid_until": grace_until
+                }
+            }
+        )
+        logger.info(f"Partner {partner_id} upgraded to {new_tier} tier, valid until {grace_until}")
+    elif compare_tiers(new_tier, current_achieved) == 0:
+        # Same tier - extend grace period
+        grace_until = datetime.utcnow() + timedelta(days=30)
+        await db.partners.update_one(
+            {"id": partner_id},
+            {"$set": {"tier_valid_until": grace_until}}
+        )
+
+
+def get_tier_price_per_page(tier: str) -> float:
+    """Get price per page for a tier"""
+    return PARTNER_TIERS.get(tier, PARTNER_TIERS["standard"])["price_per_page"]
+
+
+def calculate_price_with_tier(word_count: int, service_type: str, urgency: str, tier: str = "standard") -> tuple[float, float, float, float]:
+    """Calculate pricing with tier discount applied"""
+
+    # Convert words to pages (250 words = 1 page) - round up to next page
+    pages = max(1, math.ceil(word_count / 250))
+
+    # Get tier-specific price per page for certified translations
+    if service_type == "standard":
+        price_per_page = get_tier_price_per_page(tier)
+        base_price = pages * price_per_page
+        discount_amount = pages * (24.99 - price_per_page)  # Savings from standard price
+    elif service_type == "professional":
+        # Professional translation doesn't have tier discounts
+        base_price = word_count * 0.075
+        discount_amount = 0
+    else:
+        price_per_page = get_tier_price_per_page(tier)
+        base_price = pages * price_per_page
+        discount_amount = pages * (24.99 - price_per_page)
+
+    # Urgency fees based on percentage of base price
+    urgency_fee = 0
+    if urgency == "priority":
+        urgency_fee = base_price * 0.25
+    elif urgency == "urgent":
+        urgency_fee = base_price * 1.00
+
+    total_price = base_price + urgency_fee
+
+    return base_price, urgency_fee, total_price, discount_amount
+
 
 def get_estimated_delivery(urgency: str) -> str:
     """Calculate estimated delivery date"""
@@ -2449,6 +2990,323 @@ def extract_tables_from_textract(blocks: list) -> list:
             })
 
     return tables
+
+
+def reconstruct_layout_html_from_textract(blocks: list, page_width: int = 800, page_height: int = 1100) -> str:
+    """
+    Reconstruct the original page layout from Textract blocks using HTML with CSS positioning.
+    This preserves the visual layout of the document by using absolute positioning.
+
+    Returns HTML that visually represents the document layout.
+    """
+    block_map = {block['Id']: block for block in blocks if 'Id' in block}
+
+    # Collect all elements with their positions
+    elements = []
+    table_regions = []  # Track table bounding boxes to avoid duplicating text
+
+    # First, identify table regions
+    for block in blocks:
+        if block['BlockType'] == 'TABLE':
+            bbox = block.get('Geometry', {}).get('BoundingBox', {})
+            if bbox:
+                table_regions.append({
+                    'top': bbox.get('Top', 0),
+                    'left': bbox.get('Left', 0),
+                    'width': bbox.get('Width', 0),
+                    'height': bbox.get('Height', 0),
+                    'bottom': bbox.get('Top', 0) + bbox.get('Height', 0),
+                    'right': bbox.get('Left', 0) + bbox.get('Width', 0)
+                })
+
+    def is_in_table_region(top, left):
+        """Check if a position is inside any table region"""
+        for tr in table_regions:
+            if (tr['top'] <= top <= tr['bottom'] and
+                tr['left'] <= left <= tr['right']):
+                return True
+        return False
+
+    # Process LINE blocks for text
+    for block in blocks:
+        if block['BlockType'] == 'LINE' and 'Geometry' in block:
+            bbox = block['Geometry']['BoundingBox']
+            top = bbox.get('Top', 0)
+            left = bbox.get('Left', 0)
+
+            # Skip lines inside table regions
+            if is_in_table_region(top, left):
+                continue
+
+            elements.append({
+                'type': 'text',
+                'text': block.get('Text', ''),
+                'top': top,
+                'left': left,
+                'width': bbox.get('Width', 0),
+                'height': bbox.get('Height', 0),
+                'confidence': block.get('Confidence', 100)
+            })
+
+    # Process TABLE blocks
+    for block in blocks:
+        if block['BlockType'] == 'TABLE':
+            bbox = block.get('Geometry', {}).get('BoundingBox', {})
+
+            # Find all cells for this table
+            cells = []
+            if 'Relationships' in block:
+                for rel in block['Relationships']:
+                    if rel['Type'] == 'CHILD':
+                        for child_id in rel['Ids']:
+                            child_block = block_map.get(child_id)
+                            if child_block and child_block['BlockType'] == 'CELL':
+                                cells.append(child_block)
+
+            if not cells:
+                continue
+
+            # Determine table dimensions
+            max_row = max(cell.get('RowIndex', 1) for cell in cells)
+            max_col = max(cell.get('ColumnIndex', 1) for cell in cells)
+
+            # Create table grid
+            table_grid = [['' for _ in range(max_col)] for _ in range(max_row)]
+
+            for cell in cells:
+                row_idx = cell.get('RowIndex', 1) - 1
+                col_idx = cell.get('ColumnIndex', 1) - 1
+
+                # Get cell text
+                cell_text = ''
+                if 'Relationships' in cell:
+                    for rel in cell['Relationships']:
+                        if rel['Type'] == 'CHILD':
+                            for child_id in rel['Ids']:
+                                child_block = block_map.get(child_id)
+                                if child_block and child_block['BlockType'] == 'WORD':
+                                    cell_text += child_block.get('Text', '') + ' '
+
+                if row_idx < max_row and col_idx < max_col:
+                    table_grid[row_idx][col_idx] = cell_text.strip()
+
+            # Build HTML table
+            table_html = '<table style="border-collapse: collapse; width: 100%; font-size: inherit;">\n'
+            for row_idx, row in enumerate(table_grid):
+                table_html += '  <tr>\n'
+                for col_idx, cell_text in enumerate(row):
+                    tag = 'th' if row_idx == 0 else 'td'
+                    style = 'border: 1px solid #666; padding: 4px 8px; text-align: left;'
+                    if row_idx == 0:
+                        style += ' background-color: #e8e8e8; font-weight: bold;'
+                    table_html += f'    <{tag} style="{style}">{cell_text}</{tag}>\n'
+                table_html += '  </tr>\n'
+            table_html += '</table>'
+
+            elements.append({
+                'type': 'table',
+                'html': table_html,
+                'top': bbox.get('Top', 0),
+                'left': bbox.get('Left', 0),
+                'width': bbox.get('Width', 1),
+                'height': bbox.get('Height', 0)
+            })
+
+    # Sort elements by vertical position then horizontal
+    elements.sort(key=lambda x: (x['top'], x['left']))
+
+    # Build HTML output with visual positioning
+    html_parts = []
+    html_parts.append(f'''<div style="position: relative; width: 100%; min-height: {page_height}px; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.4; background: white; padding: 20px; box-sizing: border-box;">''')
+
+    for elem in elements:
+        top_px = int(elem['top'] * page_height)
+        left_px = int(elem['left'] * page_width)
+        width_percent = elem['width'] * 100
+
+        if elem['type'] == 'text':
+            # Text element with absolute positioning
+            html_parts.append(
+                f'<div style="position: absolute; top: {top_px}px; left: {left_px}px; '
+                f'white-space: nowrap;">{elem["text"]}</div>'
+            )
+        elif elem['type'] == 'table':
+            # Table with calculated width
+            table_width_px = int(elem['width'] * page_width)
+            html_parts.append(
+                f'<div style="position: absolute; top: {top_px}px; left: {left_px}px; '
+                f'width: {table_width_px}px;">{elem["html"]}</div>'
+            )
+
+    html_parts.append('</div>')
+
+    return '\n'.join(html_parts)
+
+
+def reconstruct_layout_text_from_textract(blocks: list, page_width_chars: int = 100) -> str:
+    """
+    Reconstruct the original page layout from Textract blocks as plain text.
+    Uses bounding box coordinates to preserve spatial positioning with spaces.
+    Better for text-only output with maintained positioning.
+    """
+    block_map = {block['Id']: block for block in blocks if 'Id' in block}
+
+    # Collect table regions to avoid duplicating text
+    table_regions = []
+    for block in blocks:
+        if block['BlockType'] == 'TABLE':
+            bbox = block.get('Geometry', {}).get('BoundingBox', {})
+            if bbox:
+                table_regions.append({
+                    'top': bbox.get('Top', 0),
+                    'left': bbox.get('Left', 0),
+                    'bottom': bbox.get('Top', 0) + bbox.get('Height', 0),
+                    'right': bbox.get('Left', 0) + bbox.get('Width', 0)
+                })
+
+    def is_in_table(top, left):
+        for tr in table_regions:
+            if (tr['top'] - 0.01 <= top <= tr['bottom'] + 0.01 and
+                tr['left'] - 0.01 <= left <= tr['right'] + 0.01):
+                return True
+        return False
+
+    # Collect all lines with positions
+    lines = []
+    for block in blocks:
+        if block['BlockType'] == 'LINE' and 'Geometry' in block:
+            bbox = block['Geometry']['BoundingBox']
+            top = bbox.get('Top', 0)
+            left = bbox.get('Left', 0)
+
+            if not is_in_table(top, left):
+                lines.append({
+                    'text': block.get('Text', ''),
+                    'top': top,
+                    'left': left
+                })
+
+    # Collect tables
+    tables = []
+    for block in blocks:
+        if block['BlockType'] == 'TABLE':
+            bbox = block.get('Geometry', {}).get('BoundingBox', {})
+
+            cells = []
+            if 'Relationships' in block:
+                for rel in block['Relationships']:
+                    if rel['Type'] == 'CHILD':
+                        for child_id in rel['Ids']:
+                            child_block = block_map.get(child_id)
+                            if child_block and child_block['BlockType'] == 'CELL':
+                                cells.append(child_block)
+
+            if cells:
+                max_row = max(cell.get('RowIndex', 1) for cell in cells)
+                max_col = max(cell.get('ColumnIndex', 1) for cell in cells)
+
+                # Calculate column widths
+                col_widths = [15] * max_col  # Default width
+                table_grid = [['' for _ in range(max_col)] for _ in range(max_row)]
+
+                for cell in cells:
+                    row_idx = cell.get('RowIndex', 1) - 1
+                    col_idx = cell.get('ColumnIndex', 1) - 1
+
+                    cell_text = ''
+                    if 'Relationships' in cell:
+                        for rel in cell['Relationships']:
+                            if rel['Type'] == 'CHILD':
+                                for child_id in rel['Ids']:
+                                    child_block = block_map.get(child_id)
+                                    if child_block and child_block['BlockType'] == 'WORD':
+                                        cell_text += child_block.get('Text', '') + ' '
+
+                    cell_text = cell_text.strip()
+                    if row_idx < max_row and col_idx < max_col:
+                        table_grid[row_idx][col_idx] = cell_text
+                        col_widths[col_idx] = max(col_widths[col_idx], len(cell_text) + 2)
+
+                # Build text table
+                table_lines = []
+                separator = '+' + '+'.join(['-' * w for w in col_widths]) + '+'
+                table_lines.append(separator)
+
+                for row_idx, row in enumerate(table_grid):
+                    row_text = '|'
+                    for col_idx, cell_text in enumerate(row):
+                        row_text += cell_text.ljust(col_widths[col_idx]) + '|'
+                    table_lines.append(row_text)
+                    if row_idx == 0:
+                        table_lines.append(separator)
+
+                table_lines.append(separator)
+
+                tables.append({
+                    'text': '\n'.join(table_lines),
+                    'top': bbox.get('Top', 0)
+                })
+
+    # Sort all elements by position
+    all_elements = []
+    for line in lines:
+        all_elements.append({'type': 'line', 'top': line['top'], 'left': line['left'], 'text': line['text']})
+    for table in tables:
+        all_elements.append({'type': 'table', 'top': table['top'], 'left': 0, 'text': table['text']})
+
+    all_elements.sort(key=lambda x: (round(x['top'], 2), x['left']))
+
+    # Group by rows (similar Y position)
+    row_threshold = 0.015
+    output_rows = []
+    current_row_elements = []
+    current_top = None
+
+    for elem in all_elements:
+        if elem['type'] == 'table':
+            # Tables are added as their own "row"
+            if current_row_elements:
+                output_rows.append({'elements': current_row_elements, 'is_table': False})
+                current_row_elements = []
+                current_top = None
+            output_rows.append({'elements': [elem], 'is_table': True})
+        else:
+            if current_top is None:
+                current_top = elem['top']
+                current_row_elements = [elem]
+            elif abs(elem['top'] - current_top) <= row_threshold:
+                current_row_elements.append(elem)
+            else:
+                if current_row_elements:
+                    output_rows.append({'elements': current_row_elements, 'is_table': False})
+                current_row_elements = [elem]
+                current_top = elem['top']
+
+    if current_row_elements:
+        output_rows.append({'elements': current_row_elements, 'is_table': False})
+
+    # Build output
+    output_lines = []
+    for row in output_rows:
+        if row['is_table']:
+            output_lines.append(row['elements'][0]['text'])
+        else:
+            elements = sorted(row['elements'], key=lambda x: x['left'])
+            if len(elements) == 1:
+                indent = int(elements[0]['left'] * page_width_chars)
+                indent = min(indent, 50)
+                output_lines.append(' ' * indent + elements[0]['text'])
+            else:
+                line_chars = [' '] * page_width_chars
+                for elem in elements:
+                    start_pos = int(elem['left'] * page_width_chars)
+                    for i, char in enumerate(elem['text']):
+                        pos = start_pos + i
+                        if pos < page_width_chars:
+                            line_chars[pos] = char
+                output_lines.append(''.join(line_chars).rstrip())
+
+    return '\n'.join(output_lines)
 
 
 def reconstruct_layout_from_textract(blocks: list, page_width_chars: int = 120, include_tables: bool = True) -> str:
@@ -2565,7 +3423,7 @@ def reconstruct_layout_from_textract(blocks: list, page_width_chars: int = 120, 
     return '\n'.join(output_parts)
 
 
-def extract_text_with_textract(content: bytes, file_extension: str, preserve_layout: bool = True, detect_tables: bool = True) -> str:
+def extract_text_with_textract(content: bytes, file_extension: str, preserve_layout: bool = True, detect_tables: bool = True) -> dict:
     """
     Extract text using AWS Textract (best quality OCR) with layout preservation and table support.
 
@@ -2574,6 +3432,9 @@ def extract_text_with_textract(content: bytes, file_extension: str, preserve_lay
         file_extension: File extension (jpg, png, pdf, etc.)
         preserve_layout: Whether to preserve document layout
         detect_tables: Whether to detect and format tables (uses analyze_document instead of detect_document_text)
+
+    Returns:
+        dict with 'text' (plain text) and 'html' (HTML with visual layout) or None if Textract unavailable
     """
     if not textract_client:
         return None
@@ -2594,26 +3455,32 @@ def extract_text_with_textract(content: bytes, file_extension: str, preserve_lay
                     Document={'Bytes': content}
                 )
 
-            # Extract text - try layout preservation first, fallback to simple extraction
+            blocks = response.get('Blocks', [])
+
+            # Generate HTML with visual layout (best for preserving document appearance)
+            html = reconstruct_layout_html_from_textract(blocks)
+
+            # Generate plain text with layout preservation
             text = ""
             if preserve_layout:
-                text = reconstruct_layout_from_textract(response.get('Blocks', []), include_tables=detect_tables)
+                text = reconstruct_layout_text_from_textract(blocks)
 
             # Fallback to simple extraction if layout reconstruction returned empty
             if not text or len(text.strip()) < 10:
                 text_parts = []
-                for block in response.get('Blocks', []):
+                for block in blocks:
                     if block['BlockType'] == 'LINE':
                         text_parts.append(block['Text'])
                 text = '\n'.join(text_parts)
                 logger.info(f"AWS Textract: layout reconstruction empty, using simple extraction")
 
             logger.info(f"AWS Textract extracted {len(text)} characters from image (tables: {detect_tables})")
-            return text
+            return {'text': text, 'html': html}
 
         # For PDFs, convert pages to images first
         elif file_extension == 'pdf':
             all_pages_text = []
+            all_pages_html = []
             TEXTRACT_MAX_SIZE = 5 * 1024 * 1024  # 5MB max for Textract
             try:
                 pdf_document = fitz.open(stream=content, filetype="pdf")
@@ -2653,15 +3520,21 @@ def extract_text_with_textract(content: bytes, file_extension: str, preserve_lay
                             Document={'Bytes': img_data}
                         )
 
-                    # Extract text - try layout preservation first, fallback to simple extraction
+                    blocks = response.get('Blocks', [])
+
+                    # Generate HTML for this page
+                    page_html = reconstruct_layout_html_from_textract(blocks)
+                    all_pages_html.append(f'<div style="margin-bottom: 20px; border-bottom: 2px dashed #ccc; padding-bottom: 20px;"><h4 style="color: #666; margin-bottom: 10px;">--- Page {page_num + 1} ---</h4>{page_html}</div>')
+
+                    # Generate plain text for this page
                     page_text = ""
                     if preserve_layout:
-                        page_text = reconstruct_layout_from_textract(response.get('Blocks', []), include_tables=detect_tables)
+                        page_text = reconstruct_layout_text_from_textract(blocks)
 
                     # Fallback to simple extraction if layout reconstruction returned empty
                     if not page_text or len(page_text.strip()) < 5:
                         page_text = ""
-                        for block in response.get('Blocks', []):
+                        for block in blocks:
                             if block['BlockType'] == 'LINE':
                                 page_text += block['Text'] + '\n'
 
@@ -2672,8 +3545,9 @@ def extract_text_with_textract(content: bytes, file_extension: str, preserve_lay
                 pdf_document.close()
 
                 text = '\n\n'.join(all_pages_text)
+                html = '\n'.join(all_pages_html)
                 logger.info(f"AWS Textract extracted {len(text)} characters from PDF ({num_pages} pages, layout: {preserve_layout}, tables: {detect_tables})")
-                return text
+                return {'text': text, 'html': html}
 
             except Exception as e:
                 logger.warning(f"Textract PDF processing failed: {e}")
@@ -2751,9 +3625,9 @@ async def extract_text_from_file(file: UploadFile) -> str:
             # Try AWS Textract first (best quality)
             if textract_client:
                 logger.info("Using AWS Textract for image OCR...")
-                text = extract_text_with_textract(content, file_extension)
-                if text and len(text.strip()) > 10:
-                    return text
+                textract_result = extract_text_with_textract(content, file_extension)
+                if textract_result and textract_result.get('text') and len(textract_result['text'].strip()) > 10:
+                    return textract_result['text']
                 logger.info("Textract returned insufficient text, trying Tesseract...")
             else:
                 logger.info("AWS Textract not configured, using Tesseract directly...")
@@ -2815,9 +3689,9 @@ async def extract_text_from_file(file: UploadFile) -> str:
             # Method 3: PDF is likely image-based - use AWS Textract (best quality)
             if textract_client:
                 logger.info("PDF appears to be image-based. Using AWS Textract...")
-                textract_text = extract_text_with_textract(content, file_extension)
-                if textract_text and len(textract_text.strip()) > 10:
-                    return textract_text
+                textract_result = extract_text_with_textract(content, file_extension)
+                if textract_result and textract_result.get('text') and len(textract_result['text'].strip()) > 10:
+                    return textract_result['text']
                 logger.info("Textract returned insufficient text, trying Tesseract...")
 
             # Method 4: Fallback to Tesseract OCR with multi-config
@@ -3024,49 +3898,75 @@ async def get_word_count(text: str = Form(...)):
 # Stripe Payment Integration
 @api_router.post("/create-payment-checkout")
 async def create_payment_checkout(request: PaymentCheckoutRequest):
-    """Create a Stripe checkout session"""
-    
+    """Create a Stripe checkout session with multi-currency support"""
+
     try:
         # Get quote
         quote = await db.translation_quotes.find_one({"id": request.quote_id})
         if not quote:
             raise HTTPException(status_code=404, detail="Quote not found")
-        
+
+        # Get currency configuration
+        currency = request.currency.lower() if request.currency else "usd"
+        if currency not in CURRENCY_CONFIG:
+            currency = "usd"
+
+        currency_info = CURRENCY_CONFIG[currency]
+
+        # Calculate amount in target currency
+        base_price_usd = quote["total_price"]
+        if currency != "usd":
+            # Get exchange rates
+            rates_response = await get_exchange_rates()
+            rates = rates_response.get("rates", {"usd": 1.0, "brl": 5.0, "eur": 0.92, "gbp": 0.79})
+            exchange_rate = rates.get(currency, 1.0)
+            amount_in_currency = base_price_usd * exchange_rate
+        else:
+            amount_in_currency = base_price_usd
+
         # Create payment transaction record
         transaction = PaymentTransaction(
             session_id="",  # Will be updated with Stripe session ID
             quote_id=request.quote_id,
-            amount=quote["total_price"],
-            currency="usd",
+            amount=amount_in_currency,
+            currency=currency,
             payment_status="pending",
             status="initiated"
         )
-        
+
         # Get customer email from request or quote
         customer_email = request.customer_email or quote.get("customer_email")
 
+        # Get payment methods for this currency
+        payment_methods = currency_info["payment_methods"]
+
         # Create Stripe checkout session
         checkout_params = {
-            'payment_method_types': ['card'],
+            'payment_method_types': payment_methods,
             'line_items': [{
                 'price_data': {
-                    'currency': 'usd',
+                    'currency': currency,
                     'product_data': {
                         'name': f'Translation Service - {quote["service_type"].title()}',
                         'description': f'From {quote["translate_from"]} to {quote["translate_to"]} - {quote["word_count"]} words',
                     },
-                    'unit_amount': int(quote["total_price"] * 100),  # Stripe expects cents
+                    'unit_amount': int(amount_in_currency * 100),  # Stripe expects cents/centavos
                 },
                 'quantity': 1,
             }],
             'mode': 'payment',
+            'allow_promotion_codes': True,  # Enable Stripe coupons/promotion codes
             'success_url': f"{request.origin_url}?payment_success=true&session_id={{CHECKOUT_SESSION_ID}}#/customer",
             'cancel_url': f"{request.origin_url}?payment_cancelled=true#/customer",
             'metadata': {
                 'quote_id': request.quote_id,
                 'transaction_id': transaction.id,
                 'customer_email': customer_email or '',
-                'customer_name': request.customer_name or quote.get("customer_name", '')
+                'customer_name': request.customer_name or quote.get("customer_name", ''),
+                'original_currency': 'usd',
+                'original_amount': str(base_price_usd),
+                'charged_currency': currency,
+                'charged_amount': str(amount_in_currency)
             }
         }
 
@@ -3371,29 +4271,90 @@ async def stripe_webhook(request: Request):
         if event['type'] == 'checkout.session.completed':
             session = event['data']['object']
             session_id = session['id']
+            metadata = session.get('metadata', {})
 
             logger.info(f"Processing checkout.session.completed for session: {session_id}")
 
-            # Update payment status
-            result = await db.payment_transactions.update_one(
-                {"session_id": session_id},
-                {
-                    "$set": {
-                        "status": "completed",
-                        "payment_status": "paid",
-                        "updated_at": datetime.utcnow()
+            # Check if this is a partner invoice payment
+            if metadata.get('type') == 'partner_invoice':
+                invoice_id = metadata.get('invoice_id')
+                logger.info(f"Processing partner invoice payment for invoice: {invoice_id}")
+
+                # Update invoice status
+                invoice = await db.partner_invoices.find_one({"id": invoice_id})
+                if invoice:
+                    await db.partner_invoices.update_one(
+                        {"id": invoice_id},
+                        {"$set": {
+                            "status": "paid",
+                            "payment_method": "stripe",
+                            "stripe_payment_intent": session.get('payment_intent'),
+                            "amount_paid": invoice.get("total_amount", 0),
+                            "paid_at": datetime.utcnow()
+                        }}
+                    )
+
+                    # Count orders that weren't already paid (to update partner stats)
+                    unpaid_order_count = await db.translation_orders.count_documents({
+                        "id": {"$in": invoice.get("order_ids", [])},
+                        "payment_status": {"$ne": "paid"}
+                    })
+
+                    # Update associated orders to paid
+                    await db.translation_orders.update_many(
+                        {"id": {"$in": invoice.get("order_ids", [])}},
+                        {"$set": {"payment_status": "paid", "payment_date": datetime.utcnow()}}
+                    )
+
+                    # Increment partner's total_paid_orders counter
+                    if unpaid_order_count > 0 and invoice.get("partner_id"):
+                        await db.partners.update_one(
+                            {"id": invoice["partner_id"]},
+                            {"$inc": {"total_paid_orders": unpaid_order_count}}
+                        )
+
+                    # Create admin notification for Stripe payment
+                    admin_notification = {
+                        "id": str(uuid.uuid4()),
+                        "type": "invoice_stripe_paid",
+                        "title": "Invoice Paid via Stripe",
+                        "message": f"Partner {invoice.get('partner_company')} paid invoice {invoice.get('invoice_number')} via card - ${invoice.get('total_amount', 0):.2f}",
+                        "invoice_id": invoice_id,
+                        "invoice_number": invoice.get("invoice_number"),
+                        "partner_id": invoice.get("partner_id"),
+                        "partner_company": invoice.get("partner_company"),
+                        "amount": invoice.get("total_amount", 0),
+                        "payment_method": "stripe",
+                        "is_read": False,
+                        "created_at": datetime.utcnow()
                     }
-                }
-            )
+                    await db.admin_notifications.insert_one(admin_notification)
 
-            if result.matched_count == 0:
-                logger.warning(f"No transaction found for session_id: {session_id}")
+                    logger.info(f"Successfully processed invoice payment: {invoice.get('invoice_number')}")
+                else:
+                    logger.warning(f"Invoice not found for payment: {invoice_id}")
+            else:
+                # Regular payment transaction
+                # Update payment status
+                result = await db.payment_transactions.update_one(
+                    {"session_id": session_id},
+                    {
+                        "$set": {
+                            "status": "completed",
+                            "payment_status": "paid",
+                            "updated_at": datetime.utcnow()
+                        }
+                    }
+                )
 
-            # Get transaction and handle success
-            transaction = await db.payment_transactions.find_one({"session_id": session_id})
-            if transaction:
-                await handle_successful_payment(session_id, transaction)
-                logger.info(f"Successfully processed payment for session: {session_id}")
+                if result.matched_count == 0:
+                    logger.warning(f"No transaction found for session_id: {session_id}")
+
+                # Get transaction and handle success
+                transaction = await db.payment_transactions.find_one({"session_id": session_id})
+                if transaction:
+                    await handle_successful_payment(session_id, transaction, metadata)
+                    logger.info(f"Successfully processed payment for session: {session_id}")
         else:
             logger.info(f"Received unhandled webhook event type: {event['type']}")
 
@@ -3410,21 +4371,74 @@ async def stripe_webhook(request: Request):
         logger.error(f"Unexpected error handling webhook: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-async def handle_successful_payment(session_id: str, payment_transaction: dict):
-    """Handle successful payment by sending confirmation emails and creating Protemos project"""
-    
+async def handle_successful_payment(session_id: str, payment_transaction: dict, stripe_metadata: dict = None):
+    """Handle successful payment by creating order, sending confirmation emails, and creating Protemos project"""
+
     try:
         # Get quote details
         quote_id = payment_transaction.get("quote_id")
         quote = await db.translation_quotes.find_one({"id": quote_id})
-        
+
         if not quote:
             logger.error(f"Quote not found for payment session: {session_id}")
             return
-        
-        # Prepare order details for email
+
+        # Get customer info from quote, with Stripe metadata as fallback
+        stripe_metadata = stripe_metadata or {}
+        customer_email = quote.get("customer_email") or stripe_metadata.get("customer_email")
+        customer_name = quote.get("customer_name") or stripe_metadata.get("customer_name") or "Valued Customer"
+
+        # Generate order number with P prefix (like P6377) to match admin panel format
+        order_count = await db.translation_orders.count_documents({})
+        order_number = f"P{order_count + 6001}"
+
+        # Create the actual order record in translation_orders (visible in admin Projects)
+        order = {
+            "id": str(uuid.uuid4()),
+            "order_number": order_number,
+            "quote_id": quote_id,
+            "session_id": session_id,
+            "partner_id": "website",
+            "client_name": customer_name,
+            "client_email": customer_email or "",
+            "document_type": quote.get("reference", "Document"),
+            "service_type": quote.get("service_type"),
+            "translate_from": quote.get("translate_from"),
+            "translate_to": quote.get("translate_to"),
+            "word_count": quote.get("word_count", 0),
+            "page_count": max(1, math.ceil(quote.get("word_count", 0) / 250)),
+            "urgency": quote.get("urgency"),
+            "notes": quote.get("notes") or f"Website order - Stripe payment",
+            "base_price": quote.get("base_price"),
+            "urgency_fee": quote.get("urgency_fee"),
+            "total_price": quote.get("total_price"),
+            "discount_amount": quote.get("discount_amount", 0),
+            "discount_code": quote.get("discount_code"),
+            "payment_status": "paid",
+            "payment_method": "stripe",
+            "translation_status": "In Progress",
+            "source": "website",
+            "revenue_source": "website",
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
+        }
+
+        # Insert order into translation_orders (admin Projects collection)
+        await db.translation_orders.insert_one(order)
+        logger.info(f"Created order {order_number} for session {session_id}")
+
+        # Link documents to the order
+        document_ids = quote.get("document_ids", [])
+        if document_ids:
+            await db.documents.update_many(
+                {"id": {"$in": document_ids}},
+                {"$set": {"order_id": order["id"], "order_number": order_number}}
+            )
+            logger.info(f"Linked {len(document_ids)} documents to order {order_number}")
+
+        # Prepare order details for email (now includes customer_name)
         order_details = {
-            "reference": quote.get("reference"),
+            "reference": order_number,
             "service_type": quote.get("service_type"),
             "translate_from": quote.get("translate_from"),
             "translate_to": quote.get("translate_to"),
@@ -3434,30 +4448,55 @@ async def handle_successful_payment(session_id: str, payment_transaction: dict):
             "base_price": quote.get("base_price"),
             "urgency_fee": quote.get("urgency_fee"),
             "total_price": quote.get("total_price"),
-            "client_email": "partner@legacytranslations.com"  # Default for partner portal
+            "client_name": customer_name,
+            "customer_name": customer_name,
+            "client_email": customer_email or "contact@legacytranslations.com",
+            "customer_email": customer_email
         }
-        
+
         # Create project in Protemos
         try:
             protemos_response = await protemos_client.create_project(order_details)
             logger.info(f"Created Protemos project for session {session_id}: {protemos_response.get('id')}")
-            
+
             # Update payment transaction with Protemos project ID
             await db.payment_transactions.update_one(
                 {"session_id": session_id},
                 {
                     "$set": {
                         "protemos_project_id": protemos_response.get("id"),
-                        "protemos_status": protemos_response.get("status", "created")
+                        "protemos_status": protemos_response.get("status", "created"),
+                        "order_id": order["id"],
+                        "order_number": order_number
                     }
                 }
             )
-            
+
+            # Also update the order with Protemos project ID
+            await db.translation_orders.update_one(
+                {"id": order["id"]},
+                {"$set": {"protemos_project_id": protemos_response.get("id")}}
+            )
+
         except Exception as e:
             logger.error(f"Failed to create Protemos project for session {session_id}: {str(e)}")
             # Don't fail the entire process if Protemos fails
-        
-        # Send confirmation email to company
+
+        # Send confirmation email to customer (if email available)
+        if customer_email:
+            try:
+                await email_service.send_order_confirmation_email(
+                    customer_email,
+                    order_details,
+                    is_partner=True
+                )
+                logger.info(f"Sent order confirmation to customer: {customer_email}")
+            except Exception as e:
+                logger.error(f"Failed to send customer confirmation email: {str(e)}")
+        else:
+            logger.warning(f"No customer email found for session {session_id} - email not sent to customer")
+
+        # Send confirmation email to company (always)
         try:
             await email_service.send_order_confirmation_email(
                 "contact@legacytranslations.com",
@@ -3467,9 +4506,9 @@ async def handle_successful_payment(session_id: str, payment_transaction: dict):
             logger.info(f"Sent order confirmation to company for session: {session_id}")
         except Exception as e:
             logger.error(f"Failed to send company confirmation email: {str(e)}")
-        
-        logger.info(f"Successfully processed payment for session: {session_id}")
-        
+
+        logger.info(f"Successfully processed payment for session: {session_id}, order: {order_number}")
+
     except Exception as e:
         logger.error(f"Error handling successful payment for session {session_id}: {str(e)}")
 
@@ -3488,6 +4527,7 @@ async def create_protemos_project(request: ProtemosProjectRequest):
             raise HTTPException(status_code=404, detail="Quote not found")
         
         # Prepare order details for Protemos
+        customer_email = quote.get("customer_email")
         order_details = {
             "reference": quote.get("reference"),
             "service_type": quote.get("service_type"),
@@ -3499,7 +4539,7 @@ async def create_protemos_project(request: ProtemosProjectRequest):
             "base_price": quote.get("base_price"),
             "urgency_fee": quote.get("urgency_fee"),
             "total_price": quote.get("total_price"),
-            "client_email": "partner@legacytranslations.com"
+            "client_email": customer_email or "contact@legacytranslations.com"
         }
         
         # Create project in Protemos
@@ -3867,6 +4907,8 @@ async def register_partner(partner_data: PartnerCreate):
             address_zip=partner_data.address_zip,
             address_country=partner_data.address_country,
             tax_id=partner_data.tax_id,
+            # Estimated volume
+            estimated_volume=partner_data.estimated_volume,
             # Payment settings
             payment_plan=partner_data.payment_plan,
             default_payment_method=partner_data.default_payment_method,
@@ -3883,6 +4925,69 @@ async def register_partner(partner_data: PartnerCreate):
         token = generate_token()
         active_tokens[token] = partner.id
 
+        # Generate WELCOME coupon for new partner (1 free certified page)
+        coupon_suffix = secrets.token_hex(3).upper()  # 6 character random suffix
+        welcome_coupon = Coupon(
+            code=f"WELCOME-{coupon_suffix}",
+            partner_id=partner.id,
+            discount_type="certified_page",
+            discount_value=1.0,  # 1 free certified page
+            max_uses=1,
+            first_order_only=True,
+            valid_until=datetime.utcnow() + timedelta(days=30)  # Valid for 30 days
+        )
+        await db.coupons.insert_one(welcome_coupon.dict())
+
+        # Store the welcome coupon code in the partner record for first login popup
+        await db.partners.update_one(
+            {"id": partner.id},
+            {"$set": {"welcome_coupon_code": welcome_coupon.code}}
+        )
+
+        # Send welcome email with coupon code
+        try:
+            welcome_subject = f"Welcome to Legacy Translations, {partner.contact_name}!"
+            welcome_content = f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <img src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png" alt="Legacy Translations" style="max-width: 180px; margin-bottom: 20px;">
+
+                <h2 style="color: #0d9488;">Welcome to Legacy Translations!</h2>
+
+                <p>Dear {partner.contact_name},</p>
+
+                <p>Thank you for registering <strong>{partner.company_name}</strong> as a business partner. We're excited to have you on board!</p>
+
+                <div style="background: linear-gradient(135deg, #0d9488 0%, #0891b2 100%); color: white; padding: 25px; border-radius: 12px; margin: 25px 0; text-align: center;">
+                    <p style="margin: 0 0 10px 0; font-size: 14px;">🎁 YOUR WELCOME GIFT</p>
+                    <p style="margin: 0 0 15px 0; font-size: 24px; font-weight: bold;">1 FREE Certified Translation Page</p>
+                    <div style="background: white; color: #0d9488; padding: 12px 25px; border-radius: 8px; display: inline-block; font-size: 20px; font-weight: bold; letter-spacing: 2px;">
+                        {welcome_coupon.code}
+                    </div>
+                    <p style="margin: 15px 0 0 0; font-size: 12px; opacity: 0.9;">Valid for 30 days • Use on your first order</p>
+                </div>
+
+                <h3 style="color: #374151;">How to use your coupon:</h3>
+                <ol style="color: #6b7280; line-height: 1.8;">
+                    <li>Log in to your <a href="https://portal.legacytranslations.com/#/partner/login" style="color: #0d9488;">Partner Portal</a></li>
+                    <li>Create a new order</li>
+                    <li>Enter the coupon code at checkout</li>
+                    <li>Enjoy your free certified translation!</li>
+                </ol>
+
+                <p style="color: #6b7280; margin-top: 25px;">
+                    If you have any questions, feel free to reply to this email or use the chat in your portal.
+                </p>
+
+                <p style="color: #374151;">
+                    Best regards,<br>
+                    <strong>The Legacy Translations Team</strong>
+                </p>
+            </div>
+            """
+            await send_email(partner.email, welcome_subject, welcome_content)
+        except Exception as email_error:
+            logger.warning(f"Failed to send welcome email: {email_error}")
+
         # Send notification email to admin if invoice plan requested
         if needs_approval:
             try:
@@ -3895,6 +5000,7 @@ async def register_partner(partner_data: PartnerCreate):
                         <p><strong>Contact:</strong> {partner.contact_name}</p>
                         <p><strong>Email:</strong> {partner.email}</p>
                         <p><strong>Phone:</strong> {partner.phone or 'Not provided'}</p>
+                        <p><strong>Estimated Monthly Volume:</strong> {partner.estimated_volume or 'Not specified'} pages/month</p>
                         <p><strong>Payment Plan Requested:</strong> <span style="color: #dc2626; font-weight: bold;">{partner.payment_plan.replace('_', ' ').title()}</span></p>
                         <p><strong>Preferred Payment Method:</strong> {partner.default_payment_method.title()}</p>
                         {f'<p><strong>Address:</strong> {partner.address_street}, {partner.address_city}, {partner.address_state} {partner.address_zip}</p>' if partner.address_street else ''}
@@ -3908,6 +5014,47 @@ async def register_partner(partner_data: PartnerCreate):
                 await send_email("contact@legacytranslations.com", admin_subject, admin_content)
             except Exception as email_error:
                 logger.error(f"Failed to send admin notification: {email_error}")
+
+        # Handle referral code - auto-create acquisition for salesperson
+        if partner_data.referral_code:
+            try:
+                salesperson = await db.salespeople.find_one({
+                    "referral_code": partner_data.referral_code.upper(),
+                    "status": "active"
+                })
+                if salesperson:
+                    # Create acquisition record
+                    acquisition = {
+                        "id": str(uuid.uuid4())[:8],
+                        "salesperson_id": salesperson["id"],
+                        "partner_id": partner.id,
+                        "partner_name": partner.company_name,
+                        "partner_tier": "bronze",  # New partners start as bronze
+                        "acquisition_date": datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d"),
+                        "commission_paid": 0,
+                        "commission_status": "pending",
+                        "partner_monthly_sales": 0,
+                        "notes": f"Auto-registered via referral link (code: {partner_data.referral_code.upper()})",
+                        "created_at": datetime.now(ZoneInfo("America/New_York")).isoformat(),
+                        "approved_at": None,
+                        "paid_at": None
+                    }
+                    await db.partner_acquisitions.insert_one(acquisition)
+
+                    # Update partner record to track referral source
+                    await db.partners.update_one(
+                        {"id": partner.id},
+                        {"$set": {
+                            "referred_by_salesperson_id": salesperson["id"],
+                            "referred_by_salesperson_name": salesperson["name"],
+                            "referral_code_used": partner_data.referral_code.upper()
+                        }}
+                    )
+
+                    logger.info(f"Partner {partner.company_name} registered via referral from {salesperson['name']}")
+            except Exception as ref_error:
+                logger.error(f"Error processing referral: {ref_error}")
+                # Don't fail registration if referral processing fails
 
         return PartnerResponse(
             id=partner.id,
@@ -3960,7 +5107,9 @@ async def login_partner(login_data: PartnerLogin):
             email=partner["email"],
             contact_name=partner["contact_name"],
             phone=partner.get("phone"),
-            token=token
+            token=token,
+            has_seen_welcome_coupon=partner.get("has_seen_welcome_coupon", False),
+            welcome_coupon_code=partner.get("welcome_coupon_code")
         )
 
     except HTTPException:
@@ -3975,6 +5124,33 @@ async def logout_partner(token: str):
     if token in active_tokens:
         del active_tokens[token]
     return {"status": "success", "message": "Logged out successfully"}
+
+@api_router.get("/partner/verify-token")
+async def verify_partner_token(token: str):
+    """Verify if a partner token is valid and not expired"""
+    try:
+        partner = await get_current_partner(token)
+        if not partner:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+        return {
+            "valid": True,
+            "partner": {
+                "id": partner["id"],
+                "company_name": partner["company_name"],
+                "email": partner["email"],
+                "contact_name": partner["contact_name"],
+                "phone": partner.get("phone"),
+                "token": token,
+                "has_seen_welcome_coupon": partner.get("has_seen_welcome_coupon", False),
+                "welcome_coupon_code": partner.get("welcome_coupon_code")
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error verifying partner token: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to verify token")
 
 # Store for password reset tokens (token -> {email, expires})
 password_reset_tokens = {}
@@ -4088,6 +5264,580 @@ async def get_current_partner_info(token: str):
         "phone": partner.get("phone")
     }
 
+# ==================== COUPON SYSTEM ====================
+
+# Price for one certified page (used for WELCOME coupon discount calculation)
+CERTIFIED_PAGE_PRICE = 24.99  # $24.99 per certified page
+
+@api_router.get("/partner/coupons")
+async def get_partner_coupons(token: str):
+    """Get all coupons available for the logged-in partner (assigned coupons only)"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    # Get coupons specifically assigned to this partner
+    coupons = await db.coupons.find({
+        "partner_id": partner["id"],
+        "is_active": True
+    }).to_list(100)
+
+    # Filter out expired and fully used coupons
+    now = datetime.utcnow()
+    available_coupons = []
+    for c in coupons:
+        # Check if expired
+        if c.get("valid_until") and now > c["valid_until"]:
+            continue
+        # Check if fully used
+        if c.get("times_used", 0) >= c.get("max_uses", 1):
+            continue
+        # Check first order restriction
+        if c.get("first_order_only", False):
+            partner_orders = await db.translation_orders.count_documents({"partner_id": partner["id"]})
+            if partner_orders > 0:
+                continue
+
+        available_coupons.append({
+            "code": c["code"],
+            "discount_type": c["discount_type"],
+            "discount_value": c["discount_value"],
+            "times_used": c.get("times_used", 0),
+            "max_uses": c["max_uses"],
+            "valid_until": c.get("valid_until"),
+            "description": get_coupon_description(c)
+        })
+
+    return available_coupons
+
+def get_coupon_description(coupon: dict) -> str:
+    """Generate human-readable description for a coupon"""
+    if coupon["discount_type"] == "percentage":
+        return f"{int(coupon['discount_value'])}% off"
+    elif coupon["discount_type"] == "fixed_amount":
+        return f"${coupon['discount_value']:.2f} off"
+    elif coupon["discount_type"] == "certified_page":
+        pages = int(coupon["discount_value"])
+        return f"{pages} free page{'s' if pages > 1 else ''}"
+    return "Discount"
+
+@api_router.post("/partner/validate-coupon")
+async def validate_coupon(token: str, code: str, order_total: float = 0):
+    """Validate a coupon code and return discount details"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    # Find coupon (case-insensitive)
+    coupon = await db.coupons.find_one({
+        "code": {"$regex": f"^{code}$", "$options": "i"},
+        "is_active": True
+    })
+
+    if not coupon:
+        raise HTTPException(status_code=404, detail="Invalid coupon code")
+
+    # Check if coupon belongs to this partner (if partner-specific)
+    if coupon.get("partner_id") and coupon["partner_id"] != partner["id"]:
+        raise HTTPException(status_code=400, detail="This coupon is not valid for your account")
+
+    # Check usage limits
+    if coupon["times_used"] >= coupon["max_uses"]:
+        raise HTTPException(status_code=400, detail="This coupon has already been used")
+
+    # Check validity dates
+    now = datetime.utcnow()
+    if coupon.get("valid_until") and now > coupon["valid_until"]:
+        raise HTTPException(status_code=400, detail="This coupon has expired")
+
+    # Check first order only restriction
+    if coupon.get("first_order_only", False):
+        partner_orders = await db.translation_orders.count_documents({"partner_id": partner["id"]})
+        if partner_orders > 0:
+            raise HTTPException(status_code=400, detail="This coupon is only valid for your first order")
+
+    # Check minimum order value
+    if order_total < coupon.get("min_order_value", 0):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Minimum order value of ${coupon['min_order_value']:.2f} required for this coupon"
+        )
+
+    # Calculate discount
+    discount_amount = 0.0
+    discount_description = ""
+
+    if coupon["discount_type"] == "certified_page":
+        # 1 certified page free = $35 discount
+        discount_amount = CERTIFIED_PAGE_PRICE * coupon["discount_value"]
+        discount_description = f"{int(coupon['discount_value'])} certified page(s) FREE"
+    elif coupon["discount_type"] == "percentage":
+        discount_amount = order_total * (coupon["discount_value"] / 100)
+        discount_description = f"{coupon['discount_value']}% off"
+    elif coupon["discount_type"] == "fixed_amount":
+        discount_amount = coupon["discount_value"]
+        discount_description = f"${coupon['discount_value']:.2f} off"
+
+    # Apply max discount cap if set
+    if coupon.get("max_discount") and discount_amount > coupon["max_discount"]:
+        discount_amount = coupon["max_discount"]
+
+    # Don't exceed order total
+    if order_total > 0:
+        discount_amount = min(discount_amount, order_total)
+
+    return {
+        "valid": True,
+        "code": coupon["code"],
+        "discount_type": coupon["discount_type"],
+        "discount_amount": round(discount_amount, 2),
+        "discount_description": discount_description,
+        "message": f"Coupon applied: {discount_description}"
+    }
+
+@api_router.post("/partner/apply-coupon")
+async def apply_coupon_to_order(token: str, code: str, order_id: str):
+    """Mark a coupon as used on an order"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    # Find and validate coupon
+    coupon = await db.coupons.find_one({
+        "code": {"$regex": f"^{code}$", "$options": "i"},
+        "is_active": True
+    })
+
+    if not coupon:
+        raise HTTPException(status_code=404, detail="Invalid coupon code")
+
+    if coupon["times_used"] >= coupon["max_uses"]:
+        raise HTTPException(status_code=400, detail="Coupon already used")
+
+    # Mark coupon as used
+    await db.coupons.update_one(
+        {"id": coupon["id"]},
+        {"$set": {
+            "times_used": coupon["times_used"] + 1,
+            "used_at": datetime.utcnow(),
+            "used_on_order_id": order_id
+        }}
+    )
+
+    return {"success": True, "message": "Coupon applied successfully"}
+
+@api_router.post("/partner/dismiss-welcome-coupon")
+async def dismiss_welcome_coupon(token: str):
+    """Mark the welcome coupon popup as seen by the partner"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    # Update the partner to mark welcome coupon as seen
+    await db.partners.update_one(
+        {"id": partner["id"]},
+        {"$set": {"has_seen_welcome_coupon": True}}
+    )
+
+    return {"success": True, "message": "Welcome coupon dismissed"}
+
+# ==================== ADMIN COUPON MANAGEMENT ====================
+
+class CouponCreate(BaseModel):
+    code: str
+    discount_type: str = "percentage"  # percentage, fixed_amount, certified_page
+    discount_value: float  # percentage (e.g., 5 for 5%), dollar amount, or pages
+    max_uses: int = 9999  # How many times can be used
+    valid_days: int = 365  # Valid for X days from now
+    min_order_value: float = 0.0  # Minimum order value
+    first_order_only: bool = False  # Only for first orders
+    partner_id: Optional[str] = None  # Specific partner or None for all
+
+@api_router.post("/admin/coupons/create")
+async def create_coupon(coupon_data: CouponCreate, admin_key: str):
+    """Create a new coupon (admin only)"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Check if coupon code already exists
+    existing = await db.coupons.find_one({"code": {"$regex": f"^{coupon_data.code}$", "$options": "i"}})
+    if existing:
+        raise HTTPException(status_code=400, detail="Coupon code already exists")
+
+    coupon = Coupon(
+        code=coupon_data.code,
+        discount_type=coupon_data.discount_type,
+        discount_value=coupon_data.discount_value,
+        max_uses=coupon_data.max_uses,
+        valid_until=datetime.utcnow() + timedelta(days=coupon_data.valid_days),
+        min_order_value=coupon_data.min_order_value,
+        first_order_only=coupon_data.first_order_only,
+        partner_id=coupon_data.partner_id
+    )
+
+    await db.coupons.insert_one(coupon.dict())
+
+    return {
+        "success": True,
+        "coupon": {
+            "id": coupon.id,
+            "code": coupon.code,
+            "discount_type": coupon.discount_type,
+            "discount_value": coupon.discount_value,
+            "max_uses": coupon.max_uses,
+            "valid_until": coupon.valid_until.isoformat()
+        }
+    }
+
+@api_router.get("/admin/coupons")
+async def list_all_coupons(admin_key: str):
+    """List all coupons (admin only) - auto-creates default templates if none exist"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Check if we need to create default coupon templates
+    existing_templates = await db.coupons.count_documents({"partner_id": None})
+    if existing_templates == 0:
+        # Create default MASS coupon templates
+        default_coupons = [
+            {"code": "MASS5", "discount_value": 5.0, "first_order_only": False},
+            {"code": "MASS10", "discount_value": 10.0, "first_order_only": False},
+            {"code": "MASS15", "discount_value": 15.0, "first_order_only": False},
+            {"code": "MASS20", "discount_value": 20.0, "first_order_only": False},
+            {"code": "MASS25", "discount_value": 25.0, "first_order_only": False},
+            {"code": "MASS30", "discount_value": 30.0, "first_order_only": False},
+            {"code": "MASS35", "discount_value": 35.0, "first_order_only": False},
+            {"code": "WELCOME100", "discount_value": 100.0, "first_order_only": True},  # 100% off first order only
+        ]
+        for coupon_data in default_coupons:
+            coupon = {
+                "id": str(uuid.uuid4()),
+                "code": coupon_data["code"],
+                "discount_type": "percentage",
+                "discount_value": coupon_data["discount_value"],
+                "max_uses": 9999,
+                "times_used": 0,
+                "is_active": True,
+                "valid_from": datetime.utcnow(),
+                "valid_until": datetime.utcnow() + timedelta(days=365 * 5),
+                "min_order_value": 0.0,
+                "first_order_only": coupon_data.get("first_order_only", False),
+                "partner_id": None,
+                "created_at": datetime.utcnow()
+            }
+            await db.coupons.insert_one(coupon)
+        logger.info("Created default coupon templates including WELCOME100")
+
+    coupons = await db.coupons.find().to_list(500)
+
+    return [{
+        "id": c["id"],
+        "code": c["code"],
+        "discount_type": c["discount_type"],
+        "discount_value": c["discount_value"],
+        "times_used": c.get("times_used", 0),
+        "max_uses": c["max_uses"],
+        "valid_until": c.get("valid_until"),
+        "is_active": c.get("is_active", True),
+        "partner_id": c.get("partner_id"),
+        "first_order_only": c.get("first_order_only", False)
+    } for c in coupons]
+
+@api_router.delete("/admin/coupons/{coupon_id}")
+async def delete_coupon(coupon_id: str, admin_key: str):
+    """Delete/deactivate a coupon (admin only)"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    result = await db.coupons.update_one(
+        {"id": coupon_id},
+        {"$set": {"is_active": False}}
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Coupon not found")
+
+    return {"success": True, "message": "Coupon deactivated"}
+
+class AssignCouponRequest(BaseModel):
+    coupon_code: str  # The coupon code to assign (e.g., "MASS10")
+    partner_id: str   # The partner to assign it to
+    max_uses: int = 1  # How many times this partner can use it
+
+@api_router.post("/admin/coupons/assign")
+async def assign_coupon_to_partner(request: AssignCouponRequest, admin_key: str):
+    """Assign a coupon to a specific partner (creates a partner-specific instance)"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Find the template coupon (the master coupon to copy from)
+    template_coupon = await db.coupons.find_one({
+        "code": {"$regex": f"^{request.coupon_code}$", "$options": "i"},
+        "partner_id": None  # Must be a global/template coupon
+    })
+
+    if not template_coupon:
+        raise HTTPException(status_code=404, detail=f"Coupon template '{request.coupon_code}' not found")
+
+    # Verify partner exists
+    partner = await db.partners.find_one({"id": request.partner_id})
+    if not partner:
+        raise HTTPException(status_code=404, detail="Partner not found")
+
+    # Check if this partner already has this coupon assigned
+    existing = await db.coupons.find_one({
+        "code": template_coupon["code"],
+        "partner_id": request.partner_id,
+        "is_active": True
+    })
+
+    if existing:
+        raise HTTPException(status_code=400, detail=f"Partner already has coupon '{request.coupon_code}' assigned")
+
+    # Create partner-specific coupon
+    partner_coupon = Coupon(
+        code=template_coupon["code"],
+        partner_id=request.partner_id,
+        discount_type=template_coupon["discount_type"],
+        discount_value=template_coupon["discount_value"],
+        max_uses=request.max_uses,
+        valid_until=template_coupon.get("valid_until") or (datetime.utcnow() + timedelta(days=365)),
+        min_order_value=template_coupon.get("min_order_value", 0),
+        first_order_only=template_coupon.get("first_order_only", False)
+    )
+
+    await db.coupons.insert_one(partner_coupon.dict())
+
+    return {
+        "success": True,
+        "message": f"Coupon '{request.coupon_code}' assigned to {partner['company_name']}",
+        "coupon_id": partner_coupon.id
+    }
+
+@api_router.get("/admin/partners/list")
+async def list_partners_for_admin(admin_key: str):
+    """List all partners (for coupon assignment dropdown)"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    partners = await db.partners.find({"is_active": True}).to_list(500)
+
+    return [{
+        "id": p["id"],
+        "company_name": p["company_name"],
+        "email": p["email"],
+        "contact_name": p.get("contact_name", "")
+    } for p in partners]
+
+@api_router.get("/admin/partners/{partner_id}/coupons")
+async def get_partner_assigned_coupons(partner_id: str, admin_key: str):
+    """Get all coupons assigned to a specific partner (admin view)"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    coupons = await db.coupons.find({
+        "partner_id": partner_id,
+        "is_active": True
+    }).to_list(100)
+
+    return [{
+        "id": c["id"],
+        "code": c["code"],
+        "discount_type": c["discount_type"],
+        "discount_value": c["discount_value"],
+        "times_used": c.get("times_used", 0),
+        "max_uses": c["max_uses"],
+        "valid_until": c.get("valid_until")
+    } for c in coupons]
+
+# ==================== PARTNER CREDIT QUALIFICATION ====================
+
+CREDIT_QUALIFICATION_MIN_TRANSLATIONS = 10  # Minimum paid translations to qualify for biweekly invoice
+
+@api_router.get("/partner/credit-qualification")
+async def get_partner_credit_qualification(token: str):
+    """Check if partner qualifies for invoice payment plans"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    total_paid_orders = partner.get("total_paid_orders", 0)
+    current_plan = partner.get("payment_plan", "pay_per_order")
+    plan_approved = partner.get("payment_plan_approved", False)
+
+    # Calculate qualification status
+    qualifies = total_paid_orders >= CREDIT_QUALIFICATION_MIN_TRANSLATIONS
+    orders_remaining = max(0, CREDIT_QUALIFICATION_MIN_TRANSLATIONS - total_paid_orders)
+
+    # Check if upgrade is pending
+    upgrade_pending = partner.get("payment_plan_upgrade_requested", False)
+    requested_plan = partner.get("requested_payment_plan")
+
+    return {
+        "current_plan": current_plan,
+        "plan_approved": plan_approved,
+        "qualifies_for_invoice": qualifies,
+        "total_paid_orders": total_paid_orders,
+        "orders_required": CREDIT_QUALIFICATION_MIN_TRANSLATIONS,
+        "orders_remaining": orders_remaining,
+        "upgrade_pending": upgrade_pending,
+        "requested_plan": requested_plan
+    }
+
+
+@api_router.get("/partner/tier-info")
+async def get_partner_tier_info(token: str):
+    """Get partner's effective tier using best of last 3 months + Loyalty Lock"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    # Get effective tier using new strategy
+    tier_result = await get_effective_partner_tier(partner)
+    effective_tier = tier_result["effective_tier"]
+    tier_info = PARTNER_TIERS[effective_tier]
+
+    # Current 30-day volume for display
+    current_volume = tier_result["current_volume"]
+    total_pages = current_volume["total_pages"]
+
+    # Calculate progress to next tier
+    next_tier = None
+    pages_to_next_tier = 0
+    if effective_tier == "standard":
+        next_tier = "bronze"
+        pages_to_next_tier = PARTNER_TIERS["bronze"]["min_pages"] - total_pages
+    elif effective_tier == "bronze":
+        next_tier = "silver"
+        pages_to_next_tier = PARTNER_TIERS["silver"]["min_pages"] - total_pages
+    elif effective_tier == "silver":
+        next_tier = "gold"
+        pages_to_next_tier = PARTNER_TIERS["gold"]["min_pages"] - total_pages
+    elif effective_tier == "gold":
+        next_tier = "platinum"
+        pages_to_next_tier = PARTNER_TIERS["platinum"]["min_pages"] - total_pages
+
+    # Get all tiers info for display
+    tiers_info = []
+    for tier_name, tier_data in [("bronze", PARTNER_TIERS["bronze"]),
+                                  ("silver", PARTNER_TIERS["silver"]),
+                                  ("gold", PARTNER_TIERS["gold"]),
+                                  ("platinum", PARTNER_TIERS["platinum"])]:
+        tiers_info.append({
+            "name": tier_name,
+            "min_pages": tier_data["min_pages"],
+            "max_pages": PARTNER_TIERS.get({
+                "bronze": "silver",
+                "silver": "gold",
+                "gold": "platinum"
+            }.get(tier_name, "platinum"), {}).get("min_pages", None),
+            "discount_percent": int(tier_data["discount"] * 100),
+            "price_per_page": tier_data["price_per_page"],
+            "is_current": tier_name == effective_tier
+        })
+
+    # Calculate monthly savings at current tier
+    standard_price = 24.99
+    current_price = tier_info["price_per_page"]
+    savings_per_page = standard_price - current_price
+    monthly_savings = savings_per_page * total_pages
+
+    return {
+        "current_tier": effective_tier,
+        "discount_percent": int(tier_info["discount"] * 100),
+        "price_per_page": tier_info["price_per_page"],
+        "standard_price": 24.99,
+        "volume_stats": current_volume,
+        "next_tier": next_tier,
+        "pages_to_next_tier": max(0, pages_to_next_tier),
+        "next_tier_discount": int(PARTNER_TIERS.get(next_tier, {}).get("discount", 0) * 100) if next_tier else None,
+        "monthly_savings": round(monthly_savings, 2),
+        "tiers": tiers_info,
+        # New fields for transparency
+        "tier_strategy": {
+            "current_volume_tier": tier_result["current_volume_tier"],
+            "best_3month_tier": tier_result["best_3month_tier"],
+            "achieved_tier": tier_result["achieved_tier"],
+            "loyalty_lock_active": tier_result["loyalty_lock_active"],
+            "months_as_partner": tier_result["months_as_partner"],
+            "reason": tier_result["reason"]
+        },
+        "monthly_volumes": tier_result["monthly_volumes"]
+    }
+
+
+@api_router.post("/partner/request-payment-upgrade")
+async def request_payment_plan_upgrade(token: str, plan: str):
+    """Request upgrade to invoice payment plan (biweekly or monthly)"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    # Validate requested plan
+    if plan not in ["biweekly", "monthly"]:
+        raise HTTPException(status_code=400, detail="Invalid payment plan. Must be 'biweekly' or 'monthly'")
+
+    # Check qualification
+    total_paid_orders = partner.get("total_paid_orders", 0)
+    if total_paid_orders < CREDIT_QUALIFICATION_MIN_TRANSLATIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Not yet qualified. Complete {CREDIT_QUALIFICATION_MIN_TRANSLATIONS - total_paid_orders} more paid translations to qualify."
+        )
+
+    # Check if already on invoice plan
+    current_plan = partner.get("payment_plan", "pay_per_order")
+    if current_plan in ["biweekly", "monthly"] and partner.get("payment_plan_approved", False):
+        raise HTTPException(status_code=400, detail="Already on an invoice payment plan")
+
+    # Update partner with upgrade request
+    await db.partners.update_one(
+        {"id": partner["id"]},
+        {"$set": {
+            "payment_plan_upgrade_requested": True,
+            "requested_payment_plan": plan,
+            "upgrade_requested_at": datetime.utcnow().isoformat()
+        }}
+    )
+
+    # Send email notification to admin
+    plan_name = "Biweekly Invoice" if plan == "biweekly" else "Monthly Invoice"
+    try:
+        email_html = f"""
+        <h2>Payment Plan Upgrade Request</h2>
+        <p>A partner has requested to upgrade their payment plan:</p>
+        <ul>
+            <li><strong>Company:</strong> {partner.get('company_name')}</li>
+            <li><strong>Contact:</strong> {partner.get('contact_name')}</li>
+            <li><strong>Email:</strong> {partner.get('email')}</li>
+            <li><strong>Current Plan:</strong> Pay Per Order</li>
+            <li><strong>Requested Plan:</strong> {plan_name}</li>
+            <li><strong>Total Paid Orders:</strong> {total_paid_orders}</li>
+            <li><strong>Total Revenue:</strong> ${partner.get('total_revenue', 0):.2f}</li>
+        </ul>
+        <p>Please review and approve/deny this request in the admin panel.</p>
+        """
+
+        await send_email(
+            to_email="contact@legacytranslations.com",
+            subject=f"Payment Plan Upgrade Request - {partner.get('company_name')}",
+            html_content=email_html
+        )
+    except Exception as e:
+        logger.warning(f"Failed to send upgrade request email: {e}")
+
+    return {
+        "success": True,
+        "message": f"Upgrade request submitted. An admin will review your request for {plan_name}.",
+        "requested_plan": plan
+    }
+
 # ==================== ADMIN USER AUTHENTICATION ====================
 
 @api_router.get("/admin/auth/verify")
@@ -4166,11 +5916,15 @@ async def register_admin_user(user_data: AdminUserCreate, admin_key: str):
         invite_token = secrets.token_urlsafe(32)
         expires = datetime.utcnow() + timedelta(days=7)  # 7 days to accept invitation
 
-        admin_invitation_tokens[invite_token] = {
+        # Store token in MongoDB (persistent storage) instead of in-memory
+        await db.admin_invitation_tokens.delete_many({"email": user_data.email})  # Remove any existing tokens
+        await db.admin_invitation_tokens.insert_one({
+            "token": invite_token,
             "email": user_data.email,
             "user_id": user.id,
-            "expires": expires
-        }
+            "expires": expires,
+            "created_at": datetime.utcnow()
+        })
 
         # Send invitation email
         frontend_url = os.environ.get('FRONTEND_URL', 'https://legacy-portal-frontend.onrender.com')
@@ -4298,7 +6052,7 @@ async def login_admin_user(login_data: AdminUserLogin, request: Request):
 
         # Generate token
         token = generate_token()
-        active_admin_tokens[token] = {"user_id": user["id"], "role": user["role"]}
+        active_admin_tokens[token] = {"user_id": user["id"], "role": user["role"], "translator_type": user.get("translator_type")}
 
         # Also save token to database for persistence across server restarts
         await db.admin_users.update_one(
@@ -4428,14 +6182,14 @@ async def admin_reset_password(request: AdminResetPassword):
 async def accept_admin_invitation(request: AdminInvitationAccept):
     """Accept invitation and set password for new admin user"""
     try:
-        # Check if token exists and is valid
-        token_data = admin_invitation_tokens.get(request.token)
+        # Check MongoDB for token (persistent storage)
+        token_data = await db.admin_invitation_tokens.find_one({"token": request.token})
 
         if not token_data:
             raise HTTPException(status_code=400, detail="Invalid or expired invitation link")
 
         if datetime.utcnow() > token_data["expires"]:
-            del admin_invitation_tokens[request.token]
+            await db.admin_invitation_tokens.delete_one({"token": request.token})
             raise HTTPException(status_code=400, detail="Invitation link has expired")
 
         # Get user to check role
@@ -4499,8 +6253,8 @@ async def accept_admin_invitation(request: AdminInvitationAccept):
         if result.modified_count == 0:
             raise HTTPException(status_code=400, detail="Failed to set up account")
 
-        # Remove used token
-        del admin_invitation_tokens[request.token]
+        # Remove used token from MongoDB
+        await db.admin_invitation_tokens.delete_one({"token": request.token})
 
         # Get user info for response
         user = await db.admin_users.find_one({"email": email})
@@ -4525,13 +6279,14 @@ async def accept_admin_invitation(request: AdminInvitationAccept):
 @api_router.get("/admin/auth/verify-invitation")
 async def verify_invitation_token(token: str):
     """Verify if an invitation token is valid"""
-    token_data = admin_invitation_tokens.get(token)
+    # Check MongoDB for token (persistent storage)
+    token_data = await db.admin_invitation_tokens.find_one({"token": token})
 
     if not token_data:
         raise HTTPException(status_code=400, detail="Invalid invitation link")
 
     if datetime.utcnow() > token_data["expires"]:
-        del admin_invitation_tokens[token]
+        await db.admin_invitation_tokens.delete_one({"token": token})
         raise HTTPException(status_code=400, detail="Invitation link has expired")
 
     # Get user info
@@ -4577,20 +6332,21 @@ async def resend_invitation(request: ResendInvitationRequest, admin_key: str):
         if not target_user.get("invitation_pending", False):
             raise HTTPException(status_code=400, detail="User has already accepted their invitation")
 
-        # Remove any existing invitation tokens for this email
-        tokens_to_remove = [k for k, v in admin_invitation_tokens.items() if v.get("email") == target_user["email"]]
-        for token in tokens_to_remove:
-            del admin_invitation_tokens[token]
+        # Remove any existing invitation tokens for this email from MongoDB
+        await db.admin_invitation_tokens.delete_many({"email": target_user["email"]})
 
         # Generate new invitation token
         invite_token = secrets.token_urlsafe(32)
         expires = datetime.utcnow() + timedelta(days=7)
 
-        admin_invitation_tokens[invite_token] = {
+        # Store new token in MongoDB (persistent storage)
+        await db.admin_invitation_tokens.insert_one({
+            "token": invite_token,
             "email": target_user["email"],
             "user_id": target_user["id"],
-            "expires": expires
-        }
+            "expires": expires,
+            "created_at": datetime.utcnow()
+        })
 
         # Send invitation email
         frontend_url = os.environ.get('FRONTEND_URL', 'https://legacy-portal-frontend.onrender.com')
@@ -5366,13 +7122,21 @@ async def request_revision(submission_id: str, admin_key: str, reason: str = "")
 @api_router.get("/admin/payments/translators")
 async def get_translators_payment_summary(admin_key: str):
     """Get payment summary for all translators (admin only)"""
-    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
-    if not is_valid:
-        user = await get_current_admin_user(admin_key)
-        if user and user.get("role") == "admin":
-            is_valid = True
-    if not is_valid:
-        raise HTTPException(status_code=401, detail="Admin access required")
+    # Use validate_admin_or_user_token for consistent authentication
+    logger.info(f"Pay Vendors request - admin_key present: {bool(admin_key)}, length: {len(admin_key) if admin_key else 0}")
+    user_info = await validate_admin_or_user_token(admin_key)
+    logger.info(f"Pay Vendors - user_info: {user_info}")
+    if not user_info:
+        logger.warning("Pay Vendors - Token validation failed")
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Check if user has admin role (case-insensitive)
+    user_role = user_info.get("role", "").lower()
+    is_master = user_info.get("is_master", False)
+    logger.info(f"Pay Vendors - role: '{user_role}', is_master: {is_master}")
+    if user_role != "admin" and not is_master:
+        logger.warning(f"Pay Vendors - Access denied: role='{user_role}', is_master={is_master}")
+        raise HTTPException(status_code=403, detail=f"Admin access required. Your role: {user_role}")
 
     try:
         # Get ALL users - show everyone regardless of is_active status
@@ -5383,13 +7147,19 @@ async def get_translators_payment_summary(admin_key: str):
 
         result = []
         for translator in all_users:
-            payments = await db.translator_payments.find({"translator_id": translator["id"]}).sort("payment_date", -1).to_list(100)
+            # Handle both "id" field and MongoDB "_id" for backwards compatibility
+            translator_id = translator.get("id") or str(translator.get("_id", ""))
+            if not translator_id:
+                logger.warning(f"Skipping user without valid ID: {translator.get('email', 'unknown')}")
+                continue
+
+            payments = await db.translator_payments.find({"translator_id": translator_id}).sort("payment_date", -1).to_list(100)
             total_paid = sum(p.get("amount", 0) for p in payments)
             rate_per_page = translator.get("rate_per_page", 0) or 0
             pages_pending = translator.get("pages_pending_payment", 0) or 0
             pending_amount = rate_per_page * pages_pending
             result.append({
-                "translator_id": translator["id"],
+                "translator_id": translator_id,
                 "name": translator.get("name", ""),
                 "email": translator.get("email", ""),
                 "role": translator.get("role", "translator"),
@@ -5414,13 +7184,11 @@ async def get_translators_payment_summary(admin_key: str):
 @api_router.get("/admin/payments/translator/{translator_id}")
 async def get_translator_payment_history(translator_id: str, admin_key: str):
     """Get payment history for a specific translator (admin only)"""
-    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
-    if not is_valid:
-        user = await get_current_admin_user(admin_key)
-        if user and user.get("role") == "admin":
-            is_valid = True
-    if not is_valid:
-        raise HTTPException(status_code=401, detail="Admin access required")
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+    if user_info.get("role", "").lower() != "admin" and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Admin access required")
 
     try:
         # Include all vendor roles: translator, admin, pm, sales
@@ -5478,13 +7246,11 @@ async def register_payment(
     receipt_file: UploadFile = File(None)
 ):
     """Register a payment made to a vendor/contractor (admin only)"""
-    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
-    if not is_valid:
-        user = await get_current_admin_user(admin_key)
-        if user and user.get("role") == "admin":
-            is_valid = True
-    if not is_valid:
-        raise HTTPException(status_code=401, detail="Admin access required")
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+    if user_info.get("role", "").lower() != "admin" and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Admin access required")
 
     try:
         # Find user (translator, sales, or any role)
@@ -5550,13 +7316,12 @@ async def register_payment(
 @api_router.post("/admin/payments/add-pages")
 async def add_translator_pages(admin_key: str, translator_id: str = Body(...), pages: int = Body(...), order_id: str = Body(""), notes: str = Body("")):
     """Add pages to a translator's pending payment count (admin only)"""
-    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
-    if not is_valid:
-        user = await get_current_admin_user(admin_key)
-        if user and user.get("role") == "admin":
-            is_valid = True
-    if not is_valid:
-        raise HTTPException(status_code=401, detail="Admin access required")
+    # Use consistent authentication pattern
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+    if user_info.get("role", "").lower() != "admin" and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Admin access required")
 
     try:
         # Include all vendor roles: translator, admin, pm, sales
@@ -5577,13 +7342,12 @@ async def add_translator_pages(admin_key: str, translator_id: str = Body(...), p
 @api_router.get("/admin/payments/report")
 async def get_payment_report(admin_key: str, start_date: str = None, end_date: str = None):
     """Get payment report with totals (admin only)"""
-    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
-    if not is_valid:
-        user = await get_current_admin_user(admin_key)
-        if user and user.get("role") == "admin":
-            is_valid = True
-    if not is_valid:
-        raise HTTPException(status_code=401, detail="Admin access required")
+    # Use consistent authentication pattern
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+    if user_info.get("role", "").lower() != "admin" and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Admin access required")
 
     try:
         query = {}
@@ -5812,11 +7576,18 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
         if not partner:
             raise HTTPException(status_code=401, detail="Invalid or expired token")
 
-        # Calculate pricing
-        base_price, urgency_fee, total_price = calculate_price(
+        # Get effective tier using best of last 3 months + Loyalty Lock
+        tier_result = await get_effective_partner_tier(partner)
+        effective_tier = tier_result["effective_tier"]
+        tier_discount = get_tier_discount(effective_tier)
+        volume_stats = tier_result["current_volume"]
+
+        # Calculate pricing with tier discount
+        base_price, urgency_fee, total_price, discount_amount = calculate_price_with_tier(
             order_data.word_count,
             order_data.service_type,
-            order_data.urgency
+            order_data.urgency,
+            effective_tier
         )
 
         # Calculate page count
@@ -5869,7 +7640,15 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
             shipping_address=order_data.shipping_address
         )
 
-        await db.translation_orders.insert_one(order.dict())
+        # Add tier info to order dict before inserting
+        order_dict = order.dict()
+        order_dict["partner_tier"] = effective_tier
+        order_dict["tier_discount_percent"] = int(tier_discount * 100)
+        order_dict["discount_amount"] = round(discount_amount, 2)
+        order_dict["original_price"] = round(page_count * 24.99 + urgency_fee, 2)  # Price without discount
+        order_dict["loyalty_lock_active"] = tier_result.get("loyalty_lock_active", False)
+
+        await db.translation_orders.insert_one(order_dict)
 
         # Associate uploaded documents with this order
         if order_data.document_ids:
@@ -5922,26 +7701,26 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
 
             # If Zelle payment, send Zelle-specific emails
             if order_data.payment_method == "zelle":
-                # Send Zelle pending email to partner
+                # Send Zelle pending email to client (order email)
                 try:
                     zelle_order_details = {
                         **order_details,
-                        "customer_name": partner.get("company_name", partner.get("contact_name", "Partner")),
-                        "customer_email": partner["email"]
+                        "customer_name": order.client_name,
+                        "customer_email": order.client_email
                     }
                     email_html = get_zelle_pending_email_template(
-                        partner.get("company_name", partner.get("contact_name", "Partner")),
+                        order.client_name,
                         zelle_order_details
                     )
                     await email_service.send_email(
-                        partner["email"],
+                        order.client_email,
                         f"Order Received - Zelle Payment Pending Verification - {order.order_number}",
                         email_html,
                         "html"
                     )
-                    logger.info(f"Zelle pending email sent to partner: {partner['email']}")
+                    logger.info(f"Zelle pending email sent to client: {order.client_email}")
                 except Exception as ze:
-                    logger.error(f"Failed to send Zelle pending email to partner: {str(ze)}")
+                    logger.error(f"Failed to send Zelle pending email to client: {str(ze)}")
 
                 # Send Zelle admin notification
                 try:
@@ -5957,9 +7736,9 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
                     logger.error(f"Failed to send Zelle admin notification: {str(ae)}")
             else:
                 # Standard order confirmation emails
-                # Notify partner
+                # Notify client (order email)
                 await email_service.send_order_confirmation_email(
-                    partner["email"],
+                    order.client_email,
                     order_details,
                     is_partner=True
                 )
@@ -6161,8 +7940,8 @@ async def admin_get_all_orders(
             user = await db.admin_users.find_one({"token": admin_key, "is_active": True})
             if user:
                 is_valid = True
-                # Cache the token
-                active_admin_tokens[admin_key] = {"user_id": user["id"], "role": user["role"]}
+                # Cache the token (including translator_type for in-house translators)
+                active_admin_tokens[admin_key] = {"user_id": user["id"], "role": user["role"], "translator_type": user.get("translator_type")}
 
     if not is_valid:
         logger.warning(f"Invalid admin key attempt: key_len={len(admin_key)}, expected_len={len(expected_key)}")
@@ -6299,16 +8078,11 @@ async def get_my_projects(token: str, admin_key: str):
         # Translator sees projects assigned to them
         orders = await db.translation_orders.find({"assigned_translator_id": user_id}).sort("created_at", -1).to_list(500)
 
-        # Auto-accept: When translator accesses their projects, auto-accept any pending assignments
-        # This fixes the issue where translator can work but status is stuck on "pending"
+        # NO auto-accept: ALL translators (in-house and contractors) must explicitly accept via email link
+        # This ensures proper tracking of assignment acceptance
         for order in orders:
             if order.get("translator_assignment_status") == "pending":
-                await db.translation_orders.update_one(
-                    {"id": order["id"]},
-                    {"$set": {"translator_assignment_status": "accepted", "translator_accepted_at": datetime.utcnow().isoformat()}}
-                )
-                order["translator_assignment_status"] = "accepted"
-                logger.info(f"Auto-accepted assignment for translator {user_id} on order {order.get('order_number', order['id'])}")
+                logger.info(f"Translator {user_id} accessed portal but assignment {order.get('order_number', order['id'])} requires explicit acceptance via email")
     else:
         orders = []
 
@@ -6860,6 +8634,36 @@ async def get_users_by_role(role: str, admin_key: str, include_pending: bool = T
         logger.error(f"Error fetching users by role: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to fetch users")
 
+@api_router.get("/admin/translators")
+async def get_all_translators(admin_key: str):
+    """Get all translators/vendors from admin_users collection"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    try:
+        # Get all users with translator role (both active and inactive)
+        translators = await db.admin_users.find({
+            "role": {"$in": ["translator", "pm", "admin", "sales"]}
+        }).to_list(200)
+
+        return [{
+            "id": t.get("id") or str(t.get("_id", "")),
+            "name": t.get("name", ""),
+            "email": t.get("email", ""),
+            "role": t.get("role", "translator"),
+            "is_active": t.get("is_active", True),
+            "rate_per_page": t.get("rate_per_page", 0),
+            "rate_per_word": t.get("rate_per_word", 0),
+            "language_pairs": t.get("language_pairs", []),
+            "translator_type": t.get("translator_type", "contractor"),
+            "pages_translated": t.get("pages_translated", 0),
+            "pages_pending_payment": t.get("pages_pending_payment", 0)
+        } for t in translators]
+    except Exception as e:
+        logger.error(f"Error fetching translators: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch translators")
+
 @api_router.get("/admin/translators/status")
 async def get_translators_with_status(admin_key: str):
     """Get all translators with their current project status and deadlines"""
@@ -7247,8 +9051,22 @@ async def delete_payment(payment_id: str, admin_key: str):
 # ==================== EXPENSES ====================
 
 @api_router.post("/admin/expenses")
-async def create_expense(expense_data: ExpenseCreate, admin_key: str, token: Optional[str] = None):
-    """Create a new expense record"""
+async def create_expense(
+    admin_key: str,
+    category: str = Form(...),
+    description: str = Form(...),
+    amount: float = Form(...),
+    date: str = Form(None),
+    subcategory: str = Form(None),
+    is_recurring: str = Form("false"),
+    recurring_period: str = Form(None),
+    vendor: str = Form(None),
+    vendor_id: str = Form(None),
+    notes: str = Form(None),
+    receipt_file: UploadFile = File(None),
+    token: Optional[str] = None
+):
+    """Create a new expense record with optional receipt file upload"""
     if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
@@ -7256,25 +9074,56 @@ async def create_expense(expense_data: ExpenseCreate, admin_key: str, token: Opt
     if token:
         current_user = await get_current_admin_user(token)
 
-    expense = Expense(
-        category=expense_data.category,
-        subcategory=expense_data.subcategory,
-        description=expense_data.description,
-        amount=expense_data.amount,
-        date=datetime.fromisoformat(expense_data.date.replace('Z', '+00:00')) if expense_data.date else datetime.utcnow(),
-        is_recurring=expense_data.is_recurring,
-        recurring_period=expense_data.recurring_period,
-        vendor=expense_data.vendor,
-        notes=expense_data.notes,
-        created_by_id=current_user["id"] if current_user else None,
-        created_by_name=current_user.get("name") if current_user else None
-    )
+    # Handle receipt file upload
+    receipt_file_data = None
+    receipt_file_type = None
+    receipt_filename = None
+    if receipt_file and receipt_file.filename:
+        allowed_types = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'application/pdf']
+        if receipt_file.content_type not in allowed_types:
+            raise HTTPException(status_code=400, detail="Invalid file type. Allowed: PNG, JPG, GIF, PDF")
 
-    await db.expenses.insert_one(expense.dict())
-    return {"status": "success", "expense": expense.dict()}
+        file_content = await receipt_file.read()
+        if len(file_content) > 10 * 1024 * 1024:  # 10MB limit
+            raise HTTPException(status_code=400, detail="File size must be less than 10MB")
+
+        receipt_file_data = base64.b64encode(file_content).decode('utf-8')
+        receipt_file_type = receipt_file.content_type
+        receipt_filename = receipt_file.filename
+
+    # Parse is_recurring from form string
+    is_recurring_bool = is_recurring.lower() in ('true', '1', 'yes')
+
+    expense_dict = {
+        "id": str(uuid.uuid4()),
+        "category": category,
+        "subcategory": subcategory or None,
+        "description": description,
+        "amount": float(amount),
+        "date": datetime.fromisoformat(date.replace('Z', '+00:00')) if date else datetime.utcnow(),
+        "is_recurring": is_recurring_bool,
+        "recurring_period": recurring_period or None,
+        "vendor": vendor or None,
+        "vendor_id": vendor_id or None,
+        "receipt_file_data": receipt_file_data,
+        "receipt_file_type": receipt_file_type,
+        "receipt_filename": receipt_filename,
+        "notes": notes or None,
+        "created_at": datetime.utcnow(),
+        "created_by_id": current_user["id"] if current_user else None,
+        "created_by_name": current_user.get("name") if current_user else None
+    }
+
+    await db.expenses.insert_one(expense_dict)
+
+    # Remove file data from response to keep it small
+    expense_response = {k: v for k, v in expense_dict.items() if k != 'receipt_file_data'}
+    expense_response['has_receipt'] = receipt_file_data is not None
+
+    return {"status": "success", "expense": expense_response}
 
 @api_router.get("/admin/expenses")
-async def get_expenses(admin_key: str, category: Optional[str] = None, start_date: Optional[str] = None, end_date: Optional[str] = None):
+async def get_expenses(admin_key: str, category: Optional[str] = None, vendor_id: Optional[str] = None, start_date: Optional[str] = None, end_date: Optional[str] = None):
     """Get all expenses with optional filters"""
     if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
         raise HTTPException(status_code=401, detail="Invalid admin key")
@@ -7282,6 +9131,8 @@ async def get_expenses(admin_key: str, category: Optional[str] = None, start_dat
     query = {}
     if category:
         query["category"] = category
+    if vendor_id:
+        query["vendor_id"] = vendor_id
 
     if start_date or end_date:
         query["date"] = {}
@@ -7295,8 +9146,66 @@ async def get_expenses(admin_key: str, category: Optional[str] = None, start_dat
     for expense in expenses:
         if '_id' in expense:
             del expense['_id']
+        # Add has_receipt flag and remove file data from list
+        expense['has_receipt'] = bool(expense.get('receipt_file_data'))
+        if 'receipt_file_data' in expense:
+            del expense['receipt_file_data']
 
     return {"expenses": expenses}
+
+@api_router.get("/admin/expenses/{expense_id}/receipt")
+async def get_expense_receipt(expense_id: str, admin_key: str):
+    """Get the receipt file for an expense"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    expense = await db.expenses.find_one({"id": expense_id})
+    if not expense:
+        raise HTTPException(status_code=404, detail="Expense not found")
+
+    if not expense.get('receipt_file_data'):
+        raise HTTPException(status_code=404, detail="No receipt attached to this expense")
+
+    return {
+        "receipt_file_data": expense['receipt_file_data'],
+        "receipt_file_type": expense.get('receipt_file_type'),
+        "receipt_filename": expense.get('receipt_filename')
+    }
+
+@api_router.post("/admin/expenses/{expense_id}/upload-receipt")
+async def upload_expense_receipt(expense_id: str, admin_key: str, receipt: UploadFile = File(...)):
+    """Upload a receipt to an existing expense"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    expense = await db.expenses.find_one({"id": expense_id})
+    if not expense:
+        raise HTTPException(status_code=404, detail="Expense not found")
+
+    # Validate file type
+    allowed_types = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'application/pdf']
+    if receipt.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Invalid file type. Only PNG, JPG, GIF, and PDF files are allowed.")
+
+    # Read and encode file
+    file_content = await receipt.read()
+    if len(file_content) > 10 * 1024 * 1024:  # 10MB limit
+        raise HTTPException(status_code=400, detail="File size must be less than 10MB")
+
+    file_base64 = base64.b64encode(file_content).decode('utf-8')
+
+    # Update expense with receipt
+    await db.expenses.update_one(
+        {"id": expense_id},
+        {"$set": {
+            "receipt_file_data": file_base64,
+            "receipt_file_type": receipt.content_type,
+            "receipt_filename": receipt.filename,
+            "has_receipt": True
+        }}
+    )
+
+    return {"success": True, "message": "Receipt uploaded successfully"}
 
 @api_router.put("/admin/expenses/{expense_id}")
 async def update_expense(expense_id: str, update_data: ExpenseUpdate, admin_key: str):
@@ -7364,8 +9273,12 @@ async def delete_expense(expense_id: str, admin_key: str):
 @api_router.get("/admin/finances/summary")
 async def get_financial_summary(admin_key: str, period: str = "month"):
     """Get financial summary with income, expenses, profit/loss"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
-        raise HTTPException(status_code=401, detail="Invalid admin key")
+    # Use consistent authentication pattern
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+    if user_info.get("role", "").lower() != "admin" and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Admin access required")
 
     now = datetime.utcnow()
 
@@ -7528,13 +9441,24 @@ async def get_financial_summary(admin_key: str, period: str = "month"):
 @api_router.get("/admin/finances/partners")
 async def get_partner_statistics(admin_key: str):
     """Get partner statistics: total received and pending amounts by company"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
-        raise HTTPException(status_code=401, detail="Invalid admin key")
+    # Use consistent authentication with other finance endpoints
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Check if user has admin role (case-insensitive)
+    user_role = user_info.get("role", "").lower()
+    if user_role != "admin" and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Admin access required")
 
     # Get all partner orders
     partner_orders = await db.translation_orders.find({
         "partner_id": {"$exists": True, "$ne": None}
     }).to_list(10000)
+
+    # Get all partners for contact info
+    all_partners = await db.partners.find({}).to_list(500)
+    partners_by_id = {p.get("id"): p for p in all_partners}
 
     # Group by partner company
     partner_stats = {}
@@ -7543,13 +9467,22 @@ async def get_partner_statistics(admin_key: str):
         partner_id = order.get("partner_id")
 
         if company not in partner_stats:
+            # Get partner contact info
+            partner_info = partners_by_id.get(partner_id, {})
             partner_stats[company] = {
                 "partner_id": partner_id,
                 "company_name": company,
+                "email": partner_info.get("email", ""),
+                "contact_name": partner_info.get("contact_name") or partner_info.get("name", ""),
+                "phone": partner_info.get("phone", ""),
                 "total_received": 0,
                 "total_pending": 0,
                 "orders_paid": 0,
-                "orders_pending": 0
+                "orders_pending": 0,
+                "created_at": partner_info.get("created_at", ""),
+                "payment_plan": partner_info.get("payment_plan", "pay_per_order"),
+                "payment_plan_approved": partner_info.get("payment_plan_approved", False),
+                "total_paid_orders": partner_info.get("total_paid_orders", 0)
             }
 
         total_price = order.get("total_price", 0)
@@ -7577,6 +9510,153 @@ async def get_partner_statistics(admin_key: str):
             "total_pending": sum(p["total_pending"] for p in result)
         }
     }
+
+
+@api_router.post("/admin/partners/{partner_id}/approve-payment-upgrade")
+async def approve_partner_payment_upgrade(partner_id: str, admin_key: str, approved: bool, plan: str = None):
+    """Approve or deny a partner's payment plan upgrade request (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        partner = await db.partners.find_one({"id": partner_id})
+        if not partner:
+            raise HTTPException(status_code=404, detail="Partner not found")
+
+        if approved:
+            # Use the requested plan or the one provided
+            target_plan = plan or partner.get("requested_payment_plan", "biweekly")
+            if target_plan not in ["biweekly", "monthly"]:
+                raise HTTPException(status_code=400, detail="Invalid payment plan")
+
+            await db.partners.update_one(
+                {"id": partner_id},
+                {"$set": {
+                    "payment_plan": target_plan,
+                    "payment_plan_approved": True,
+                    "payment_plan_upgrade_requested": False,
+                    "requested_payment_plan": None,
+                    "payment_plan_approved_at": datetime.utcnow().isoformat()
+                }}
+            )
+
+            # Send approval email to partner
+            plan_name = "Biweekly Invoice" if target_plan == "biweekly" else "Monthly Invoice"
+            try:
+                email_html = f"""
+                <h2>Payment Plan Upgrade Approved!</h2>
+                <p>Great news! Your payment plan upgrade request has been approved.</p>
+                <ul>
+                    <li><strong>New Plan:</strong> {plan_name}</li>
+                </ul>
+                <p>You can now receive invoices for your orders instead of paying per order.</p>
+                <p>Thank you for your business!</p>
+                """
+                await send_email(
+                    to_email=partner.get("email"),
+                    subject="Payment Plan Upgrade Approved - Legacy Translations",
+                    html_content=email_html
+                )
+            except Exception as e:
+                logger.warning(f"Failed to send approval email: {e}")
+
+            return {"success": True, "message": f"Partner upgraded to {plan_name}"}
+        else:
+            # Deny the request
+            await db.partners.update_one(
+                {"id": partner_id},
+                {"$set": {
+                    "payment_plan_upgrade_requested": False,
+                    "requested_payment_plan": None
+                }}
+            )
+
+            # Send denial email
+            try:
+                email_html = f"""
+                <h2>Payment Plan Upgrade Request</h2>
+                <p>Thank you for your interest in our invoice payment plans.</p>
+                <p>At this time, we are unable to approve your upgrade request. Please continue using Pay Per Order for now.</p>
+                <p>If you have questions, please contact us at contact@legacytranslations.com.</p>
+                """
+                await send_email(
+                    to_email=partner.get("email"),
+                    subject="Payment Plan Upgrade Request Update - Legacy Translations",
+                    html_content=email_html
+                )
+            except Exception as e:
+                logger.warning(f"Failed to send denial email: {e}")
+
+            return {"success": True, "message": "Upgrade request denied"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing payment upgrade: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to process upgrade request")
+
+
+@api_router.post("/admin/partners/{partner_id}/set-payment-plan")
+async def admin_set_partner_payment_plan(partner_id: str, admin_key: str, plan: str, send_notification: bool = True):
+    """Admin: Directly set a partner's payment plan (biweekly, monthly, or pay_per_order)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    if plan not in ["pay_per_order", "biweekly", "monthly"]:
+        raise HTTPException(status_code=400, detail="Invalid payment plan. Must be 'pay_per_order', 'biweekly', or 'monthly'")
+
+    try:
+        partner = await db.partners.find_one({"id": partner_id})
+        if not partner:
+            raise HTTPException(status_code=404, detail="Partner not found")
+
+        # Update partner's payment plan
+        update_data = {
+            "payment_plan": plan,
+            "payment_plan_approved": plan != "pay_per_order",  # Approved if not pay_per_order
+            "payment_plan_upgrade_requested": False,
+            "requested_payment_plan": None
+        }
+        if plan != "pay_per_order":
+            update_data["payment_plan_approved_at"] = datetime.utcnow().isoformat()
+
+        await db.partners.update_one(
+            {"id": partner_id},
+            {"$set": update_data}
+        )
+
+        # Send notification email to partner if requested
+        if send_notification and partner.get("email") and plan != "pay_per_order":
+            try:
+                plan_name = "Biweekly Invoice" if plan == "biweekly" else "Monthly Invoice"
+                email_html = f"""
+                <h2>Payment Plan Updated!</h2>
+                <p>Dear {partner.get('contact_name', 'Partner')},</p>
+                <p>Your payment plan has been updated to <strong>{plan_name}</strong>.</p>
+                <p>You can now receive invoices for your orders instead of paying per order.</p>
+                <p>Thank you for being a valued partner!</p>
+                <p>Best regards,<br>Legacy Translations Team</p>
+                """
+                await send_email(
+                    to_email=partner.get("email"),
+                    subject="Payment Plan Updated - Legacy Translations",
+                    html_content=email_html
+                )
+            except Exception as e:
+                logger.warning(f"Failed to send payment plan update email: {e}")
+
+        plan_display = {"pay_per_order": "Pay Per Order", "biweekly": "Biweekly Invoice", "monthly": "Monthly Invoice"}
+        return {"success": True, "message": f"Partner payment plan set to {plan_display.get(plan, plan)}"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error setting partner payment plan: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update payment plan")
 
 
 @api_router.delete("/admin/partners/{partner_id}")
@@ -7654,6 +9734,783 @@ async def delete_partner_by_email(email: str, admin_key: str):
     except Exception as e:
         logger.error(f"Error deleting partner by email: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to delete partner")
+
+
+@api_router.get("/admin/find-email/{email}")
+async def find_email_in_system(email: str, admin_key: str):
+    """Find where an email is registered in the system (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") != "admin":
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    email_lower = email.lower().strip()
+    found_in = []
+
+    try:
+        # Check partners collection
+        partner = await db.partners.find_one({"email": {"$regex": f"^{email_lower}$", "$options": "i"}})
+        if partner:
+            found_in.append({
+                "collection": "partners",
+                "id": partner.get("id"),
+                "name": partner.get("company_name") or partner.get("name"),
+                "email": partner.get("email")
+            })
+
+        # Check customers collection
+        customer = await db.customers.find_one({"email": {"$regex": f"^{email_lower}$", "$options": "i"}})
+        if customer:
+            found_in.append({
+                "collection": "customers",
+                "id": customer.get("id"),
+                "name": customer.get("full_name") or customer.get("name"),
+                "email": customer.get("email")
+            })
+
+        # Check admin_users collection
+        admin_user = await db.admin_users.find_one({"email": {"$regex": f"^{email_lower}$", "$options": "i"}})
+        if admin_user:
+            found_in.append({
+                "collection": "admin_users",
+                "id": admin_user.get("id"),
+                "name": admin_user.get("name"),
+                "email": admin_user.get("email"),
+                "role": admin_user.get("role")
+            })
+
+        # Check salespersons collection
+        salesperson = await db.salespersons.find_one({"email": {"$regex": f"^{email_lower}$", "$options": "i"}})
+        if salesperson:
+            found_in.append({
+                "collection": "salespersons",
+                "id": salesperson.get("id"),
+                "name": salesperson.get("name"),
+                "email": salesperson.get("email")
+            })
+
+        if not found_in:
+            return {"status": "not_found", "message": f"Email '{email}' not found in any collection"}
+
+        return {"status": "found", "email": email, "found_in": found_in}
+
+    except Exception as e:
+        logger.error(f"Error finding email: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to search for email")
+
+
+@api_router.delete("/admin/delete-email/{email}")
+async def delete_email_from_system(email: str, admin_key: str, collection: str = None):
+    """Delete an email from specified collection or all collections (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") != "admin":
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    email_lower = email.lower().strip()
+    deleted_from = []
+
+    try:
+        collections_to_check = [collection] if collection else ["partners", "customers", "admin_users", "salespersons"]
+
+        for coll_name in collections_to_check:
+            if coll_name == "partners":
+                result = await db.partners.find_one_and_delete({"email": {"$regex": f"^{email_lower}$", "$options": "i"}})
+                if result:
+                    # Mark orders as orphaned
+                    await db.translation_orders.update_many(
+                        {"partner_id": result.get("id")},
+                        {"$set": {"partner_deleted": True, "partner_deleted_at": datetime.utcnow()}}
+                    )
+                    deleted_from.append({"collection": "partners", "name": result.get("company_name") or result.get("name")})
+
+            elif coll_name == "customers":
+                result = await db.customers.find_one_and_delete({"email": {"$regex": f"^{email_lower}$", "$options": "i"}})
+                if result:
+                    deleted_from.append({"collection": "customers", "name": result.get("full_name") or result.get("name")})
+
+            elif coll_name == "admin_users":
+                result = await db.admin_users.find_one_and_delete({"email": {"$regex": f"^{email_lower}$", "$options": "i"}})
+                if result:
+                    deleted_from.append({"collection": "admin_users", "name": result.get("name"), "role": result.get("role")})
+
+            elif coll_name == "salespersons":
+                result = await db.salespersons.find_one_and_delete({"email": {"$regex": f"^{email_lower}$", "$options": "i"}})
+                if result:
+                    deleted_from.append({"collection": "salespersons", "name": result.get("name")})
+
+        if not deleted_from:
+            raise HTTPException(status_code=404, detail=f"Email '{email}' not found in any collection")
+
+        logger.info(f"Email '{email}' deleted from: {[d['collection'] for d in deleted_from]}")
+
+        return {
+            "status": "success",
+            "message": f"Email '{email}' deleted successfully",
+            "deleted_from": deleted_from
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting email: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to delete email")
+
+
+# ==================== PARTNER INVOICE ENDPOINTS ====================
+
+@api_router.get("/admin/partner-invoices")
+async def get_all_partner_invoices(admin_key: str):
+    """Get all partner invoices (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        invoices = await db.partner_invoices.find({}).sort("created_at", -1).to_list(1000)
+        for inv in invoices:
+            if '_id' in inv:
+                del inv['_id']
+        return {"invoices": invoices}
+    except Exception as e:
+        logger.error(f"Error fetching partner invoices: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch invoices")
+
+
+@api_router.get("/admin/partner-invoices/partner/{partner_id}")
+async def get_partner_invoices_admin(partner_id: str, admin_key: str):
+    """Get all invoices for a specific partner (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        invoices = await db.partner_invoices.find({"partner_id": partner_id}).sort("created_at", -1).to_list(1000)
+        for inv in invoices:
+            if '_id' in inv:
+                del inv['_id']
+        return {"invoices": invoices}
+    except Exception as e:
+        logger.error(f"Error fetching partner invoices: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch invoices")
+
+
+@api_router.get("/admin/partner-orders/{partner_id}")
+async def get_partner_orders_for_invoice(partner_id: str, admin_key: str):
+    """Get all pending orders for a partner (for invoice creation)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        # Get all orders for this partner that are not yet paid
+        orders = await db.translation_orders.find({
+            "partner_id": partner_id,
+            "payment_status": {"$in": ["pending", "overdue"]}
+        }).sort("created_at", -1).to_list(1000)
+
+        # Get already invoiced order IDs
+        invoiced_orders = set()
+        existing_invoices = await db.partner_invoices.find({
+            "partner_id": partner_id,
+            "status": {"$in": ["pending", "partial"]}
+        }).to_list(1000)
+        for inv in existing_invoices:
+            invoiced_orders.update(inv.get("order_ids", []))
+
+        # Filter out already invoiced orders
+        available_orders = []
+        for order in orders:
+            if '_id' in order:
+                del order['_id']
+            if order.get("id") not in invoiced_orders:
+                available_orders.append(order)
+
+        return {"orders": available_orders, "invoiced_order_ids": list(invoiced_orders)}
+    except Exception as e:
+        logger.error(f"Error fetching partner orders: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch orders")
+
+
+@api_router.post("/admin/partner-invoices/create")
+async def create_partner_invoice(invoice_data: PartnerInvoiceCreate, admin_key: str):
+    """Create a new invoice for a partner (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        # Get partner info
+        partner = await db.partners.find_one({"id": invoice_data.partner_id})
+        if not partner:
+            raise HTTPException(status_code=404, detail="Partner not found")
+
+        # Get orders and calculate total
+        orders = await db.translation_orders.find({
+            "id": {"$in": invoice_data.order_ids}
+        }).to_list(1000)
+
+        if not orders:
+            raise HTTPException(status_code=400, detail="No valid orders found")
+
+        subtotal = sum(order.get("total_price", 0) for order in orders)
+        total_amount = subtotal  # No tax for now
+
+        # Create invoice
+        invoice = PartnerInvoice(
+            partner_id=invoice_data.partner_id,
+            partner_company=partner.get("company_name"),
+            partner_email=partner.get("email"),
+            order_ids=invoice_data.order_ids,
+            subtotal=subtotal,
+            total_amount=total_amount,
+            due_date=datetime.utcnow() + timedelta(days=invoice_data.due_days),
+            notes=invoice_data.notes
+        )
+
+        await db.partner_invoices.insert_one(invoice.dict())
+
+        # Update orders to mark them as invoiced
+        await db.translation_orders.update_many(
+            {"id": {"$in": invoice_data.order_ids}},
+            {"$set": {"invoice_id": invoice.id, "invoice_number": invoice.invoice_number}}
+        )
+
+        logger.info(f"Created invoice {invoice.invoice_number} for partner {partner.get('company_name')}")
+
+        return {
+            "status": "success",
+            "invoice": invoice.dict()
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating partner invoice: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create invoice")
+
+
+@api_router.delete("/admin/partner-invoices/{invoice_id}")
+async def delete_partner_invoice(invoice_id: str, admin_key: str):
+    """Delete a partner invoice (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        invoice = await db.partner_invoices.find_one({"id": invoice_id})
+        if not invoice:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+
+        # Remove invoice reference from orders
+        await db.translation_orders.update_many(
+            {"invoice_id": invoice_id},
+            {"$unset": {"invoice_id": "", "invoice_number": ""}}
+        )
+
+        # Delete the invoice
+        await db.partner_invoices.delete_one({"id": invoice_id})
+
+        logger.info(f"Deleted invoice {invoice.get('invoice_number')}")
+        return {"status": "success", "message": "Invoice deleted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting invoice: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to delete invoice")
+
+
+@api_router.put("/admin/partner-invoices/{invoice_id}/mark-paid")
+async def mark_invoice_paid(invoice_id: str, admin_key: str, payment_method: str = "manual"):
+    """Mark an invoice as paid manually (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        invoice = await db.partner_invoices.find_one({"id": invoice_id})
+        if not invoice:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+
+        # Count orders that weren't already paid (to update partner stats)
+        unpaid_order_count = await db.translation_orders.count_documents({
+            "id": {"$in": invoice.get("order_ids", [])},
+            "payment_status": {"$ne": "paid"}
+        })
+
+        # Update invoice
+        await db.partner_invoices.update_one(
+            {"id": invoice_id},
+            {"$set": {
+                "status": "paid",
+                "payment_method": payment_method,
+                "amount_paid": invoice.get("total_amount", 0),
+                "paid_at": datetime.utcnow()
+            }}
+        )
+
+        # Update associated orders
+        await db.translation_orders.update_many(
+            {"id": {"$in": invoice.get("order_ids", [])}},
+            {"$set": {"payment_status": "paid", "payment_date": datetime.utcnow()}}
+        )
+
+        # Increment partner's total_paid_orders counter
+        if unpaid_order_count > 0 and invoice.get("partner_id"):
+            await db.partners.update_one(
+                {"id": invoice["partner_id"]},
+                {"$inc": {"total_paid_orders": unpaid_order_count}}
+            )
+
+        logger.info(f"Marked invoice {invoice.get('invoice_number')} as paid")
+        return {"status": "success", "message": "Invoice marked as paid"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error marking invoice as paid: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update invoice")
+
+
+# Partner Portal Invoice Endpoints
+@api_router.get("/partner/invoices")
+async def get_partner_invoices(token: str):
+    """Get all invoices for the logged-in partner"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    try:
+        invoices = await db.partner_invoices.find({"partner_id": partner["id"]}).sort("created_at", -1).to_list(1000)
+        for inv in invoices:
+            if '_id' in inv:
+                del inv['_id']
+        return {"invoices": invoices}
+    except Exception as e:
+        logger.error(f"Error fetching partner invoices: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch invoices")
+
+
+@api_router.get("/partner/invoices/{invoice_id}")
+async def get_partner_invoice_detail(invoice_id: str, token: str):
+    """Get invoice details with orders (partner portal)"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    try:
+        invoice = await db.partner_invoices.find_one({"id": invoice_id, "partner_id": partner["id"]})
+        if not invoice:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+
+        if '_id' in invoice:
+            del invoice['_id']
+
+        # Get associated orders
+        orders = await db.translation_orders.find({
+            "id": {"$in": invoice.get("order_ids", [])}
+        }).to_list(1000)
+
+        for order in orders:
+            if '_id' in order:
+                del order['_id']
+
+        return {"invoice": invoice, "orders": orders}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching invoice details: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch invoice details")
+
+
+@api_router.post("/partner/invoices/{invoice_id}/pay-stripe")
+async def create_invoice_stripe_checkout(invoice_id: str, request: PartnerInvoicePayStripe):
+    """Create Stripe checkout session for invoice payment"""
+    try:
+        invoice = await db.partner_invoices.find_one({"id": invoice_id})
+        if not invoice:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+
+        if invoice.get("status") == "paid":
+            raise HTTPException(status_code=400, detail="Invoice already paid")
+
+        # Get currency configuration for multi-currency support (BRL includes PIX)
+        currency = request.currency.lower() if request.currency else "usd"
+        if currency not in CURRENCY_CONFIG:
+            currency = "usd"
+
+        currency_info = CURRENCY_CONFIG[currency]
+        payment_methods = currency_info["payment_methods"]
+
+        # Calculate amount in target currency
+        base_amount_usd = invoice.get("total_amount", 0)
+        if currency != "usd":
+            rates_response = await get_exchange_rates()
+            rates = rates_response.get("rates", {"usd": 1.0, "brl": 5.0, "eur": 0.92, "gbp": 0.79})
+            exchange_rate = rates.get(currency, 1.0)
+            amount_in_currency = base_amount_usd * exchange_rate
+        else:
+            amount_in_currency = base_amount_usd
+
+        # Create Stripe checkout session
+        checkout_params = {
+            'payment_method_types': payment_methods,
+            'line_items': [{
+                'price_data': {
+                    'currency': currency,
+                    'product_data': {
+                        'name': f'Invoice {invoice.get("invoice_number")}',
+                        'description': f'Partner Invoice - {invoice.get("partner_company")} - {len(invoice.get("order_ids", []))} orders',
+                    },
+                    'unit_amount': int(amount_in_currency * 100),
+                },
+                'quantity': 1,
+            }],
+            'mode': 'payment',
+            'success_url': f"{request.origin_url}?invoice_paid=true&invoice_id={invoice_id}#/partner",
+            'cancel_url': f"{request.origin_url}?invoice_cancelled=true#/partner",
+            'metadata': {
+                'invoice_id': invoice_id,
+                'invoice_number': invoice.get("invoice_number"),
+                'partner_id': invoice.get("partner_id"),
+                'type': 'partner_invoice'
+            }
+        }
+
+        if invoice.get("partner_email"):
+            checkout_params['customer_email'] = invoice.get("partner_email")
+
+        checkout_session = stripe.checkout.Session.create(**checkout_params)
+
+        # Update invoice with session ID
+        await db.partner_invoices.update_one(
+            {"id": invoice_id},
+            {"$set": {"stripe_session_id": checkout_session.id}}
+        )
+
+        return {
+            "status": "success",
+            "checkout_url": checkout_session.url,
+            "session_id": checkout_session.id
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating Stripe checkout for invoice: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create payment checkout")
+
+
+@api_router.post("/partner/invoices/{invoice_id}/pay-zelle")
+async def submit_invoice_zelle_payment(invoice_id: str, request: PartnerInvoicePayZelle, token: str):
+    """Submit Zelle receipt for invoice payment"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    try:
+        invoice = await db.partner_invoices.find_one({"id": invoice_id, "partner_id": partner["id"]})
+        if not invoice:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+
+        if invoice.get("status") == "paid":
+            raise HTTPException(status_code=400, detail="Invoice already paid")
+
+        # Get receipt URL
+        receipt_url = None
+        if request.zelle_receipt_id:
+            doc = await db.documents.find_one({"id": request.zelle_receipt_id})
+            if doc:
+                backend_url = os.environ.get("BACKEND_URL", "https://legacy-portal-backend.onrender.com")
+                receipt_url = f"{backend_url}/api/download-document/{request.zelle_receipt_id}"
+
+        # Update invoice with Zelle receipt (pending verification)
+        await db.partner_invoices.update_one(
+            {"id": invoice_id},
+            {"$set": {
+                "payment_method": "zelle",
+                "zelle_receipt_id": request.zelle_receipt_id,
+                "zelle_receipt_url": receipt_url,
+                "zelle_submitted_at": datetime.utcnow(),
+                "status": "pending_zelle"  # Mark as pending Zelle verification
+            }}
+        )
+
+        # Create admin notification for Zelle receipt
+        admin_notification = {
+            "id": str(uuid.uuid4()),
+            "type": "invoice_zelle_receipt",
+            "title": "Invoice Zelle Payment Received",
+            "message": f"Partner {invoice.get('partner_company')} submitted Zelle receipt for invoice {invoice.get('invoice_number')} - {invoice.get('total_amount', 0):.2f} USD",
+            "invoice_id": invoice_id,
+            "invoice_number": invoice.get("invoice_number"),
+            "partner_id": invoice.get("partner_id"),
+            "partner_company": invoice.get("partner_company"),
+            "amount": invoice.get("total_amount", 0),
+            "receipt_url": receipt_url,
+            "is_read": False,
+            "created_at": datetime.utcnow()
+        }
+        await db.admin_notifications.insert_one(admin_notification)
+
+        logger.info(f"Zelle receipt submitted for invoice {invoice.get('invoice_number')}")
+
+        return {
+            "status": "success",
+            "message": "Zelle receipt submitted. Payment will be verified shortly."
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error submitting Zelle payment: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to submit Zelle payment")
+
+
+# ==================== INVOICE PAYMENT MANAGEMENT ====================
+
+@api_router.get("/admin/invoice-payments/pending-zelle")
+async def get_pending_zelle_invoices(admin_key: str):
+    """Get all invoices with pending Zelle verification"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        invoices = await db.partner_invoices.find({
+            "status": "pending_zelle",
+            "zelle_receipt_id": {"$exists": True, "$ne": None}
+        }).sort("zelle_submitted_at", -1).to_list(100)
+
+        for inv in invoices:
+            if '_id' in inv:
+                del inv['_id']
+
+        return {"invoices": invoices, "count": len(invoices)}
+    except Exception as e:
+        logger.error(f"Error fetching pending Zelle invoices: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch pending invoices")
+
+
+@api_router.put("/admin/invoice-payments/{invoice_id}/approve-zelle")
+async def approve_zelle_invoice_payment(invoice_id: str, admin_key: str):
+    """Approve a Zelle payment for an invoice"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        invoice = await db.partner_invoices.find_one({"id": invoice_id})
+        if not invoice:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+
+        # Count orders that weren't already paid (to update partner stats)
+        unpaid_order_count = await db.translation_orders.count_documents({
+            "id": {"$in": invoice.get("order_ids", [])},
+            "payment_status": {"$ne": "paid"}
+        })
+
+        # Update invoice to paid
+        await db.partner_invoices.update_one(
+            {"id": invoice_id},
+            {"$set": {
+                "status": "paid",
+                "amount_paid": invoice.get("total_amount", 0),
+                "paid_at": datetime.utcnow(),
+                "zelle_verified_at": datetime.utcnow()
+            }}
+        )
+
+        # Update associated orders to paid
+        await db.translation_orders.update_many(
+            {"id": {"$in": invoice.get("order_ids", [])}},
+            {"$set": {"payment_status": "paid", "payment_date": datetime.utcnow()}}
+        )
+
+        # Increment partner's total_paid_orders counter
+        if unpaid_order_count > 0 and invoice.get("partner_id"):
+            await db.partners.update_one(
+                {"id": invoice["partner_id"]},
+                {"$inc": {"total_paid_orders": unpaid_order_count}}
+            )
+
+        # Record payment in history
+        payment_record = {
+            "id": str(uuid.uuid4()),
+            "invoice_id": invoice_id,
+            "invoice_number": invoice.get("invoice_number"),
+            "partner_id": invoice.get("partner_id"),
+            "partner_company": invoice.get("partner_company"),
+            "amount": invoice.get("total_amount", 0),
+            "payment_method": "zelle",
+            "zelle_receipt_url": invoice.get("zelle_receipt_url"),
+            "status": "completed",
+            "created_at": datetime.utcnow()
+        }
+        await db.invoice_payments.insert_one(payment_record)
+
+        # Create notification for payment approval
+        admin_notification = {
+            "id": str(uuid.uuid4()),
+            "type": "invoice_payment_approved",
+            "title": "Invoice Payment Approved",
+            "message": f"Zelle payment approved for invoice {invoice.get('invoice_number')} - {invoice.get('partner_company')} - ${invoice.get('total_amount', 0):.2f}",
+            "invoice_id": invoice_id,
+            "invoice_number": invoice.get("invoice_number"),
+            "partner_company": invoice.get("partner_company"),
+            "amount": invoice.get("total_amount", 0),
+            "payment_method": "zelle",
+            "is_read": False,
+            "created_at": datetime.utcnow()
+        }
+        await db.admin_notifications.insert_one(admin_notification)
+
+        logger.info(f"Approved Zelle payment for invoice {invoice.get('invoice_number')}")
+        return {"status": "success", "message": "Payment approved successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error approving Zelle payment: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to approve payment")
+
+
+@api_router.put("/admin/invoice-payments/{invoice_id}/reject-zelle")
+async def reject_zelle_invoice_payment(invoice_id: str, admin_key: str, reason: str = ""):
+    """Reject a Zelle payment for an invoice"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        invoice = await db.partner_invoices.find_one({"id": invoice_id})
+        if not invoice:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+
+        # Update invoice back to pending
+        await db.partner_invoices.update_one(
+            {"id": invoice_id},
+            {"$set": {
+                "status": "pending",
+                "zelle_rejected_at": datetime.utcnow(),
+                "zelle_rejection_reason": reason
+            },
+            "$unset": {
+                "zelle_receipt_id": "",
+                "zelle_receipt_url": "",
+                "zelle_submitted_at": ""
+            }}
+        )
+
+        logger.info(f"Rejected Zelle payment for invoice {invoice.get('invoice_number')}: {reason}")
+        return {"status": "success", "message": "Payment rejected"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error rejecting Zelle payment: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to reject payment")
+
+
+@api_router.get("/admin/invoice-payments/history")
+async def get_invoice_payment_history(admin_key: str, limit: int = 50):
+    """Get invoice payment history"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        # Get paid invoices as payment history
+        paid_invoices = await db.partner_invoices.find({
+            "status": "paid"
+        }).sort("paid_at", -1).to_list(limit)
+
+        payments = []
+        for inv in paid_invoices:
+            if '_id' in inv:
+                del inv['_id']
+            payments.append({
+                "id": inv.get("id"),
+                "invoice_number": inv.get("invoice_number"),
+                "partner_id": inv.get("partner_id"),
+                "partner_company": inv.get("partner_company"),
+                "amount": inv.get("total_amount", 0),
+                "payment_method": inv.get("payment_method", "unknown"),
+                "paid_at": inv.get("paid_at"),
+                "zelle_receipt_url": inv.get("zelle_receipt_url"),
+                "stripe_payment_intent": inv.get("stripe_payment_intent"),
+                "order_count": len(inv.get("order_ids", []))
+            })
+
+        # Calculate summary
+        total_received = sum(p["amount"] for p in payments)
+
+        return {
+            "payments": payments,
+            "summary": {
+                "total_payments": len(payments),
+                "total_received": total_received
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error fetching payment history: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch payment history")
+
+
+@api_router.get("/admin/invoice-notifications")
+async def get_invoice_notifications(admin_key: str, unread_only: bool = False):
+    """Get invoice-related admin notifications"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        query = {"type": {"$in": ["invoice_zelle_receipt", "invoice_payment_approved", "invoice_stripe_paid"]}}
+        if unread_only:
+            query["is_read"] = False
+
+        notifications = await db.admin_notifications.find(query).sort("created_at", -1).to_list(50)
+
+        for notif in notifications:
+            if '_id' in notif:
+                del notif['_id']
+
+        unread_count = await db.admin_notifications.count_documents({
+            "type": {"$in": ["invoice_zelle_receipt", "invoice_payment_approved", "invoice_stripe_paid"]},
+            "is_read": False
+        })
+
+        return {
+            "notifications": notifications,
+            "unread_count": unread_count
+        }
+    except Exception as e:
+        logger.error(f"Error fetching invoice notifications: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch notifications")
+
+
+@api_router.put("/admin/invoice-notifications/{notif_id}/read")
+async def mark_invoice_notification_read(notif_id: str, admin_key: str):
+    """Mark an invoice notification as read"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        await db.admin_notifications.update_one(
+            {"id": notif_id},
+            {"$set": {"is_read": True}}
+        )
+        return {"status": "success"}
+    except Exception as e:
+        logger.error(f"Error marking notification as read: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update notification")
 
 
 @api_router.get("/admin/orders/{order_id}")
@@ -7766,19 +10623,28 @@ async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate,
                         )
 
                         # Send email to translator with accept/decline links
-                        if translator.get("email"):
+                        # Skip if using dedicated project email endpoint (skip_email=True)
+                        if translator.get("email") and not update_data.skip_email:
                             try:
                                 # Build accept/decline URLs - point to frontend for better UX (no cold start screen)
                                 frontend_url = os.environ.get("FRONTEND_URL", "https://legacy-portal-frontend.onrender.com")
                                 accept_url = f"{frontend_url}/#/assignment/{assignment_token}/accept"
                                 decline_url = f"{frontend_url}/#/assignment/{assignment_token}/decline"
 
-                                # Prepare order details for email
+                                # Prepare order details for email - prefer translator_deadline (TD) over client deadline
                                 deadline_str = "To be confirmed"
-                                if current_order.get("deadline"):
-                                    deadline = current_order.get("deadline")
+                                # First try translator_deadline (set by PM specifically for translator), then fall back to client deadline
+                                deadline = current_order.get("translator_deadline") or current_order.get("deadline")
+                                if deadline:
                                     if isinstance(deadline, datetime):
                                         deadline_str = deadline.strftime("%B %d, %Y at %I:%M %p")
+                                    elif isinstance(deadline, str):
+                                        try:
+                                            from dateutil import parser
+                                            parsed = parser.parse(deadline)
+                                            deadline_str = parsed.strftime("%B %d, %Y at %I:%M %p")
+                                        except:
+                                            deadline_str = str(deadline)
                                     else:
                                         deadline_str = str(deadline)
 
@@ -7812,6 +10678,8 @@ async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate,
                 update_dict["translator_assignment_status"] = "none"
         if update_data.deadline:
             update_dict["deadline"] = update_data.deadline
+        if update_data.translator_deadline is not None:
+            update_dict["translator_deadline"] = update_data.translator_deadline
         if update_data.internal_notes is not None:
             update_dict["internal_notes"] = update_data.internal_notes
 
@@ -7836,6 +10704,22 @@ async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate,
             update_dict["total_price"] = update_data.total_price
         if update_data.base_price is not None:
             update_dict["base_price"] = update_data.base_price
+
+        # Handle translator assignment status (Admin/PM can manually change pending to accepted)
+        if update_data.translator_assignment_status is not None:
+            update_dict["translator_assignment_status"] = update_data.translator_assignment_status
+            # Also update the responded_at timestamp when status changes
+            if update_data.translator_assignment_status in ["accepted", "declined"]:
+                update_dict["translator_assignment_responded_at"] = datetime.utcnow()
+
+        # Handle reopening order for corrections
+        if update_data.reopened_at is not None:
+            update_dict["reopened_at"] = update_data.reopened_at
+        if update_data.reopened_for_corrections is not None:
+            update_dict["reopened_for_corrections"] = update_data.reopened_for_corrections
+            if update_data.reopened_for_corrections:
+                # Log the reopen action
+                logger.info(f"Order {order_id} reopened for corrections")
 
         # Add updated_at timestamp
         update_dict["updated_at"] = datetime.utcnow()
@@ -7955,6 +10839,9 @@ async def admin_mark_order_paid(order_id: str, admin_key: str):
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
+    # Check if order was already paid (to avoid double counting)
+    was_already_paid = order.get("payment_status") == "paid"
+
     # Build the update fields
     update_fields = {"payment_status": "paid", "payment_date": datetime.utcnow()}
 
@@ -7972,11 +10859,18 @@ async def admin_mark_order_paid(order_id: str, admin_key: str):
     if result.modified_count == 0:
         raise HTTPException(status_code=404, detail="Order not updated")
 
+    # Increment partner's total_paid_orders counter if not already paid
+    if not was_already_paid and order.get("partner_id"):
+        await db.partners.update_one(
+            {"id": order["partner_id"]},
+            {"$inc": {"total_paid_orders": 1}}
+        )
+
     return {"status": "success", "message": "Order marked as paid"}
 
 @api_router.post("/admin/orders/{order_id}/upload-translation")
 async def admin_upload_translation(order_id: str, admin_key: str, file: UploadFile = File(...)):
-    """Upload translated file for an order (admin/PM only)"""
+    """Upload translated file for an order (admin/PM only) - supports multiple files"""
     user_info = await validate_admin_or_user_token(admin_key)
     if not user_info:
         raise HTTPException(status_code=401, detail="Invalid admin key or token")
@@ -7996,11 +10890,29 @@ async def admin_upload_translation(order_id: str, admin_key: str, file: UploadFi
         'pdf': 'application/pdf',
         'doc': 'application/msword',
         'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'txt': 'text/plain'
+        'txt': 'text/plain',
+        'html': 'text/html'
     }
     file_type = file_types.get(file_extension, 'application/octet-stream')
 
-    # Update order with translated file
+    # Generate unique document ID
+    document_id = str(uuid.uuid4())
+
+    # Save to order_documents collection for multiple file support
+    document_record = {
+        "id": document_id,
+        "order_id": order_id,
+        "filename": file.filename,
+        "file_data": file_base64,
+        "content_type": file_type,
+        "source": "translated_document",
+        "document_type": "translation",
+        "uploaded_at": datetime.utcnow(),
+        "uploaded_by": user_info.get("name", "Admin")
+    }
+    await db.order_documents.insert_one(document_record)
+
+    # Also update order with latest translated file (for backwards compatibility)
     await db.translation_orders.update_one(
         {"id": order_id},
         {"$set": {
@@ -8010,7 +10922,171 @@ async def admin_upload_translation(order_id: str, admin_key: str, file: UploadFi
         }}
     )
 
-    return {"status": "success", "message": f"Translation file '{file.filename}' uploaded successfully"}
+    logger.info(f"Translation file uploaded: {file.filename} (doc_id: {document_id}) for order {order_id}")
+
+    return {
+        "status": "success",
+        "message": f"Translation file '{file.filename}' uploaded successfully",
+        "document_id": document_id,
+        "filename": file.filename
+    }
+
+
+@api_router.post("/admin/orders/{order_id}/upload-cover-page")
+async def admin_upload_cover_page(order_id: str, admin_key: str, file: UploadFile = File(...)):
+    """
+    Upload a separate cover page for an order.
+    The cover page is stored independently and will be used as-is (no processing)
+    to avoid formatting issues.
+    """
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Find the order
+    order = await db.translation_orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Read and encode file
+    file_content = await file.read()
+    file_base64 = base64.b64encode(file_content).decode('utf-8')
+
+    # Determine file type
+    file_extension = file.filename.split('.')[-1].lower() if '.' in file.filename else 'pdf'
+    file_types = {
+        'pdf': 'application/pdf',
+        'png': 'image/png',
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg'
+    }
+    file_type = file_types.get(file_extension, 'application/pdf')
+
+    # Update order with separate cover page
+    await db.translation_orders.update_one(
+        {"id": order_id},
+        {"$set": {
+            "cover_page_file": file_base64,
+            "cover_page_filename": file.filename,
+            "cover_page_type": file_type,
+            "use_separate_cover": True
+        }}
+    )
+
+    logger.info(f"Cover page uploaded for order {order.get('order_number')}: {file.filename}")
+    return {
+        "status": "success",
+        "message": f"Cover page '{file.filename}' uploaded successfully. It will be used as-is without modification."
+    }
+
+
+@api_router.post("/admin/orders/{order_id}/replace-translation-pages")
+async def admin_replace_translation_pages(
+    order_id: str,
+    admin_key: str,
+    file: UploadFile = File(...),
+    keep_cover_pages: int = 1
+):
+    """
+    Replace only the translation content pages while keeping the cover page(s) intact.
+
+    Parameters:
+    - keep_cover_pages: Number of pages to keep from the beginning (default: 1 = first page is cover)
+
+    This is useful when translation pages have formatting issues but the cover is fine.
+    """
+    import fitz  # PyMuPDF
+
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Find the order
+    order = await db.translation_orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Get existing translated file
+    existing_file = order.get("translated_file")
+    if not existing_file:
+        raise HTTPException(status_code=400, detail="No existing translation file to replace pages in")
+
+    try:
+        # Read the new translation pages
+        new_content = await file.read()
+        new_doc = fitz.open(stream=new_content, filetype="pdf")
+
+        # Open existing document
+        existing_bytes = base64.b64decode(existing_file)
+        existing_doc = fitz.open(stream=existing_bytes, filetype="pdf")
+
+        # Create combined document
+        combined_doc = fitz.open()
+
+        # Keep cover pages from existing document
+        pages_to_keep = min(keep_cover_pages, len(existing_doc))
+        if pages_to_keep > 0:
+            combined_doc.insert_pdf(existing_doc, from_page=0, to_page=pages_to_keep - 1)
+            logger.info(f"Kept {pages_to_keep} cover page(s) from existing document")
+
+        # Add all pages from new document (replacement translation pages)
+        combined_doc.insert_pdf(new_doc, from_page=0, to_page=len(new_doc) - 1)
+        logger.info(f"Added {len(new_doc)} new translation page(s)")
+
+        # Convert to base64
+        combined_bytes = combined_doc.tobytes()
+        combined_base64 = base64.b64encode(combined_bytes).decode('utf-8')
+
+        # Clean up
+        new_doc.close()
+        existing_doc.close()
+        combined_doc.close()
+
+        # Update order with combined file
+        await db.translation_orders.update_one(
+            {"id": order_id},
+            {"$set": {
+                "translated_file": combined_base64,
+                "translated_filename": order.get("translated_filename", "translation.pdf"),
+                "pages_replaced_at": datetime.utcnow().isoformat()
+            }}
+        )
+
+        return {
+            "status": "success",
+            "message": f"Translation pages replaced successfully. Kept {pages_to_keep} cover page(s), added {len(new_doc)} new page(s).",
+            "cover_pages_kept": pages_to_keep,
+            "new_pages_added": len(new_doc)
+        }
+
+    except Exception as e:
+        logger.error(f"Error replacing translation pages: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to replace pages: {str(e)}")
+
+
+@api_router.delete("/admin/orders/{order_id}/cover-page")
+async def admin_delete_cover_page(order_id: str, admin_key: str):
+    """Remove the separate cover page from an order"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    order = await db.translation_orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    await db.translation_orders.update_one(
+        {"id": order_id},
+        {"$unset": {
+            "cover_page_file": "",
+            "cover_page_filename": "",
+            "cover_page_type": "",
+            "use_separate_cover": ""
+        }}
+    )
+
+    return {"status": "success", "message": "Cover page removed"}
+
 
 # ==================== PAYMENT PROOF ENDPOINTS ====================
 @api_router.post("/payment-proofs/upload")
@@ -8321,6 +11397,10 @@ async def review_payment_proof(
     if status == "approved" and proof.get("order_id"):
         # First get the order to check its current status
         order = await db.translation_orders.find_one({"id": proof["order_id"]})
+
+        # Check if order was already paid (to avoid double counting)
+        was_already_paid = order and order.get("payment_status") == "paid"
+
         update_fields = {
             "payment_status": "paid",
             "payment_date": datetime.utcnow(),
@@ -8336,6 +11416,14 @@ async def review_payment_proof(
             {"id": proof["order_id"]},
             {"$set": update_fields}
         )
+
+        # Increment partner's total_paid_orders counter if not already paid
+        if not was_already_paid and order and order.get("partner_id"):
+            await db.partners.update_one(
+                {"id": order["partner_id"]},
+                {"$inc": {"total_paid_orders": 1}}
+            )
+
         logger.info(f"Order {proof['order_id']} marked as paid via {proof['payment_method']}")
 
     # Send email notification to customer
@@ -8556,10 +11644,395 @@ class AttachmentsSelection(BaseModel):
     include_workspace: bool = True
     additional_document_ids: List[str] = []
 
+class ExternalAttachment(BaseModel):
+    filename: str
+    content_type: str
+    data: str  # Base64 encoded file data
+
 class DeliverOrderRequest(BaseModel):
     bcc_email: Optional[str] = None
     notify_pm: bool = False
     attachments: Optional[AttachmentsSelection] = None
+    include_verification_page: bool = True  # Include verification page with QR code by default
+    certifier_name: Optional[str] = None
+    # Combined PDF options
+    generate_combined_pdf: bool = True  # Generate single PDF with all parts
+    include_certificate: bool = True
+    include_translation: bool = True
+    include_original: bool = True
+    translator_name: Optional[str] = None
+    document_type: Optional[str] = None
+    source_language: Optional[str] = None
+    target_language: Optional[str] = None
+    # External attachment for resend (not saved to system)
+    external_attachment: Optional[ExternalAttachment] = None
+
+
+async def generate_combined_delivery_pdf(
+    order: dict,
+    include_certificate: bool = True,
+    include_translation: bool = True,
+    include_original: bool = True,
+    include_verification: bool = True,
+    certification_data: dict = None,
+    translator_name: str = "Beatriz Paiva"
+) -> bytes:
+    """
+    Generate a combined PDF document with:
+    1. Certificate of Accuracy
+    2. Translation pages
+    3. Original document pages
+    4. Verification page with QR code
+    """
+    import fitz  # PyMuPDF
+    from io import BytesIO
+
+    # Create new PDF document
+    doc = fitz.open()
+
+    # ==================== FIXED LAYOUT CONSTANTS (DO NOT CHANGE) ====================
+    # These values match the Start template and must remain consistent
+
+    # Page dimensions (Letter size - 8.5" x 11" at 72 DPI)
+    page_width = 612
+    page_height = 792
+
+    # Fixed margins for cover page (in points)
+    MARGIN_LEFT = 50          # Left margin for decorative lines
+    MARGIN_RIGHT = 50         # Right margin for decorative lines
+    MARGIN_TOP = 60           # Top margin for header
+    MARGIN_BOTTOM = 60        # Bottom margin for footer
+    BODY_MARGIN_LEFT = 80     # Left margin for body text
+    HEADER_LINE_Y = 80        # Y position of header decorative line
+    FOOTER_LINE_Y = page_height - 60  # Y position of footer line
+
+    # Colors (Legacy Translations brand)
+    blue_color = (0.11, 0.27, 0.53)  # #1C4587 - Primary brand blue
+    gold_color = (0.85, 0.65, 0.13)  # #D9A521 - Accent gold
+    gray_color = (0.4, 0.4, 0.4)     # Body text gray
+    # ==================== END FIXED LAYOUT CONSTANTS ====================
+
+    # Get order details (orders may have different field names for languages/document type)
+    order_number = order.get("order_number", "P0000")
+    document_type = order.get("translation_document_type") or order.get("document_type") or "Document"
+    source_lang = order.get("translation_source_language") or order.get("translate_from") or order.get("source_language") or "Portuguese"
+    target_lang = order.get("translation_target_language") or order.get("translate_to") or order.get("target_language") or "English"
+    client_name = order.get("client_name", "")
+    translation_date = datetime.utcnow().strftime("%B %d, %Y")
+
+    # ==================== PAGE 1: COVER PAGE / CERTIFICATE ====================
+    if include_certificate:
+        # Check if there's a separate cover page uploaded (use it as-is to preserve formatting)
+        use_separate_cover = order.get("use_separate_cover", False)
+        cover_page_file = order.get("cover_page_file")
+
+        if use_separate_cover and cover_page_file:
+            # Use the uploaded cover page exactly as-is (no modifications)
+            try:
+                cover_bytes = base64.b64decode(cover_page_file)
+                cover_type = order.get("cover_page_type", "application/pdf")
+
+                if cover_type == "application/pdf":
+                    # Insert PDF cover page(s) directly
+                    cover_doc = fitz.open(stream=cover_bytes, filetype="pdf")
+                    for page_num in range(len(cover_doc)):
+                        doc.insert_pdf(cover_doc, from_page=page_num, to_page=page_num)
+                    cover_doc.close()
+                    logger.info(f"Inserted {len(cover_doc)} page(s) from separate cover PDF")
+                else:
+                    # Insert image cover page
+                    from PIL import Image
+                    from io import BytesIO as PILBytesIO
+                    img = Image.open(PILBytesIO(cover_bytes))
+                    page = doc.new_page(width=page_width, height=page_height)
+
+                    # Calculate scaling to fit page while maintaining aspect ratio
+                    img_width, img_height = img.size
+                    scale = min((page_width - 40) / img_width, (page_height - 40) / img_height)
+                    new_width = img_width * scale
+                    new_height = img_height * scale
+                    x_offset = (page_width - new_width) / 2
+                    y_offset = (page_height - new_height) / 2
+
+                    # Convert to PNG bytes for insertion
+                    img_buffer = PILBytesIO()
+                    img.save(img_buffer, format='PNG')
+                    img_buffer.seek(0)
+
+                    page.insert_image(
+                        fitz.Rect(x_offset, y_offset, x_offset + new_width, y_offset + new_height),
+                        stream=img_buffer.getvalue()
+                    )
+                    logger.info("Inserted separate cover image")
+
+            except Exception as e:
+                logger.error(f"Error inserting separate cover page: {str(e)}, falling back to generated certificate")
+                # Fall back to generated certificate
+                use_separate_cover = False
+
+        if not use_separate_cover or not cover_page_file:
+            # Generate standard Certificate of Accuracy with FIXED layout
+            # This template matches the Start tab and must not change
+            page = doc.new_page(width=page_width, height=page_height)
+
+            # Header decorative line (fixed position)
+            page.draw_rect(fitz.Rect(MARGIN_LEFT, HEADER_LINE_Y, page_width - MARGIN_RIGHT, HEADER_LINE_Y + 3), color=blue_color, fill=blue_color)
+
+            # Company name (centered, fixed Y=60)
+            page.insert_text((page_width/2 - 100, MARGIN_TOP), "Legacy Translations", fontsize=18, fontname="helv", color=blue_color)
+
+            # Contact info (centered, fixed positions)
+            page.insert_text((page_width/2 - 140, 100), "867 Boylston Street · 5th Floor · #2073 · Boston, MA 02116", fontsize=8, fontname="helv", color=gray_color)
+            page.insert_text((page_width/2 - 95, 112), "(857) 316-7770 · contact@legacytranslations.com", fontsize=8, fontname="helv", color=gray_color)
+
+            # Order number (centered, fixed Y=150)
+            page.insert_text((page_width/2 - 40, 150), f"Order # {order_number}", fontsize=11, fontname="helv", color=gray_color)
+
+            # Main title (centered, fixed Y=200)
+            page.insert_text((page_width/2 - 130, 200), "CERTIFICATION OF TRANSLATION ACCURACY", fontsize=14, fontname="helvB", color=blue_color)
+
+            # Subtitle (centered, fixed Y=240)
+            subtitle = f"Translation of a {document_type} from {source_lang} to {target_lang}"
+            page.insert_text((page_width/2 - len(subtitle)*2.5, 240), subtitle, fontsize=10, fontname="helv", color=gray_color)
+
+            # Body text (fixed left margin, starting Y=300)
+            body_y = 300
+            body_texts = [
+                f"I, {translator_name}, hereby certify that the attached translation from {source_lang}",
+                f"to {target_lang} is a true and accurate translation of the original document.",
+                "",
+                "I further certify that I am competent to translate from the source language to the target",
+                "language, and that the translation is complete and accurate to the best of my knowledge",
+                "and ability.",
+                "",
+                "This certification is made under penalty of perjury under the laws of the United States",
+                "of America and the Commonwealth of Massachusetts."
+            ]
+
+            for text in body_texts:
+                if text:
+                    page.insert_text((BODY_MARGIN_LEFT, body_y), text, fontsize=10, fontname="helv", color=(0.2, 0.2, 0.2))
+                body_y += 18
+
+            # Signature section (fixed position Y=550)
+            sig_y = 550
+            page.insert_text((BODY_MARGIN_LEFT, sig_y), "___________________________________", fontsize=10, fontname="helv", color=gray_color)
+            page.insert_text((BODY_MARGIN_LEFT, sig_y + 20), translator_name, fontsize=11, fontname="helvB", color=blue_color)
+            page.insert_text((BODY_MARGIN_LEFT, sig_y + 35), "Authorized Representative", fontsize=9, fontname="helv", color=gray_color)
+            page.insert_text((BODY_MARGIN_LEFT, sig_y + 50), "Legacy Translations Inc.", fontsize=9, fontname="helv", color=gray_color)
+            page.insert_text((BODY_MARGIN_LEFT, sig_y + 65), f"Dated: {translation_date}", fontsize=9, fontname="helv", color=gray_color)
+
+            # ATA info (right side, fixed position)
+            page.insert_text((400, sig_y + 35), "ATA Member #275993", fontsize=9, fontname="helv", color=gray_color)
+
+            # Footer decorative line (fixed position)
+            page.draw_rect(fitz.Rect(MARGIN_LEFT, FOOTER_LINE_Y, page_width - MARGIN_RIGHT, FOOTER_LINE_Y + 3), color=blue_color, fill=blue_color)
+
+    # ==================== TRANSLATION PAGES ====================
+    if include_translation:
+        # Check for existing translated file (PDF)
+        translated_file = order.get("translated_file")
+        if translated_file:
+            try:
+                # Decode base64 PDF
+                pdf_bytes = base64.b64decode(translated_file)
+                trans_doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+
+                for page_num in range(len(trans_doc)):
+                    # Insert each page from the translated PDF
+                    doc.insert_pdf(trans_doc, from_page=page_num, to_page=page_num)
+
+                trans_doc.close()
+            except Exception as e:
+                logger.error(f"Error adding translated PDF: {str(e)}")
+
+        # Check for translation HTML (workspace content)
+        translation_html = order.get("translation_html")
+        if translation_html and not translated_file:
+            # Create a simple text page with the translation content
+            page = doc.new_page(width=page_width, height=page_height)
+
+            # Header
+            page.draw_rect(fitz.Rect(50, 40, page_width - 50, 43), color=blue_color, fill=blue_color)
+            page.insert_text((page_width/2 - 60, 30), "Legacy Translations", fontsize=12, fontname="helv", color=blue_color)
+
+            # Title
+            page.insert_text((80, 80), "TRANSLATED DOCUMENT", fontsize=12, fontname="helvB", color=blue_color)
+            page.insert_text((80, 100), f"Order: {order_number} | {source_lang} → {target_lang}", fontsize=9, fontname="helv", color=gray_color)
+
+            # Content note
+            page.insert_text((80, 140), "Translation content available in HTML format.", fontsize=10, fontname="helv", color=gray_color)
+            page.insert_text((80, 160), "Please refer to the attached HTML file for full formatted content.", fontsize=10, fontname="helv", color=gray_color)
+
+    # ==================== ORIGINAL DOCUMENT PAGES ====================
+    if include_original:
+        # Get original documents - support both single file and list of files
+        original_file_list = order.get("original_file_list", [])
+        original_file = order.get("original_file") or order.get("file_data")
+
+        # If we have a single file but no list, create a list with it
+        if original_file and not original_file_list:
+            original_file_list = [{"data": original_file, "filename": "original.pdf", "content_type": "application/pdf"}]
+
+        if original_file_list:
+            # Add separator page
+            sep_page = doc.new_page(width=page_width, height=page_height)
+            sep_page.draw_rect(fitz.Rect(50, 380, page_width - 50, 383), color=blue_color, fill=blue_color)
+            sep_page.insert_text((page_width/2 - 60, 400), "ORIGINAL DOCUMENT", fontsize=16, fontname="helvB", color=blue_color)
+            sep_page.insert_text((page_width/2 - 100, 430), "The following pages contain the original document", fontsize=10, fontname="helv", color=gray_color)
+
+            for orig_item in original_file_list:
+                try:
+                    file_data = orig_item.get("data", "")
+                    content_type = orig_item.get("content_type", "application/pdf").lower()
+                    filename = orig_item.get("filename", "").lower()
+
+                    file_bytes = base64.b64decode(file_data)
+
+                    # Check if it's an image (JPG, PNG, etc.)
+                    is_image = "image" in content_type or filename.endswith(('.jpg', '.jpeg', '.png', '.gif', '.bmp'))
+
+                    if is_image:
+                        # Convert image to PDF page
+                        try:
+                            from PIL import Image
+                            import io
+
+                            pil_img = Image.open(io.BytesIO(file_bytes))
+                            img_width, img_height = pil_img.size
+
+                            # Create a new page and insert the image
+                            img_page = doc.new_page(width=page_width, height=page_height)
+
+                            # Calculate scale to fit page with margins
+                            margin = 36
+                            max_width = page_width - 2 * margin
+                            max_height = page_height - 2 * margin
+                            scale = min(max_width / img_width, max_height / img_height)
+
+                            new_width = img_width * scale
+                            new_height = img_height * scale
+                            x_offset = (page_width - new_width) / 2
+                            y_offset = (page_height - new_height) / 2
+                            insert_rect = fitz.Rect(x_offset, y_offset, x_offset + new_width, y_offset + new_height)
+
+                            img_page.insert_image(insert_rect, stream=file_bytes)
+                            pil_img.close()
+                            logger.info(f"Added original image to combined PDF: {orig_item.get('filename', 'image')}")
+                        except Exception as img_err:
+                            logger.error(f"Error adding original image: {str(img_err)}")
+                    else:
+                        # Try to open as PDF
+                        try:
+                            orig_doc = fitz.open(stream=file_bytes, filetype="pdf")
+                            for page_num in range(len(orig_doc)):
+                                doc.insert_pdf(orig_doc, from_page=page_num, to_page=page_num)
+                            orig_doc.close()
+                            logger.info(f"Added original PDF to combined PDF: {orig_item.get('filename', 'document')}")
+                        except Exception as pdf_err:
+                            # If it fails as PDF, try as image
+                            try:
+                                from PIL import Image
+                                import io
+
+                                pil_img = Image.open(io.BytesIO(file_bytes))
+                                img_width, img_height = pil_img.size
+
+                                img_page = doc.new_page(width=page_width, height=page_height)
+                                margin = 36
+                                max_width = page_width - 2 * margin
+                                max_height = page_height - 2 * margin
+                                scale = min(max_width / img_width, max_height / img_height)
+
+                                new_width = img_width * scale
+                                new_height = img_height * scale
+                                x_offset = (page_width - new_width) / 2
+                                y_offset = (page_height - new_height) / 2
+                                insert_rect = fitz.Rect(x_offset, y_offset, x_offset + new_width, y_offset + new_height)
+
+                                img_page.insert_image(insert_rect, stream=file_bytes)
+                                pil_img.close()
+                                logger.info(f"Added original file as image to combined PDF: {orig_item.get('filename', 'file')}")
+                            except Exception as fallback_err:
+                                logger.error(f"Error adding original document: {str(fallback_err)}")
+                except Exception as e:
+                    logger.error(f"Error processing original document: {str(e)}")
+
+    # ==================== VERIFICATION PAGE ====================
+    if include_verification and certification_data:
+        page = doc.new_page(width=page_width, height=page_height)
+
+        cert_id = certification_data.get("certification_id", "")
+        verification_url = certification_data.get("verification_url", "")
+        qr_code_data = certification_data.get("qr_code_data", "")
+        document_hash = certification_data.get("document_hash", "")[:20]
+        certified_date = datetime.utcnow().strftime("%B %d, %Y")
+
+        # Header banner background
+        page.draw_rect(fitz.Rect(0, 0, page_width, 100), color=blue_color, fill=blue_color)
+
+        # Header text
+        page.insert_text((page_width/2 - 80, 40), "Legacy Translations", fontsize=16, fontname="helvB", color=(1, 1, 1))
+        page.insert_text((page_width/2 - 70, 65), "Document Verification", fontsize=14, fontname="helv", color=(1, 1, 1))
+        page.insert_text((page_width/2 - 120, 85), "Official Certification for Translated Documents", fontsize=9, fontname="helv", color=(0.8, 0.8, 0.8))
+
+        # Verified badge
+        page.draw_rect(fitz.Rect(200, 130, 412, 160), color=(0.86, 0.97, 0.86), fill=(0.86, 0.97, 0.86), radius=15)
+        page.insert_text((230, 150), "✓ Certified & Verified Document", fontsize=11, fontname="helvB", color=(0.09, 0.4, 0.21))
+
+        # Certification details box
+        page.draw_rect(fitz.Rect(60, 180, page_width - 60, 380), color=(0.95, 0.96, 0.98), fill=(0.95, 0.96, 0.98), radius=10)
+
+        # Details
+        details_y = 210
+        details = [
+            ("Certification ID:", cert_id),
+            ("Order Number:", order_number),
+            ("Document Type:", document_type),
+            ("Translation:", f"{source_lang} → {target_lang}"),
+            ("Certified Date:", certified_date),
+            ("Certified By:", translator_name),
+            ("Document Hash:", f"{document_hash}..."),
+        ]
+
+        for label, value in details:
+            page.insert_text((80, details_y), label, fontsize=10, fontname="helv", color=gray_color)
+            page.insert_text((250, details_y), value, fontsize=10, fontname="helvB", color=(0.1, 0.1, 0.1))
+            details_y += 22
+
+        # QR Code section
+        page.draw_rect(fitz.Rect(150, 400, page_width - 150, 600), color=(0.93, 0.95, 1), fill=(0.93, 0.95, 1), radius=10)
+        page.insert_text((page_width/2 - 60, 430), "📱 Scan to Verify Online", fontsize=11, fontname="helvB", color=blue_color)
+
+        # Add QR code image if available
+        if qr_code_data:
+            try:
+                qr_bytes = base64.b64decode(qr_code_data)
+                qr_rect = fitz.Rect(page_width/2 - 60, 450, page_width/2 + 60, 570)
+                page.insert_image(qr_rect, stream=qr_bytes)
+            except Exception as e:
+                logger.error(f"Error adding QR code: {str(e)}")
+
+        page.insert_text((page_width/2 - 100, 590), "Point your camera at this QR code to verify", fontsize=9, fontname="helv", color=gray_color)
+
+        # Verification URL
+        page.draw_rect(fitz.Rect(80, 620, page_width - 80, 660), color=(0.97, 0.97, 0.97), fill=(0.97, 0.97, 0.97), radius=5)
+        page.insert_text((100, 635), "Verify at:", fontsize=9, fontname="helv", color=gray_color)
+        page.insert_text((160, 635), verification_url, fontsize=9, fontname="helvB", color=blue_color)
+
+        # Footer notice
+        page.insert_text((80, 700), "⚠️ Important: This document has been digitally certified by Legacy Translations Inc.", fontsize=8, fontname="helvB", color=gray_color)
+        page.insert_text((80, 715), "Any alterations to this document will invalidate this certification.", fontsize=8, fontname="helv", color=gray_color)
+
+        # Company footer
+        page.draw_rect(fitz.Rect(0, page_height - 40, page_width, page_height), color=(0.97, 0.97, 0.97), fill=(0.97, 0.97, 0.97))
+        page.insert_text((page_width/2 - 150, page_height - 20), "Legacy Translations Inc. · 867 Boylston St, Boston, MA · (857) 316-7770 · ATA #275993", fontsize=7, fontname="helv", color=gray_color)
+
+    # Save to bytes
+    pdf_bytes = doc.tobytes()
+    doc.close()
+
+    return pdf_bytes
 
 @api_router.post("/admin/orders/{order_id}/deliver")
 async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrderRequest = None):
@@ -8572,6 +12045,14 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
     bcc_email = request.bcc_email if request else None
     notify_pm = request.notify_pm if request else False
     attachments_selection = request.attachments if request else None
+    include_verification_page = request.include_verification_page if request else True
+    certifier_name = request.certifier_name if request else None
+    # Combined PDF options
+    generate_combined_pdf = request.generate_combined_pdf if request else True
+    include_certificate = request.include_certificate if request else True
+    include_translation = request.include_translation if request else True
+    include_original = request.include_original if request else True
+    translator_name = request.translator_name if request else certifier_name or "Beatriz Paiva"
 
     # Find the order
     order = await db.translation_orders.find_one({"id": order_id})
@@ -8603,103 +12084,802 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
         has_html_translation = order.get("translation_html")
 
         # Debug logging
-        logger.info(f"Delivering order {order.get('order_number')}: has_file={has_file_attachment}, has_html={bool(has_html_translation)}")
+        logger.info(f"Delivering order {order.get('order_number')}: has_file={has_file_attachment}, has_html={bool(has_html_translation)}, combined_pdf={generate_combined_pdf}")
 
-        # Determine what to include based on selection (or default behavior)
-        include_workspace = True
-        additional_doc_ids = []
+        # Create certification first if verification page is requested (needed for combined PDF)
+        certification_data = None
+        if include_verification_page:
+            try:
+                # Generate certification ID
+                cert_id = f"LT-{datetime.now().strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}"
 
-        if attachments_selection:
-            include_workspace = attachments_selection.include_workspace
-            additional_doc_ids = attachments_selection.additional_document_ids or []
+                # Create document hash from translation content
+                translation_content = order.get('translation_html', '') or 'Translation Content'
+                document_hash = hashlib.sha256(translation_content.encode('utf-8')).hexdigest()
 
-        # Add workspace translation if selected
-        if include_workspace and has_html_translation:
-            translation_html_content = generate_translation_html_for_email(order)
-            all_attachments.append({
-                "content": base64.b64encode(translation_html_content.encode('utf-8')).decode('utf-8'),
-                "filename": f"Translation_{order['order_number']}.html",
-                "content_type": "text/html"
-            })
-            attachment_filenames.append(f"Translation_{order['order_number']}.html")
-            logger.info(f"Added workspace translation to attachments")
+                # Generate verification URL
+                base_url = os.environ.get("FRONTEND_URL", "https://portal.legacytranslations.com")
+                verification_url = f"{base_url}/#/verify/{cert_id}"
 
-        # Get ALL documents from the project
-        # Priority: translated documents first, then original documents
-        project_docs = await db.order_documents.find({"order_id": order_id}).to_list(100)
-        project_docs_main = await db.documents.find({"order_id": order_id}).to_list(100)
+                # Generate QR code
+                qr_code_data = generate_qr_code(verification_url)
 
-        # Separate translated documents from original documents
-        translated_docs = [doc for doc in project_docs if doc.get("source") == "translated_document"]
-        original_docs = [doc for doc in project_docs if doc.get("source") != "translated_document"]
+                # Normalize certifier name - replace "Admin (Self)" with proper name
+                normalized_certifier = certifier_name
+                if normalized_certifier in ["Admin (Self)", "Admin", "Self", None, ""]:
+                    normalized_certifier = "Beatriz Paiva"
 
-        logger.info(f"Found {len(translated_docs)} translated documents and {len(original_docs)} original documents")
+                # Create certification record
+                certification = {
+                    "certification_id": cert_id,
+                    "order_id": order_id,
+                    "order_number": order.get("order_number"),
+                    "document_type": order.get("document_type", "Document"),
+                    "source_language": order.get("source_language", ""),
+                    "target_language": order.get("target_language", ""),
+                    "page_count": 1,
+                    "document_hash": document_hash,
+                    "certifier_name": normalized_certifier,
+                    "certifier_title": "Legal Representative",
+                    "certifier_credentials": "ATA Member # 275993",
+                    "company_name": "Legacy Translations Inc.",
+                    "company_address": "867 Boylston Street, 5th Floor, #2073, Boston, MA 02116",
+                    "company_phone": "(857) 316-7770",
+                    "company_email": "contact@legacytranslations.com",
+                    "client_name": order.get("client_name", ""),
+                    "certified_at": datetime.utcnow(),
+                    "is_valid": True,
+                    "verification_url": verification_url,
+                    "qr_code_data": qr_code_data
+                }
 
-        # PRIORITY: If we have translated documents, send ONLY those (not original documents)
-        docs_to_send = translated_docs if translated_docs else []
+                # Store in database
+                await db.certifications.insert_one(certification)
+                certification_data = certification
 
-        # Add translated documents as attachments
-        for doc in docs_to_send:
-            doc_data = doc.get("file_data") or doc.get("data")
-            if doc_data:
-                filename = doc.get("filename", "translated_document.pdf")
-                # Avoid duplicates
-                if filename not in attachment_filenames:
-                    all_attachments.append({
-                        "content": doc_data,
-                        "filename": filename,
-                        "content_type": doc.get("content_type", "application/pdf")
-                    })
-                    attachment_filenames.append(filename)
-                    logger.info(f"Added translated document to attachments: {filename}")
-            else:
-                logger.warning(f"Translated document {doc.get('id')} has no data!")
+                logger.info(f"Created certification for delivery: {cert_id}")
 
-        # Also check documents collection for translated files
-        for doc in project_docs_main:
-            if doc.get("source") == "translated_document":
-                doc_data = doc.get("file_data") or doc.get("data")
-                if doc_data:
-                    filename = doc.get("filename", "document.pdf")
-                    if filename not in attachment_filenames:
-                        all_attachments.append({
-                            "content": doc_data,
-                            "filename": filename,
-                            "content_type": doc.get("content_type", "application/pdf")
-                        })
-                        attachment_filenames.append(filename)
-                        logger.info(f"Added translated document from main collection: {filename}")
+                # Generate verification page HTML
+                certified_date = datetime.utcnow().strftime('%B %d, %Y')
+                # Get document info with fallbacks (orders may have different field names)
+                doc_type = order.get("translation_document_type") or order.get("document_type") or "Document"
+                src_lang = order.get("translation_source_language") or order.get("translate_from") or order.get("source_language") or "Portuguese"
+                tgt_lang = order.get("translation_target_language") or order.get("translate_to") or order.get("target_language") or "English"
+                verification_page_html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Document Verification - {cert_id}</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }}
+        .container {{
+            max-width: 650px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+            overflow: hidden;
+        }}
+        .header-banner {{
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            padding: 30px;
+            text-align: center;
+            position: relative;
+        }}
+        .header-banner::after {{
+            content: '';
+            position: absolute;
+            bottom: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 25px solid transparent;
+            border-right: 25px solid transparent;
+            border-top: 20px solid #3b82f6;
+        }}
+        .logo {{ max-height: 55px; margin-bottom: 15px; filter: brightness(0) invert(1); }}
+        .header-title {{ color: white; font-size: 26px; font-weight: 700; margin: 0; letter-spacing: -0.5px; }}
+        .header-subtitle {{ color: rgba(255,255,255,0.85); font-size: 14px; margin-top: 8px; }}
 
-        # Also add any additional documents explicitly selected (for backwards compatibility)
-        if additional_doc_ids:
-            for doc_id in additional_doc_ids:
-                # Check if it's a string ID for order documents
-                if isinstance(doc_id, str) and not doc_id.startswith('temp-'):
-                    doc = await db.order_documents.find_one({"id": doc_id})
-                    if doc and (doc.get("file_data") or doc.get("data")):
+        .content {{ padding: 50px 40px 40px; }}
+
+        .badge-container {{ text-align: center; margin-bottom: 30px; }}
+        .valid-badge {{
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+            color: #166534;
+            padding: 12px 24px;
+            border-radius: 50px;
+            font-weight: 700;
+            font-size: 15px;
+            box-shadow: 0 4px 15px rgba(22, 163, 74, 0.2);
+            border: 2px solid #86efac;
+        }}
+        .valid-icon {{
+            width: 24px;
+            height: 24px;
+            background: #166534;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
+        }}
+
+        .cert-card {{
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            padding: 25px;
+            margin: 25px 0;
+        }}
+        .cert-row {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }}
+        .cert-row:last-child {{ border-bottom: none; }}
+        .cert-label {{ color: #64748b; font-size: 13px; font-weight: 500; }}
+        .cert-value {{ font-weight: 600; color: #1e293b; font-size: 14px; text-align: right; }}
+        .cert-id-badge {{
+            font-family: 'Consolas', 'Monaco', monospace;
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            border: 1px solid #fcd34d;
+        }}
+
+        .qr-section {{
+            text-align: center;
+            margin: 35px 0;
+            padding: 30px;
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+            border-radius: 16px;
+            border: 2px dashed #93c5fd;
+        }}
+        .qr-code {{
+            width: 180px;
+            height: 180px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            border: 4px solid white;
+        }}
+        .qr-title {{
+            font-size: 16px;
+            font-weight: 700;
+            color: #1e40af;
+            margin-bottom: 15px;
+        }}
+        .qr-instruction {{
+            font-size: 13px;
+            color: #64748b;
+            margin-top: 15px;
+            line-height: 1.5;
+        }}
+
+        .verify-url-box {{
+            text-align: center;
+            padding: 15px 20px;
+            background: #f8fafc;
+            border-radius: 10px;
+            margin: 20px 0;
+            border: 1px solid #e2e8f0;
+        }}
+        .verify-label {{ font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }}
+        .verify-url {{
+            font-size: 14px;
+            color: #3b82f6;
+            word-break: break-all;
+            font-weight: 600;
+        }}
+
+        .footer {{
+            text-align: center;
+            padding: 25px 40px;
+            background: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+        }}
+        .footer-notice {{
+            font-size: 12px;
+            color: #64748b;
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }}
+        .footer-notice strong {{ color: #1e293b; }}
+        .footer-company {{
+            font-size: 11px;
+            color: #94a3b8;
+            line-height: 1.8;
+        }}
+        .divider {{
+            width: 60px;
+            height: 3px;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+            margin: 15px auto;
+            border-radius: 2px;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-banner">
+            <img src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png" alt="Legacy Translations" class="logo" />
+            <h1 class="header-title">Document Verification</h1>
+            <p class="header-subtitle">Official Certification for Translated Documents</p>
+        </div>
+
+        <div class="content">
+            <div class="badge-container">
+                <span class="valid-badge">
+                    <span class="valid-icon">✓</span>
+                    Certified & Verified Document
+                </span>
+            </div>
+
+            <div class="cert-card">
+                <div class="cert-row">
+                    <span class="cert-label">Certification ID</span>
+                    <span class="cert-value cert-id-badge">{cert_id}</span>
+                </div>
+                <div class="cert-row">
+                    <span class="cert-label">Order Number</span>
+                    <span class="cert-value">{order.get('order_number', 'N/A')}</span>
+                </div>
+                <div class="cert-row">
+                    <span class="cert-label">Document Type</span>
+                    <span class="cert-value">{doc_type}</span>
+                </div>
+                <div class="cert-row">
+                    <span class="cert-label">Translation</span>
+                    <span class="cert-value">{src_lang} → {tgt_lang}</span>
+                </div>
+                <div class="cert-row">
+                    <span class="cert-label">Certified Date</span>
+                    <span class="cert-value">{certified_date}</span>
+                </div>
+                <div class="cert-row">
+                    <span class="cert-label">Certified By</span>
+                    <span class="cert-value">{certifier_name or 'Beatriz Paiva'}</span>
+                </div>
+                <div class="cert-row">
+                    <span class="cert-label">Document Hash</span>
+                    <span class="cert-value" style="font-family: monospace; font-size: 11px; color: #64748b;">{document_hash[:20]}...</span>
+                </div>
+            </div>
+
+            <div class="qr-section">
+                <p class="qr-title">📱 Scan to Verify Online</p>
+                {f'<img src="data:image/png;base64,{qr_code_data}" alt="QR Code" class="qr-code" />' if qr_code_data else '<div style="width:180px;height:180px;background:#e2e8f0;display:inline-block;border-radius:12px;"></div>'}
+                <p class="qr-instruction">
+                    Point your phone's camera at this QR code<br/>
+                    to instantly verify the authenticity of this document
+                </p>
+            </div>
+
+            <div class="verify-url-box">
+                <p class="verify-label">Manual Verification URL</p>
+                <p class="verify-url">{verification_url}</p>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p class="footer-notice">
+                <strong>⚠️ Important Notice:</strong> This document has been digitally certified by Legacy Translations Inc.<br/>
+                Any alterations to this document will invalidate this certification.
+            </p>
+            <div class="divider"></div>
+            <p class="footer-company">
+                <strong>Legacy Translations Inc.</strong><br/>
+                867 Boylston Street, 5th Floor, #2073 • Boston, MA 02116<br/>
+                (857) 316-7770 • contact@legacytranslations.com<br/>
+                ATA Member #275993
+            </p>
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+                logger.info(f"Certification created for delivery: {cert_id}")
+
+            except Exception as e:
+                logger.error(f"Failed to create certification for delivery: {str(e)}")
+                import traceback
+                traceback.print_exc()
+
+        # ==================== GENERATE COMBINED PDF OR SEPARATE ATTACHMENTS ====================
+        if generate_combined_pdf:
+            # Generate a single combined PDF with all parts
+            try:
+                logger.info(f"Generating combined PDF for order {order.get('order_number')}")
+
+                # Fetch original documents for the combined PDF
+                # First try to find explicitly marked originals
+                original_docs = await db.order_documents.find({
+                    "order_id": order_id,
+                    "$or": [
+                        {"document_type": "original"},
+                        {"is_original": True},
+                        {"filename": {"$regex": "original", "$options": "i"}}
+                    ]
+                }).to_list(10)
+
+                # If no specific original docs found, try documents that are NOT translated
+                if not original_docs:
+                    original_docs = await db.order_documents.find({
+                        "order_id": order_id,
+                        "source": {"$ne": "translated_document"}
+                    }).to_list(10)
+
+                # If still no docs, try to get from order itself
+                original_file_data = None
+                original_file_list = []  # Support multiple originals
+                if original_docs:
+                    for doc in original_docs:
                         doc_data = doc.get("file_data") or doc.get("data")
-                        filename = doc.get("filename", f"document_{doc_id}.pdf")
-                        # Avoid duplicates
-                        if filename not in attachment_filenames:
-                            all_attachments.append({
-                                "content": doc_data,
-                                "filename": filename,
+                        if doc_data:
+                            original_file_list.append({
+                                "data": doc_data,
+                                "filename": doc.get("filename", "original.pdf"),
                                 "content_type": doc.get("content_type", "application/pdf")
                             })
-                            attachment_filenames.append(filename)
-                            logger.info(f"Added additional document {doc_id} to attachments: {filename}")
+                            if not original_file_data:
+                                original_file_data = doc_data  # Keep first for backward compatibility
 
-        # Fallback: if no attachments selected but order has translated_file, use that
-        if not all_attachments and has_file_attachment:
-            all_attachments.append({
-                "content": order["translated_file"],
-                "filename": order["translated_filename"],
-                "content_type": order.get("translated_file_type", "application/pdf")
-            })
-            attachment_filenames.append(order["translated_filename"])
-            logger.info(f"Using fallback uploaded file: {order['translated_filename']}")
+                # Prepare order data with original file if found
+                order_with_original = dict(order)
+                if original_file_data:
+                    order_with_original["original_file"] = original_file_data
+                if original_file_list:
+                    order_with_original["original_file_list"] = original_file_list
+
+                # Fetch translated documents from order_documents collection if not already on order
+                if not order_with_original.get("translated_file"):
+                    translated_docs = await db.order_documents.find({
+                        "order_id": order_id,
+                        "source": "translated_document"
+                    }).to_list(10)
+
+                    if translated_docs:
+                        # Get the first translated document (usually a PDF)
+                        for trans_doc in translated_docs:
+                            trans_data = trans_doc.get("file_data") or trans_doc.get("data")
+                            if trans_data:
+                                content_type = trans_doc.get("content_type", "application/pdf")
+                                # If it's a PDF, use it directly
+                                if "pdf" in content_type.lower():
+                                    order_with_original["translated_file"] = trans_data
+                                    order_with_original["translated_filename"] = trans_doc.get("filename", "translation.pdf")
+                                    logger.info(f"Found translated PDF from order_documents: {trans_doc.get('filename')}")
+                                    break
+                                # If it's an image (JPG, PNG), convert to PDF with full page size
+                                elif "image" in content_type.lower():
+                                    try:
+                                        import fitz
+                                        from PIL import Image
+                                        import io
+
+                                        img_bytes = base64.b64decode(trans_data)
+                                        # Get image dimensions using PIL
+                                        pil_img = Image.open(io.BytesIO(img_bytes))
+                                        img_width, img_height = pil_img.size
+
+                                        # Create PDF with letter size
+                                        pdf_doc = fitz.open()
+                                        pdf_page = pdf_doc.new_page(width=612, height=792)
+
+                                        # Calculate scale to fit page with small margins
+                                        margin = 36  # 0.5 inch margins
+                                        max_width = 612 - 2 * margin
+                                        max_height = 792 - 2 * margin
+                                        scale = min(max_width / img_width, max_height / img_height)
+
+                                        # Center the image
+                                        new_width = img_width * scale
+                                        new_height = img_height * scale
+                                        x_offset = (612 - new_width) / 2
+                                        y_offset = (792 - new_height) / 2
+                                        insert_rect = fitz.Rect(x_offset, y_offset, x_offset + new_width, y_offset + new_height)
+
+                                        pdf_page.insert_image(insert_rect, stream=img_bytes)
+
+                                        # Convert to base64
+                                        pdf_bytes = pdf_doc.tobytes()
+                                        order_with_original["translated_file"] = base64.b64encode(pdf_bytes).decode('utf-8')
+                                        order_with_original["translated_filename"] = trans_doc.get("filename", "translation.pdf").rsplit('.', 1)[0] + ".pdf"
+                                        logger.info(f"Converted translated image to PDF (full size): {trans_doc.get('filename')}")
+                                        pdf_doc.close()
+                                        pil_img.close()
+                                        break
+                                    except Exception as img_err:
+                                        logger.error(f"Error converting image to PDF: {str(img_err)}")
+                                        continue
+
+                # Generate the combined PDF
+                combined_pdf_bytes = await generate_combined_delivery_pdf(
+                    order=order_with_original,
+                    include_certificate=include_certificate,
+                    include_translation=include_translation,
+                    include_original=include_original and bool(original_file_data),
+                    include_verification=include_verification_page,
+                    certification_data=certification_data,
+                    translator_name=translator_name
+                )
+
+                # Add combined PDF as the single attachment
+                all_attachments = [{
+                    "content": base64.b64encode(combined_pdf_bytes).decode('utf-8'),
+                    "filename": f"Certified_Translation_{order['order_number']}.pdf",
+                    "content_type": "application/pdf"
+                }]
+                attachment_filenames = [f"Certified_Translation_{order['order_number']}.pdf"]
+                has_attachments = True
+                logger.info(f"Generated combined PDF: Certified_Translation_{order['order_number']}.pdf")
+
+            except Exception as e:
+                logger.error(f"Failed to generate combined PDF: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                # Fallback to separate attachments on error
+                generate_combined_pdf = False
+
+        # Fallback: Create a SINGLE combined PDF (same structure as Quick Package)
+        # Structure: Certificate → Translation → Original → Verification
+        if not generate_combined_pdf:
+            try:
+                import fitz
+                from bs4 import BeautifulSoup
+
+                logger.info(f"Creating fallback combined PDF for order {order.get('order_number')}")
+
+                pdf_doc = fitz.open()
+                page_width, page_height = 612, 792  # Letter size
+                blue_color = (0.11, 0.27, 0.53)
+                gray_color = (0.4, 0.4, 0.4)
+
+                # Get order details
+                order_number = order.get("order_number", "P0000")
+                document_type = order.get("translation_document_type") or order.get("document_type") or "Document"
+                source_lang = order.get("translation_source_language") or order.get("translate_from") or order.get("source_language") or "Portuguese"
+                target_lang = order.get("translation_target_language") or order.get("translate_to") or order.get("target_language") or "English"
+                translation_date = datetime.utcnow().strftime("%B %d, %Y")
+
+                # ==================== PAGE 1: CERTIFICATE OF ACCURACY ====================
+                if include_certificate:
+                    page = pdf_doc.new_page(width=page_width, height=page_height)
+
+                    # Header line
+                    page.draw_rect(fitz.Rect(50, 80, page_width - 50, 83), color=blue_color, fill=blue_color)
+
+                    # Company name
+                    page.insert_text((page_width/2 - 100, 60), "Legacy Translations", fontsize=18, fontname="helv", color=blue_color)
+
+                    # Contact info
+                    page.insert_text((page_width/2 - 140, 100), "867 Boylston Street · 5th Floor · #2073 · Boston, MA 02116", fontsize=8, fontname="helv", color=gray_color)
+                    page.insert_text((page_width/2 - 95, 112), "(857) 316-7770 · contact@legacytranslations.com", fontsize=8, fontname="helv", color=gray_color)
+
+                    # Order number
+                    page.insert_text((page_width/2 - 40, 150), f"Order # {order_number}", fontsize=11, fontname="helv", color=gray_color)
+
+                    # Main title
+                    page.insert_text((page_width/2 - 130, 200), "CERTIFICATION OF TRANSLATION ACCURACY", fontsize=14, fontname="helvB", color=blue_color)
+
+                    # Subtitle
+                    subtitle = f"Translation of a {document_type} from {source_lang} to {target_lang}"
+                    page.insert_text((page_width/2 - len(subtitle)*2.5, 240), subtitle, fontsize=10, fontname="helv", color=gray_color)
+
+                    # Body text
+                    body_y = 300
+                    body_texts = [
+                        f"I, {translator_name}, hereby certify that the attached translation from {source_lang}",
+                        f"to {target_lang} is a true and accurate translation of the original document.",
+                        "",
+                        "I further certify that I am competent to translate from the source language to the target",
+                        "language, and that the translation is complete and accurate to the best of my knowledge",
+                        "and ability.",
+                        "",
+                        "This certification is made under penalty of perjury under the laws of the United States",
+                        "of America and the Commonwealth of Massachusetts."
+                    ]
+
+                    for text in body_texts:
+                        if text:
+                            page.insert_text((80, body_y), text, fontsize=10, fontname="helv", color=(0.2, 0.2, 0.2))
+                        body_y += 18
+
+                    # Signature section
+                    sig_y = 550
+                    page.insert_text((80, sig_y), "___________________________________", fontsize=10, fontname="helv", color=gray_color)
+                    page.insert_text((80, sig_y + 20), translator_name, fontsize=11, fontname="helvB", color=blue_color)
+                    page.insert_text((80, sig_y + 35), "Authorized Representative", fontsize=9, fontname="helv", color=gray_color)
+                    page.insert_text((80, sig_y + 50), "Legacy Translations Inc.", fontsize=9, fontname="helv", color=gray_color)
+                    page.insert_text((80, sig_y + 65), f"Dated: {translation_date}", fontsize=9, fontname="helv", color=gray_color)
+
+                    # ATA info
+                    page.insert_text((400, sig_y + 35), "ATA Member #275993", fontsize=9, fontname="helv", color=gray_color)
+
+                    # Footer line
+                    page.draw_rect(fitz.Rect(50, page_height - 60, page_width - 50, page_height - 57), color=blue_color, fill=blue_color)
+
+                # ==================== TRANSLATION PAGES ====================
+                if include_translation:
+                    # Check for existing translated file (PDF)
+                    translated_file = order.get("translated_file")
+                    if translated_file:
+                        try:
+                            trans_bytes = base64.b64decode(translated_file)
+                            trans_doc = fitz.open(stream=trans_bytes, filetype="pdf")
+                            for page_num in range(len(trans_doc)):
+                                pdf_doc.insert_pdf(trans_doc, from_page=page_num, to_page=page_num)
+                            trans_doc.close()
+                            logger.info("Added translated PDF pages to combined document")
+                        except Exception as trans_err:
+                            logger.error(f"Error adding translated PDF: {str(trans_err)}")
+
+                    # If no PDF but has HTML translation
+                    elif has_html_translation:
+                        try:
+                            translation_html_content = generate_translation_html_for_email(order)
+                            soup = BeautifulSoup(translation_html_content, 'html.parser')
+                            for script in soup(["script", "style"]):
+                                script.decompose()
+                            text_content = soup.get_text(separator='\n')
+                            lines = [line.strip() for line in text_content.split('\n') if line.strip()]
+
+                            # Create translation page
+                            trans_page = pdf_doc.new_page(width=page_width, height=page_height)
+                            margin = 72
+                            y_position = 80
+
+                            # Header
+                            trans_page.draw_rect(fitz.Rect(50, 40, page_width - 50, 43), color=blue_color, fill=blue_color)
+                            trans_page.insert_text((page_width/2 - 60, 30), "Legacy Translations", fontsize=12, fontname="helv", color=blue_color)
+                            trans_page.insert_text((page_width/2 - 50, 60), "TRANSLATION", fontsize=12, fontname="helvB", color=blue_color)
+
+                            y_position = 100
+                            for line in lines:
+                                if y_position > page_height - margin:
+                                    trans_page = pdf_doc.new_page(width=page_width, height=page_height)
+                                    y_position = margin
+
+                                max_chars = 80
+                                while len(line) > max_chars:
+                                    trans_page.insert_text((margin, y_position), line[:max_chars], fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
+                                    y_position += 14
+                                    line = line[max_chars:]
+                                    if y_position > page_height - margin:
+                                        trans_page = pdf_doc.new_page(width=page_width, height=page_height)
+                                        y_position = margin
+
+                                if line:
+                                    trans_page.insert_text((margin, y_position), line, fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
+                                    y_position += 14
+
+                            logger.info("Added HTML translation as text pages")
+                        except Exception as html_err:
+                            logger.error(f"Error adding HTML translation: {str(html_err)}")
+
+                # ==================== ORIGINAL DOCUMENT PAGES ====================
+                if include_original:
+                    original_docs = await db.order_documents.find({
+                        "order_id": order_id,
+                        "$or": [
+                            {"document_type": "original"},
+                            {"is_original": True},
+                            {"filename": {"$regex": "original", "$options": "i"}}
+                        ]
+                    }).to_list(10)
+
+                    if not original_docs:
+                        original_docs = await db.order_documents.find({
+                            "order_id": order_id,
+                            "source": {"$ne": "translated_document"}
+                        }).to_list(10)
+
+                    if original_docs:
+                        # Add separator page
+                        sep_page = pdf_doc.new_page(width=page_width, height=page_height)
+                        sep_page.draw_rect(fitz.Rect(50, 380, page_width - 50, 383), color=blue_color, fill=blue_color)
+                        sep_page.insert_text((page_width/2 - 60, 400), "ORIGINAL DOCUMENT", fontsize=16, fontname="helvB", color=blue_color)
+
+                        for orig_doc in original_docs:
+                            try:
+                                doc_data = orig_doc.get("file_data") or orig_doc.get("data")
+                                if doc_data:
+                                    content_type = orig_doc.get("content_type", "").lower()
+                                    filename = orig_doc.get("filename", "").lower()
+                                    file_bytes = base64.b64decode(doc_data)
+
+                                    is_image = "image" in content_type or filename.endswith(('.jpg', '.jpeg', '.png', '.gif'))
+
+                                    if is_image:
+                                        from PIL import Image
+                                        import io
+                                        pil_img = Image.open(io.BytesIO(file_bytes))
+                                        img_width, img_height = pil_img.size
+                                        img_page = pdf_doc.new_page(width=page_width, height=page_height)
+                                        margin = 36
+                                        max_w, max_h = page_width - 2*margin, page_height - 2*margin
+                                        scale = min(max_w/img_width, max_h/img_height)
+                                        new_w, new_h = img_width*scale, img_height*scale
+                                        x_off, y_off = (page_width-new_w)/2, (page_height-new_h)/2
+                                        img_page.insert_image(fitz.Rect(x_off, y_off, x_off+new_w, y_off+new_h), stream=file_bytes)
+                                        pil_img.close()
+                                    else:
+                                        orig_pdf = fitz.open(stream=file_bytes, filetype="pdf")
+                                        for pn in range(len(orig_pdf)):
+                                            pdf_doc.insert_pdf(orig_pdf, from_page=pn, to_page=pn)
+                                        orig_pdf.close()
+                            except Exception as orig_err:
+                                logger.error(f"Error adding original doc: {str(orig_err)}")
+
+                # ==================== VERIFICATION PAGE (at the end) ====================
+                if certification_data and include_verification_page:
+                    ver_page = pdf_doc.new_page(width=page_width, height=page_height)
+
+                    # Header
+                    ver_page.draw_rect(fitz.Rect(50, 40, 562, 100), color=blue_color, fill=blue_color)
+                    ver_page.insert_text((200, 65), "DOCUMENT VERIFICATION", fontsize=16, fontname="helvB", color=(1, 1, 1))
+                    ver_page.insert_text((180, 85), "Certified Translation Authenticity", fontsize=10, fontname="helv", color=(0.9, 0.9, 0.9))
+
+                    # Content box
+                    ver_page.draw_rect(fitz.Rect(50, 120, 562, 500), color=(0.95, 0.95, 0.95), fill=(0.98, 0.98, 0.98))
+
+                    y = 150
+                    ver_page.insert_text((70, y), "Certification ID:", fontsize=10, fontname="helvB", color=(0.3, 0.3, 0.3))
+                    ver_page.insert_text((200, y), certification_data.get('certification_id', ''), fontsize=10, fontname="helv", color=blue_color)
+
+                    y += 30
+                    ver_page.insert_text((70, y), "Document Type:", fontsize=10, fontname="helvB", color=(0.3, 0.3, 0.3))
+                    ver_page.insert_text((200, y), document_type, fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
+
+                    y += 30
+                    ver_page.insert_text((70, y), "Languages:", fontsize=10, fontname="helvB", color=(0.3, 0.3, 0.3))
+                    ver_page.insert_text((200, y), f"{source_lang} → {target_lang}", fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
+
+                    y += 30
+                    ver_page.insert_text((70, y), "Certified Date:", fontsize=10, fontname="helvB", color=(0.3, 0.3, 0.3))
+                    ver_page.insert_text((200, y), translation_date, fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
+
+                    y += 30
+                    ver_page.insert_text((70, y), "Certifier:", fontsize=10, fontname="helvB", color=(0.3, 0.3, 0.3))
+                    ver_page.insert_text((200, y), certification_data.get('certifier_name', translator_name), fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
+
+                    # QR Code
+                    y += 50
+                    ver_page.insert_text((70, y), "Scan to Verify:", fontsize=10, fontname="helvB", color=(0.3, 0.3, 0.3))
+                    qr_data = certification_data.get('qr_code_data')
+                    if qr_data:
+                        try:
+                            qr_bytes = base64.b64decode(qr_data)
+                            ver_page.insert_image(fitz.Rect(70, y + 10, 170, y + 110), stream=qr_bytes)
+                        except:
+                            pass
+
+                    # Verification URL
+                    y += 130
+                    ver_page.insert_text((70, y), "Verification URL:", fontsize=10, fontname="helvB", color=(0.3, 0.3, 0.3))
+                    ver_page.insert_text((70, y + 20), certification_data.get('verification_url', ''), fontsize=9, fontname="helv", color=blue_color)
+
+                    # Footer
+                    ver_page.insert_text((70, 520), "This document has been digitally certified by Legacy Translations Inc.", fontsize=9, fontname="helv", color=gray_color)
+                    ver_page.insert_text((70, 535), "Any alterations to this document will invalidate this certification.", fontsize=9, fontname="helv", color=gray_color)
+                    ver_page.draw_rect(fitz.Rect(50, 560, 562, 562), color=blue_color, fill=blue_color)
+                    ver_page.insert_text((150, 590), "Legacy Translations Inc. | 867 Boylston Street, Boston, MA 02116", fontsize=8, fontname="helv", color=gray_color)
+                    ver_page.insert_text((200, 605), "(857) 316-7770 | contact@legacytranslations.com", fontsize=8, fontname="helv", color=gray_color)
+
+                # Save combined PDF
+                combined_pdf_bytes = pdf_doc.tobytes()
+                pdf_doc.close()
+
+                all_attachments = [{
+                    "content": base64.b64encode(combined_pdf_bytes).decode('utf-8'),
+                    "filename": f"Certified_Translation_{order['order_number']}.pdf",
+                    "content_type": "application/pdf"
+                }]
+                attachment_filenames = [f"Certified_Translation_{order['order_number']}.pdf"]
+                logger.info(f"Created fallback combined PDF: Certified_Translation_{order['order_number']}.pdf")
+
+            except Exception as fallback_err:
+                logger.error(f"Failed to create fallback combined PDF: {str(fallback_err)}")
+                import traceback
+                traceback.print_exc()
+                # If everything fails, try to send just the translated file if available
+                if has_file_attachment:
+                    all_attachments = [{
+                        "content": order["translated_file"],
+                        "filename": order["translated_filename"],
+                        "content_type": order.get("translated_file_type", "application/pdf")
+                    }]
+                    attachment_filenames = [order["translated_filename"]]
+
+        # FINAL FALLBACK: If still no attachments, try to get any translated documents from order_documents
+        if len(all_attachments) == 0:
+            logger.warning(f"No attachments generated, trying to fetch from order_documents collection")
+            try:
+                translated_docs = await db.order_documents.find({
+                    "order_id": order_id,
+                    "source": "translated_document"
+                }).to_list(50)
+
+                if translated_docs:
+                    for doc in translated_docs:
+                        doc_data = doc.get("file_data") or doc.get("data")
+                        if doc_data:
+                            all_attachments.append({
+                                "content": doc_data,
+                                "filename": doc.get("filename", "translation.pdf"),
+                                "content_type": doc.get("content_type", "application/pdf")
+                            })
+                            attachment_filenames.append(doc.get("filename", "translation.pdf"))
+                            logger.info(f"Added fallback document from order_documents: {doc.get('filename')}")
+
+                if len(all_attachments) == 0:
+                    logger.error(f"NO ATTACHMENTS FOUND for order {order_id}! Order data: translated_file={bool(order.get('translated_file'))}, translation_html={bool(order.get('translation_html'))}")
+            except Exception as final_err:
+                logger.error(f"Final fallback failed: {str(final_err)}")
 
         has_attachments = len(all_attachments) > 0
+        logger.info(f"Final attachment count for order {order.get('order_number')}: {len(all_attachments)}, has_attachments={has_attachments}")
+
+        # Add external attachment if provided (for resend)
+        external_attachment_sent = False
+        external_attachment_filename = None
+        if request.external_attachment:
+            try:
+                ext_att = request.external_attachment
+                all_attachments.append({
+                    "content": ext_att.data,  # Already base64 encoded
+                    "filename": ext_att.filename,
+                    "content_type": ext_att.content_type
+                })
+                attachment_filenames.append(ext_att.filename)
+                external_attachment_sent = True
+                external_attachment_filename = ext_att.filename
+                has_attachments = True
+                logger.info(f"Added external attachment for resend: {ext_att.filename}")
+            except Exception as e:
+                logger.error(f"Failed to add external attachment: {str(e)}")
+
+        # Add additional documents from selection (multiple file support)
+        additional_docs_sent = 0
+        if attachments_selection and attachments_selection.additional_document_ids:
+            logger.info(f"Processing {len(attachments_selection.additional_document_ids)} additional document(s)")
+            for doc_id in attachments_selection.additional_document_ids:
+                try:
+                    # Find document in order_documents collection
+                    doc = await db.order_documents.find_one({"id": doc_id})
+                    if doc and doc.get("file_data"):
+                        all_attachments.append({
+                            "content": doc["file_data"],  # Already base64 encoded
+                            "filename": doc.get("filename", f"document_{doc_id}.pdf"),
+                            "content_type": doc.get("content_type", "application/pdf")
+                        })
+                        attachment_filenames.append(doc.get("filename", f"document_{doc_id}.pdf"))
+                        additional_docs_sent += 1
+                        has_attachments = True
+                        logger.info(f"Added additional document: {doc.get('filename')} (id: {doc_id})")
+                    else:
+                        logger.warning(f"Additional document not found or has no data: {doc_id}")
+                except Exception as e:
+                    logger.error(f"Failed to add additional document {doc_id}: {str(e)}")
+
+            if additional_docs_sent > 0:
+                logger.info(f"Successfully added {additional_docs_sent} additional document(s) to email")
 
         # Use professional email template
         email_html = get_delivery_email_template(order['client_name'])
@@ -8798,16 +12978,26 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
 
         return {
             "status": "success",
-            "message": "Order delivered and emails sent",
+            "message": "Certified translation delivered successfully",
             "attachment_sent": has_attachments,
             "attachments_sent": len(all_attachments),
             "attachment_filenames": attachment_filenames,
+            "additional_docs_sent": additional_docs_sent,
+            "combined_pdf": generate_combined_pdf,
             "pm_notified": pm_notified,
             "bcc_sent": bcc_sent,
-            "debug": {
-                "had_file": has_file_attachment,
-                "had_html": bool(has_html_translation),
-                "total_attachments": len(all_attachments)
+            "external_attachment_sent": external_attachment_sent,
+            "external_attachment_filename": external_attachment_filename,
+            "certification": {
+                "included": bool(certification_data),
+                "certification_id": certification_data.get("certification_id") if certification_data else None,
+                "verification_url": certification_data.get("verification_url") if certification_data else None
+            } if include_verification_page else None,
+            "document_contents": {
+                "certificate": include_certificate,
+                "translation": include_translation,
+                "original": include_original,
+                "verification_page": include_verification_page
             }
         }
 
@@ -8831,8 +13021,25 @@ async def get_translated_document(order_id: str, admin_key: str):
     has_file = bool(order.get("translated_file"))
     has_html = bool(order.get("translation_html"))
 
+    # Get additional translated documents from order_documents collection
+    additional_docs = await db.order_documents.find({
+        "order_id": order_id,
+        "source": "translated_document"
+    }).to_list(50)
+
+    # Format additional docs for frontend
+    additional_documents = []
+    for doc in additional_docs:
+        additional_documents.append({
+            "id": doc.get("id"),
+            "filename": doc.get("filename"),
+            "content_type": doc.get("content_type"),
+            "uploaded_at": doc.get("uploaded_at"),
+            "uploaded_by": doc.get("uploaded_by")
+        })
+
     response = {
-        "has_translated_document": has_file or has_html,
+        "has_translated_document": has_file or has_html or len(additional_documents) > 0,
         "translated_filename": order.get("translated_filename"),
         "translated_file_type": order.get("translated_file_type"),
         "translation_ready": order.get("translation_ready", False),
@@ -8842,7 +13049,8 @@ async def get_translated_document(order_id: str, admin_key: str):
         "translation_status": order.get("translation_status"),
         "client_name": order.get("client_name"),
         "client_email": order.get("client_email"),
-        "order_number": order.get("order_number")
+        "order_number": order.get("order_number"),
+        "additional_documents": additional_documents
     }
 
     # Include translation content for review
@@ -9335,8 +13543,9 @@ async def mark_conversation_read(conversation_id: str, token: str):
 @api_router.get("/admin/partner-messages")
 async def get_admin_partner_messages(admin_key: str, limit: int = 50):
     """Get messages sent by partners for admin view"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
-        raise HTTPException(status_code=401, detail="Invalid admin key")
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info or user_info.get("role") not in ["admin", "pm", "translator", "contractor", "inhouse"]:
+        raise HTTPException(status_code=401, detail="Invalid admin key or insufficient permissions")
 
     messages = await db.partner_messages.find().sort("created_at", -1).limit(limit).to_list(limit)
 
@@ -9351,8 +13560,9 @@ async def get_admin_partner_messages(admin_key: str, limit: int = 50):
 @api_router.put("/admin/partner-messages/{message_id}/read")
 async def mark_partner_message_read(message_id: str, admin_key: str):
     """Mark a partner message as read by admin"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
-        raise HTTPException(status_code=401, detail="Invalid admin key")
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info or user_info.get("role") not in ["admin", "pm", "translator", "contractor", "inhouse"]:
+        raise HTTPException(status_code=401, detail="Invalid admin key or insufficient permissions")
 
     result = await db.partner_messages.update_one(
         {"id": message_id},
@@ -9375,8 +13585,9 @@ class ReplyToPartnerRequest(BaseModel):
 @api_router.post("/admin/partner-messages/{message_id}/reply")
 async def reply_to_partner_message(message_id: str, request: ReplyToPartnerRequest, admin_key: str):
     """Admin replies to a partner message via email and stores in portal"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
-        raise HTTPException(status_code=401, detail="Invalid admin key")
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info or user_info.get("role") not in ["admin", "pm", "translator", "contractor", "inhouse"]:
+        raise HTTPException(status_code=401, detail="Invalid admin key or insufficient permissions")
 
     # Get the original message
     message = await db.partner_messages.find_one({"id": message_id})
@@ -9680,7 +13891,7 @@ class TranslatorMessageRequest(BaseModel):
 
 @api_router.post("/admin/send-file-assignment-email")
 async def send_file_assignment_email(admin_key: str, request: dict = Body(...)):
-    """Send email invitation to translator for a specific file assignment"""
+    """Send email invitation to translator for a specific file assignment with accept/decline buttons"""
     # Validate admin key or user token
     is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
     if not is_valid:
@@ -9693,7 +13904,9 @@ async def send_file_assignment_email(admin_key: str, request: dict = Body(...)):
 
     translator_email = request.get("translator_email")
     translator_name = request.get("translator_name", "Translator")
+    translator_id = request.get("translator_id")
     document_name = request.get("document_name", "Document")
+    order_id = request.get("order_id")
     order_number = request.get("order_number", "")
     language_pair = request.get("language_pair", "")
     pm_name = request.get("pm_name", "Project Manager")
@@ -9701,33 +13914,81 @@ async def send_file_assignment_email(admin_key: str, request: dict = Body(...)):
     if not translator_email:
         raise HTTPException(status_code=400, detail="Translator email is required")
 
-    # Create email content
+    # Get order details for the email
+    order = await db.translation_orders.find_one({"id": order_id}) if order_id else None
+
+    # Generate assignment token and update order
+    assignment_token = str(uuid.uuid4())
+    if order_id:
+        await db.translation_orders.update_one(
+            {"id": order_id},
+            {"$set": {
+                "assigned_translator_id": translator_id,
+                "assigned_translator_name": translator_name,
+                "translator_assignment_token": assignment_token,
+                "translator_assignment_status": "pending"
+            }}
+        )
+
+    # Build accept/decline URLs
+    api_base = os.environ.get("API_URL", "https://legacy-portal-cont-backend.onrender.com")
+    accept_url = f"{api_base}/api/translator/assignment/{assignment_token}/accept"
+    decline_url = f"{api_base}/api/translator/assignment/{assignment_token}/decline"
+    portal_url = os.environ.get("FRONTEND_URL", "https://legacy-portal-frontend.onrender.com")
+
+    # Get deadline from order - prefer translator_deadline if set by PM, otherwise use project deadline
+    deadline_str = "To be confirmed"
+    if order:
+        # First try translator_deadline (set by PM specifically for translator)
+        deadline = order.get("translator_deadline") or order.get("deadline")
+        if deadline:
+            try:
+                if isinstance(deadline, datetime):
+                    deadline_str = deadline.strftime("%B %d, %Y at %H:%M")
+                elif isinstance(deadline, str):
+                    # Try to parse ISO format
+                    from dateutil import parser
+                    parsed = parser.parse(deadline)
+                    deadline_str = parsed.strftime("%B %d, %Y at %H:%M")
+                else:
+                    deadline_str = str(deadline)
+            except:
+                deadline_str = str(deadline)
+
+    # Create email content with accept/decline buttons
     email_html = f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
-            <h1 style="color: white; margin: 0;">📄 New Document Assignment</h1>
+            <h1 style="color: white; margin: 0;">📄 New Translation Assignment</h1>
         </div>
         <div style="padding: 30px; background: #f8fafc; border: 1px solid #e2e8f0;">
             <p style="font-size: 16px;">Hello <strong>{translator_name}</strong>,</p>
-            <p>You have been assigned a new document to translate:</p>
+            <p>You have been assigned a new translation project. Please review the details and accept or decline this assignment:</p>
 
             <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0;">
-                <p style="margin: 5px 0;"><strong>📋 Order:</strong> {order_number}</p>
+                <p style="margin: 5px 0;"><strong>📋 Project:</strong> {order_number}</p>
                 <p style="margin: 5px 0;"><strong>📄 Document:</strong> {document_name}</p>
                 <p style="margin: 5px 0;"><strong>🌐 Language:</strong> {language_pair}</p>
+                <p style="margin: 5px 0;"><strong>📅 Deadline:</strong> {deadline_str}</p>
                 <p style="margin: 5px 0;"><strong>👤 Assigned by:</strong> {pm_name}</p>
             </div>
 
-            <p>Please log in to your translator portal to view and work on this document.</p>
-
             <div style="text-align: center; margin: 30px 0;">
-                <a href="{os.environ.get('FRONTEND_URL', 'https://legacy-portal-frontend.onrender.com')}/#/admin"
-                   style="background: #2563eb; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">
-                    Open Translator Portal
+                <a href="{accept_url}"
+                   style="display: inline-block; background: linear-gradient(135deg, #28a745 0%, #218838 100%); color: white; padding: 14px 35px; text-decoration: none; border-radius: 50px; font-weight: bold; margin: 10px; box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);">
+                    ✓ ACCEPT PROJECT
+                </a>
+            </div>
+            <div style="text-align: center; margin: 20px 0;">
+                <a href="{decline_url}"
+                   style="display: inline-block; background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); color: white; padding: 14px 35px; text-decoration: none; border-radius: 50px; font-weight: bold; margin: 10px; box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);">
+                    ✗ DECLINE PROJECT
                 </a>
             </div>
 
-            <p style="color: #64748b; font-size: 14px;">If you have any questions, please contact your project manager.</p>
+            <p style="color: #64748b; font-size: 14px; text-align: center; margin-top: 25px;">
+                Please respond as soon as possible so we can proceed with the project.
+            </p>
         </div>
         <div style="background: #1e293b; padding: 15px; text-align: center; border-radius: 0 0 8px 8px;">
             <p style="color: #94a3b8; margin: 0; font-size: 12px;">Legacy Translations - Professional Translation Services</p>
@@ -9738,13 +13999,201 @@ async def send_file_assignment_email(admin_key: str, request: dict = Body(...)):
     try:
         await email_service.send_email(
             translator_email,
-            f"📄 New Document Assignment - {order_number}",
+            f"📄 New Translation Assignment - {order_number}",
             email_html
         )
-        logger.info(f"Sent file assignment email to {translator_name} ({translator_email}) for {document_name}")
-        return {"status": "success", "message": f"Email sent to {translator_name}"}
+        logger.info(f"Sent file assignment email with accept/decline to {translator_name} ({translator_email}) for {document_name}")
+        return {"status": "success", "message": f"Email invitation sent to {translator_name}"}
     except Exception as e:
         logger.error(f"Failed to send file assignment email: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
+
+
+def get_project_assignment_email_template(translator_name: str, order_details: dict, files_list: list, accept_url: str, decline_url: str) -> str:
+    """Generate professional email template for complete project assignment with accept/decline buttons"""
+
+    # Build files list HTML
+    files_html = ""
+    for idx, doc in enumerate(files_list, 1):
+        filename = doc.get("filename", "Document")
+        files_html += f'''
+                                            <tr>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{idx}. {filename}</td>
+                                            </tr>'''
+
+    total_files = len(files_list)
+
+    content = f'''
+                            <p style="color: #1a2a4a; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
+                                Hello, {translator_name}
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                You have been assigned a new translation project with {total_files} file(s). Please review the details below and accept or decline this assignment.
+                            </p>
+
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #f0f4f8 0%, #e8eef5 100%); border-radius: 8px; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 25px;">
+                                        <p style="color: #1a2a4a; font-size: 16px; font-weight: 600; margin: 0 0 15px 0;">
+                                            Project Details
+                                        </p>
+                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0; width: 40%;"><strong>Project Number:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0; font-weight: 600;">{order_details.get('order_number', 'N/A')}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Languages:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('translate_from', 'N/A').title()} &rarr; {order_details.get('translate_to', 'N/A').title()}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Total Files:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{total_files} file(s)</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Deadline:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('deadline', 'To be confirmed')}</td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #f0f4f8 0%, #e8eef5 100%); border-radius: 8px; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 25px;">
+                                        <p style="color: #1a2a4a; font-size: 16px; font-weight: 600; margin: 0 0 15px 0;">
+                                            Files in this Project ({total_files})
+                                        </p>
+                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                            {files_html}
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 30px 0;">
+                                <tr>
+                                    <td align="center" style="padding: 10px;">
+                                        <a href="{accept_url}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #28a745 0%, #218838 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 50px; font-size: 16px; font-weight: 600; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3); margin: 5px;">
+                                            ACCEPT PROJECT
+                                        </a>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="center" style="padding: 10px;">
+                                        <a href="{decline_url}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 50px; font-size: 16px; font-weight: 600; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3); margin: 5px;">
+                                            DECLINE PROJECT
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="color: #64748b; font-size: 13px; line-height: 1.7; margin: 20px 0; text-align: center;">
+                                Please respond as soon as possible so we can proceed with the project.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Regards,
+                            </p>'''
+    return get_email_header() + content + get_email_footer(include_review_button=False)
+
+
+@api_router.post("/admin/send-project-assignment-email")
+async def send_project_assignment_email(admin_key: str, request: dict = Body(...)):
+    """Send email invitation to translator for complete project assignment (all files at once)"""
+    # Validate admin key or user token
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await db.admin_users.find_one({"token": admin_key, "is_active": True})
+        if user and user.get("role") in ["admin", "pm"]:
+            is_valid = True
+
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    translator_email = request.get("translator_email")
+    translator_name = request.get("translator_name", "Translator")
+    translator_id = request.get("translator_id")
+    order_id = request.get("order_id")
+    order_number = request.get("order_number", "")
+    language_pair = request.get("language_pair", "")
+    documents = request.get("documents", [])
+    total_files = request.get("total_files", len(documents))
+    deadline = request.get("deadline")
+
+    if not translator_email:
+        raise HTTPException(status_code=400, detail="Translator email is required")
+
+    if not documents:
+        raise HTTPException(status_code=400, detail="No documents provided")
+
+    if not order_id:
+        raise HTTPException(status_code=400, detail="Order ID is required")
+
+    # Format deadline if provided
+    deadline_text = "To be confirmed"
+    if deadline:
+        try:
+            deadline_dt = datetime.fromisoformat(deadline.replace('Z', '+00:00'))
+            deadline_text = deadline_dt.strftime("%B %d, %Y at %I:%M %p")
+        except:
+            deadline_text = deadline
+
+    # Parse language pair
+    translate_from = ""
+    translate_to = ""
+    if language_pair and " → " in language_pair:
+        parts = language_pair.split(" → ")
+        translate_from = parts[0].strip() if len(parts) > 0 else ""
+        translate_to = parts[1].strip() if len(parts) > 1 else ""
+    elif language_pair and " -> " in language_pair:
+        parts = language_pair.split(" -> ")
+        translate_from = parts[0].strip() if len(parts) > 0 else ""
+        translate_to = parts[1].strip() if len(parts) > 1 else ""
+
+    # Generate assignment token and update order
+    assignment_token = str(uuid.uuid4())
+    await db.translation_orders.update_one(
+        {"id": order_id},
+        {"$set": {
+            "translator_assignment_token": assignment_token,
+            "translator_assignment_status": "pending",
+            "translator_assignment_responded_at": None
+        }}
+    )
+
+    # Build accept/decline URLs
+    frontend_url = os.environ.get("FRONTEND_URL", "https://legacy-portal-frontend.onrender.com")
+    accept_url = f"{frontend_url}/#/assignment/{assignment_token}/accept"
+    decline_url = f"{frontend_url}/#/assignment/{assignment_token}/decline"
+
+    # Prepare order details for email template
+    order_details = {
+        "order_number": order_number,
+        "translate_from": translate_from,
+        "translate_to": translate_to,
+        "deadline": deadline_text
+    }
+
+    # Generate email HTML using professional template
+    email_html = get_project_assignment_email_template(
+        translator_name,
+        order_details,
+        documents,
+        accept_url,
+        decline_url
+    )
+
+    try:
+        await email_service.send_email(
+            translator_email,
+            f"New Project Assignment - {order_number} ({total_files} files)",
+            email_html
+        )
+        logger.info(f"Sent project assignment email to {translator_name} ({translator_email}) for order {order_number} with {total_files} files")
+        return {"status": "success", "message": f"Project email sent to {translator_name} with {total_files} files"}
+    except Exception as e:
+        logger.error(f"Failed to send project assignment email: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
 
 
@@ -9988,6 +14437,53 @@ async def admin_download_document(document_id: str, admin_key: str):
         "extracted_text": document.get("extracted_text", "")
     }
 
+
+@api_router.get("/download-document/{document_id}")
+async def public_download_document(document_id: str):
+    """Public endpoint to download/view invoice receipt documents"""
+    # First check in documents collection
+    document = await db.documents.find_one({"id": document_id})
+
+    if not document:
+        # Try order_documents collection
+        document = await db.order_documents.find_one({"id": document_id})
+
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # Return the file as a downloadable response
+    import base64
+    from fastapi.responses import Response
+
+    file_data = document.get("file_data", "")
+    if not file_data:
+        raise HTTPException(status_code=404, detail="Document data not found")
+
+    # Decode base64 if it's encoded
+    try:
+        if isinstance(file_data, str):
+            # Remove data URL prefix if present
+            if "base64," in file_data:
+                file_data = file_data.split("base64,")[1]
+            file_bytes = base64.b64decode(file_data)
+        else:
+            file_bytes = file_data
+    except Exception as e:
+        logger.error(f"Error decoding document: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error processing document")
+
+    content_type = document.get("content_type", "application/octet-stream")
+    filename = document.get("filename", "document")
+
+    return Response(
+        content=file_bytes,
+        media_type=content_type,
+        headers={
+            "Content-Disposition": f'inline; filename="{filename}"'
+        }
+    )
+
+
 @api_router.get("/admin/orders/{order_id}/documents")
 async def admin_get_order_documents(order_id: str, admin_key: str):
     """Admin/PM/Translator: Get all documents for an order (from both collections)"""
@@ -10097,7 +14593,7 @@ async def admin_download_order_document(doc_id: str, admin_key: str):
     raise HTTPException(status_code=404, detail="Document not found")
 
 @api_router.patch("/admin/order-documents/{doc_id}")
-async def admin_update_order_document(doc_id: str, admin_key: str, update_data: dict):
+async def admin_update_order_document(doc_id: str, admin_key: str, update_data: dict = Body(...)):
     """Admin/PM: Update document metadata (e.g., assign translator to specific document)"""
     user_info = await validate_admin_or_user_token(admin_key)
     if not user_info:
@@ -10127,8 +14623,12 @@ async def admin_update_order_document(doc_id: str, admin_key: str, update_data: 
             {"$set": update_dict}
         )
 
-    if result.modified_count == 0:
-        raise HTTPException(status_code=404, detail="Document not found or no changes made")
+    # Also check if matched but not modified (same values)
+    if result.matched_count > 0:
+        return {"success": True, "message": "Document updated successfully"}
+
+    if result.modified_count == 0 and result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Document not found")
 
     return {"success": True, "message": "Document updated successfully"}
 
@@ -10377,15 +14877,20 @@ CRITICAL INSTRUCTIONS:
                 logger.error(f"Claude OCR failed: {str(e)}, falling back to standard OCR")
                 # Fall through to standard OCR methods
 
+        html_content = ""  # Will store HTML version for visual layout
+
         if is_image:
             # Try AWS Textract first for images
             if textract_client:
                 logger.info("Using AWS Textract for image OCR...")
-                text = extract_text_with_textract(file_content, file_extension)
-                if text and len(text.strip()) > 10:
-                    logger.info(f"Textract extracted {len(text)} characters")
-                else:
-                    text = ""
+                textract_result = extract_text_with_textract(file_content, file_extension)
+                if textract_result:
+                    text = textract_result.get('text', '')
+                    html_content = textract_result.get('html', '')
+                    if text and len(text.strip()) > 10:
+                        logger.info(f"Textract extracted {len(text)} characters")
+                    else:
+                        text = ""
 
             # Fallback to Tesseract if Textract didn't work
             if not text:
@@ -10456,9 +14961,12 @@ CRITICAL INSTRUCTIONS:
                 # Try Textract first
                 if textract_client:
                     logger.info("Using AWS Textract for PDF OCR...")
-                    text = extract_text_with_textract(file_content, 'pdf')
-                    if text and len(text.strip()) > 10:
-                        logger.info(f"Textract extracted {len(text)} characters from PDF")
+                    textract_result = extract_text_with_textract(file_content, 'pdf')
+                    if textract_result:
+                        text = textract_result.get('text', '')
+                        html_content = textract_result.get('html', '')
+                        if text and len(text.strip()) > 10:
+                            logger.info(f"Textract extracted {len(text)} characters from PDF")
 
                 # Fallback to Tesseract with multiple configs
                 if not text or len(text.strip()) < 10:
@@ -10517,12 +15025,18 @@ CRITICAL INSTRUCTIONS:
         # Count words
         word_count = count_words(text)
 
-        return {
+        response = {
             "status": "success",
             "text": text.strip(),
             "word_count": word_count,
             "filename": request.filename
         }
+
+        # Include HTML if available (for visual layout preservation)
+        if html_content:
+            response["html"] = html_content
+
+        return response
 
     except HTTPException:
         raise
@@ -10802,6 +15316,84 @@ At the very end of the translation content (but inside the HTML body), add the f
 This marker must appear AFTER all translated content but BEFORE the closing body/html tags.
 {currency_conversion_instructions}{additional_instructions}"""
 
+            # Fetch glossary and TM terms if use_glossary is enabled
+            if getattr(request, 'use_glossary', True):
+                glossary_and_tm_section = ""
+                source_lang_full = request.source_language
+                target_lang_full = request.target_language
+                source_lang_code = request.source_language.lower()[:2]
+                target_lang_code = request.target_language.lower()[:2]
+
+                # Fetch matching glossaries
+                try:
+                    glossaries = await db.glossaries.find({
+                        "$or": [
+                            {"sourceLang": source_lang_full, "targetLang": target_lang_full},
+                            {"sourceLang": {"$regex": source_lang_code, "$options": "i"}, "targetLang": {"$regex": target_lang_code, "$options": "i"}},
+                            {"source_language": source_lang_code, "target_language": target_lang_code}
+                        ]
+                    }).to_list(10)
+
+                    if glossaries:
+                        all_terms = []
+                        for glossary in glossaries:
+                            if glossary.get("terms"):
+                                for term in glossary["terms"][:100]:
+                                    all_terms.append(f"• {term.get('source', '')} → {term.get('target', '')}")
+
+                        if all_terms:
+                            glossary_and_tm_section += f"""
+
+═══════════════════════════════════════════════════════════════════
+                    GLOSSARY - MANDATORY TERMS
+═══════════════════════════════════════════════════════════════════
+You MUST use these EXACT translations for the following terms:
+{chr(10).join(all_terms[:100])}
+"""
+                except Exception as e:
+                    logger.warning(f"Error fetching glossaries for translation: {e}")
+
+                # Fetch Translation Memory entries
+                try:
+                    tm_entries = await db.translation_memory.find({
+                        "$or": [
+                            {"sourceLang": source_lang_full, "targetLang": target_lang_full},
+                            {"sourceLang": {"$regex": source_lang_full[:10], "$options": "i"},
+                             "targetLang": {"$regex": target_lang_full[:10], "$options": "i"}}
+                        ]
+                    }).sort("score", -1).to_list(100)
+
+                    if tm_entries:
+                        uploaded_tm = [tm for tm in tm_entries if tm.get("is_uploaded") or tm.get("score", 0) == 100]
+                        auto_tm = [tm for tm in tm_entries if not tm.get("is_uploaded") and tm.get("score", 0) != 100]
+
+                        tm_text = ""
+                        if uploaded_tm:
+                            tm_text += "🔹 PRIORITY TERMS (from uploaded TM - USE EXACTLY):\n"
+                            for tm in uploaded_tm[:50]:
+                                tm_text += f"• {tm.get('source', '')} → {tm.get('target', '')}\n"
+
+                        if auto_tm and len(uploaded_tm) < 50:
+                            tm_text += "\n🔸 APPROVED TRANSLATIONS (from high-quality translations):\n"
+                            for tm in auto_tm[:50 - len(uploaded_tm)]:
+                                tm_text += f"• {tm.get('source', '')} → {tm.get('target', '')} (score: {tm.get('score', 0)}%)\n"
+
+                        if tm_text:
+                            glossary_and_tm_section += f"""
+
+═══════════════════════════════════════════════════════════════════
+                    TRANSLATION MEMORY
+═══════════════════════════════════════════════════════════════════
+Use these approved translations when translating similar content:
+{tm_text}
+"""
+                except Exception as e:
+                    logger.warning(f"Error fetching TM for translation: {e}")
+
+                # Append glossary/TM section to system prompt
+                if glossary_and_tm_section:
+                    system_prompt += glossary_and_tm_section
+
             user_message = f"Translate this {request.document_type} document to professional HTML format:\n\n{request.text}"
 
         elif request.action == 'improve_formality':
@@ -10863,10 +15455,15 @@ CRITICAL OUTPUT RULES:
                                 page = doc[page_num]
                                 pix = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0))  # 2x zoom for better quality
                                 img_bytes = pix.tobytes("jpeg")
-                                page_b64 = base64.b64encode(img_bytes).decode('utf-8')
+                                # Compress image if needed to stay under Claude's 5MB limit
+                                compressed_bytes, final_media_type = compress_image_for_claude_api(
+                                    img_bytes, "image/jpeg"
+                                )
+                                page_b64 = base64.b64encode(compressed_bytes).decode('utf-8')
                                 page_images.append({
                                     "page_num": page_num + 1,
-                                    "data": page_b64
+                                    "data": page_b64,
+                                    "media_type": final_media_type
                                 })
 
                             doc.close()
@@ -10882,19 +15479,61 @@ CRITICAL OUTPUT RULES:
                             all_page_images = []
                     elif 'png' in header.lower():
                         media_type = "image/png"
-                        all_page_images = [{"page_num": 1, "data": image_data}]
+                        # Compress image if needed to stay under Claude's 5MB limit
+                        try:
+                            img_bytes = base64.b64decode(image_data)
+                            compressed_bytes, final_media_type = compress_image_for_claude_api(img_bytes, media_type)
+                            compressed_b64 = base64.b64encode(compressed_bytes).decode('utf-8')
+                            all_page_images = [{"page_num": 1, "data": compressed_b64, "media_type": final_media_type}]
+                        except Exception as e:
+                            logger.warning(f"Image compression failed, using original: {e}")
+                            all_page_images = [{"page_num": 1, "data": image_data, "media_type": media_type}]
                     elif 'gif' in header.lower():
                         media_type = "image/gif"
-                        all_page_images = [{"page_num": 1, "data": image_data}]
+                        # Compress image if needed to stay under Claude's 5MB limit
+                        try:
+                            img_bytes = base64.b64decode(image_data)
+                            compressed_bytes, final_media_type = compress_image_for_claude_api(img_bytes, media_type)
+                            compressed_b64 = base64.b64encode(compressed_bytes).decode('utf-8')
+                            all_page_images = [{"page_num": 1, "data": compressed_b64, "media_type": final_media_type}]
+                        except Exception as e:
+                            logger.warning(f"Image compression failed, using original: {e}")
+                            all_page_images = [{"page_num": 1, "data": image_data, "media_type": media_type}]
                     elif 'webp' in header.lower():
                         media_type = "image/webp"
-                        all_page_images = [{"page_num": 1, "data": image_data}]
+                        # Compress image if needed to stay under Claude's 5MB limit
+                        try:
+                            img_bytes = base64.b64decode(image_data)
+                            compressed_bytes, final_media_type = compress_image_for_claude_api(img_bytes, media_type)
+                            compressed_b64 = base64.b64encode(compressed_bytes).decode('utf-8')
+                            all_page_images = [{"page_num": 1, "data": compressed_b64, "media_type": final_media_type}]
+                        except Exception as e:
+                            logger.warning(f"Image compression failed, using original: {e}")
+                            all_page_images = [{"page_num": 1, "data": image_data, "media_type": media_type}]
                     else:
-                        # Default to jpeg
-                        all_page_images = [{"page_num": 1, "data": image_data}]
+                        # Default to jpeg - Compress image if needed
+                        media_type = "image/jpeg"
+                        try:
+                            img_bytes = base64.b64decode(image_data)
+                            compressed_bytes, final_media_type = compress_image_for_claude_api(img_bytes, media_type)
+                            compressed_b64 = base64.b64encode(compressed_bytes).decode('utf-8')
+                            all_page_images = [{"page_num": 1, "data": compressed_b64, "media_type": final_media_type}]
+                        except Exception as e:
+                            logger.warning(f"Image compression failed, using original: {e}")
+                            all_page_images = [{"page_num": 1, "data": image_data, "media_type": media_type}]
                 else:
-                    # No header, assume single image
-                    all_page_images = [{"page_num": 1, "data": image_data}] if image_data else []
+                    # No header, assume single image - compress if needed
+                    if image_data:
+                        try:
+                            img_bytes = base64.b64decode(image_data)
+                            compressed_bytes, final_media_type = compress_image_for_claude_api(img_bytes, "image/jpeg")
+                            compressed_b64 = base64.b64encode(compressed_bytes).decode('utf-8')
+                            all_page_images = [{"page_num": 1, "data": compressed_b64, "media_type": final_media_type}]
+                        except Exception as e:
+                            logger.warning(f"Image compression failed, using original: {e}")
+                            all_page_images = [{"page_num": 1, "data": image_data, "media_type": "image/jpeg"}]
+                    else:
+                        all_page_images = []
 
                 # Build message content with ALL page images
                 if all_page_images:
@@ -10902,11 +15541,13 @@ CRITICAL OUTPUT RULES:
 
                     # Add ALL page images to the message
                     for page_info in all_page_images:
+                        # Use page-specific media_type if available, fallback to global media_type
+                        page_media_type = page_info.get("media_type", media_type)
                         message_content.append({
                             "type": "image",
                             "source": {
                                 "type": "base64",
-                                "media_type": media_type,
+                                "media_type": page_media_type,
                                 "data": page_info["data"],
                             },
                         })
@@ -11064,8 +15705,8 @@ TERMINOLOGIA GERAL:
 """
 }
 
-def get_proofreading_prompt(source_lang: str, target_lang: str, doc_type: str) -> str:
-    """Generate document-type specific proofreading prompt."""
+def get_proofreading_prompt(source_lang: str, target_lang: str, doc_type: str, glossary_and_tm_terms: str = "") -> str:
+    """Generate document-type specific proofreading prompt with glossary and TM support."""
 
     special_chars = LANGUAGE_SPECIAL_CHARS.get(source_lang, "")
 
@@ -11080,6 +15721,19 @@ def get_proofreading_prompt(source_lang: str, target_lang: str, doc_type: str) -
     else:
         terminology = DOCUMENT_TERMINOLOGY["general"]
 
+    # Add glossary and TM terms section if provided
+    glossary_section = ""
+    if glossary_and_tm_terms:
+        glossary_section = f"""
+{glossary_and_tm_terms}
+
+IMPORTANTE: Os termos acima do GLOSSÁRIO e MEMÓRIA DE TRADUÇÃO são OBRIGATÓRIOS.
+- Se a tradução usar termos diferentes dos especificados no glossário, marque como erro de "Terminologia" com gravidade ALTA.
+- Os termos do glossário são a ÚNICA tradução aceitável para esses termos.
+- A memória de tradução contém traduções previamente aprovadas que devem ser seguidas.
+
+"""
+
     prompt = f"""Você é um revisor de traduções certificado.
 
 IDIOMA FONTE: {source_lang}
@@ -11090,7 +15744,7 @@ CARACTERES ESPECIAIS DO IDIOMA FONTE (devem ser PRESERVADOS em nomes próprios):
 {special_chars}
 
 {terminology}
-
+{glossary_section}
 INSTRUÇÕES DE REVISÃO:
 
 1. Compare CADA elemento dos dois documentos minuciosamente
@@ -11262,6 +15916,49 @@ Retorne o JSON com a análise completa."""
                 clean_result = clean_result.strip()
 
                 parsed_result = json.loads(clean_result)
+
+                # Filter out errors where original equals sugestao (no actual change)
+                # This fixes a bug where AI flags items as errors when before/after are identical
+                if parsed_result.get("erros"):
+                    original_count = len(parsed_result["erros"])
+                    filtered_errors = []
+                    for erro in parsed_result["erros"]:
+                        original_text = (erro.get("original") or "").strip()
+                        sugestao = (erro.get("sugestao") or "").strip()
+                        # Only keep errors where there's an actual difference
+                        if original_text != sugestao:
+                            filtered_errors.append(erro)
+                        else:
+                            logger.info(f"Filtered out duplicate simple proofread error: '{original_text}' == '{sugestao}'")
+
+                    parsed_result["erros"] = filtered_errors
+                    filtered_count = original_count - len(filtered_errors)
+
+                    # Recalculate counts after filtering
+                    if filtered_count > 0:
+                        parsed_result["total_erros"] = len(filtered_errors)
+                        parsed_result["criticos"] = sum(1 for e in filtered_errors if e.get("gravidade") == "CRÍTICO")
+                        parsed_result["altos"] = sum(1 for e in filtered_errors if e.get("gravidade") == "ALTO")
+                        parsed_result["medios"] = sum(1 for e in filtered_errors if e.get("gravidade") == "MÉDIO")
+                        parsed_result["baixos"] = sum(1 for e in filtered_errors if e.get("gravidade") == "BAIXO")
+
+                        # Recalculate score and classification
+                        total = len(filtered_errors)
+                        criticos = parsed_result["criticos"]
+                        altos = parsed_result["altos"]
+
+                        if criticos > 0 or altos > 2:
+                            parsed_result["classificacao"] = "REPROVADO"
+                            parsed_result["pontuacao_final"] = max(0, 70 - (criticos * 15) - (altos * 5))
+                        elif altos > 0 or total > 3:
+                            parsed_result["classificacao"] = "APROVADO_COM_OBSERVACOES"
+                            parsed_result["pontuacao_final"] = max(70, 85 - (altos * 5) - (total * 2))
+                        else:
+                            parsed_result["classificacao"] = "APROVADO"
+                            parsed_result["pontuacao_final"] = max(85, 100 - (total * 3))
+
+                        logger.info(f"Simple proofread: Filtered {filtered_count} duplicate errors, {len(filtered_errors)} remaining")
+
                 return parsed_result
 
             except json.JSONDecodeError:
@@ -11298,22 +15995,130 @@ async def admin_proofread(request: ProofreadRequest, admin_key: str):
     if not user_info:
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
-    # Only admin and PM can run proofreading
-    if user_info.get("role") not in ["admin", "pm"]:
-        raise HTTPException(status_code=403, detail="Only admin and PM can run proofreading")
+    # Admin, PM and in-house translators can run proofreading
+    user_role = user_info.get("role")
+    is_in_house_translator = user_role == "translator" and user_info.get("translator_type") == "in_house"
+    if user_role not in ["admin", "pm"] and not is_in_house_translator:
+        raise HTTPException(status_code=403, detail="Only admin, PM and in-house translators can run proofreading")
 
     if not request.claude_api_key:
         raise HTTPException(status_code=400, detail="Claude API key is required")
 
     try:
+        # Fetch glossary terms for this language pair
+        glossary_and_tm_terms = ""
+        source_lang_full = request.source_language
+        target_lang_full = request.target_language
+        source_lang_code = request.source_language.lower()[:2]
+        target_lang_code = request.target_language.lower()[:2]
+
+        # Fetch matching glossaries
+        try:
+            glossaries = await db.glossaries.find({
+                "$or": [
+                    {"sourceLang": source_lang_full, "targetLang": target_lang_full},
+                    {"sourceLang": {"$regex": source_lang_code, "$options": "i"}, "targetLang": {"$regex": target_lang_code, "$options": "i"}},
+                    {"source_language": source_lang_code, "target_language": target_lang_code}
+                ]
+            }).to_list(10)
+
+            if glossaries:
+                all_terms = []
+                for glossary in glossaries:
+                    if glossary.get("terms"):
+                        for term in glossary["terms"][:100]:
+                            all_terms.append(f"• {term.get('source', '')} → {term.get('target', '')}")
+
+                if all_terms:
+                    glossary_and_tm_terms += f"""
+═══════════════════════════════════════════════════════════════════
+                    GLOSSÁRIO - TERMOS OBRIGATÓRIOS
+═══════════════════════════════════════════════════════════════════
+Use EXATAMENTE estas traduções para os seguintes termos:
+{chr(10).join(all_terms[:100])}
+"""
+        except Exception as e:
+            logger.warning(f"Error fetching glossaries for proofreading: {e}")
+
+        # Fetch Translation Memory entries
+        try:
+            tm_entries = await db.translation_memory.find({
+                "$or": [
+                    {"sourceLang": source_lang_full, "targetLang": target_lang_full},
+                    {"sourceLang": {"$regex": source_lang_full[:10], "$options": "i"},
+                     "targetLang": {"$regex": target_lang_full[:10], "$options": "i"}}
+                ]
+            }).sort("score", -1).to_list(100)
+
+            if tm_entries:
+                # Separate uploaded TM (priority) from auto-generated TM
+                uploaded_tm = [tm for tm in tm_entries if tm.get("is_uploaded") or tm.get("score", 0) == 100]
+                auto_tm = [tm for tm in tm_entries if not tm.get("is_uploaded") and tm.get("score", 0) != 100]
+
+                tm_text = ""
+                if uploaded_tm:
+                    tm_text += "🔹 TERMOS PRIORITÁRIOS (TM importada - USE EXATAMENTE):\n"
+                    for tm in uploaded_tm[:50]:
+                        tm_text += f"• {tm.get('source', '')} → {tm.get('target', '')}\n"
+
+                if auto_tm and len(uploaded_tm) < 50:
+                    tm_text += "\n🔸 TRADUÇÕES APROVADAS (de traduções de alta qualidade):\n"
+                    for tm in auto_tm[:50 - len(uploaded_tm)]:
+                        tm_text += f"• {tm.get('source', '')} → {tm.get('target', '')} (score: {tm.get('score', 0)}%)\n"
+
+                if tm_text:
+                    glossary_and_tm_terms += f"""
+═══════════════════════════════════════════════════════════════════
+                    MEMÓRIA DE TRADUÇÃO
+═══════════════════════════════════════════════════════════════════
+Referência de traduções aprovadas - verifique se foram seguidas:
+{tm_text}
+"""
+        except Exception as e:
+            logger.warning(f"Error fetching TM for proofreading: {e}")
+
         system_prompt = get_proofreading_prompt(
             request.source_language,
             request.target_language,
-            request.document_type
+            request.document_type,
+            glossary_and_tm_terms
         )
 
         # Build the message content based on whether we have an image or just text
         if request.original_image:
+            # Compress image if too large to avoid Claude API size limits
+            image_data = request.original_image
+            media_type = "image/png"
+            try:
+                # Decode base64 image
+                import io
+                image_bytes = base64.b64decode(image_data)
+                img = Image.open(io.BytesIO(image_bytes))
+
+                # Check if image needs resizing (max 1500px on longest side for API limits)
+                max_dimension = 1500
+                if img.width > max_dimension or img.height > max_dimension:
+                    # Calculate new size maintaining aspect ratio
+                    ratio = min(max_dimension / img.width, max_dimension / img.height)
+                    new_size = (int(img.width * ratio), int(img.height * ratio))
+                    img = img.resize(new_size, Image.Resampling.LANCZOS)
+                    logger.info(f"Resized image from {request.original_image[:50]}... to {new_size}")
+
+                # Convert to RGB if necessary (for JPEG)
+                if img.mode in ('RGBA', 'P'):
+                    img = img.convert('RGB')
+
+                # Compress as JPEG with quality 85
+                buffer = io.BytesIO()
+                img.save(buffer, format='JPEG', quality=85, optimize=True)
+                image_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+                media_type = "image/jpeg"
+                logger.info(f"Compressed image for proofreading: original ~{len(request.original_image)//1024}KB, compressed ~{len(image_data)//1024}KB")
+            except Exception as e:
+                logger.warning(f"Could not compress image, using original: {str(e)}")
+                # Use original image if compression fails
+                image_data = request.original_image
+
             # Use Claude Vision API with image
             user_content = [
                 {
@@ -11324,8 +16129,8 @@ async def admin_proofread(request: ProofreadRequest, admin_key: str):
                     "type": "image",
                     "source": {
                         "type": "base64",
-                        "media_type": "image/png",
-                        "data": request.original_image
+                        "media_type": media_type,
+                        "data": image_data
                     }
                 },
                 {
@@ -11390,6 +16195,43 @@ Analise minuciosamente e retorne o JSON com todos os erros encontrados."""
                 clean_result = clean_result.strip()
 
                 parsed_result = json.loads(clean_result)
+
+                # Filter out errors where traducao_errada equals correcao (no actual change)
+                # This fixes a bug where AI flags items as errors when before/after are identical
+                if parsed_result.get("erros"):
+                    original_count = len(parsed_result["erros"])
+                    filtered_errors = []
+                    for erro in parsed_result["erros"]:
+                        traducao_errada = (erro.get("traducao_errada") or "").strip()
+                        correcao = (erro.get("correcao") or "").strip()
+                        # Only keep errors where there's an actual difference
+                        if traducao_errada != correcao:
+                            filtered_errors.append(erro)
+                        else:
+                            logger.info(f"Filtered out duplicate proofreading error: '{traducao_errada}' == '{correcao}'")
+
+                    parsed_result["erros"] = filtered_errors
+                    filtered_count = original_count - len(filtered_errors)
+
+                    # Recalculate summary counts after filtering
+                    if filtered_count > 0 and parsed_result.get("resumo"):
+                        resumo = parsed_result["resumo"]
+                        resumo["total_erros"] = len(filtered_errors)
+                        # Recalculate severity counts from filtered errors
+                        resumo["criticos"] = sum(1 for e in filtered_errors if e.get("gravidade") == "CRÍTICO")
+                        resumo["altos"] = sum(1 for e in filtered_errors if e.get("gravidade") == "ALTO")
+                        resumo["medios"] = sum(1 for e in filtered_errors if e.get("gravidade") == "MÉDIO")
+                        resumo["baixos"] = sum(1 for e in filtered_errors if e.get("gravidade") == "BAIXO")
+
+                        # Update quality classification based on new counts
+                        if resumo["criticos"] > 0 or resumo["altos"] > 2:
+                            resumo["qualidade"] = "REPROVADO"
+                        elif resumo["altos"] > 0 or resumo["medios"] > 3:
+                            resumo["qualidade"] = "APROVADO_COM_OBSERVACOES"
+                        else:
+                            resumo["qualidade"] = "APROVADO"
+
+                        logger.info(f"Proofreading: Filtered {filtered_count} duplicate errors, {len(filtered_errors)} remaining")
 
                 return {
                     "status": "success",
@@ -11535,9 +16377,17 @@ async def delete_translation_instruction(instruction_id: str, admin_key: str):
 # Glossaries CRUD
 @api_router.get("/admin/glossaries")
 async def get_glossaries(admin_key: str):
-    """Get all glossaries"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
-        raise HTTPException(status_code=401, detail="Invalid admin key")
+    """Get all glossaries - Admin, PM, and in-house translators"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Admin, PM, and in-house translators can access glossaries
+    user_role = user_info.get("role")
+    is_in_house_translator = user_role == "translator" and user_info.get("translator_type") == "in_house"
+
+    if user_role not in ["admin", "pm"] and not is_in_house_translator and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Only admin, PM, or in-house translators can access glossaries")
 
     glossaries = await db.glossaries.find().sort("created_at", -1).to_list(100)
     for gloss in glossaries:
@@ -11551,9 +16401,17 @@ async def get_glossaries(admin_key: str):
 
 @api_router.post("/admin/glossaries")
 async def create_glossary(data: GlossaryCreate, admin_key: str):
-    """Create a new glossary"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
-        raise HTTPException(status_code=401, detail="Invalid admin key")
+    """Create a new glossary - Admin, PM, and in-house translators"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Admin, PM, and in-house translators can create glossaries
+    user_role = user_info.get("role")
+    is_in_house_translator = user_role == "translator" and user_info.get("translator_type") == "in_house"
+
+    if user_role not in ["admin", "pm"] and not is_in_house_translator and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Only admin, PM, or in-house translators can create glossaries")
 
     glossary = {
         "id": str(uuid.uuid4()),
@@ -11564,7 +16422,9 @@ async def create_glossary(data: GlossaryCreate, admin_key: str):
         "language": data.language or f"{data.sourceLang} <> {data.targetLang}",  # Legacy compatibility
         "field": data.field,
         "terms": [t.dict() for t in data.terms],
-        "created_at": datetime.utcnow()
+        "is_uploaded": True,  # All user-created glossaries should be treated as priority
+        "created_at": datetime.utcnow(),
+        "created_by": user_info.get("user_id", "system")
     }
 
     await db.glossaries.insert_one(glossary)
@@ -11574,9 +16434,17 @@ async def create_glossary(data: GlossaryCreate, admin_key: str):
 
 @api_router.put("/admin/glossaries/{glossary_id}")
 async def update_glossary(glossary_id: str, data: GlossaryCreate, admin_key: str):
-    """Update a glossary"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
-        raise HTTPException(status_code=401, detail="Invalid admin key")
+    """Update a glossary - Admin, PM, and in-house translators"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Admin, PM, and in-house translators can update glossaries
+    user_role = user_info.get("role")
+    is_in_house_translator = user_role == "translator" and user_info.get("translator_type") == "in_house"
+
+    if user_role not in ["admin", "pm"] and not is_in_house_translator and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Only admin, PM, or in-house translators can update glossaries")
 
     result = await db.glossaries.update_one(
         {"id": glossary_id},
@@ -11599,9 +16467,17 @@ async def update_glossary(glossary_id: str, data: GlossaryCreate, admin_key: str
 
 @api_router.delete("/admin/glossaries/{glossary_id}")
 async def delete_glossary(glossary_id: str, admin_key: str):
-    """Delete a glossary"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
-        raise HTTPException(status_code=401, detail="Invalid admin key")
+    """Delete a glossary - Admin, PM, and in-house translators"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Admin, PM, and in-house translators can delete glossaries
+    user_role = user_info.get("role")
+    is_in_house_translator = user_role == "translator" and user_info.get("translator_type") == "in_house"
+
+    if user_role not in ["admin", "pm"] and not is_in_house_translator and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Only admin, PM, or in-house translators can delete glossaries")
 
     result = await db.glossaries.delete_one({"id": glossary_id})
 
@@ -11672,14 +16548,17 @@ class TranslationMemoryCreate(BaseModel):
 
 @api_router.get("/admin/translation-memory")
 async def get_translation_memory(admin_key: str, sourceLang: Optional[str] = None, targetLang: Optional[str] = None):
-    """Get all translation memory entries - ADMIN ONLY"""
+    """Get all translation memory entries - Admin, PM, and in-house translators"""
     user_info = await validate_admin_or_user_token(admin_key)
     if not user_info:
         raise HTTPException(status_code=401, detail="Invalid admin key or token")
 
-    # Only admin can access TM
-    if user_info.get("role") != "admin" and not user_info.get("is_master"):
-        raise HTTPException(status_code=403, detail="Only admin can access Translation Memory")
+    # Admin, PM, and in-house translators can access TM
+    user_role = user_info.get("role")
+    is_in_house_translator = user_role == "translator" and user_info.get("translator_type") == "in_house"
+
+    if user_role not in ["admin", "pm"] and not is_in_house_translator and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Only admin, PM, or in-house translators can access Translation Memory")
 
     # Build query filter
     query = {}
@@ -11763,14 +16642,17 @@ async def add_translation_memory(data: TranslationMemoryCreate, admin_key: str):
 
 @api_router.delete("/admin/translation-memory/{entry_id}")
 async def delete_translation_memory(entry_id: str, admin_key: str):
-    """Delete a translation memory entry - ADMIN ONLY"""
+    """Delete a translation memory entry - Admin, PM, and in-house translators"""
     user_info = await validate_admin_or_user_token(admin_key)
     if not user_info:
         raise HTTPException(status_code=401, detail="Invalid admin key or token")
 
-    # Only admin can delete TM
-    if user_info.get("role") != "admin" and not user_info.get("is_master"):
-        raise HTTPException(status_code=403, detail="Only admin can delete Translation Memory")
+    # Admin, PM, and in-house translators can delete TM
+    user_role = user_info.get("role")
+    is_in_house_translator = user_role == "translator" and user_info.get("translator_type") == "in_house"
+
+    if user_role not in ["admin", "pm"] and not is_in_house_translator and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Only admin, PM, or in-house translators can delete Translation Memory")
 
     result = await db.translation_memory.delete_one({"id": entry_id})
 
@@ -11781,14 +16663,17 @@ async def delete_translation_memory(entry_id: str, admin_key: str):
 
 @api_router.delete("/admin/translation-memory")
 async def clear_translation_memory(admin_key: str, sourceLang: Optional[str] = None, targetLang: Optional[str] = None):
-    """Clear translation memory entries - ADMIN ONLY"""
+    """Clear translation memory entries - Admin, PM, and in-house translators"""
     user_info = await validate_admin_or_user_token(admin_key)
     if not user_info:
         raise HTTPException(status_code=401, detail="Invalid admin key or token")
 
-    # Only admin can clear TM
-    if user_info.get("role") != "admin" and not user_info.get("is_master"):
-        raise HTTPException(status_code=403, detail="Only admin can clear Translation Memory")
+    # Admin, PM, and in-house translators can clear TM
+    user_role = user_info.get("role")
+    is_in_house_translator = user_role == "translator" and user_info.get("translator_type") == "in_house"
+
+    if user_role not in ["admin", "pm"] and not is_in_house_translator and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Only admin, PM, or in-house translators can clear Translation Memory")
 
     query = {}
     if sourceLang:
@@ -11802,14 +16687,17 @@ async def clear_translation_memory(admin_key: str, sourceLang: Optional[str] = N
 
 @api_router.get("/admin/translation-memory/download")
 async def download_translation_memory(admin_key: str, format: str = "csv", sourceLang: Optional[str] = None, targetLang: Optional[str] = None):
-    """Download translation memory as CSV or TMX - ADMIN ONLY"""
+    """Download translation memory as CSV or TMX - Admin, PM, and in-house translators"""
     user_info = await validate_admin_or_user_token(admin_key)
     if not user_info:
         raise HTTPException(status_code=401, detail="Invalid admin key or token")
 
-    # Only admin can download TM
-    if user_info.get("role") != "admin" and not user_info.get("is_master"):
-        raise HTTPException(status_code=403, detail="Only admin can download Translation Memory")
+    # Admin, PM, and in-house translators can download TM
+    user_role = user_info.get("role")
+    is_in_house_translator = user_role == "translator" and user_info.get("translator_type") == "in_house"
+
+    if user_role not in ["admin", "pm"] and not is_in_house_translator and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Only admin, PM, or in-house translators can download Translation Memory")
 
     # Build query filter
     query = {}
@@ -11862,6 +16750,419 @@ async def download_translation_memory(admin_key: str, format: str = "csv", sourc
 
         csv_content = "\n".join(csv_lines)
         return JSONResponse(content={"format": "csv", "content": csv_content, "filename": f"translation_memory_{datetime.now().strftime('%Y%m%d')}.csv"})
+
+
+@api_router.post("/admin/translation-memory/upload")
+async def upload_translation_memory(
+    admin_key: str,
+    file: UploadFile = File(...),
+    sourceLang: str = Form("Portuguese (Brazil)"),
+    targetLang: str = Form("English"),
+    field: str = Form("General")
+):
+    """
+    Upload Translation Memory from CSV or TMX file
+    Only admin, PM, and in-house translators can upload TM
+    """
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Check if user is admin, PM, or in-house translator
+    user_role = user_info.get("role")
+    is_in_house_translator = user_role == "translator" and user_info.get("translator_type") == "in_house"
+
+    if user_role not in ["admin", "pm"] and not is_in_house_translator and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Only admin, PM, or in-house translators can upload Translation Memory")
+
+    # Read file content
+    content = await file.read()
+    filename = file.filename.lower()
+
+    added_count = 0
+    updated_count = 0
+    entries = []
+
+    try:
+        if filename.endswith('.tmx') or filename.endswith('.xml'):
+            # Parse TMX file
+            import xml.etree.ElementTree as ET
+            root = ET.fromstring(content.decode('utf-8'))
+
+            for tu in root.findall('.//tu'):
+                tuvs = tu.findall('tuv')
+                if len(tuvs) >= 2:
+                    source_text = ""
+                    target_text = ""
+
+                    for tuv in tuvs:
+                        lang = tuv.get('{http://www.w3.org/XML/1998/namespace}lang', '') or tuv.get('lang', '')
+                        seg = tuv.find('seg')
+                        if seg is not None and seg.text:
+                            # Determine if this is source or target based on language code
+                            lang_lower = lang.lower()
+                            if lang_lower.startswith('pt') or lang_lower.startswith('por'):
+                                source_text = seg.text.strip()
+                            elif lang_lower.startswith('en'):
+                                target_text = seg.text.strip()
+                            elif not source_text:
+                                source_text = seg.text.strip()
+                            else:
+                                target_text = seg.text.strip()
+
+                    if source_text and target_text:
+                        entries.append({
+                            "source": source_text,
+                            "target": target_text
+                        })
+
+        elif filename.endswith('.csv'):
+            # Parse CSV file
+            import csv
+            import io
+            content_str = content.decode('utf-8-sig')  # Handle BOM
+            reader = csv.reader(io.StringIO(content_str))
+            header = next(reader, None)  # Skip header row
+
+            # Try to determine column positions
+            source_col = 0
+            target_col = 1
+
+            if header:
+                header_lower = [h.lower().strip() for h in header]
+                for i, h in enumerate(header_lower):
+                    if 'source' in h or 'original' in h or 'origem' in h:
+                        source_col = i
+                    elif 'target' in h or 'translation' in h or 'destino' in h or 'tradução' in h:
+                        target_col = i
+
+            for row in reader:
+                if len(row) > max(source_col, target_col):
+                    source_text = row[source_col].strip()
+                    target_text = row[target_col].strip()
+
+                    if source_text and target_text:
+                        entries.append({
+                            "source": source_text,
+                            "target": target_text
+                        })
+
+        # Insert entries into database
+        for entry in entries:
+            # Check if entry already exists
+            existing = await db.translation_memory.find_one({
+                "sourceLang": sourceLang,
+                "targetLang": targetLang,
+                "source": entry["source"]
+            })
+
+            if existing:
+                # Update if target is different
+                if existing.get("target") != entry["target"]:
+                    await db.translation_memory.update_one(
+                        {"id": existing["id"]},
+                        {"$set": {
+                            "target": entry["target"],
+                            "score": 100,  # Uploaded TM gets highest priority
+                            "is_uploaded": True,
+                            "updated_at": datetime.utcnow()
+                        }}
+                    )
+                    updated_count += 1
+            else:
+                tm_entry = {
+                    "id": str(uuid.uuid4()),
+                    "sourceLang": sourceLang,
+                    "targetLang": targetLang,
+                    "field": field,
+                    "documentType": "Uploaded TM",
+                    "source": entry["source"],
+                    "target": entry["target"],
+                    "score": 100,  # Uploaded TM gets highest priority
+                    "is_uploaded": True,
+                    "context": f"Uploaded by {user_info.get('user_id', 'unknown')}",
+                    "created_at": datetime.utcnow(),
+                    "created_by": user_info.get("user_id", "system")
+                }
+                await db.translation_memory.insert_one(tm_entry)
+                added_count += 1
+
+        return {
+            "status": "success",
+            "added": added_count,
+            "updated": updated_count,
+            "total_entries": len(entries),
+            "message": f"Successfully processed {len(entries)} TM entries"
+        }
+
+    except Exception as e:
+        logger.error(f"Error uploading TM: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Error processing file: {str(e)}")
+
+
+@api_router.post("/admin/glossaries/upload")
+async def upload_glossary(
+    admin_key: str,
+    file: UploadFile = File(...),
+    name: str = Form("Uploaded Glossary"),
+    sourceLang: str = Form("Portuguese (Brazil)"),
+    targetLang: str = Form("English"),
+    field: str = Form("All Fields"),
+    bidirectional: bool = Form(True)
+):
+    """
+    Upload Glossary from CSV or TMX file
+    Only admin, PM, and in-house translators can upload glossaries
+    """
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Check if user is admin, PM, or in-house translator
+    user_role = user_info.get("role")
+    is_in_house_translator = user_role == "translator" and user_info.get("translator_type") == "in_house"
+
+    if user_role not in ["admin", "pm"] and not is_in_house_translator and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Only admin, PM, or in-house translators can upload glossaries")
+
+    # Read file content
+    content = await file.read()
+    filename = file.filename.lower()
+
+    terms = []
+
+    try:
+        if filename.endswith('.tmx') or filename.endswith('.xml'):
+            # Parse TMX file
+            import xml.etree.ElementTree as ET
+            root = ET.fromstring(content.decode('utf-8'))
+
+            for tu in root.findall('.//tu'):
+                tuvs = tu.findall('tuv')
+                if len(tuvs) >= 2:
+                    source_text = ""
+                    target_text = ""
+
+                    for tuv in tuvs:
+                        lang = tuv.get('{http://www.w3.org/XML/1998/namespace}lang', '') or tuv.get('lang', '')
+                        seg = tuv.find('seg')
+                        if seg is not None and seg.text:
+                            lang_lower = lang.lower()
+                            if lang_lower.startswith('pt') or lang_lower.startswith('por'):
+                                source_text = seg.text.strip()
+                            elif lang_lower.startswith('en'):
+                                target_text = seg.text.strip()
+                            elif not source_text:
+                                source_text = seg.text.strip()
+                            else:
+                                target_text = seg.text.strip()
+
+                    if source_text and target_text:
+                        terms.append({
+                            "id": len(terms) + 1,
+                            "source": source_text,
+                            "target": target_text,
+                            "notes": ""
+                        })
+
+        elif filename.endswith('.csv'):
+            # Parse CSV file
+            import csv
+            import io
+            content_str = content.decode('utf-8-sig')  # Handle BOM
+            reader = csv.reader(io.StringIO(content_str))
+            header = next(reader, None)  # Skip header row
+
+            # Try to determine column positions
+            source_col = 0
+            target_col = 1
+            notes_col = -1
+
+            if header:
+                header_lower = [h.lower().strip() for h in header]
+                for i, h in enumerate(header_lower):
+                    if 'source' in h or 'original' in h or 'origem' in h or 'term' in h:
+                        source_col = i
+                    elif 'target' in h or 'translation' in h or 'destino' in h or 'tradução' in h:
+                        target_col = i
+                    elif 'note' in h or 'comment' in h or 'observação' in h:
+                        notes_col = i
+
+            term_id = 1
+            for row in reader:
+                if len(row) > max(source_col, target_col):
+                    source_text = row[source_col].strip()
+                    target_text = row[target_col].strip()
+                    notes = row[notes_col].strip() if notes_col >= 0 and len(row) > notes_col else ""
+
+                    if source_text and target_text:
+                        terms.append({
+                            "id": term_id,
+                            "source": source_text,
+                            "target": target_text,
+                            "notes": notes
+                        })
+                        term_id += 1
+
+        elif filename.endswith('.xlsx') or filename.endswith('.xls'):
+            # Parse Excel file
+            try:
+                import openpyxl
+                import io
+
+                workbook = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+                sheet = workbook.active
+
+                # Try to find header row and determine columns
+                source_col = 0
+                target_col = 1
+                notes_col = -1
+                header_row = list(sheet.iter_rows(min_row=1, max_row=1, values_only=True))[0] if sheet.max_row > 0 else []
+
+                if header_row:
+                    header_lower = [str(h).lower().strip() if h else '' for h in header_row]
+                    for i, h in enumerate(header_lower):
+                        if 'source' in h or 'original' in h or 'origem' in h or 'term' in h or 'português' in h:
+                            source_col = i
+                        elif 'target' in h or 'translation' in h or 'destino' in h or 'tradução' in h or 'english' in h or 'inglês' in h:
+                            target_col = i
+                        elif 'note' in h or 'comment' in h or 'observação' in h:
+                            notes_col = i
+
+                term_id = 1
+                for row in sheet.iter_rows(min_row=2, values_only=True):  # Skip header
+                    if len(row) > max(source_col, target_col):
+                        source_text = str(row[source_col]).strip() if row[source_col] else ""
+                        target_text = str(row[target_col]).strip() if row[target_col] else ""
+                        notes = str(row[notes_col]).strip() if notes_col >= 0 and len(row) > notes_col and row[notes_col] else ""
+
+                        if source_text and target_text and source_text != 'None' and target_text != 'None':
+                            terms.append({
+                                "id": term_id,
+                                "source": source_text,
+                                "target": target_text,
+                                "notes": notes
+                            })
+                            term_id += 1
+
+                workbook.close()
+            except ImportError:
+                raise HTTPException(status_code=400, detail="Excel support not available. Please use CSV or TMX format.")
+
+        elif filename.endswith('.sdltm'):
+            # Parse SDL Trados TM file (SQLite database)
+            try:
+                import sqlite3
+                import tempfile
+                import os
+
+                # Write content to temp file (sqlite needs file path)
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.sdltm') as tmp:
+                    tmp.write(content)
+                    tmp_path = tmp.name
+
+                try:
+                    conn = sqlite3.connect(tmp_path)
+                    cursor = conn.cursor()
+
+                    # SDL TM stores translations in translation_units table
+                    cursor.execute("""
+                        SELECT source_segment, target_segment
+                        FROM translation_units
+                        WHERE source_segment IS NOT NULL AND target_segment IS NOT NULL
+                        LIMIT 5000
+                    """)
+
+                    term_id = 1
+                    for row in cursor.fetchall():
+                        source_text = row[0].strip() if row[0] else ""
+                        target_text = row[1].strip() if row[1] else ""
+
+                        if source_text and target_text:
+                            terms.append({
+                                "id": term_id,
+                                "source": source_text,
+                                "target": target_text,
+                                "notes": "from Trados TM"
+                            })
+                            term_id += 1
+
+                    conn.close()
+                finally:
+                    os.unlink(tmp_path)
+
+            except Exception as e:
+                logger.warning(f"Error parsing SDLTM file: {e}")
+                raise HTTPException(status_code=400, detail=f"Error parsing Trados TM file: {str(e)}")
+
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported file format. Use CSV, Excel (.xlsx), TMX, or Trados TM (.sdltm)")
+
+        if not terms:
+            raise HTTPException(status_code=400, detail="No valid terms found in the file")
+
+        # Create or update glossary
+        glossary_name = name or f"Uploaded Glossary ({datetime.now().strftime('%Y-%m-%d')})"
+
+        # Check if glossary with same name exists
+        existing_glossary = await db.glossaries.find_one({"name": glossary_name})
+
+        if existing_glossary:
+            # Merge terms
+            existing_terms = existing_glossary.get("terms", [])
+            existing_sources = {t["source"].lower() for t in existing_terms}
+
+            for term in terms:
+                if term["source"].lower() not in existing_sources:
+                    term["id"] = len(existing_terms) + 1
+                    existing_terms.append(term)
+
+            await db.glossaries.update_one(
+                {"id": existing_glossary["id"]},
+                {"$set": {
+                    "terms": existing_terms,
+                    "is_uploaded": True,
+                    "updated_at": datetime.utcnow()
+                }}
+            )
+
+            return {
+                "status": "success",
+                "glossary_id": existing_glossary["id"],
+                "added_terms": len(terms),
+                "total_terms": len(existing_terms),
+                "message": f"Merged {len(terms)} terms into existing glossary '{glossary_name}'"
+            }
+        else:
+            # Create new glossary
+            glossary = {
+                "id": str(uuid.uuid4()),
+                "name": glossary_name,
+                "sourceLang": sourceLang,
+                "targetLang": targetLang,
+                "bidirectional": bidirectional,
+                "language": f"{sourceLang} <> {targetLang}",
+                "field": field,
+                "terms": terms,
+                "is_uploaded": True,
+                "created_at": datetime.utcnow(),
+                "created_by": user_info.get("user_id", "system")
+            }
+
+            await db.glossaries.insert_one(glossary)
+
+            return {
+                "status": "success",
+                "glossary_id": glossary["id"],
+                "added_terms": len(terms),
+                "message": f"Created glossary '{glossary_name}' with {len(terms)} terms"
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error uploading glossary: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Error processing file: {str(e)}")
 
 
 # ==================== CUSTOMER MODELS ====================
@@ -13414,6 +18715,423 @@ async def exclude_from_followup(admin_key: str, quote_id: str, quote_type: str =
         logger.error(f"Error excluding quote from follow-ups: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to exclude quote")
 
+
+@api_router.get("/admin/quotes/search")
+async def search_quotes_for_client_info(
+    admin_key: str,
+    reference: Optional[str] = None,
+    date: Optional[str] = None,
+    amount: Optional[float] = None
+):
+    """
+    Search quotes and payment transactions to find client email.
+    Useful when order confirmation went to wrong recipient.
+
+    Args:
+        reference: Order reference or partial match (e.g., WEB-1768509736913)
+        date: Date in YYYY-MM-DD format to search quotes created on that day
+        amount: Payment amount to search for
+    """
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        results = {
+            "quotes": [],
+            "payment_transactions": [],
+            "documents": []
+        }
+
+        # Build query for translation_quotes
+        quote_query = {}
+        if reference:
+            quote_query["$or"] = [
+                {"reference": {"$regex": reference, "$options": "i"}},
+                {"id": {"$regex": reference, "$options": "i"}}
+            ]
+        if amount:
+            quote_query["total_price"] = amount
+        if date:
+            try:
+                search_date = datetime.strptime(date, "%Y-%m-%d")
+                next_day = search_date + timedelta(days=1)
+                quote_query["created_at"] = {"$gte": search_date, "$lt": next_day}
+            except ValueError:
+                pass
+
+        # Search translation_quotes
+        if quote_query:
+            quotes = await db.translation_quotes.find(quote_query).sort("created_at", -1).to_list(50)
+        else:
+            # Get recent quotes if no filters
+            quotes = await db.translation_quotes.find({}).sort("created_at", -1).to_list(20)
+
+        for q in quotes:
+            results["quotes"].append({
+                "id": q.get("id"),
+                "reference": q.get("reference"),
+                "customer_email": q.get("customer_email"),
+                "customer_name": q.get("customer_name"),
+                "total_price": q.get("total_price"),
+                "document_ids": q.get("document_ids"),
+                "created_at": q.get("created_at").isoformat() if q.get("created_at") else None
+            })
+
+        # Search payment_transactions
+        tx_query = {}
+        if amount:
+            tx_query["amount"] = amount
+        if date:
+            try:
+                search_date = datetime.strptime(date, "%Y-%m-%d")
+                next_day = search_date + timedelta(days=1)
+                tx_query["created_at"] = {"$gte": search_date, "$lt": next_day}
+            except ValueError:
+                pass
+
+        if tx_query:
+            transactions = await db.payment_transactions.find(tx_query).sort("created_at", -1).to_list(50)
+        else:
+            transactions = await db.payment_transactions.find({}).sort("created_at", -1).to_list(20)
+
+        for tx in transactions:
+            # Also get the associated quote for customer info
+            quote = await db.translation_quotes.find_one({"id": tx.get("quote_id")})
+            results["payment_transactions"].append({
+                "id": tx.get("id"),
+                "session_id": tx.get("session_id"),
+                "quote_id": tx.get("quote_id"),
+                "amount": tx.get("amount"),
+                "payment_status": tx.get("payment_status"),
+                "status": tx.get("status"),
+                "customer_email": quote.get("customer_email") if quote else None,
+                "customer_name": quote.get("customer_name") if quote else None,
+                "created_at": tx.get("created_at").isoformat() if tx.get("created_at") else None
+            })
+
+        # Search for documents uploaded around that time
+        doc_query = {}
+        if date:
+            try:
+                search_date = datetime.strptime(date, "%Y-%m-%d")
+                next_day = search_date + timedelta(days=1)
+                doc_query["created_at"] = {"$gte": search_date, "$lt": next_day}
+            except ValueError:
+                pass
+
+        if doc_query:
+            docs = await db.documents.find(doc_query).sort("created_at", -1).to_list(50)
+            for doc in docs:
+                results["documents"].append({
+                    "id": doc.get("id"),
+                    "filename": doc.get("filename"),
+                    "order_id": doc.get("order_id"),
+                    "word_count": doc.get("word_count"),
+                    "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None
+                })
+
+        return results
+
+    except Exception as e:
+        logger.error(f"Error searching quotes: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to search quotes")
+
+
+@api_router.get("/admin/orphaned-payments")
+async def get_orphaned_payments(admin_key: str):
+    """
+    Find paid payment transactions that don't have an associated order.
+    These are orders that were paid but lost due to the bug.
+    """
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        # Find all completed/paid payment transactions
+        paid_transactions = await db.payment_transactions.find({
+            "$or": [
+                {"status": "completed"},
+                {"payment_status": "paid"}
+            ]
+        }).sort("created_at", -1).to_list(100)
+
+        orphaned = []
+        for tx in paid_transactions:
+            # Check if there's an order for this transaction in translation_orders
+            order = await db.translation_orders.find_one({
+                "$or": [
+                    {"session_id": tx.get("session_id")},
+                    {"quote_id": tx.get("quote_id")}
+                ]
+            })
+
+            if not order:
+                # This is an orphaned payment - get quote details
+                quote = await db.translation_quotes.find_one({"id": tx.get("quote_id")})
+
+                # Get associated documents
+                documents = []
+                if quote and quote.get("document_ids"):
+                    docs = await db.documents.find({"id": {"$in": quote.get("document_ids")}}).to_list(50)
+                    documents = [{"id": d.get("id"), "filename": d.get("filename"), "word_count": d.get("word_count")} for d in docs]
+
+                orphaned.append({
+                    "transaction_id": tx.get("id"),
+                    "session_id": tx.get("session_id"),
+                    "quote_id": tx.get("quote_id"),
+                    "amount": tx.get("amount"),
+                    "payment_status": tx.get("payment_status"),
+                    "customer_email": quote.get("customer_email") if quote else None,
+                    "customer_name": quote.get("customer_name") if quote else None,
+                    "service_type": quote.get("service_type") if quote else None,
+                    "translate_from": quote.get("translate_from") if quote else None,
+                    "translate_to": quote.get("translate_to") if quote else None,
+                    "word_count": quote.get("word_count") if quote else None,
+                    "documents": documents,
+                    "created_at": tx.get("created_at").isoformat() if tx.get("created_at") else None
+                })
+
+        return {
+            "orphaned_count": len(orphaned),
+            "orphaned_payments": orphaned
+        }
+
+    except Exception as e:
+        logger.error(f"Error finding orphaned payments: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to find orphaned payments")
+
+
+@api_router.post("/admin/recover-order/{transaction_id}")
+async def recover_order_from_payment(transaction_id: str, admin_key: str):
+    """
+    Create an order from an orphaned payment transaction.
+    Use this to recover orders that were lost due to the bug.
+    """
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        # Find the payment transaction
+        tx = await db.payment_transactions.find_one({"id": transaction_id})
+        if not tx:
+            raise HTTPException(status_code=404, detail="Transaction not found")
+
+        # Check if order already exists in translation_orders
+        existing_order = await db.translation_orders.find_one({
+            "$or": [
+                {"session_id": tx.get("session_id")},
+                {"quote_id": tx.get("quote_id")}
+            ]
+        })
+        if existing_order:
+            raise HTTPException(status_code=400, detail=f"Order already exists: {existing_order.get('order_number')}")
+
+        # Get quote details
+        quote = await db.translation_quotes.find_one({"id": tx.get("quote_id")})
+        if not quote:
+            raise HTTPException(status_code=404, detail="Quote not found for this transaction")
+
+        # Generate order number with P prefix to match admin panel
+        order_count = await db.translation_orders.count_documents({})
+        order_number = f"P{order_count + 6001}"
+
+        # Create the order
+        customer_name = quote.get("customer_name") or "Customer"
+        customer_email = quote.get("customer_email")
+
+        order = {
+            "id": str(uuid.uuid4()),
+            "order_number": order_number,
+            "quote_id": tx.get("quote_id"),
+            "session_id": tx.get("session_id"),
+            "partner_id": "website",
+            "client_name": customer_name,
+            "client_email": customer_email or "",
+            "document_type": quote.get("reference", "Document"),
+            "service_type": quote.get("service_type"),
+            "translate_from": quote.get("translate_from"),
+            "translate_to": quote.get("translate_to"),
+            "word_count": quote.get("word_count", 0),
+            "page_count": max(1, math.ceil(quote.get("word_count", 0) / 250)),
+            "urgency": quote.get("urgency"),
+            "notes": quote.get("notes") or "Recovered order - Website Stripe payment",
+            "base_price": quote.get("base_price"),
+            "urgency_fee": quote.get("urgency_fee"),
+            "total_price": quote.get("total_price"),
+            "discount_amount": quote.get("discount_amount", 0),
+            "discount_code": quote.get("discount_code"),
+            "payment_status": "paid",
+            "payment_method": "stripe",
+            "translation_status": "In Progress",
+            "source": "website",
+            "revenue_source": "website",
+            "recovered_order": True,
+            "created_at": quote.get("created_at", datetime.utcnow()),
+            "updated_at": datetime.utcnow()
+        }
+
+        await db.translation_orders.insert_one(order)
+
+        # Link documents to the order
+        document_ids = quote.get("document_ids", [])
+        if document_ids:
+            await db.documents.update_many(
+                {"id": {"$in": document_ids}},
+                {"$set": {"order_id": order["id"], "order_number": order_number}}
+            )
+
+        # Update transaction with order info
+        await db.payment_transactions.update_one(
+            {"id": transaction_id},
+            {"$set": {"order_id": order["id"], "order_number": order_number}}
+        )
+
+        return {
+            "status": "success",
+            "message": f"Order {order_number} recovered successfully",
+            "order": order
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error recovering order: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to recover order")
+
+
+@api_router.get("/admin/recover-all-orders")
+async def recover_all_orphaned_orders(admin_key: str):
+    """
+    Automatically recover ALL orphaned orders from paid payment transactions.
+    Call this once after deploying to fix all lost orders.
+    """
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        # Find all completed/paid payment transactions
+        paid_transactions = await db.payment_transactions.find({
+            "$or": [
+                {"status": "completed"},
+                {"payment_status": "paid"}
+            ]
+        }).sort("created_at", -1).to_list(500)
+
+        recovered = []
+        skipped = []
+        errors = []
+
+        for tx in paid_transactions:
+            try:
+                # Check if order already exists in translation_orders
+                existing_order = await db.translation_orders.find_one({
+                    "$or": [
+                        {"session_id": tx.get("session_id")},
+                        {"quote_id": tx.get("quote_id")}
+                    ]
+                })
+
+                if existing_order:
+                    skipped.append({
+                        "transaction_id": tx.get("id"),
+                        "reason": f"Order already exists: {existing_order.get('order_number')}"
+                    })
+                    continue
+
+                # Get quote details
+                quote = await db.translation_quotes.find_one({"id": tx.get("quote_id")})
+                if not quote:
+                    skipped.append({
+                        "transaction_id": tx.get("id"),
+                        "reason": "Quote not found"
+                    })
+                    continue
+
+                # Generate order number with P prefix to match admin panel
+                order_count = await db.translation_orders.count_documents({})
+                order_number = f"P{order_count + 6001}"
+
+                # Create the order
+                customer_name = quote.get("customer_name") or "Customer"
+                customer_email = quote.get("customer_email")
+                created_at = quote.get("created_at", datetime.utcnow())
+
+                order = {
+                    "id": str(uuid.uuid4()),
+                    "order_number": order_number,
+                    "quote_id": tx.get("quote_id"),
+                    "session_id": tx.get("session_id"),
+                    "partner_id": "website",
+                    "client_name": customer_name,
+                    "client_email": customer_email or "",
+                    "document_type": quote.get("reference", "Document"),
+                    "service_type": quote.get("service_type"),
+                    "translate_from": quote.get("translate_from"),
+                    "translate_to": quote.get("translate_to"),
+                    "word_count": quote.get("word_count", 0),
+                    "page_count": max(1, math.ceil(quote.get("word_count", 0) / 250)),
+                    "urgency": quote.get("urgency"),
+                    "notes": quote.get("notes") or "Recovered order - Website Stripe payment",
+                    "base_price": quote.get("base_price"),
+                    "urgency_fee": quote.get("urgency_fee"),
+                    "total_price": quote.get("total_price"),
+                    "discount_amount": quote.get("discount_amount", 0),
+                    "discount_code": quote.get("discount_code"),
+                    "payment_status": "paid",
+                    "payment_method": "stripe",
+                    "translation_status": "In Progress",
+                    "source": "website",
+                    "revenue_source": "website",
+                    "recovered_order": True,
+                    "created_at": created_at,
+                    "updated_at": datetime.utcnow()
+                }
+
+                await db.translation_orders.insert_one(order)
+
+                # Link documents to the order
+                document_ids = quote.get("document_ids", [])
+                if document_ids:
+                    await db.documents.update_many(
+                        {"id": {"$in": document_ids}},
+                        {"$set": {"order_id": order["id"], "order_number": order_number}}
+                    )
+
+                # Update transaction with order info
+                await db.payment_transactions.update_one(
+                    {"id": tx.get("id")},
+                    {"$set": {"order_id": order["id"], "order_number": order_number}}
+                )
+
+                recovered.append({
+                    "order_number": order_number,
+                    "customer_email": customer_email,
+                    "customer_name": customer_name,
+                    "amount": tx.get("amount"),
+                    "documents_count": len(document_ids)
+                })
+
+            except Exception as e:
+                errors.append({
+                    "transaction_id": tx.get("id"),
+                    "error": str(e)
+                })
+
+        return {
+            "status": "success",
+            "recovered_count": len(recovered),
+            "skipped_count": len(skipped),
+            "error_count": len(errors),
+            "recovered_orders": recovered,
+            "skipped": skipped,
+            "errors": errors
+        }
+
+    except Exception as e:
+        logger.error(f"Error recovering all orders: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to recover orders")
+
+
 # ==================== DISCOUNT CODES ====================
 
 class DiscountCode(BaseModel):
@@ -13437,31 +19155,54 @@ class DiscountCodeCreate(BaseModel):
 
 @api_router.get("/discount-codes/validate")
 async def validate_discount_code(code: str):
-    """Validate a discount code"""
+    """Validate a discount code (checks both internal database and Stripe promotion codes)"""
     try:
+        # First, check internal database
         discount = await db.discount_codes.find_one({
             "code": code.upper(),
             "is_active": True
         })
 
-        if not discount:
-            return {"valid": False, "message": "Invalid discount code"}
+        if discount:
+            # Check if expired
+            if discount.get("expires_at") and datetime.utcnow() > discount["expires_at"]:
+                return {"valid": False, "message": "Discount code has expired"}
 
-        # Check if expired
-        if discount.get("expires_at") and datetime.utcnow() > discount["expires_at"]:
-            return {"valid": False, "message": "Discount code has expired"}
+            # Check max uses
+            if discount.get("max_uses") and discount["uses"] >= discount["max_uses"]:
+                return {"valid": False, "message": "Discount code has reached maximum uses"}
 
-        # Check max uses
-        if discount.get("max_uses") and discount["uses"] >= discount["max_uses"]:
-            return {"valid": False, "message": "Discount code has reached maximum uses"}
-
-        return {
-            "valid": True,
-            "discount": {
+            return {
+                "valid": True,
                 "type": discount["type"],
                 "value": discount["value"]
             }
-        }
+
+        # If not found in internal database, check Stripe promotion codes
+        try:
+            promo_codes = stripe.PromotionCode.list(code=code.upper(), active=True, limit=1)
+            if promo_codes.data:
+                promo_code = promo_codes.data[0]
+                coupon = promo_code.coupon
+
+                # Get discount type and value from Stripe coupon
+                if coupon.percent_off:
+                    return {
+                        "valid": True,
+                        "type": "percentage",
+                        "value": coupon.percent_off
+                    }
+                elif coupon.amount_off:
+                    # Stripe stores amount in cents
+                    return {
+                        "valid": True,
+                        "type": "fixed",
+                        "value": coupon.amount_off / 100
+                    }
+        except Exception as stripe_error:
+            logger.error(f"Error checking Stripe promotion code: {str(stripe_error)}")
+
+        return {"valid": False, "message": "Invalid discount code"}
 
     except Exception as e:
         logger.error(f"Error validating discount code: {str(e)}")
@@ -13961,6 +19702,14 @@ STANDARD NOTATIONS:
 
 You MUST replicate the EXACT visual layout of the original document:
 
+🔴 CRITICAL: 1 ORIGINAL PAGE = 1 TRANSLATED PAGE 🔴
+• Each page of the original document MUST fit in exactly ONE page of translation
+• Target page size: US Letter (8.5" × 11") with 0.75" margins
+• If content is dense, REDUCE font sizes to fit (minimum 9pt for body, 8pt for tables)
+• Use compact spacing and padding when needed to fit content
+• NEVER let content overflow to additional pages - scale down to fit
+• This 1:1 page correspondence is MANDATORY for certified translations
+
 📐 STRUCTURE:
 • Match the original document's visual structure EXACTLY
 • If the original has a header, reproduce it with same proportions
@@ -13994,16 +19743,24 @@ You MUST replicate the EXACT visual layout of the original document:
                     OUTPUT FORMAT
 ═══════════════════════════════════════════════════════════════════
 
-Output CLEAN, PROFESSIONAL HTML:
+Output CLEAN, PROFESSIONAL HTML that fits on US LETTER pages:
 
 1. Start with <!DOCTYPE html> and proper structure
 2. Include embedded CSS for professional appearance:
-   - Font: Georgia, "Times New Roman", serif (12pt body)
-   - Tables: 1px solid black borders, 8px padding
-   - Margins: 20mm all sides
-   - Line-height: 1.5
+   - Font: Georgia, "Times New Roman", serif (11pt body - smaller for dense content)
+   - Tables: 1px solid black borders, 4-6px padding (compact)
+   - Margins: 0.75in all sides
+   - Line-height: 1.3-1.4 (compact)
+   - Use table-layout: fixed for consistent column widths
+   - Add word-wrap: break-word for long text in cells
 
 3. Page size: {'US Letter (8.5" × 11")' if page_format == "letter" else 'A4 (210mm × 297mm)'}
+   ⚠️ IMPORTANT: Content MUST fit within printable area (7" × 9.5")
+
+4. For tables with many columns:
+   - Use smaller font (9-10pt) to fit horizontally
+   - Abbreviate headers if needed (keep full text in cells)
+   - Split very wide tables into sections if necessary
 
 4. Structure:
    - Center main titles
@@ -14399,6 +20156,69 @@ async def chunk_document_for_translation(original_text: str, original_images: li
     return chunks
 
 
+def compress_image_for_claude_api(img_bytes: bytes, media_type: str = "image/jpeg", max_size: int = 5 * 1024 * 1024) -> tuple:
+    """
+    Compress an image to stay under Claude API's 5MB limit.
+
+    Args:
+        img_bytes: Raw image bytes
+        media_type: MIME type of the image
+        max_size: Maximum size in bytes (default 5MB)
+
+    Returns:
+        tuple: (compressed_bytes, media_type) - always returns JPEG if compression needed
+    """
+    # Check if already under limit
+    if len(img_bytes) <= max_size:
+        return img_bytes, media_type
+
+    try:
+        # Load image with PIL
+        img = Image.open(io.BytesIO(img_bytes))
+
+        # Convert to RGB if necessary (for JPEG output)
+        if img.mode in ('RGBA', 'P', 'LA'):
+            img = img.convert('RGB')
+
+        # Try progressively lower quality settings
+        quality_levels = [85, 70, 55, 40]
+
+        for quality in quality_levels:
+            jpeg_buffer = io.BytesIO()
+            img.save(jpeg_buffer, format='JPEG', quality=quality, optimize=True)
+            compressed_bytes = jpeg_buffer.getvalue()
+
+            if len(compressed_bytes) <= max_size:
+                logger.info(f"Image compressed from {len(img_bytes)} to {len(compressed_bytes)} bytes (quality={quality})")
+                return compressed_bytes, "image/jpeg"
+
+        # If still too large, resize the image progressively
+        scale_factors = [0.75, 0.5, 0.35, 0.25]
+        original_size = img.size
+
+        for scale in scale_factors:
+            new_size = (int(original_size[0] * scale), int(original_size[1] * scale))
+            resized_img = img.resize(new_size, Image.LANCZOS)
+
+            # Try quality settings again with resized image
+            for quality in [70, 50, 35]:
+                jpeg_buffer = io.BytesIO()
+                resized_img.save(jpeg_buffer, format='JPEG', quality=quality, optimize=True)
+                compressed_bytes = jpeg_buffer.getvalue()
+
+                if len(compressed_bytes) <= max_size:
+                    logger.info(f"Image resized to {new_size} and compressed to {len(compressed_bytes)} bytes (quality={quality})")
+                    return compressed_bytes, "image/jpeg"
+
+        # Last resort: return the smallest version we could make
+        logger.warning(f"Could not compress image below {max_size} bytes, using smallest version ({len(compressed_bytes)} bytes)")
+        return compressed_bytes, "image/jpeg"
+
+    except Exception as e:
+        logger.error(f"Image compression failed: {e}")
+        return img_bytes, media_type
+
+
 async def run_ai_translator_stage(pipeline: dict, claude_api_key: str) -> dict:
     """
     STAGE 1: AI TRANSLATOR
@@ -14413,31 +20233,99 @@ async def run_ai_translator_stage(pipeline: dict, claude_api_key: str) -> dict:
     config = pipeline["config"]
     original_text = pipeline["original_text"] or ""
 
-    # Get glossary terms if enabled
+    # ALWAYS get glossary terms - glossary is mandatory and has priority
     glossary_terms = ""
-    if config.get("use_glossary"):
-        source_lang = config["source_language"].lower()[:2]
-        target_lang = config["target_language"].lower()[:2]
+    source_lang_full = config.get("source_language", "Portuguese (Brazil)")
+    target_lang_full = config.get("target_language", "English")
+    source_lang = source_lang_full.lower()[:2]
+    target_lang = target_lang_full.lower()[:2]
 
-        glossary = await db.glossaries.find_one({
+    # Always fetch all matching glossaries for the language pair
+    try:
+        glossaries = await db.glossaries.find({
             "$or": [
                 {"source_language": source_lang, "target_language": target_lang},
-                {"language_pair": f"{source_lang}-{target_lang}"}
+                {"language_pair": f"{source_lang}-{target_lang}"},
+                {"sourceLang": source_lang_full, "targetLang": target_lang_full},
+                {"sourceLang": {"$regex": source_lang, "$options": "i"}, "targetLang": {"$regex": target_lang, "$options": "i"}}
             ]
-        })
+        }).to_list(50)
 
-        if glossary and glossary.get("terms"):
-            terms_list = "\n".join([f"• {t['source']} → {t['target']}" for t in glossary["terms"][:100]])
+        # Collect all terms from all matching glossaries
+        # ALL glossaries created by users are treated as priority
+        all_terms = []
+
+        for glossary in glossaries:
+            if glossary and glossary.get("terms"):
+                for term in glossary["terms"]:
+                    if term.get("source") and term.get("target"):
+                        term_entry = {"source": term["source"], "target": term["target"]}
+                        all_terms.append(term_entry)
+
+        # Build glossary text - ALL glossaries are treated as priority/mandatory
+        if all_terms:
+            glossary_text = "🔹 MANDATORY GLOSSARY TERMS (USE EXACTLY):\n"
+            seen_sources = set()
+            for t in all_terms[:200]:  # Allow up to 200 terms
+                if t["source"].lower() not in seen_sources:
+                    glossary_text += f"• {t['source']} → {t['target']}\n"
+                    seen_sources.add(t["source"].lower())
+
             glossary_terms = f"""
 ═══════════════════════════════════════════════════════════════════
                     GLOSSARY - MANDATORY TERMS
 ═══════════════════════════════════════════════════════════════════
-Use these EXACT translations for the following terms:
-{terms_list}
-"""
+CRITICAL: You MUST use these EXACT translations for the following terms.
+These terms have been pre-approved and take ABSOLUTE PRIORITY over any other translation.
+DO NOT translate these terms differently under any circumstances.
 
-    # Get specialized prompt
-    system_prompt = get_ai_translator_prompt(config, glossary_terms)
+{glossary_text}
+"""
+    except Exception as e:
+        logger.warning(f"Error fetching glossaries for translation: {e}")
+
+    # Get Translation Memory entries (prioritize uploaded TM with score=100)
+    tm_terms = ""
+    try:
+        # Fetch TM entries sorted by score (highest first) - uploaded TM has score=100
+        tm_entries = await db.translation_memory.find({
+            "$or": [
+                {"sourceLang": source_lang_full, "targetLang": target_lang_full},
+                {"sourceLang": {"$regex": source_lang_full[:10], "$options": "i"},
+                 "targetLang": {"$regex": target_lang_full[:10], "$options": "i"}}
+            ]
+        }).sort("score", -1).to_list(100)
+
+        if tm_entries:
+            # Separate uploaded TM (priority) from auto-generated TM
+            uploaded_tm = [tm for tm in tm_entries if tm.get("is_uploaded") or tm.get("score", 0) == 100]
+            auto_tm = [tm for tm in tm_entries if not tm.get("is_uploaded") and tm.get("score", 0) != 100]
+
+            tm_text = ""
+            if uploaded_tm:
+                tm_text += "🔹 PRIORITY TERMS (from uploaded TM - USE EXACTLY):\n"
+                for tm in uploaded_tm[:50]:
+                    tm_text += f"• {tm['source']} → {tm['target']}\n"
+
+            if auto_tm and len(uploaded_tm) < 50:
+                tm_text += "\n🔸 APPROVED TRANSLATIONS (from high-quality translations):\n"
+                for tm in auto_tm[:50 - len(uploaded_tm)]:
+                    tm_text += f"• {tm['source']} → {tm['target']} (score: {tm.get('score', 0)}%)\n"
+
+            if tm_text:
+                tm_terms = f"""
+═══════════════════════════════════════════════════════════════════
+                    TRANSLATION MEMORY
+═══════════════════════════════════════════════════════════════════
+Reference these approved translations when translating similar content:
+{tm_text}
+"""
+    except Exception as e:
+        logger.warning(f"Error fetching TM for translation: {e}")
+
+    # Get specialized prompt - combine glossary and TM terms
+    combined_terms = glossary_terms + tm_terms
+    system_prompt = get_ai_translator_prompt(config, combined_terms)
 
     # Add custom instructions if provided
     custom_instructions = config.get("custom_instructions", "") or ""
@@ -14477,35 +20365,76 @@ Use these EXACT translations for the following terms:
                             # Use higher resolution for better OCR
                             pix = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0))
                             img_bytes = pix.tobytes("jpeg")
-                            page_base64 = base64.b64encode(img_bytes).decode('utf-8')
+
+                            # Compress image if needed to stay under Claude's 5MB limit
+                            compressed_bytes, final_media_type = compress_image_for_claude_api(
+                                img_bytes, "image/jpeg"
+                            )
+
+                            page_base64 = base64.b64encode(compressed_bytes).decode('utf-8')
                             all_page_images.append({
                                 "page": page_num + 1,
                                 "data": page_base64,
-                                "media_type": "image/jpeg"
+                                "media_type": final_media_type
                             })
                         doc.close()
                     except Exception as e:
                         logger.error(f"PDF extraction failed: {e}")
-                        # Fallback to single image
+                        # Fallback to single image - still try to compress
+                        try:
+                            img_bytes = base64.b64decode(raw_data)
+                            compressed_bytes, final_media_type = compress_image_for_claude_api(
+                                img_bytes, "image/jpeg"
+                            )
+                            compressed_base64 = base64.b64encode(compressed_bytes).decode('utf-8')
+                        except Exception as compress_err:
+                            logger.warning(f"Fallback compression failed: {compress_err}")
+                            compressed_base64 = raw_data
+                            final_media_type = "image/jpeg"
+
                         all_page_images.append({
                             "page": 1,
-                            "data": raw_data,
-                            "media_type": "image/jpeg"
+                            "data": compressed_base64,
+                            "media_type": final_media_type
                         })
                 else:
                     # Single image (not PDF)
                     media_type = "image/png" if 'png' in header.lower() else "image/jpeg"
+
+                    # Decode and compress if needed to stay under Claude's 5MB limit
+                    try:
+                        img_bytes = base64.b64decode(raw_data)
+                        compressed_bytes, final_media_type = compress_image_for_claude_api(
+                            img_bytes, media_type
+                        )
+                        compressed_base64 = base64.b64encode(compressed_bytes).decode('utf-8')
+                    except Exception as e:
+                        logger.warning(f"Image compression failed, using original: {e}")
+                        compressed_base64 = raw_data
+                        final_media_type = media_type
+
                     all_page_images.append({
                         "page": 1,
-                        "data": raw_data,
-                        "media_type": media_type
+                        "data": compressed_base64,
+                        "media_type": final_media_type
                     })
             elif image_data:
-                # Raw base64 without header
+                # Raw base64 without header - decode and compress if needed
+                try:
+                    img_bytes = base64.b64decode(image_data)
+                    compressed_bytes, final_media_type = compress_image_for_claude_api(
+                        img_bytes, "image/jpeg"
+                    )
+                    compressed_base64 = base64.b64encode(compressed_bytes).decode('utf-8')
+                except Exception as e:
+                    logger.warning(f"Image compression failed, using original: {e}")
+                    compressed_base64 = image_data
+                    final_media_type = "image/jpeg"
+
                 all_page_images.append({
                     "page": 1,
-                    "data": image_data,
-                    "media_type": "image/jpeg"
+                    "data": compressed_base64,
+                    "media_type": final_media_type
                 })
 
         # Determine chunk size based on number of pages
@@ -14617,14 +20546,16 @@ async def translate_single_chunk(client, config: dict, system_prompt: str, page_
 
 {text}
 
-Produce a complete HTML translation ready for professional use.
+Produce a complete HTML translation ready for professional printing on US Letter format.
+⚠️ CRITICAL: Each original page MUST fit on exactly ONE translated page. Scale font sizes and spacing as needed to fit.
 {"Include page breaks between pages using: <div class='page-break' style='page-break-before: always;'></div>" if len(page_images) > 1 else ""}"""
         else:
             text_prompt = f"""Translate this {config['document_type']} document from the images{chunk_info}.
 
 Look at {'all ' + str(len(page_images)) + ' pages' if len(page_images) > 1 else 'the document'} carefully and translate ALL visible text from {config['source_language']} to {config['target_language']}.
 
-Produce a complete HTML translation ready for professional use.
+Produce a complete HTML translation ready for professional printing on US Letter format.
+⚠️ CRITICAL: Each original page MUST fit on exactly ONE translated page. Scale font sizes and spacing as needed to fit.
 {"Include page breaks between pages using: <div class='page-break' style='page-break-before: always;'></div>" if len(page_images) > 1 else ""}"""
 
         message_content.append({
@@ -16448,6 +22379,175 @@ async def quickbooks_sync_contractor_payment(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_router.post("/quickbooks/sync/partner-invoice")
+async def quickbooks_sync_partner_invoice(
+    admin_key: str = None,
+    invoice_id: str = Body(...),
+    send_email: bool = Body(True)
+):
+    """
+    Create and optionally send an Invoice in QuickBooks for a Partner Invoice.
+
+    This creates a proper Invoice (not Sales Receipt) for B2B partner billing,
+    since the partner hasn't paid yet. The invoice will be sent to the partner's email.
+    """
+    try:
+        # Check QuickBooks connection
+        settings = await db.settings.find_one({"key": "quickbooks"})
+        if not settings or not settings.get("quickbooks_connected"):
+            raise HTTPException(status_code=400, detail="QuickBooks not connected")
+
+        # Get the partner invoice
+        partner_invoice = await db.partner_invoices.find_one({"id": invoice_id})
+        if not partner_invoice:
+            raise HTTPException(status_code=404, detail="Partner invoice not found")
+
+        # Check if already synced
+        if partner_invoice.get("quickbooks_invoice_id"):
+            return {
+                "success": True,
+                "already_synced": True,
+                "invoice_id": partner_invoice.get("quickbooks_invoice_id"),
+                "invoice_number": partner_invoice.get("quickbooks_invoice_number"),
+                "message": "Invoice already synced to QuickBooks"
+            }
+
+        # Get partner details
+        partner = await db.partners.find_one({"id": partner_invoice.get("partner_id")})
+        if not partner:
+            raise HTTPException(status_code=404, detail="Partner not found")
+
+        qb_client = get_quickbooks_client(settings)
+
+        # Get or create customer in QuickBooks
+        partner_email = partner.get("email") or partner_invoice.get("partner_email")
+        partner_name = partner.get("company_name") or partner_invoice.get("partner_company")
+
+        qb_customer_id = None
+
+        # Try to find existing customer by email
+        if partner_email:
+            existing = qb_client.find_customer_by_email(partner_email)
+            if existing.get("success"):
+                customers = existing.get("data", {}).get("QueryResponse", {}).get("Customer", [])
+                if customers:
+                    qb_customer_id = customers[0].get("Id")
+
+        # If not found by email, try by company name
+        if not qb_customer_id and partner_name:
+            existing = qb_client.find_customer_by_name(partner_name)
+            if existing.get("success"):
+                customers = existing.get("data", {}).get("QueryResponse", {}).get("Customer", [])
+                if customers:
+                    qb_customer_id = customers[0].get("Id")
+
+        # Create customer if not found
+        if not qb_customer_id:
+            cust_result = qb_client.create_customer(
+                display_name=partner_name or "Partner",
+                email=partner_email,
+                phone=partner.get("phone"),
+                company=partner_name
+            )
+            if cust_result.get("success"):
+                qb_customer_id = cust_result.get("data", {}).get("Customer", {}).get("Id")
+            else:
+                raise HTTPException(status_code=400, detail=f"Failed to create customer in QuickBooks: {cust_result.get('error')}")
+
+        # Get orders included in this invoice to build line items
+        order_ids = partner_invoice.get("order_ids", [])
+        orders = await db.translation_orders.find({"id": {"$in": order_ids}}).to_list(1000)
+
+        # Build line items from orders
+        line_items = []
+        for order in orders:
+            doc_type = order.get('document_type', order.get('service_type', 'Document'))
+            source_lang = order.get('translate_from', order.get('source_language', ''))
+            target_lang = order.get('translate_to', order.get('target_language', ''))
+            order_num = order.get('order_number', order.get('id', ''))[:8]
+
+            description = f"Translation - {doc_type}"
+            if source_lang and target_lang:
+                description += f" ({source_lang} to {target_lang})"
+            description += f" - Order #{order_num}"
+
+            line_items.append({
+                "description": description,
+                "amount": order.get("total_price", 0),
+                "quantity": 1
+            })
+
+        # If no orders found, create a single line item with total
+        if not line_items:
+            line_items = [{
+                "description": f"Partner Invoice {partner_invoice.get('invoice_number')} - Translation Services",
+                "amount": partner_invoice.get("total_amount", 0),
+                "quantity": 1
+            }]
+
+        # Format due date
+        due_date = None
+        if partner_invoice.get("due_date"):
+            due_date_obj = partner_invoice.get("due_date")
+            if isinstance(due_date_obj, datetime):
+                due_date = due_date_obj.strftime("%Y-%m-%d")
+            elif isinstance(due_date_obj, str):
+                due_date = due_date_obj[:10]  # Take just the date part
+
+        # Create Invoice in QuickBooks
+        invoice_result = qb_client.create_invoice(
+            customer_id=qb_customer_id,
+            line_items=line_items,
+            due_date=due_date,
+            memo=f"Invoice {partner_invoice.get('invoice_number')} - {len(order_ids)} orders"
+        )
+
+        if not invoice_result.get("success"):
+            raise HTTPException(status_code=400, detail=f"Failed to create invoice: {invoice_result.get('error')}")
+
+        qb_invoice = invoice_result.get("data", {}).get("Invoice", {})
+        qb_invoice_id = qb_invoice.get("Id")
+        qb_invoice_number = qb_invoice.get("DocNumber")
+
+        # Send invoice via email if requested
+        email_sent = False
+        if send_email and qb_invoice_id and partner_email:
+            send_result = qb_client.send_invoice(qb_invoice_id, partner_email)
+            if send_result.get("success"):
+                email_sent = True
+            else:
+                logger.warning(f"Failed to send invoice email: {send_result.get('error')}")
+
+        # Update partner invoice with QuickBooks info
+        update_data = {
+            "quickbooks_invoice_id": qb_invoice_id,
+            "quickbooks_invoice_number": qb_invoice_number,
+            "quickbooks_synced_at": datetime.utcnow(),
+            "quickbooks_customer_id": qb_customer_id
+        }
+
+        await db.partner_invoices.update_one(
+            {"id": invoice_id},
+            {"$set": update_data}
+        )
+
+        logger.info(f"Synced partner invoice {partner_invoice.get('invoice_number')} to QuickBooks as invoice #{qb_invoice_number}")
+
+        return {
+            "success": True,
+            "invoice_id": qb_invoice_id,
+            "invoice_number": qb_invoice_number,
+            "customer_id": qb_customer_id,
+            "email_sent": email_sent,
+            "sent_to": partner_email if email_sent else None
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"QuickBooks sync partner invoice error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @api_router.get("/quickbooks/invoice/{order_id}")
 async def quickbooks_get_invoice(order_id: str, admin_key: str = None):
     """Get QuickBooks invoice status for an order"""
@@ -16529,12 +22629,15 @@ def generate_qr_code(data: str) -> str:
 @api_router.post("/certifications/create")
 async def create_certification(data: CertificationCreate, admin_key: str):
     """Create a new document certification with unique ID and QR code"""
-    # Validate admin key
+    # Validate admin key or user token (admin, PM, and in-house translators can create certifications)
     is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
     if not is_valid:
         user = await get_current_admin_user(admin_key)
-        if user and user.get("role") in ["admin", "pm"]:
-            is_valid = True
+        if user:
+            user_role = user.get("role")
+            is_in_house = user_role == "translator" and user.get("translator_type") == "in_house"
+            if user_role in ["admin", "pm"] or is_in_house:
+                is_valid = True
 
     if not is_valid:
         raise HTTPException(status_code=401, detail="Invalid admin key")
@@ -16553,6 +22656,11 @@ async def create_certification(data: CertificationCreate, admin_key: str):
         # Generate QR code
         qr_code_data = generate_qr_code(verification_url)
 
+        # Normalize certifier name - replace "Admin (Self)" with proper name
+        certifier_name = data.certifier_name
+        if certifier_name in ["Admin (Self)", "Admin", "Self", None, ""]:
+            certifier_name = "Beatriz Paiva"
+
         # Create certification record
         certification = {
             "certification_id": cert_id,
@@ -16563,8 +22671,8 @@ async def create_certification(data: CertificationCreate, admin_key: str):
             "target_language": data.target_language,
             "page_count": data.page_count,
             "document_hash": document_hash,
-            "certifier_name": data.certifier_name,
-            "certifier_title": data.certifier_title,
+            "certifier_name": certifier_name,
+            "certifier_title": data.certifier_title or "Legal Representative",
             "certifier_credentials": data.certifier_credentials,
             "company_name": data.company_name,
             "company_address": data.company_address,
@@ -16626,6 +22734,8 @@ async def verify_certification(certification_id: str):
             document_type=certification.get("document_type"),
             source_language=certification.get("source_language"),
             target_language=certification.get("target_language"),
+            page_count=certification.get("page_count"),
+            order_number=certification.get("order_number"),
             certifier_name=certification.get("certifier_name"),
             certifier_title=certification.get("certifier_title"),
             certifier_credentials=certification.get("certifier_credentials"),
@@ -17033,10 +23143,6 @@ async def delete_restore_point(restore_point_id: str, admin_key: str):
         logger.error(f"Error deleting restore point: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to delete restore point")
 
-
-# Include the router in the main app
-app.include_router(api_router)
-
 # Root endpoint
 @app.get("/")
 async def root():
@@ -17076,23 +23182,26 @@ async def aws_diagnostic():
 # ==================== SALES CONTROL ENDPOINTS ====================
 
 class Salesperson(BaseModel):
-    id: str = None
+    id: Optional[str] = None
     name: str
     email: str
     phone: str = ""
-    commission_type: str = "tier"  # tier, fixed, percentage
+    commission_type: str = "tier"  # tier, fixed, percentage, referral_plus_commission
     commission_rate: float = 0  # percentage or fixed amount per partner
+    referral_bonus: float = 0  # Fixed bonus per referral (for referral_plus_commission type)
     base_salary: float = 0
     monthly_target: int = 10  # partners per month
     status: str = "active"  # active, inactive, pending
-    hired_date: str = None
+    hired_date: Optional[str] = None
     notes: str = ""
-    created_at: str = None
+    referral_code: Optional[str] = None  # Unique referral code for tracking partner acquisitions
+    preferred_language: str = "en"  # en, pt, es - for email communications
+    created_at: Optional[str] = None
     # Authentication fields
-    password_hash: str = None
-    token: str = None
-    invite_token: str = None
-    invite_sent_at: str = None
+    password_hash: Optional[str] = None
+    token: Optional[str] = None
+    invite_token: Optional[str] = None
+    invite_sent_at: Optional[str] = None
 
 class SalesGoal(BaseModel):
     id: str = None
@@ -17144,76 +23253,353 @@ class CommissionPayment(BaseModel):
     created_at: str = None
 
 # Get all salespeople
-@app.get("/admin/salespeople")
+@api_router.get("/admin/salespeople")
 async def get_salespeople(admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
 
-    salespeople = await db.salespeople.find().sort("created_at", -1).to_list(100)
+    # Validate admin key or user token
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm", "sales"]:
+            raise HTTPException(status_code=401, detail="Invalid admin key or insufficient permissions")
 
-    # Get acquisition counts for each salesperson
-    for sp in salespeople:
-        sp["_id"] = str(sp["_id"])
-        acquisitions = await db.partner_acquisitions.count_documents({"salesperson_id": sp["id"]})
-        sp["total_acquisitions"] = acquisitions
+    try:
+        salespeople = await db.salespeople.find().sort("created_at", -1).to_list(100)
 
-        # Get current month acquisitions
-        current_month = datetime.now().strftime("%Y-%m")
-        month_acquisitions = await db.partner_acquisitions.count_documents({
-            "salesperson_id": sp["id"],
-            "acquisition_date": {"$regex": f"^{current_month}"}
-        })
-        sp["month_acquisitions"] = month_acquisitions
+        # Get acquisition counts for each salesperson
+        for sp in salespeople:
+            sp["_id"] = str(sp["_id"])
+            acquisitions = await db.partner_acquisitions.count_documents({"salesperson_id": sp["id"]})
+            sp["total_acquisitions"] = acquisitions
 
-    return salespeople
+            # Get current month acquisitions
+            current_month = datetime.now().strftime("%Y-%m")
+            month_acquisitions = await db.partner_acquisitions.count_documents({
+                "salesperson_id": sp["id"],
+                "acquisition_date": {"$regex": f"^{current_month}"}
+            })
+            sp["month_acquisitions"] = month_acquisitions
+
+        return salespeople
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching salespeople: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch salespeople: {str(e)}")
+
+# Generate unique referral code for salesperson
+def generate_referral_code(name: str = None) -> str:
+    """Generate a unique random referral code (6 alphanumeric characters)"""
+    # Generate fully random alphanumeric code (uppercase letters and numbers)
+    chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'  # Removed confusing chars (0, O, 1, I)
+    return ''.join(secrets.choice(chars) for _ in range(6))
 
 # Create salesperson
-@app.post("/admin/salespeople")
+@api_router.post("/admin/salespeople")
 async def create_salesperson(salesperson: Salesperson, admin_key: str = Header(None)):
+    # Validate admin key or user token
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
 
-    salesperson.id = str(uuid.uuid4())[:8]
-    salesperson.created_at = datetime.now(ZoneInfo("America/New_York")).isoformat()
-    salesperson.hired_date = salesperson.hired_date or datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm", "sales"]:
+            raise HTTPException(status_code=401, detail="Invalid admin key or insufficient permissions")
 
-    await db.salespeople.insert_one(salesperson.dict())
+    try:
+        salesperson.id = str(uuid.uuid4())[:8]
+        salesperson.created_at = datetime.now(ZoneInfo("America/New_York")).isoformat()
+        salesperson.hired_date = salesperson.hired_date or datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
 
-    return {"success": True, "salesperson": salesperson.dict()}
+        # Generate unique referral code
+        referral_code = generate_referral_code(salesperson.name)
+        # Ensure uniqueness
+        while await db.salespeople.find_one({"referral_code": referral_code}):
+            referral_code = generate_referral_code(salesperson.name)
+        salesperson.referral_code = referral_code
+
+        # Generate invite token automatically so the invite link works immediately
+        invite_token = str(uuid.uuid4())
+        salesperson.invite_token = invite_token
+        salesperson.invite_sent_at = datetime.now(ZoneInfo("America/New_York")).isoformat()
+        salesperson.status = "pending"
+
+        await db.salespeople.insert_one(salesperson.dict())
+
+        # Generate invite link
+        frontend_url = os.environ.get('FRONTEND_URL', 'https://portal.legacytranslations.com')
+        invite_link = f"{frontend_url}/#/sales-invite?token={invite_token}"
+
+        salesperson_data = salesperson.dict()
+        salesperson_data['invite_link'] = invite_link
+
+        # Send invite email automatically
+        try:
+            # Get preferred language (default to English)
+            lang = salesperson.preferred_language or 'en'
+
+            # Email content by language
+            email_content = {
+                'en': {
+                    'subject': "You're Invited to Join Legacy Translations Partner Program",
+                    'greeting': f'Hi {salesperson.name},',
+                    'intro': "You've been invited to become a Legacy Translations referral partner!",
+                    'what_earn_title': "WHAT YOU'LL EARN:",
+                    'what_earn_items': [
+                        '$100 bonus when your referral reaches $100 in orders',
+                        '10% commission on all orders (first 30 days)',
+                        'Monthly bonus for hitting your referral goal'
+                    ],
+                    'how_works_title': 'HOW IT WORKS:',
+                    'how_works_items': [
+                        'Click the link below to create your account',
+                        'Get your personal referral link',
+                        'Share with businesses that need translations',
+                        'Track your earnings in real-time'
+                    ],
+                    'who_refer_title': 'WHO TO REFER:',
+                    'who_refer_desc': 'Law firms, immigration offices, accounting firms, real estate agencies, hospitals – any business with recurring translation needs.',
+                    'cta_button': 'CREATE YOUR ACCOUNT',
+                    'expires': 'This link expires in 7 days.',
+                    'questions': 'Questions? Reply to this email.',
+                    'closing': 'Best,',
+                    'team': 'Legacy Translations Team'
+                },
+                'pt': {
+                    'subject': 'Você foi Convidado para o Programa de Parceiros Legacy Translations',
+                    'greeting': f'Olá {salesperson.name},',
+                    'intro': 'Você foi convidado para se tornar um parceiro de indicação da Legacy Translations!',
+                    'what_earn_title': 'O QUE VOCÊ GANHARÁ:',
+                    'what_earn_items': [
+                        'Bônus de $100 quando sua indicação atingir $100 em pedidos',
+                        '10% de comissão em todos os pedidos (primeiros 30 dias)',
+                        'Bônus mensal por atingir sua meta de indicações'
+                    ],
+                    'how_works_title': 'COMO FUNCIONA:',
+                    'how_works_items': [
+                        'Clique no link abaixo para criar sua conta',
+                        'Obtenha seu link de indicação pessoal',
+                        'Compartilhe com empresas que precisam de traduções',
+                        'Acompanhe seus ganhos em tempo real'
+                    ],
+                    'who_refer_title': 'QUEM INDICAR:',
+                    'who_refer_desc': 'Escritórios de advocacia, escritórios de imigração, contabilidades, imobiliárias, hospitais – qualquer empresa com necessidades recorrentes de tradução.',
+                    'cta_button': 'CRIAR MINHA CONTA',
+                    'expires': 'Este link expira em 7 dias.',
+                    'questions': 'Dúvidas? Responda a este email.',
+                    'closing': 'Atenciosamente,',
+                    'team': 'Equipe Legacy Translations'
+                },
+                'es': {
+                    'subject': 'Estás Invitado al Programa de Socios de Legacy Translations',
+                    'greeting': f'Hola {salesperson.name},',
+                    'intro': '¡Has sido invitado a convertirte en socio de referidos de Legacy Translations!',
+                    'what_earn_title': 'LO QUE GANARÁS:',
+                    'what_earn_items': [
+                        'Bono de $100 cuando tu referido alcance $100 en pedidos',
+                        '10% de comisión en todos los pedidos (primeros 30 días)',
+                        'Bono mensual por alcanzar tu meta de referidos'
+                    ],
+                    'how_works_title': 'CÓMO FUNCIONA:',
+                    'how_works_items': [
+                        'Haz clic en el enlace de abajo para crear tu cuenta',
+                        'Obtén tu enlace de referidos personal',
+                        'Comparte con empresas que necesitan traducciones',
+                        'Rastrea tus ganancias en tiempo real'
+                    ],
+                    'who_refer_title': '¿A QUIÉN REFERIR?',
+                    'who_refer_desc': 'Bufetes de abogados, oficinas de inmigración, firmas de contabilidad, agencias inmobiliarias, hospitales – cualquier negocio con necesidades recurrentes de traducción.',
+                    'cta_button': 'CREAR MI CUENTA',
+                    'expires': 'Este enlace expira en 7 días.',
+                    'questions': '¿Preguntas? Responde a este correo.',
+                    'closing': 'Saludos,',
+                    'team': 'Equipo Legacy Translations'
+                }
+            }
+
+            content = email_content.get(lang, email_content['en'])
+            what_earn_html = ''.join([f'<li style="margin-bottom: 8px;">✓ {item}</li>' for item in content['what_earn_items']])
+            how_works_html = ''.join([f'<li style="margin-bottom: 8px;">{i+1}. {item}</li>' for i, item in enumerate(content['how_works_items'])])
+
+            email_html = f"""
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f5f5f5;">
+                <tr>
+                    <td align="center" style="padding: 40px 20px;">
+                        <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 600px;">
+                            <!-- Header -->
+                            <tr>
+                                <td style="background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); padding: 30px 40px; border-radius: 8px 8px 0 0; text-align: center;">
+                                    <p style="color: #ffffff; font-size: 24px; font-weight: 600; margin: 0;">Legacy Translations</p>
+                                </td>
+                            </tr>
+                            <!-- Gold separator -->
+                            <tr>
+                                <td style="background: linear-gradient(90deg, #c9a227 0%, #e6c547 50%, #c9a227 100%); height: 4px;"></td>
+                            </tr>
+                            <!-- Content -->
+                            <tr>
+                                <td style="padding: 40px;">
+                                    <p style="color: #1a2a4a; font-size: 16px; margin: 0 0 15px 0;">{content['greeting']}</p>
+                                    <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 25px 0;">{content['intro']}</p>
+
+                                    <!-- What You'll Earn Section -->
+                                    <div style="background: linear-gradient(135deg, #f0f4f8 0%, #e8eef5 100%); border-radius: 8px; padding: 20px; margin-bottom: 20px; border-left: 4px solid #c9a227;">
+                                        <p style="color: #1a2a4a; font-size: 15px; font-weight: 600; margin: 0 0 12px 0;">{content['what_earn_title']}</p>
+                                        <ul style="color: #4a5568; font-size: 14px; margin: 0; padding-left: 5px; list-style: none;">{what_earn_html}</ul>
+                                    </div>
+
+                                    <!-- How It Works Section -->
+                                    <div style="background: linear-gradient(135deg, #f0f4f8 0%, #e8eef5 100%); border-radius: 8px; padding: 20px; margin-bottom: 20px; border-left: 4px solid #1a2a4a;">
+                                        <p style="color: #1a2a4a; font-size: 15px; font-weight: 600; margin: 0 0 12px 0;">{content['how_works_title']}</p>
+                                        <ul style="color: #4a5568; font-size: 14px; margin: 0; padding-left: 5px; list-style: none;">{how_works_html}</ul>
+                                    </div>
+
+                                    <!-- Who To Refer Section -->
+                                    <div style="background: linear-gradient(135deg, #f0f4f8 0%, #e8eef5 100%); border-radius: 8px; padding: 20px; margin-bottom: 25px; border-left: 4px solid #c9a227;">
+                                        <p style="color: #1a2a4a; font-size: 15px; font-weight: 600; margin: 0 0 8px 0;">{content['who_refer_title']}</p>
+                                        <p style="color: #4a5568; font-size: 14px; margin: 0; line-height: 1.6;">{content['who_refer_desc']}</p>
+                                    </div>
+
+                                    <!-- CTA Button -->
+                                    <div style="text-align: center; margin: 30px 0;">
+                                        <a href="{invite_link}" style="display: inline-block; background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 50px; font-size: 15px; font-weight: 600; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(26, 42, 74, 0.3);">{content['cta_button']}</a>
+                                        <p style="color: #64748b; font-size: 13px; margin: 15px 0 0 0;">{content['expires']}</p>
+                                    </div>
+
+                                    <!-- Questions -->
+                                    <p style="color: #64748b; font-size: 14px; margin: 25px 0 20px 0;">{content['questions']}</p>
+
+                                    <!-- Closing -->
+                                    <p style="color: #1a2a4a; font-size: 14px; margin: 0;">{content['closing']}</p>
+                                    <p style="color: #1a2a4a; font-size: 14px; font-weight: 600; margin: 5px 0 0 0;">{content['team']}</p>
+                                </td>
+                            </tr>
+                            <!-- Footer -->
+                            <tr>
+                                <td style="background-color: #1a2a4a; padding: 25px 40px; border-radius: 0 0 8px 8px;">
+                                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                        <tr>
+                                            <td align="center">
+                                                <a href="https://www.facebook.com/legacytranslationsusa/" target="_blank" style="display: inline-block; background-color: #c9a227; color: #1a2a4a; text-decoration: none; padding: 8px 20px; border-radius: 50px; font-size: 12px; font-weight: 600; margin-right: 10px;">Facebook</a>
+                                                <a href="https://www.instagram.com/legacytranslations/" target="_blank" style="display: inline-block; background-color: #c9a227; color: #1a2a4a; text-decoration: none; padding: 8px 20px; border-radius: 50px; font-size: 12px; font-weight: 600;">Instagram</a>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td align="center" style="padding-top: 15px;">
+                                                <p style="color: #a0aec0; font-size: 11px; line-height: 1.8; margin: 0;">
+                                                    867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116<br>
+                                                    <a href="mailto:contact@legacytranslations.com" style="color: #c9a227; text-decoration: none;">contact@legacytranslations.com</a>
+                                                </p>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+            """
+
+            await email_service.send_email(
+                to=salesperson.email,
+                subject=content['subject'],
+                content=email_html,
+                content_type="html"
+            )
+            logger.info(f"Invite email sent to salesperson: {salesperson.email}")
+        except Exception as email_error:
+            logger.error(f"Error sending invite email: {str(email_error)}")
+            # Don't fail the request, salesperson is already created
+
+        return {"success": True, "salesperson": salesperson_data, "invite_link": invite_link}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating salesperson: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create salesperson: {str(e)}")
 
 # Update salesperson
-@app.put("/admin/salespeople/{salesperson_id}")
+@api_router.put("/admin/salespeople/{salesperson_id}")
 async def update_salesperson(salesperson_id: str, salesperson: Salesperson, admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
 
-    update_data = {k: v for k, v in salesperson.dict().items() if v is not None and k != "id"}
+    # Validate admin key or user token
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm", "sales"]:
+            raise HTTPException(status_code=401, detail="Invalid admin key or insufficient permissions")
 
-    result = await db.salespeople.update_one(
-        {"id": salesperson_id},
-        {"$set": update_data}
-    )
+    try:
+        # First check if salesperson exists
+        existing = await db.salespeople.find_one({"id": salesperson_id})
+        if not existing:
+            raise HTTPException(status_code=404, detail="Salesperson not found")
 
-    if result.modified_count == 0:
-        raise HTTPException(status_code=404, detail="Salesperson not found")
+        update_data = {k: v for k, v in salesperson.dict().items() if v is not None and k != "id"}
 
-    return {"success": True}
+        await db.salespeople.update_one(
+            {"id": salesperson_id},
+            {"$set": update_data}
+        )
+
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating salesperson: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update salesperson: {str(e)}")
 
 # Delete salesperson
-@app.delete("/admin/salespeople/{salesperson_id}")
+@api_router.delete("/admin/salespeople/{salesperson_id}")
 async def delete_salesperson(salesperson_id: str, admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
 
-    result = await db.salespeople.delete_one({"id": salesperson_id})
+    # Validate admin key or user token
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm", "sales"]:
+            raise HTTPException(status_code=401, detail="Invalid admin key or insufficient permissions")
 
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Salesperson not found")
+    try:
+        result = await db.salespeople.delete_one({"id": salesperson_id})
 
-    return {"success": True}
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Salesperson not found")
+
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting salesperson: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete salesperson: {str(e)}")
+
+# Get salesperson by referral code (public endpoint for partner registration)
+@app.get("/api/referral/{referral_code}")
+async def get_salesperson_by_referral(referral_code: str):
+    """Public endpoint to validate referral code and get salesperson info"""
+    salesperson = await db.salespeople.find_one({"referral_code": referral_code.upper(), "status": "active"})
+
+    if not salesperson:
+        raise HTTPException(status_code=404, detail="Invalid referral code")
+
+    # Return only public info
+    return {
+        "valid": True,
+        "salesperson_id": salesperson["id"],
+        "salesperson_name": salesperson["name"],
+        "referral_code": salesperson["referral_code"]
+    }
 
 # Get sales goals
-@app.get("/admin/sales-goals")
+@api_router.get("/admin/sales-goals")
 async def get_sales_goals(admin_key: str = Header(None), month: str = None):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
@@ -17233,7 +23619,7 @@ async def get_sales_goals(admin_key: str = Header(None), month: str = None):
     return goals
 
 # Create/Update sales goal
-@app.post("/admin/sales-goals")
+@api_router.post("/admin/sales-goals")
 async def create_sales_goal(goal: SalesGoal, admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
@@ -17263,7 +23649,7 @@ async def create_sales_goal(goal: SalesGoal, admin_key: str = Header(None)):
     return {"success": True, "goal": goal.dict()}
 
 # Get partner acquisitions
-@app.get("/admin/partner-acquisitions")
+@api_router.get("/admin/partner-acquisitions")
 async def get_partner_acquisitions(admin_key: str = Header(None), salesperson_id: str = None):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
@@ -17283,7 +23669,7 @@ async def get_partner_acquisitions(admin_key: str = Header(None), salesperson_id
     return acquisitions
 
 # Record partner acquisition
-@app.post("/admin/partner-acquisitions")
+@api_router.post("/admin/partner-acquisitions")
 async def create_partner_acquisition(acquisition: PartnerAcquisition, admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
@@ -17325,7 +23711,7 @@ async def create_partner_acquisition(acquisition: PartnerAcquisition, admin_key:
     return {"success": True, "acquisition": acquisition.dict()}
 
 # Update acquisition commission status
-@app.put("/admin/partner-acquisitions/{acquisition_id}/status")
+@api_router.put("/admin/partner-acquisitions/{acquisition_id}/status")
 async def update_acquisition_status(acquisition_id: str, status: str, admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
@@ -17344,7 +23730,7 @@ async def update_acquisition_status(acquisition_id: str, status: str, admin_key:
     return {"success": True}
 
 # Get sales dashboard stats
-@app.get("/admin/sales-dashboard")
+@api_router.get("/admin/sales-dashboard")
 async def get_sales_dashboard(admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
@@ -17443,7 +23829,7 @@ async def get_sales_dashboard(admin_key: str = Header(None)):
 # ==================== SALESPERSON PORTAL ENDPOINTS ====================
 
 # Send invite to salesperson
-@app.post("/admin/salespeople/{salesperson_id}/invite")
+@api_router.post("/admin/salespeople/{salesperson_id}/invite")
 async def invite_salesperson(salesperson_id: str, admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
@@ -17469,48 +23855,181 @@ async def invite_salesperson(salesperson_id: str, admin_key: str = Header(None))
         frontend_url = os.environ.get('FRONTEND_URL', 'https://portal.legacytranslations.com')
         invite_link = f"{frontend_url}/#/sales-invite?token={invite_token}"
 
+        # Get preferred language (default to English)
+        lang = salesperson.get('preferred_language', 'en')
+
+        # Email content by language
+        email_content = {
+            'en': {
+                'subject': "You're Invited to Join Legacy Translations Partner Program",
+                'greeting': f'Hi {salesperson["name"]},',
+                'intro': "You've been invited to become a Legacy Translations referral partner!",
+                'what_earn_title': "WHAT YOU'LL EARN:",
+                'what_earn_items': [
+                    '$100 bonus when your referral reaches $100 in orders',
+                    '10% commission on all orders (first 30 days)',
+                    'Monthly bonus for hitting your referral goal'
+                ],
+                'how_works_title': 'HOW IT WORKS:',
+                'how_works_items': [
+                    'Click the link below to create your account',
+                    'Get your personal referral link',
+                    'Share with businesses that need translations',
+                    'Track your earnings in real-time'
+                ],
+                'who_refer_title': 'WHO TO REFER:',
+                'who_refer_desc': 'Law firms, immigration offices, accounting firms, real estate agencies, hospitals – any business with recurring translation needs.',
+                'cta_button': 'CREATE YOUR ACCOUNT',
+                'expires': 'This link expires in 7 days.',
+                'questions': 'Questions? Reply to this email.',
+                'closing': 'Best,',
+                'team': 'Legacy Translations Team'
+            },
+            'pt': {
+                'subject': 'Você foi Convidado para o Programa de Parceiros Legacy Translations',
+                'greeting': f'Olá {salesperson["name"]},',
+                'intro': 'Você foi convidado para se tornar um parceiro de indicação da Legacy Translations!',
+                'what_earn_title': 'O QUE VOCÊ GANHARÁ:',
+                'what_earn_items': [
+                    'Bônus de $100 quando sua indicação atingir $100 em pedidos',
+                    '10% de comissão em todos os pedidos (primeiros 30 dias)',
+                    'Bônus mensal por atingir sua meta de indicações'
+                ],
+                'how_works_title': 'COMO FUNCIONA:',
+                'how_works_items': [
+                    'Clique no link abaixo para criar sua conta',
+                    'Obtenha seu link de indicação pessoal',
+                    'Compartilhe com empresas que precisam de traduções',
+                    'Acompanhe seus ganhos em tempo real'
+                ],
+                'who_refer_title': 'QUEM INDICAR:',
+                'who_refer_desc': 'Escritórios de advocacia, escritórios de imigração, contabilidades, imobiliárias, hospitais – qualquer empresa com necessidades recorrentes de tradução.',
+                'cta_button': 'CRIAR MINHA CONTA',
+                'expires': 'Este link expira em 7 dias.',
+                'questions': 'Dúvidas? Responda a este email.',
+                'closing': 'Atenciosamente,',
+                'team': 'Equipe Legacy Translations'
+            },
+            'es': {
+                'subject': 'Estás Invitado al Programa de Socios de Legacy Translations',
+                'greeting': f'Hola {salesperson["name"]},',
+                'intro': '¡Has sido invitado a convertirte en socio de referidos de Legacy Translations!',
+                'what_earn_title': 'LO QUE GANARÁS:',
+                'what_earn_items': [
+                    'Bono de $100 cuando tu referido alcance $100 en pedidos',
+                    '10% de comisión en todos los pedidos (primeros 30 días)',
+                    'Bono mensual por alcanzar tu meta de referidos'
+                ],
+                'how_works_title': 'CÓMO FUNCIONA:',
+                'how_works_items': [
+                    'Haz clic en el enlace de abajo para crear tu cuenta',
+                    'Obtén tu enlace de referidos personal',
+                    'Comparte con empresas que necesitan traducciones',
+                    'Rastrea tus ganancias en tiempo real'
+                ],
+                'who_refer_title': '¿A QUIÉN REFERIR?',
+                'who_refer_desc': 'Bufetes de abogados, oficinas de inmigración, firmas de contabilidad, agencias inmobiliarias, hospitales – cualquier negocio con necesidades recurrentes de traducción.',
+                'cta_button': 'CREAR MI CUENTA',
+                'expires': 'Este enlace expira en 7 días.',
+                'questions': '¿Preguntas? Responde a este correo.',
+                'closing': 'Saludos,',
+                'team': 'Equipo Legacy Translations'
+            }
+        }
+
+        # Get content for selected language
+        content = email_content.get(lang, email_content['en'])
+
+        # Build items list HTML
+        what_earn_html = ''.join([f'<li style="margin-bottom: 8px;">✓ {item}</li>' for item in content['what_earn_items']])
+        how_works_html = ''.join([f'<li style="margin-bottom: 8px;">{i+1}. {item}</li>' for i, item in enumerate(content['how_works_items'])])
+
         email_html = f"""
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #4F46E5, #7C3AED); border-radius: 10px;">
-                <h1 style="color: white; margin: 0;">🎉 Welcome to the Team!</h1>
-            </div>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f5f5f5;">
+            <tr>
+                <td align="center" style="padding: 40px 20px;">
+                    <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 600px;">
+                        <!-- Header -->
+                        <tr>
+                            <td style="background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); padding: 30px 40px; border-radius: 8px 8px 0 0; text-align: center;">
+                                <p style="color: #ffffff; font-size: 24px; font-weight: 600; margin: 0;">Legacy Translations</p>
+                            </td>
+                        </tr>
+                        <!-- Gold separator -->
+                        <tr>
+                            <td style="background: linear-gradient(90deg, #c9a227 0%, #e6c547 50%, #c9a227 100%); height: 4px;"></td>
+                        </tr>
+                        <!-- Content -->
+                        <tr>
+                            <td style="padding: 40px;">
+                                <p style="color: #1a2a4a; font-size: 16px; margin: 0 0 15px 0;">{content['greeting']}</p>
+                                <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 25px 0;">{content['intro']}</p>
 
-            <div style="padding: 30px 20px;">
-                <p>Hi <strong>{salesperson['name']}</strong>,</p>
+                                <!-- What You'll Earn Section -->
+                                <div style="background: linear-gradient(135deg, #f0f4f8 0%, #e8eef5 100%); border-radius: 8px; padding: 20px; margin-bottom: 20px; border-left: 4px solid #c9a227;">
+                                    <p style="color: #1a2a4a; font-size: 15px; font-weight: 600; margin: 0 0 12px 0;">{content['what_earn_title']}</p>
+                                    <ul style="color: #4a5568; font-size: 14px; margin: 0; padding-left: 5px; list-style: none;">{what_earn_html}</ul>
+                                </div>
 
-                <p>You've been invited to join <strong>Legacy Translations</strong> as a Sales Partner!</p>
+                                <!-- How It Works Section -->
+                                <div style="background: linear-gradient(135deg, #f0f4f8 0%, #e8eef5 100%); border-radius: 8px; padding: 20px; margin-bottom: 20px; border-left: 4px solid #1a2a4a;">
+                                    <p style="color: #1a2a4a; font-size: 15px; font-weight: 600; margin: 0 0 12px 0;">{content['how_works_title']}</p>
+                                    <ul style="color: #4a5568; font-size: 14px; margin: 0; padding-left: 5px; list-style: none;">{how_works_html}</ul>
+                                </div>
 
-                <p>As a sales partner, you'll be able to:</p>
-                <ul>
-                    <li>✅ Register new partners and earn commissions</li>
-                    <li>📊 Track your performance and earnings</li>
-                    <li>💰 View your monthly commission reports</li>
-                </ul>
+                                <!-- Who To Refer Section -->
+                                <div style="background: linear-gradient(135deg, #f0f4f8 0%, #e8eef5 100%); border-radius: 8px; padding: 20px; margin-bottom: 25px; border-left: 4px solid #c9a227;">
+                                    <p style="color: #1a2a4a; font-size: 15px; font-weight: 600; margin: 0 0 8px 0;">{content['who_refer_title']}</p>
+                                    <p style="color: #4a5568; font-size: 14px; margin: 0; line-height: 1.6;">{content['who_refer_desc']}</p>
+                                </div>
 
-                <div style="text-align: center; margin: 30px 0;">
-                    <a href="{invite_link}" style="background: linear-gradient(135deg, #4F46E5, #7C3AED); color: white; padding: 15px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
-                        Set Up Your Account
-                    </a>
-                </div>
+                                <!-- CTA Button -->
+                                <div style="text-align: center; margin: 30px 0;">
+                                    <a href="{invite_link}" style="display: inline-block; background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 50px; font-size: 15px; font-weight: 600; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(26, 42, 74, 0.3);">{content['cta_button']}</a>
+                                    <p style="color: #64748b; font-size: 13px; margin: 15px 0 0 0;">{content['expires']}</p>
+                                </div>
 
-                <p style="color: #666; font-size: 14px;">This invitation link will expire in 7 days.</p>
-            </div>
+                                <!-- Questions -->
+                                <p style="color: #64748b; font-size: 14px; margin: 25px 0 20px 0;">{content['questions']}</p>
 
-            <div style="text-align: center; padding: 20px; background: #f5f5f5; border-radius: 10px;">
-                <p style="margin: 0; color: #666;">Legacy Translation Services</p>
-            </div>
-        </div>
+                                <!-- Closing -->
+                                <p style="color: #1a2a4a; font-size: 14px; margin: 0;">{content['closing']}</p>
+                                <p style="color: #1a2a4a; font-size: 14px; font-weight: 600; margin: 5px 0 0 0;">{content['team']}</p>
+                            </td>
+                        </tr>
+                        <!-- Footer -->
+                        <tr>
+                            <td style="background-color: #1a2a4a; padding: 25px 40px; border-radius: 0 0 8px 8px;">
+                                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                    <tr>
+                                        <td align="center">
+                                            <a href="https://www.facebook.com/legacytranslationsusa/" target="_blank" style="display: inline-block; background-color: #c9a227; color: #1a2a4a; text-decoration: none; padding: 8px 20px; border-radius: 50px; font-size: 12px; font-weight: 600; margin-right: 10px;">Facebook</a>
+                                            <a href="https://www.instagram.com/legacytranslations/" target="_blank" style="display: inline-block; background-color: #c9a227; color: #1a2a4a; text-decoration: none; padding: 8px 20px; border-radius: 50px; font-size: 12px; font-weight: 600;">Instagram</a>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td align="center" style="padding-top: 15px;">
+                                            <p style="color: #a0aec0; font-size: 11px; line-height: 1.8; margin: 0;">
+                                                867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116<br>
+                                                <a href="mailto:contact@legacytranslations.com" style="color: #c9a227; text-decoration: none;">contact@legacytranslations.com</a>
+                                            </p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
         """
 
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = "🎉 You're Invited to Join Legacy Translations Sales Team!"
-        msg['From'] = EMAIL_USER
-        msg['To'] = salesperson['email']
-        msg.attach(MIMEText(email_html, 'html'))
-
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
-            smtp.login(EMAIL_USER, EMAIL_PASSWORD)
-            smtp.send_message(msg)
+        await email_service.send_email(
+            to=salesperson['email'],
+            subject=content['subject'],
+            content=email_html,
+            content_type="html"
+        )
 
         logger.info(f"Invite sent to salesperson: {salesperson['email']}")
 
@@ -17520,8 +24039,32 @@ async def invite_salesperson(salesperson_id: str, admin_key: str = Header(None))
 
     return {"success": True, "message": "Invitation sent", "invite_link": invite_link}
 
+# Verify salesperson invite token (before showing set-password form)
+@api_router.get("/salesperson/verify-invite")
+async def verify_salesperson_invite(token: str):
+    """Verify if invite token is valid before showing the password form"""
+    salesperson = await db.salespeople.find_one({"invite_token": token})
+    if not salesperson:
+        raise HTTPException(status_code=404, detail="Invalid or expired invite token")
+
+    # Check if invite is expired (7 days)
+    if salesperson.get("invite_sent_at"):
+        try:
+            invite_date = datetime.fromisoformat(salesperson["invite_sent_at"])
+            if datetime.now() - invite_date > timedelta(days=7):
+                raise HTTPException(status_code=400, detail="Invite token has expired. Please request a new invitation.")
+        except:
+            pass  # If date parsing fails, continue
+
+    return {
+        "valid": True,
+        "name": salesperson.get("name"),
+        "email": salesperson.get("email"),
+        "referral_code": salesperson.get("referral_code")
+    }
+
 # Salesperson set password (from invite)
-@app.post("/salesperson/set-password")
+@api_router.post("/salesperson/set-password")
 async def salesperson_set_password(invite_token: str = Form(...), password: str = Form(...)):
     salesperson = await db.salespeople.find_one({"invite_token": invite_token})
     if not salesperson:
@@ -17552,7 +24095,7 @@ async def salesperson_set_password(invite_token: str = Form(...), password: str 
     }}
 
 # Salesperson login
-@app.post("/salesperson/login")
+@api_router.post("/salesperson/login")
 async def salesperson_login(email: str = Form(...), password: str = Form(...)):
     salesperson = await db.salespeople.find_one({"email": email.lower().strip()})
     if not salesperson:
@@ -17587,7 +24130,7 @@ async def salesperson_login(email: str = Form(...), password: str = Form(...)):
     }
 
 # Get salesperson dashboard (for salesperson portal)
-@app.get("/salesperson/dashboard")
+@api_router.get("/salesperson/dashboard")
 async def get_salesperson_dashboard(token: str = Header(None, alias="salesperson-token")):
     if not token:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -17695,7 +24238,7 @@ async def get_salesperson_dashboard(token: str = Header(None, alias="salesperson
     }
 
 # Salesperson register a new partner
-@app.post("/salesperson/register-partner")
+@api_router.post("/salesperson/register-partner")
 async def salesperson_register_partner(
     token: str = Header(None, alias="salesperson-token"),
     company_name: str = Form(...),
@@ -17852,7 +24395,7 @@ async def salesperson_register_partner(
     }
 
 # Get commission structure explanation
-@app.get("/salesperson/commission-info")
+@api_router.get("/salesperson/commission-info")
 async def get_commission_info(token: str = Header(None, alias="salesperson-token")):
     if not token:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -17891,7 +24434,7 @@ async def get_commission_info(token: str = Header(None, alias="salesperson-token
     }
 
 # Salesperson notifications
-@app.get("/salesperson/notifications")
+@api_router.get("/salesperson/notifications")
 async def get_salesperson_notifications(token: str = Header(None, alias="salesperson-token")):
     if not token:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -17909,7 +24452,7 @@ async def get_salesperson_notifications(token: str = Header(None, alias="salespe
 
     return {"notifications": notifications}
 
-@app.put("/salesperson/notifications/{notification_id}/read")
+@api_router.put("/salesperson/notifications/{notification_id}/read")
 async def mark_notification_read(notification_id: str, token: str = Header(None, alias="salesperson-token")):
     if not token:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -17925,7 +24468,7 @@ async def mark_notification_read(notification_id: str, token: str = Header(None,
 
     return {"success": True}
 
-@app.put("/salesperson/notifications/read-all")
+@api_router.put("/salesperson/notifications/read-all")
 async def mark_all_notifications_read(token: str = Header(None, alias="salesperson-token")):
     if not token:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -17942,7 +24485,7 @@ async def mark_all_notifications_read(token: str = Header(None, alias="salespers
     return {"success": True}
 
 # Salesperson payment history
-@app.get("/salesperson/payment-history")
+@api_router.get("/salesperson/payment-history")
 async def get_payment_history(token: str = Header(None, alias="salesperson-token")):
     if not token:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -17974,7 +24517,7 @@ async def get_payment_history(token: str = Header(None, alias="salesperson-token
     }
 
 # Admin: Approve commission
-@app.put("/admin/acquisitions/{acquisition_id}/approve")
+@api_router.put("/admin/acquisitions/{acquisition_id}/approve")
 async def approve_acquisition(acquisition_id: str, admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
@@ -18006,7 +24549,7 @@ async def approve_acquisition(acquisition_id: str, admin_key: str = Header(None)
     return {"success": True}
 
 # Admin: Process payment for multiple acquisitions
-@app.post("/admin/commission-payments")
+@api_router.post("/admin/commission-payments")
 async def create_commission_payment(
     salesperson_id: str = Form(...),
     acquisition_ids: str = Form(...),  # Comma-separated IDs
@@ -18069,7 +24612,7 @@ async def create_commission_payment(
     return {"success": True, "payment": payment.dict()}
 
 # Admin: Get salesperson ranking
-@app.get("/admin/salesperson-ranking")
+@api_router.get("/admin/salesperson-ranking")
 async def get_salesperson_ranking(admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
@@ -18131,7 +24674,7 @@ async def get_salesperson_ranking(admin_key: str = Header(None)):
     }
 
 # Admin: Get pending commissions for payment
-@app.get("/admin/pending-commissions")
+@api_router.get("/admin/pending-commissions")
 async def get_pending_commissions(admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
@@ -18161,7 +24704,7 @@ async def get_pending_commissions(admin_key: str = Header(None)):
     return {"pending_by_salesperson": list(by_salesperson.values())}
 
 # Admin: Get payment history
-@app.get("/admin/payment-history")
+@api_router.get("/admin/payment-history")
 async def get_admin_payment_history(admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
@@ -18177,6 +24720,9 @@ async def get_admin_payment_history(admin_key: str = Header(None)):
         "payments": payments,
         "total_paid": total_paid
     }
+
+# Include the router in the main app - MUST be after all api_router routes are defined
+app.include_router(api_router)
 
 @app.on_event("startup")
 async def create_default_partner():

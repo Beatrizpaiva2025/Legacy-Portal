@@ -232,6 +232,7 @@ const CUSTOMER_TRANSLATIONS = {
     discount: 'Discount',
     discountCode: 'Discount Code',
     enterCode: 'Enter code',
+    couponAtCheckout: 'Have a coupon? Apply it at checkout',
     apply: 'Apply',
     off: 'off',
     applied: 'applied!',
@@ -253,6 +254,14 @@ const CUSTOMER_TRANSLATIONS = {
     submitZelleOrder: 'Submit Order with Zelle',
     zelleOrderSubmitted: 'Order submitted! We will verify your Zelle payment and send a confirmation email once your translation begins.',
     zelleUsaOnly: '(USA only)',
+    zelleSendTo: 'Send payment to',
+    zelleIncludeEmail: 'Include your email in the payment note',
+    zelleAmount: 'Amount',
+    payWithZelleBtn: 'Pay with Zelle',
+    couponCodeOptional: 'Coupon Code (optional)',
+    enterCouponCode: 'Enter coupon code',
+    invalidCoupon: 'Invalid coupon code',
+    zelleAmountToPay: 'Amount to pay',
 
     // Buttons
     continueToPayment: 'Continue to Payment',
@@ -434,6 +443,7 @@ const CUSTOMER_TRANSLATIONS = {
     discount: 'Descuento',
     discountCode: 'Código de Descuento',
     enterCode: 'Ingresar código',
+    couponAtCheckout: '¿Tienes un cupón? Aplícalo en el checkout',
     apply: 'Aplicar',
     off: 'de descuento',
     applied: '¡aplicado!',
@@ -455,6 +465,14 @@ const CUSTOMER_TRANSLATIONS = {
     submitZelleOrder: 'Enviar Orden con Zelle',
     zelleOrderSubmitted: '¡Orden enviada! Verificaremos tu pago Zelle y te enviaremos un email de confirmación cuando tu traducción comience.',
     zelleUsaOnly: '(Solo USA)',
+    zelleSendTo: 'Enviar pago a',
+    zelleIncludeEmail: 'Incluye tu email en la nota del pago',
+    zelleAmount: 'Monto',
+    payWithZelleBtn: 'Pagar con Zelle',
+    couponCodeOptional: 'Código de Cupón (opcional)',
+    enterCouponCode: 'Ingresa código de cupón',
+    invalidCoupon: 'Código de cupón inválido',
+    zelleAmountToPay: 'Monto a pagar',
 
     // Buttons
     continueToPayment: 'Continuar al Pago',
@@ -636,6 +654,7 @@ const CUSTOMER_TRANSLATIONS = {
     discount: 'Desconto',
     discountCode: 'Código de Desconto',
     enterCode: 'Inserir código',
+    couponAtCheckout: 'Tem um cupom? Aplique no checkout',
     apply: 'Aplicar',
     off: 'de desconto',
     applied: 'aplicado!',
@@ -657,6 +676,14 @@ const CUSTOMER_TRANSLATIONS = {
     submitZelleOrder: 'Enviar Pedido com Zelle',
     zelleOrderSubmitted: 'Pedido enviado! Verificaremos seu pagamento Zelle e enviaremos um email de confirmação quando sua tradução começar.',
     zelleUsaOnly: '(Somente EUA)',
+    zelleSendTo: 'Enviar pagamento para',
+    zelleIncludeEmail: 'Inclua seu email na nota do pagamento',
+    zelleAmount: 'Valor',
+    payWithZelleBtn: 'Pagar com Zelle',
+    couponCodeOptional: 'Código do Cupom (opcional)',
+    enterCouponCode: 'Digite o código do cupom',
+    invalidCoupon: 'Código do cupom inválido',
+    zelleAmountToPay: 'Valor a pagar',
 
     // Buttons
     continueToPayment: 'Continuar para Pagamento',
@@ -974,6 +1001,10 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
   // Payment method states
   const [paymentMethod, setPaymentMethod] = useState('card'); // 'card' or 'zelle'
   const [zelleReceipt, setZelleReceipt] = useState(null);
+  const [showZelleModal, setShowZelleModal] = useState(false);
+  const [zelleCouponCode, setZelleCouponCode] = useState('');
+  const [zelleDiscount, setZelleDiscount] = useState(null); // {type: 'percentage'|'fixed', value: number}
+  const [zelleDiscountError, setZelleDiscountError] = useState('');
   const zelleReceiptInputRef = useRef(null);
 
   // Support form states
@@ -1003,6 +1034,46 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
     country: 'USA'
   });
   const USPS_PRIORITY_MAIL = 18.99;
+
+  // Multi-currency support
+  const [userCurrency, setUserCurrency] = useState({ currency: 'usd', symbol: '$', country_code: 'US' });
+  const [exchangeRates, setExchangeRates] = useState({ usd: 1.0, brl: 5.0, eur: 0.92, gbp: 0.79 });
+  const [currencyLoaded, setCurrencyLoaded] = useState(false);
+
+  // Detect user's country and currency on load
+  useEffect(() => {
+    const detectCurrency = async () => {
+      try {
+        const geoResponse = await axios.get(`${API}/geo/detect`);
+        if (geoResponse.data) {
+          setUserCurrency(geoResponse.data);
+        }
+
+        const ratesResponse = await axios.get(`${API}/exchange-rates`);
+        if (ratesResponse.data?.rates) {
+          setExchangeRates(ratesResponse.data.rates);
+        }
+      } catch (err) {
+        console.log('Using default currency (USD)');
+      } finally {
+        setCurrencyLoaded(true);
+      }
+    };
+    detectCurrency();
+  }, []);
+
+  // Convert USD price to user's local currency
+  const convertPrice = (priceUsd) => {
+    if (!priceUsd) return 0;
+    const rate = exchangeRates[userCurrency.currency] || 1;
+    return priceUsd * rate;
+  };
+
+  // Format price in user's local currency
+  const formatLocalPrice = (priceUsd) => {
+    const converted = convertPrice(priceUsd);
+    return `${userCurrency.symbol}${converted.toFixed(2)}`;
+  };
 
   // If logged in, pre-fill email/name
   useEffect(() => {
@@ -1402,92 +1473,169 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
       const quoteResponse = await axios.post(`${API}/calculate-quote`, quoteData);
       const quoteId = quoteResponse.data.id;
 
-      // Handle different payment methods
-      if (paymentMethod === 'zelle') {
-        // ZELLE PAYMENT FLOW
-        // Step 2a: Upload Zelle receipt
-        let receiptUrl = null;
-        if (zelleReceipt) {
-          const receiptFormData = new FormData();
-          receiptFormData.append('file', zelleReceipt);
-          const uploadResponse = await axios.post(`${API}/upload-document`, receiptFormData);
-          receiptUrl = uploadResponse.data.document_id;
-        }
+      // CARD PAYMENT FLOW (Stripe)
+      // Step 2: Create Stripe checkout session
+      // Note: origin_url should NOT include hash - backend will append query params before hash
+      const checkoutResponse = await axios.post(`${API}/create-payment-checkout`, {
+        quote_id: quoteId,
+        customer_email: guestEmail,
+        customer_name: guestName,
+        origin_url: window.location.origin,
+        currency: userCurrency.currency // Multi-currency support
+      });
 
-        // Step 2b: Create Zelle order
-        const zelleOrderData = {
-          quote_id: quoteId,
-          customer_email: guestEmail,
-          customer_name: guestName,
-          payment_method: 'zelle',
-          zelle_receipt_id: receiptUrl,
-          total_price: quote?.total || 0,
-          notes: formData.notes,
-          shipping_address: needsPhysicalCopy || formData.service_type === 'rmv' ? shippingAddress : null
-        };
+      // Step 3: Save form data before redirecting to Stripe
+      const pendingOrderData = {
+        formData,
+        guestName,
+        guestEmail,
+        certifications,
+        needsPhysicalCopy,
+        shippingAddress,
+        uploadedFiles,
+        wordCount,
+        discountCode,
+        appliedDiscount
+      };
+      sessionStorage.setItem('pendingOrderData', JSON.stringify(pendingOrderData));
 
-        await axios.post(`${API}/create-zelle-order`, zelleOrderData);
-
-        // Step 3: Show success message
-        setSuccess(t.zelleOrderSubmitted);
-        setSubmitting(false);
-
-        // Clear form
-        setFormData({
-          service_type: 'certified',
-          translate_from: 'portuguese',
-          translate_to: 'english',
-          urgency: 'no',
-          reference: '',
-          notes: ''
-        });
-        setUploadedFiles([]);
-        setZelleReceipt(null);
-        setQuote(null);
-        setPaymentMethod('card');
-
+      // Step 4: Redirect to Stripe checkout
+      if (checkoutResponse.data.checkout_url) {
+        // Set flag to prevent beforeunload warning
+        setRedirectingToPayment(true);
+        // Small delay to ensure state is updated before redirect
+        setTimeout(() => {
+          window.location.href = checkoutResponse.data.checkout_url;
+        }, 100);
       } else {
-        // CARD PAYMENT FLOW (Stripe)
-        // Step 2: Create Stripe checkout session
-        // Note: origin_url should NOT include hash - backend will append query params before hash
-        const checkoutResponse = await axios.post(`${API}/create-payment-checkout`, {
-          quote_id: quoteId,
-          customer_email: guestEmail,
-          customer_name: guestName,
-          origin_url: window.location.origin
-        });
-
-        // Step 3: Save form data before redirecting to Stripe
-        const pendingOrderData = {
-          formData,
-          guestName,
-          guestEmail,
-          certifications,
-          needsPhysicalCopy,
-          shippingAddress,
-          uploadedFiles,
-          wordCount,
-          discountCode,
-          appliedDiscount
-        };
-        sessionStorage.setItem('pendingOrderData', JSON.stringify(pendingOrderData));
-
-        // Step 4: Redirect to Stripe checkout
-        if (checkoutResponse.data.checkout_url) {
-          // Set flag to prevent beforeunload warning
-          setRedirectingToPayment(true);
-          // Small delay to ensure state is updated before redirect
-          setTimeout(() => {
-            window.location.href = checkoutResponse.data.checkout_url;
-          }, 100);
-        } else {
-          throw new Error('No checkout URL received');
-        }
+        throw new Error('No checkout URL received');
       }
 
     } catch (err) {
       setError(err.response?.data?.detail || t.failedToProcess);
       setSubmitting(false);
+    }
+  };
+
+  // Handle Zelle payment submission
+  const handleZellePayment = async () => {
+    if (!zelleReceipt) {
+      setError(t.receiptRequired);
+      return;
+    }
+
+    setSubmitting(true);
+    setError('');
+
+    try {
+      // Step 1: Create a quote first
+      const quoteData = {
+        reference: `WEB-${Date.now()}`,
+        service_type: formData.service_type,
+        translate_from: formData.translate_from,
+        translate_to: formData.translate_to,
+        word_count: wordCount,
+        urgency: formData.urgency,
+        customer_email: guestEmail,
+        customer_name: guestName,
+        notes: formData.notes,
+        document_ids: uploadedFiles.map(f => f.documentId).filter(Boolean),
+        shipping_fee: quote?.shipping_fee || 0,
+        discount_amount: quote?.discount || 0,
+        discount_code: appliedDiscount ? discountCode : null
+      };
+
+      const quoteResponse = await axios.post(`${API}/calculate-quote`, quoteData);
+      const quoteId = quoteResponse.data.id;
+
+      // Step 2: Upload Zelle receipt
+      const receiptFormData = new FormData();
+      receiptFormData.append('file', zelleReceipt);
+      const uploadResponse = await axios.post(`${API}/upload-document`, receiptFormData);
+      const receiptUrl = uploadResponse.data.document_id;
+
+      // Step 3: Create Zelle order with calculated discount
+      const zelleTotal = getZelleTotal();
+      const discountAmount = (quote?.total_price || 0) - zelleTotal;
+
+      const zelleOrderData = {
+        quote_id: quoteId,
+        customer_email: guestEmail,
+        customer_name: guestName,
+        payment_method: 'zelle',
+        zelle_receipt_id: receiptUrl,
+        total_price: zelleTotal,
+        original_price: quote?.total_price || 0,
+        discount_amount: discountAmount > 0 ? discountAmount : 0,
+        notes: zelleCouponCode ? `${formData.notes}\n\nCoupon Code: ${zelleCouponCode} (${zelleDiscount?.type === 'percentage' ? `${zelleDiscount.value}%` : `$${zelleDiscount?.value}`} off)` : formData.notes,
+        coupon_code: zelleCouponCode || null,
+        shipping_address: needsPhysicalCopy || formData.service_type === 'rmv' ? shippingAddress : null
+      };
+
+      await axios.post(`${API}/create-zelle-order`, zelleOrderData);
+
+      // Step 4: Show success and close modal
+      setSuccess(t.zelleOrderSubmitted);
+      setShowZelleModal(false);
+      setZelleReceipt(null);
+      setZelleCouponCode('');
+      setZelleDiscount(null);
+      setZelleDiscountError('');
+
+      // Clear form
+      setFormData({
+        service_type: 'certified',
+        translate_from: 'portuguese',
+        translate_to: 'english',
+        urgency: 'no',
+        reference: '',
+        notes: ''
+      });
+      setUploadedFiles([]);
+      setQuote(null);
+
+    } catch (err) {
+      setError(err.response?.data?.detail || t.failedToProcess);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Validate Zelle coupon code
+  const validateZelleCoupon = async () => {
+    if (!zelleCouponCode.trim()) {
+      setZelleDiscount(null);
+      setZelleDiscountError('');
+      return;
+    }
+
+    try {
+      const response = await axios.get(`${API}/discount-codes/validate?code=${zelleCouponCode}`);
+      if (response.data.valid) {
+        setZelleDiscount({
+          type: response.data.type,
+          value: response.data.value
+        });
+        setZelleDiscountError('');
+      } else {
+        setZelleDiscount(null);
+        setZelleDiscountError(t.invalidCoupon);
+      }
+    } catch (err) {
+      setZelleDiscount(null);
+      setZelleDiscountError(t.invalidCoupon);
+    }
+  };
+
+  // Calculate Zelle total with discount
+  const getZelleTotal = () => {
+    const basePrice = quote?.total_price || 0;
+    if (!zelleDiscount) return basePrice;
+
+    if (zelleDiscount.type === 'percentage') {
+      return basePrice * (1 - zelleDiscount.value / 100);
+    } else {
+      return Math.max(0, basePrice - zelleDiscount.value);
     }
   };
 
@@ -1796,7 +1944,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
                     </div>
                     <div className="text-sm text-gray-500">{t.certifiedDesc}</div>
                   </div>
-                  <div className="font-semibold text-teal-600">$24.99{t.perPage}</div>
+                  <div className="font-semibold text-teal-600">{formatLocalPrice(24.99)}{t.perPage}</div>
                 </label>
 
                 {/* Standard Translation */}
@@ -1818,7 +1966,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
                     </div>
                     <div className="text-sm text-gray-500">{t.standardDesc}</div>
                   </div>
-                  <div className="font-semibold text-teal-600">$19.99{t.perPage}</div>
+                  <div className="font-semibold text-teal-600">{formatLocalPrice(19.99)}{t.perPage}</div>
                 </label>
 
                 {/* Sworn Translation */}
@@ -1840,7 +1988,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
                     </div>
                     <div className="text-sm text-gray-500">{t.swornDesc}</div>
                   </div>
-                  <div className="font-semibold text-teal-600">$55.00{t.perPage}</div>
+                  <div className="font-semibold text-teal-600">{formatLocalPrice(55.00)}{t.perPage}</div>
                 </label>
 
                 {/* RMV Certified Translation */}
@@ -1862,7 +2010,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
                     </div>
                     <div className="text-sm text-gray-500">{t.rmvDesc}</div>
                   </div>
-                  <div className="font-semibold text-teal-600">$24.99{t.perPage}</div>
+                  <div className="font-semibold text-teal-600">{formatLocalPrice(24.99)}{t.perPage}</div>
                 </label>
               </div>
 
@@ -2161,112 +2309,13 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
               </button>
             </div>
 
-            {/* Payment Method Selection */}
-            <div className="space-y-3">
-              <h3 className="font-semibold text-gray-800">{t.selectPaymentMethod}</h3>
-
-              {/* Pay with Card Option */}
-              <label className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'card' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                <input
-                  type="radio"
-                  name="paymentMethod"
-                  value="card"
-                  checked={paymentMethod === 'card'}
-                  onChange={() => setPaymentMethod('card')}
-                  className="w-5 h-5 text-teal-600"
-                />
-                <div className="ml-3 flex-1">
-                  <div className="flex items-center gap-2">
-                    <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                    </svg>
-                    <span className="font-medium">{t.payWithCard}</span>
-                  </div>
-                  <p className="text-sm text-gray-500 mt-1">{t.payWithCardDesc}</p>
-                </div>
-              </label>
-
-              {/* Pay with Zelle Option */}
-              <label className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'zelle' ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                <input
-                  type="radio"
-                  name="paymentMethod"
-                  value="zelle"
-                  checked={paymentMethod === 'zelle'}
-                  onChange={() => setPaymentMethod('zelle')}
-                  className="w-5 h-5 text-purple-600"
-                />
-                <div className="ml-3 flex-1">
-                  <div className="flex items-center gap-2">
-                    <svg className="w-6 h-6 text-purple-600" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                    </svg>
-                    <span className="font-medium">{t.payWithZelle}</span>
-                    <span className="text-xs text-purple-600 font-medium">{t.zelleUsaOnly}</span>
-                  </div>
-                  <p className="text-sm text-gray-500 mt-1">{t.payWithZelleDesc}</p>
-                </div>
-              </label>
-
-              {/* Zelle Instructions - shown when Zelle is selected */}
-              {paymentMethod === 'zelle' && (
-                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 space-y-3">
-                  <h4 className="font-semibold text-purple-800">{t.zelleInstructions}</h4>
-                  <div className="space-y-2 text-sm text-purple-700">
-                    <p>{t.zelleStep1}</p>
-                    <p className="font-semibold">{t.zelleStep2}</p>
-                    <p>{t.zelleStep3}</p>
-                    <p>{t.zelleStep4}</p>
-                  </div>
-
-                  {/* Zelle Receipt Upload */}
-                  <div className="mt-4">
-                    <label className="block text-sm font-medium text-purple-800 mb-2">
-                      {t.uploadReceipt} *
-                    </label>
-                    <input
-                      type="file"
-                      ref={zelleReceiptInputRef}
-                      accept="image/*,.pdf"
-                      onChange={(e) => setZelleReceipt(e.target.files[0])}
-                      className="hidden"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => zelleReceiptInputRef.current?.click()}
-                      className="w-full p-3 border-2 border-dashed border-purple-300 rounded-lg text-purple-600 hover:border-purple-400 hover:bg-purple-100 transition-colors"
-                    >
-                      {zelleReceipt ? (
-                        <span className="flex items-center justify-center gap-2">
-                          <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                          {zelleReceipt.name}
-                        </span>
-                      ) : (
-                        <span className="flex items-center justify-center gap-2">
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                          </svg>
-                          {t.uploadReceipt}
-                        </span>
-                      )}
-                    </button>
-                    {paymentMethod === 'zelle' && !zelleReceipt && (
-                      <p className="text-xs text-purple-600 mt-1">{t.receiptRequired}</p>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Continue to Payment / Submit Zelle Order Button */}
+            {/* Continue to Payment Button */}
             <button
               type="submit"
-              disabled={submitting || uploadedFiles.length === 0 || !guestName || !guestEmail || ((needsPhysicalCopy || formData.service_type === 'rmv') && (!shippingAddress.street || !shippingAddress.city || !shippingAddress.state || !shippingAddress.zipCode)) || (paymentMethod === 'zelle' && !zelleReceipt)}
-              className={`w-full py-3 text-white rounded-md font-semibold ${paymentMethod === 'zelle' ? 'bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400' : 'bg-teal-600 hover:bg-teal-700 disabled:bg-gray-400'}`}
+              disabled={submitting || uploadedFiles.length === 0 || !guestName || !guestEmail || ((needsPhysicalCopy || formData.service_type === 'rmv') && (!shippingAddress.street || !shippingAddress.city || !shippingAddress.state || !shippingAddress.zipCode))}
+              className="w-full py-3 text-white rounded-md font-semibold bg-teal-600 hover:bg-teal-700 disabled:bg-gray-400"
             >
-              {submitting ? t.processingBtn : (paymentMethod === 'zelle' ? t.submitZelleOrder : t.continueToPayment)}
+              {submitting ? t.processingBtn : t.continueToPayment}
             </button>
           </form>
         </div>
@@ -2294,30 +2343,30 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
             <div className="border-t pt-3 mt-3">
               <div className="flex justify-between">
                 <span className="text-gray-600">{t.basePrice}</span>
-                <span className="font-medium">${(quote?.base_price || 0).toFixed(2)}</span>
+                <span className="font-medium">{formatLocalPrice(quote?.base_price || 0)}</span>
               </div>
               {quote?.urgency_fee > 0 && (
                 <div className="flex justify-between text-orange-600">
                   <span>{t.urgencyFee}</span>
-                  <span>${quote.urgency_fee.toFixed(2)}</span>
+                  <span>{formatLocalPrice(quote.urgency_fee)}</span>
                 </div>
               )}
               {quote?.certification_fee > 0 && (
                 <div className="flex justify-between text-purple-600">
                   <span>{t.certification}</span>
-                  <span>${quote.certification_fee.toFixed(2)}</span>
+                  <span>{formatLocalPrice(quote.certification_fee)}</span>
                 </div>
               )}
               {quote?.shipping_fee > 0 && (
                 <div className="flex justify-between text-blue-600">
                   <span>{t.uspsPriorityMail}</span>
-                  <span>${quote.shipping_fee.toFixed(2)}</span>
+                  <span>{formatLocalPrice(quote.shipping_fee)}</span>
                 </div>
               )}
               {quote?.discount > 0 && (
                 <div className="flex justify-between text-green-600">
                   <span>{t.discount}</span>
-                  <span>-${quote.discount.toFixed(2)}</span>
+                  <span>-{formatLocalPrice(quote.discount)}</span>
                 </div>
               )}
             </div>
@@ -2325,34 +2374,43 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
             <div className="border-t pt-3 mt-3">
               <div className="flex justify-between text-lg">
                 <span className="font-bold">{t.total}</span>
-                <span className="font-bold text-teal-600">${(quote?.total_price || 0).toFixed(2)}</span>
+                <span className="font-bold text-teal-600">{formatLocalPrice(quote?.total_price || 0)}</span>
               </div>
             </div>
 
-            {/* Discount Code */}
+            {/* Discount Code Info */}
             <div className="border-t pt-3 mt-3">
-              <label className="block text-sm font-medium text-gray-700 mb-1">{t.discountCode}</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
-                  value={discountCode}
-                  onChange={(e) => setDiscountCode(e.target.value.toUpperCase())}
-                  placeholder={t.enterCode}
-                />
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <svg className="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+                <span>{t.couponAtCheckout}</span>
+              </div>
+            </div>
+
+            {/* Zelle Payment Option */}
+            <div className="border-t pt-4 mt-4">
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <svg className="w-5 h-5 text-purple-600" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                  </svg>
+                  <span className="font-semibold text-purple-800">{t.payWithZelle}</span>
+                  <span className="text-xs text-purple-600 font-medium">{t.zelleUsaOnly}</span>
+                </div>
+                <div className="text-sm text-purple-700 space-y-1 mb-3">
+                  <p>{t.zelleSendTo}: <strong>contact@legacytranslations.com</strong></p>
+                  <p className="text-xs">{t.zelleIncludeEmail}</p>
+                </div>
                 <button
                   type="button"
-                  onClick={applyDiscountCode}
-                  className="px-3 py-2 bg-gray-200 text-gray-700 rounded-md text-sm hover:bg-gray-300"
+                  onClick={() => setShowZelleModal(true)}
+                  disabled={uploadedFiles.length === 0 || !guestName || !guestEmail}
+                  className="w-full py-2 bg-purple-600 text-white rounded-md text-sm font-medium hover:bg-purple-700 transition-colors disabled:bg-gray-400"
                 >
-                  {t.apply}
+                  {t.payWithZelleBtn}
                 </button>
               </div>
-              {appliedDiscount && (
-                <p className="text-green-600 text-xs mt-1">
-                  {appliedDiscount.type === 'percentage' ? `${appliedDiscount.value}% ${t.off}` : `$${appliedDiscount.value} ${t.off}`} {t.applied}
-                </p>
-              )}
             </div>
 
             <div className="text-xs text-gray-500 mt-4">
@@ -2361,6 +2419,139 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
           </div>
         </div>
       </div>
+
+      {/* Zelle Payment Modal */}
+      {showZelleModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-purple-800">{t.payWithZelle}</h3>
+              <button
+                onClick={() => {
+                  setShowZelleModal(false);
+                  setZelleCouponCode('');
+                  setZelleDiscount(null);
+                  setZelleDiscountError('');
+                  setZelleReceipt(null);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Coupon Code */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                {t.couponCodeOptional}
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={zelleCouponCode}
+                  onChange={(e) => {
+                    setZelleCouponCode(e.target.value.toUpperCase());
+                    setZelleDiscount(null);
+                    setZelleDiscountError('');
+                  }}
+                  placeholder={t.enterCouponCode}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500 uppercase"
+                />
+                <button
+                  type="button"
+                  onClick={validateZelleCoupon}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-md text-sm font-medium hover:bg-purple-700 transition-colors"
+                >
+                  {t.apply}
+                </button>
+              </div>
+              {zelleDiscountError && (
+                <p className="text-red-500 text-xs mt-1">{zelleDiscountError}</p>
+              )}
+              {zelleDiscount && (
+                <p className="text-green-600 text-xs mt-1">
+                  {zelleDiscount.type === 'percentage' ? `${zelleDiscount.value}%` : `$${zelleDiscount.value}`} {t.off} {t.applied}
+                </p>
+              )}
+            </div>
+
+            {/* Price Summary */}
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between text-purple-700">
+                  <span>Subtotal:</span>
+                  <span>{formatLocalPrice(quote?.total_price || 0)}</span>
+                </div>
+                {zelleDiscount && (
+                  <div className="flex justify-between text-green-600">
+                    <span>{t.discount} ({zelleDiscount.type === 'percentage' ? `${zelleDiscount.value}%` : formatLocalPrice(zelleDiscount.value)}):</span>
+                    <span>-{formatLocalPrice(quote?.total_price - getZelleTotal())}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-bold text-purple-800 text-base border-t border-purple-200 pt-2">
+                  <span>{t.zelleAmountToPay}:</span>
+                  <span>{formatLocalPrice(getZelleTotal())}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Zelle Instructions */}
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">
+              <div className="space-y-1 text-xs text-gray-600">
+                <p><strong>1.</strong> {t.zelleStep1}</p>
+                <p><strong>2.</strong> {t.zelleSendTo}: <strong>contact@legacytranslations.com</strong></p>
+                <p><strong>3.</strong> {t.zelleIncludeEmail}</p>
+              </div>
+            </div>
+
+            {/* Upload Receipt */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                {t.uploadReceipt} *
+              </label>
+              <input
+                type="file"
+                ref={zelleReceiptInputRef}
+                accept="image/*,.pdf"
+                onChange={(e) => setZelleReceipt(e.target.files[0])}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => zelleReceiptInputRef.current?.click()}
+                className="w-full p-3 border-2 border-dashed border-purple-300 rounded-lg text-purple-600 hover:border-purple-400 hover:bg-purple-50 transition-colors"
+              >
+                {zelleReceipt ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    {zelleReceipt.name}
+                  </span>
+                ) : (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                    {t.uploadReceipt}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {/* Submit Button */}
+            <button
+              onClick={handleZellePayment}
+              disabled={submitting || !zelleReceipt}
+              className="w-full py-3 bg-purple-600 text-white rounded-md font-semibold hover:bg-purple-700 disabled:bg-gray-400 transition-colors"
+            >
+              {submitting ? t.processingBtn : t.submitZelleOrder}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -2470,7 +2661,7 @@ const CustomerOrdersPage = ({ token, t }) => {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-xl font-bold text-gray-800">${order.total_price?.toFixed(2)}</div>
+                    <div className="text-xl font-bold text-gray-800">{formatLocalPrice(order.total_price || 0)}</div>
                     <div className="text-sm text-gray-500">
                       {new Date(order.created_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
                     </div>
@@ -2491,11 +2682,11 @@ const CustomerOrdersPage = ({ token, t }) => {
                     </div>
                     <div>
                       <div className="text-sm text-gray-500">{t.basePrice}</div>
-                      <div className="font-medium">${order.base_price?.toFixed(2)}</div>
+                      <div className="font-medium">{formatLocalPrice(order.base_price || 0)}</div>
                     </div>
                     <div>
                       <div className="text-sm text-gray-500">{t.urgencyFee}</div>
-                      <div className="font-medium">${order.urgency_fee?.toFixed(2)}</div>
+                      <div className="font-medium">{formatLocalPrice(order.urgency_fee || 0)}</div>
                     </div>
                   </div>
                   {order.reference && (
