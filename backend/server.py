@@ -700,27 +700,33 @@ def get_tradux_correction_received_email_template(client_name: str, order_number
 
 # ==================== TRADUX BRANDING SYSTEM ====================
 # TRADUX: Affordable AI-powered translations
-# Branding: Blue (#1e3a5f, #2563eb) + Orange (#f97316, #ea580c)
+# Branding colors from tradux-site GitHub repo:
+#   Navy Blue: #1E3A8A | Bright Blue: #3B82F6 | Orange: #f97316 | Gold: #D4AF37
 # Logo: The X in TRADUX is larger/highlighted (like "X marks the spot")
+# Assets: https://github.com/Beatrizpaiva2025/tradux-site
+
+TRADUX_ASSETS_BASE = "https://raw.githubusercontent.com/Beatrizpaiva2025/tradux-site/main"
 
 def get_tradux_logo_html(size: str = "normal") -> str:
-    """Generate TRADUX logo HTML with highlighted X"""
+    """Generate TRADUX logo HTML with highlighted X (X marks the spot!)"""
     if size == "large":
         return '''<span style="font-family: 'Segoe UI', Arial, sans-serif; font-weight: 800; letter-spacing: -1px;">
-            <span style="color: #1e3a5f;">TRADU</span><span style="color: #f97316; font-size: 1.3em; font-weight: 900;">X</span>
+            <span style="color: #1E3A8A;">TRADU</span><span style="color: #f97316; font-size: 1.35em; font-weight: 900; text-shadow: 0 0 10px rgba(249,115,22,0.5);">X</span>
         </span>'''
     elif size == "small":
         return '''<span style="font-family: 'Segoe UI', Arial, sans-serif; font-weight: 700; font-size: 14px;">
-            <span style="color: #1e3a5f;">TRADU</span><span style="color: #f97316; font-size: 1.2em; font-weight: 800;">X</span>
+            <span style="color: #1E3A8A;">TRADU</span><span style="color: #f97316; font-size: 1.2em; font-weight: 800;">X</span>
         </span>'''
     else:
         return '''<span style="font-family: 'Segoe UI', Arial, sans-serif; font-weight: 800; font-size: 28px; letter-spacing: -1px;">
-            <span style="color: #1e3a5f;">TRADU</span><span style="color: #f97316; font-size: 1.25em; font-weight: 900;">X</span>
+            <span style="color: #1E3A8A;">TRADU</span><span style="color: #f97316; font-size: 1.35em; font-weight: 900; text-shadow: 0 0 10px rgba(249,115,22,0.5);">X</span>
         </span>'''
 
 
 def get_tradux_email_header() -> str:
-    """Generate TRADUX professional email header with blue/orange branding"""
+    """Generate TRADUX professional email header with blue/orange branding
+    Colors from tradux-site repo: Navy #1E3A8A, Blue #3B82F6, Orange #f97316, Gold #D4AF37
+    """
     return '''<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -728,17 +734,17 @@ def get_tradux_email_header() -> str:
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TRADUX Translations</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f4;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f4f4f4;">
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f8f8;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f8f8f8;">
         <tr>
             <td align="center" style="padding: 40px 20px;">
                 <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 600px;">
                     <tr>
-                        <td style="background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%); padding: 30px 40px; border-radius: 8px 8px 0 0; text-align: center;">
+                        <td style="background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%); padding: 30px 40px; border-radius: 8px 8px 0 0; text-align: center;">
                             <p style="margin: 0; font-family: 'Segoe UI', Arial, sans-serif; font-weight: 800; font-size: 32px; letter-spacing: -1px;">
-                                <span style="color: #ffffff;">TRADU</span><span style="color: #f97316; font-size: 1.25em; font-weight: 900;">X</span>
+                                <span style="color: #ffffff;">TRADU</span><span style="color: #f97316; font-size: 1.35em; font-weight: 900; text-shadow: 0 0 10px rgba(249,115,22,0.5);">X</span>
                             </p>
-                            <p style="color: rgba(255,255,255,0.8); font-size: 12px; margin: 8px 0 0 0; letter-spacing: 2px; text-transform: uppercase;">Professional Translations</p>
+                            <p style="color: rgba(255,255,255,0.8); font-size: 12px; margin: 8px 0 0 0; letter-spacing: 2px; text-transform: uppercase;">Fast, Affordable, Professional</p>
                         </td>
                     </tr>
                     <tr>
@@ -749,7 +755,7 @@ def get_tradux_email_header() -> str:
 
 
 def get_tradux_email_footer() -> str:
-    """Generate TRADUX email footer with branding"""
+    """Generate TRADUX email footer with branding from tradux-site repo"""
     return '''
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 30px 0;">
                                 <tr>
@@ -759,7 +765,7 @@ def get_tradux_email_footer() -> str:
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                                 <tr>
                                     <td style="padding-top: 15px;">
-                                        <p style="color: #1e3a5f; font-size: 15px; font-weight: 600; margin: 0 0 3px 0;">
+                                        <p style="color: #1E3A8A; font-size: 15px; font-weight: 600; margin: 0 0 3px 0;">
                                             TRADUX Translations
                                         </p>
                                         <p style="color: #64748b; font-size: 13px; margin: 0;">
@@ -771,12 +777,14 @@ def get_tradux_email_footer() -> str:
                         </td>
                     </tr>
                     <tr>
-                        <td style="background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%); padding: 30px 40px; border-radius: 0 0 8px 8px;">
+                        <td style="background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%); padding: 30px 40px; border-radius: 0 0 8px 8px;">
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                                 <tr>
                                     <td align="center">
                                         <p style="color: #a0aec0; font-size: 12px; line-height: 1.8; margin: 0;">
                                             <a href="mailto:contact@tradux.com" style="color: #f97316; text-decoration: none;">contact@tradux.com</a>
+                                            &nbsp;|&nbsp;
+                                            <a href="https://wa.me/18572081139" style="color: #f97316; text-decoration: none;">WhatsApp: (857) 208-1139</a>
                                         </p>
                                     </td>
                                 </tr>
@@ -803,7 +811,7 @@ def get_tradux_email_footer() -> str:
 def get_tradux_approval_email(client_name: str, order_number: str, approval_url: str, document_type: str = "Document") -> str:
     """Generate TRADUX-branded email for client translation approval"""
     content = f'''
-                            <p style="color: #1e3a5f; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
+                            <p style="color: #1E3A8A; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
                                 Hello, {client_name}
                             </p>
                             <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
@@ -826,7 +834,7 @@ def get_tradux_approval_email(client_name: str, order_number: str, approval_url:
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border: 1px solid #bfdbfe; border-radius: 8px; margin: 25px 0;">
                                 <tr>
                                     <td style="padding: 20px;">
-                                        <p style="color: #1e3a5f; font-size: 14px; font-weight: 600; margin: 0 0 10px 0;">
+                                        <p style="color: #1E3A8A; font-size: 14px; font-weight: 600; margin: 0 0 10px 0;">
                                             What happens next?
                                         </p>
                                         <ul style="color: #475569; font-size: 13px; margin: 0; padding-left: 20px; line-height: 1.8;">
@@ -842,7 +850,7 @@ def get_tradux_approval_email(client_name: str, order_number: str, approval_url:
                             </p>
                             <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 20px 0;">
                                 Best regards,<br>
-                                <strong style="color: #1e3a5f;">TRADU<span style="color: #f97316;">X</span> Team</strong>
+                                <strong style="color: #1E3A8A;">TRADU<span style="color: #f97316;">X</span> Team</strong>
                             </p>'''
     return get_tradux_email_header() + content + get_tradux_email_footer()
 
@@ -850,7 +858,7 @@ def get_tradux_approval_email(client_name: str, order_number: str, approval_url:
 def get_tradux_delivery_email(client_name: str, order_number: str, document_type: str = "Document") -> str:
     """Generate TRADUX-branded email for certified translation delivery"""
     content = f'''
-                            <p style="color: #1e3a5f; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
+                            <p style="color: #1E3A8A; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
                                 Hello, {client_name}
                             </p>
                             <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
@@ -881,7 +889,7 @@ def get_tradux_delivery_email(client_name: str, order_number: str, document_type
                             </p>
                             <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 20px 0;">
                                 Best regards,<br>
-                                <strong style="color: #1e3a5f;">TRADU<span style="color: #f97316;">X</span> Team</strong>
+                                <strong style="color: #1E3A8A;">TRADU<span style="color: #f97316;">X</span> Team</strong>
                             </p>'''
     return get_tradux_email_header() + content + get_tradux_email_footer()
 
@@ -889,7 +897,7 @@ def get_tradux_delivery_email(client_name: str, order_number: str, document_type
 def get_tradux_correction_email(client_name: str, order_number: str) -> str:
     """Generate TRADUX-branded email confirming correction request"""
     content = f'''
-                            <p style="color: #1e3a5f; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
+                            <p style="color: #1E3A8A; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
                                 Hello, {client_name}
                             </p>
                             <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
@@ -902,7 +910,7 @@ def get_tradux_correction_email(client_name: str, order_number: str) -> str:
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border: 1px solid #bfdbfe; border-radius: 8px; margin: 25px 0;">
                                 <tr>
                                     <td style="padding: 20px; text-align: center;">
-                                        <p style="color: #1e3a5f; font-size: 14px; font-weight: 600; margin: 0;">
+                                        <p style="color: #1E3A8A; font-size: 14px; font-weight: 600; margin: 0;">
                                             ✓ Your request has been assigned to our team
                                         </p>
                                     </td>
@@ -911,7 +919,7 @@ def get_tradux_correction_email(client_name: str, order_number: str) -> str:
 
                             <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 20px 0;">
                                 Best regards,<br>
-                                <strong style="color: #1e3a5f;">TRADU<span style="color: #f97316;">X</span> Team</strong>
+                                <strong style="color: #1E3A8A;">TRADU<span style="color: #f97316;">X</span> Team</strong>
                             </p>'''
     return get_tradux_email_header() + content + get_tradux_email_footer()
 
@@ -927,7 +935,9 @@ def generate_tradux_certification_cover(
     certified_date: str,
     qr_code_base64: str = None
 ) -> str:
-    """Generate TRADUX certification cover page HTML with blue/orange branding"""
+    """Generate TRADUX certification cover page HTML with blue/orange branding
+    Colors from tradux-site: Navy #1E3A8A, Blue #3B82F6, Orange #f97316, Gold #D4AF37
+    """
     qr_section = ""
     if qr_code_base64:
         qr_section = f'''
@@ -952,7 +962,7 @@ def generate_tradux_certification_cover(
             padding: 0.5in;
         }}
         .container {{
-            border: 3px solid #1e3a5f;
+            border: 3px solid #1E3A8A;
             min-height: 10in;
             padding: 30px;
             position: relative;
@@ -969,8 +979,8 @@ def generate_tradux_certification_cover(
             letter-spacing: -2px;
             margin-bottom: 5px;
         }}
-        .logo .tradu {{ color: #1e3a5f; }}
-        .logo .x {{ color: #f97316; font-size: 1.3em; font-weight: 900; }}
+        .logo .tradu {{ color: #1E3A8A; }}
+        .logo .x {{ color: #f97316; font-size: 1.35em; font-weight: 900; text-shadow: 0 0 10px rgba(249,115,22,0.3); }}
         .tagline {{
             color: #64748b;
             font-size: 12px;
@@ -982,14 +992,14 @@ def generate_tradux_certification_cover(
             margin: 30px 0;
         }}
         .cert-title h1 {{
-            color: #1e3a5f;
+            color: #1E3A8A;
             font-size: 24px;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 2px;
         }}
         .cert-id {{
-            background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+            background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%);
             color: white;
             display: inline-block;
             padding: 8px 20px;
@@ -1018,7 +1028,7 @@ def generate_tradux_certification_cover(
         }}
         .info-value {{
             flex: 1;
-            color: #1e3a5f;
+            color: #1E3A8A;
             font-size: 14px;
             font-weight: 500;
         }}
@@ -1030,7 +1040,7 @@ def generate_tradux_certification_cover(
             border-radius: 8px;
         }}
         .certification-statement p {{
-            color: #1e3a5f;
+            color: #1E3A8A;
             font-size: 13px;
             line-height: 1.8;
         }}
@@ -1040,12 +1050,12 @@ def generate_tradux_certification_cover(
         }}
         .signature-line {{
             width: 250px;
-            border-bottom: 1px solid #1e3a5f;
+            border-bottom: 1px solid #1E3A8A;
             margin: 0 auto 10px;
             padding-top: 50px;
         }}
         .certifier-name {{
-            color: #1e3a5f;
+            color: #1E3A8A;
             font-size: 16px;
             font-weight: 600;
         }}
@@ -2987,18 +2997,33 @@ BRAND_CONFIGS = {
         "brand_code": "tradux",
         "brand_name": "TRADUX",
         "tagline": "Fast, Affordable, Professional",
-        "primary_color": "#1e3a5f",
-        "secondary_color": "#f97316",
-        "accent_color": "#ea580c",
+        # Colors from tradux-site GitHub repo
+        "primary_color": "#1E3A8A",       # Navy blue
+        "primary_light": "#3B82F6",       # Bright blue
+        "secondary_color": "#f97316",     # Orange
+        "accent_color": "#ea580c",        # Dark orange
+        "gold_color": "#D4AF37",          # Gold (from icons)
         "company_name": "TRADUX",
         "company_email": "contact@tradux.com",
+        "company_phone": "(857) 208-1139",
         "website_url": "https://tradux.com",
+        "vercel_url": "https://tradux-site.vercel.app",
+        "whatsapp_url": "https://wa.me/18572081139",
         "default_certifier_name": "TRADUX Translations",
         "default_certifier_title": "Professional Translation Services",
         "certification_prefix": "TX",
         "email_from_name": "TRADUX",
         "show_ata_badge": False,
-        "show_bbb_badge": False
+        "show_bbb_badge": False,
+        "show_uscis_badge": True,
+        # Assets from GitHub repo
+        "assets_base_url": "https://raw.githubusercontent.com/Beatrizpaiva2025/tradux-site/main",
+        "logo_svg": "https://raw.githubusercontent.com/Beatrizpaiva2025/tradux-site/main/tradux-logo.svg",
+        "logo_white_svg": "https://raw.githubusercontent.com/Beatrizpaiva2025/tradux-site/main/tradux-logo-white.svg",
+        "hero_image": "https://raw.githubusercontent.com/Beatrizpaiva2025/tradux-site/main/hero-image.svg",
+        "certified_icon": "https://raw.githubusercontent.com/Beatrizpaiva2025/tradux-site/main/certified-icon.svg",
+        "document_icon": "https://raw.githubusercontent.com/Beatrizpaiva2025/tradux-site/main/document-icon.svg",
+        "uscis_icon": "https://raw.githubusercontent.com/Beatrizpaiva2025/tradux-site/main/uscis-icon.svg"
     }
 }
 
