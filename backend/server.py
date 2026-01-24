@@ -698,6 +698,559 @@ def get_tradux_correction_received_email_template(client_name: str, order_number
     return get_email_header() + content + get_email_footer(include_review_button=False)
 
 
+# ==================== TRADUX BRANDING SYSTEM ====================
+# TRADUX: Affordable AI-powered translations
+# Branding: Blue (#1e3a5f, #2563eb) + Orange (#f97316, #ea580c)
+# Logo: The X in TRADUX is larger/highlighted (like "X marks the spot")
+
+def get_tradux_logo_html(size: str = "normal") -> str:
+    """Generate TRADUX logo HTML with highlighted X"""
+    if size == "large":
+        return '''<span style="font-family: 'Segoe UI', Arial, sans-serif; font-weight: 800; letter-spacing: -1px;">
+            <span style="color: #1e3a5f;">TRADU</span><span style="color: #f97316; font-size: 1.3em; font-weight: 900;">X</span>
+        </span>'''
+    elif size == "small":
+        return '''<span style="font-family: 'Segoe UI', Arial, sans-serif; font-weight: 700; font-size: 14px;">
+            <span style="color: #1e3a5f;">TRADU</span><span style="color: #f97316; font-size: 1.2em; font-weight: 800;">X</span>
+        </span>'''
+    else:
+        return '''<span style="font-family: 'Segoe UI', Arial, sans-serif; font-weight: 800; font-size: 28px; letter-spacing: -1px;">
+            <span style="color: #1e3a5f;">TRADU</span><span style="color: #f97316; font-size: 1.25em; font-weight: 900;">X</span>
+        </span>'''
+
+
+def get_tradux_email_header() -> str:
+    """Generate TRADUX professional email header with blue/orange branding"""
+    return '''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TRADUX Translations</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f4;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f4f4f4;">
+        <tr>
+            <td align="center" style="padding: 40px 20px;">
+                <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 600px;">
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%); padding: 30px 40px; border-radius: 8px 8px 0 0; text-align: center;">
+                            <p style="margin: 0; font-family: 'Segoe UI', Arial, sans-serif; font-weight: 800; font-size: 32px; letter-spacing: -1px;">
+                                <span style="color: #ffffff;">TRADU</span><span style="color: #f97316; font-size: 1.25em; font-weight: 900;">X</span>
+                            </p>
+                            <p style="color: rgba(255,255,255,0.8); font-size: 12px; margin: 8px 0 0 0; letter-spacing: 2px; text-transform: uppercase;">Professional Translations</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="background: linear-gradient(90deg, #f97316 0%, #ea580c 50%, #f97316 100%); height: 4px;"></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 40px;">'''
+
+
+def get_tradux_email_footer() -> str:
+    """Generate TRADUX email footer with branding"""
+    return '''
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 30px 0;">
+                                <tr>
+                                    <td style="border-top: 1px solid #e2e8f0;"></td>
+                                </tr>
+                            </table>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                <tr>
+                                    <td style="padding-top: 15px;">
+                                        <p style="color: #1e3a5f; font-size: 15px; font-weight: 600; margin: 0 0 3px 0;">
+                                            TRADUX Translations
+                                        </p>
+                                        <p style="color: #64748b; font-size: 13px; margin: 0;">
+                                            Fast, Affordable, Professional
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%); padding: 30px 40px; border-radius: 0 0 8px 8px;">
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                <tr>
+                                    <td align="center">
+                                        <p style="color: #a0aec0; font-size: 12px; line-height: 1.8; margin: 0;">
+                                            <a href="mailto:contact@tradux.com" style="color: #f97316; text-decoration: none;">contact@tradux.com</a>
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top: 15px;">
+                                <tr>
+                                    <td align="center">
+                                        <p style="color: #64748b; font-size: 11px; margin: 0;">
+                                            © 2025 TRADUX. All rights reserved.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>'''
+
+
+def get_tradux_approval_email(client_name: str, order_number: str, approval_url: str, document_type: str = "Document") -> str:
+    """Generate TRADUX-branded email for client translation approval"""
+    content = f'''
+                            <p style="color: #1e3a5f; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
+                                Hello, {client_name}
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Great news! Your translation for <strong>{document_type}</strong> (Order #{order_number}) has been completed and is ready for your review.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 25px 0;">
+                                Please click the button below to review your translation. You can approve it or request corrections if needed.
+                            </p>
+
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 30px 0;">
+                                <tr>
+                                    <td align="center">
+                                        <a href="{approval_url}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); color: #ffffff; text-decoration: none; padding: 18px 45px; border-radius: 50px; font-size: 16px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(249, 115, 22, 0.4);">
+                                            REVIEW MY TRANSLATION
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border: 1px solid #bfdbfe; border-radius: 8px; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 20px;">
+                                        <p style="color: #1e3a5f; font-size: 14px; font-weight: 600; margin: 0 0 10px 0;">
+                                            What happens next?
+                                        </p>
+                                        <ul style="color: #475569; font-size: 13px; margin: 0; padding-left: 20px; line-height: 1.8;">
+                                            <li><strong>Approve:</strong> We'll generate your certified translation and send it to you</li>
+                                            <li><strong>Request Changes:</strong> Describe what needs correction and our team will review it</li>
+                                        </ul>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="color: #64748b; font-size: 13px; line-height: 1.7; margin: 25px 0 0 0;">
+                                If you have any questions, simply reply to this email.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 20px 0;">
+                                Best regards,<br>
+                                <strong style="color: #1e3a5f;">TRADU<span style="color: #f97316;">X</span> Team</strong>
+                            </p>'''
+    return get_tradux_email_header() + content + get_tradux_email_footer()
+
+
+def get_tradux_delivery_email(client_name: str, order_number: str, document_type: str = "Document") -> str:
+    """Generate TRADUX-branded email for certified translation delivery"""
+    content = f'''
+                            <p style="color: #1e3a5f; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
+                                Hello, {client_name}
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Your certified translation for <strong>{document_type}</strong> (Order #{order_number}) is ready!
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Please find your certified translation attached to this email.
+                            </p>
+
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #86efac; border-radius: 8px; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 20px; text-align: center;">
+                                        <p style="color: #166534; font-size: 16px; font-weight: 600; margin: 0;">
+                                            ✓ Your translation has been certified
+                                        </p>
+                                        <p style="color: #15803d; font-size: 13px; margin: 10px 0 0 0;">
+                                            This document includes a certification cover page with a unique verification code.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 10px 0;">
+                                If you have any questions or need additional copies, simply reply to this email.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Thank you for choosing TRADUX!
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 20px 0;">
+                                Best regards,<br>
+                                <strong style="color: #1e3a5f;">TRADU<span style="color: #f97316;">X</span> Team</strong>
+                            </p>'''
+    return get_tradux_email_header() + content + get_tradux_email_footer()
+
+
+def get_tradux_correction_email(client_name: str, order_number: str) -> str:
+    """Generate TRADUX-branded email confirming correction request"""
+    content = f'''
+                            <p style="color: #1e3a5f; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
+                                Hello, {client_name}
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Thank you for your feedback on Order #{order_number}.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                We have received your correction request and our team will review it carefully. You will receive an updated translation for approval shortly.
+                            </p>
+
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border: 1px solid #bfdbfe; border-radius: 8px; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 20px; text-align: center;">
+                                        <p style="color: #1e3a5f; font-size: 14px; font-weight: 600; margin: 0;">
+                                            ✓ Your request has been assigned to our team
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 20px 0;">
+                                Best regards,<br>
+                                <strong style="color: #1e3a5f;">TRADU<span style="color: #f97316;">X</span> Team</strong>
+                            </p>'''
+    return get_tradux_email_header() + content + get_tradux_email_footer()
+
+
+def generate_tradux_certification_cover(
+    order_number: str,
+    document_type: str,
+    source_language: str,
+    target_language: str,
+    page_count: int,
+    client_name: str,
+    certification_id: str,
+    certified_date: str,
+    qr_code_base64: str = None
+) -> str:
+    """Generate TRADUX certification cover page HTML with blue/orange branding"""
+    qr_section = ""
+    if qr_code_base64:
+        qr_section = f'''
+            <div style="text-align: center; margin: 20px 0;">
+                <img src="data:image/png;base64,{qr_code_base64}" alt="Verification QR Code" style="width: 100px; height: 100px;">
+                <p style="color: #64748b; font-size: 10px; margin: 5px 0 0 0;">Scan to verify</p>
+            </div>
+        '''
+
+    return f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Certification - {order_number}</title>
+    <style>
+        @page {{ size: Letter; margin: 0; }}
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{
+            font-family: 'Segoe UI', 'Times New Roman', serif;
+            background: white;
+            min-height: 11in;
+            padding: 0.5in;
+        }}
+        .container {{
+            border: 3px solid #1e3a5f;
+            min-height: 10in;
+            padding: 30px;
+            position: relative;
+        }}
+        .header {{
+            text-align: center;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #f97316;
+        }}
+        .logo {{
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-weight: 800;
+            font-size: 42px;
+            letter-spacing: -2px;
+            margin-bottom: 5px;
+        }}
+        .logo .tradu {{ color: #1e3a5f; }}
+        .logo .x {{ color: #f97316; font-size: 1.3em; font-weight: 900; }}
+        .tagline {{
+            color: #64748b;
+            font-size: 12px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+        }}
+        .cert-title {{
+            text-align: center;
+            margin: 30px 0;
+        }}
+        .cert-title h1 {{
+            color: #1e3a5f;
+            font-size: 24px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }}
+        .cert-id {{
+            background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+            color: white;
+            display: inline-block;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            margin-top: 10px;
+        }}
+        .info-section {{
+            margin: 30px 0;
+            padding: 20px;
+            background: #f8fafc;
+            border-radius: 8px;
+            border-left: 4px solid #f97316;
+        }}
+        .info-row {{
+            display: flex;
+            margin: 10px 0;
+        }}
+        .info-label {{
+            width: 150px;
+            color: #64748b;
+            font-size: 12px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }}
+        .info-value {{
+            flex: 1;
+            color: #1e3a5f;
+            font-size: 14px;
+            font-weight: 500;
+        }}
+        .certification-statement {{
+            text-align: center;
+            margin: 30px 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+            border-radius: 8px;
+        }}
+        .certification-statement p {{
+            color: #1e3a5f;
+            font-size: 13px;
+            line-height: 1.8;
+        }}
+        .signature-section {{
+            margin-top: 40px;
+            text-align: center;
+        }}
+        .signature-line {{
+            width: 250px;
+            border-bottom: 1px solid #1e3a5f;
+            margin: 0 auto 10px;
+            padding-top: 50px;
+        }}
+        .certifier-name {{
+            color: #1e3a5f;
+            font-size: 16px;
+            font-weight: 600;
+        }}
+        .certifier-title {{
+            color: #64748b;
+            font-size: 12px;
+        }}
+        .footer {{
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            right: 30px;
+            text-align: center;
+            padding-top: 20px;
+            border-top: 1px solid #e2e8f0;
+        }}
+        .footer p {{
+            color: #94a3b8;
+            font-size: 10px;
+            line-height: 1.6;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">
+                <span class="tradu">TRADU</span><span class="x">X</span>
+            </div>
+            <p class="tagline">Professional Translation Services</p>
+        </div>
+
+        <div class="cert-title">
+            <h1>Certificate of Translation Accuracy</h1>
+            <span class="cert-id">{certification_id}</span>
+        </div>
+
+        <div class="info-section">
+            <div class="info-row">
+                <span class="info-label">Order Number:</span>
+                <span class="info-value">#{order_number}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Document Type:</span>
+                <span class="info-value">{document_type}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Languages:</span>
+                <span class="info-value">{source_language} → {target_language}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Page Count:</span>
+                <span class="info-value">{page_count} page(s)</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Client:</span>
+                <span class="info-value">{client_name}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Certification Date:</span>
+                <span class="info-value">{certified_date}</span>
+            </div>
+        </div>
+
+        <div class="certification-statement">
+            <p>
+                I hereby certify that the attached translation is, to the best of my knowledge and belief,
+                a true and accurate translation of the original document from {source_language} into {target_language}.
+            </p>
+        </div>
+
+        {qr_section}
+
+        <div class="signature-section">
+            <div class="signature-line"></div>
+            <p class="certifier-name">TRADUX Translations</p>
+            <p class="certifier-title">Professional Translation Services</p>
+        </div>
+
+        <div class="footer">
+            <p>
+                This certification can be verified online using the certification ID above.<br>
+                TRADUX · contact@tradux.com
+            </p>
+        </div>
+    </div>
+</body>
+</html>'''
+
+
+async def generate_tradux_certified_pdf(
+    translation_html: str,
+    order: dict,
+    certification_id: str,
+    qr_code_base64: str = None
+) -> bytes:
+    """Generate a complete certified PDF with TRADUX cover page + translation"""
+    import fitz  # PyMuPDF
+
+    # Generate cover page HTML
+    cover_html = generate_tradux_certification_cover(
+        order_number=order.get("order_number", ""),
+        document_type=order.get("document_type", "Document"),
+        source_language=order.get("translate_from", "Portuguese"),
+        target_language=order.get("translate_to", "English"),
+        page_count=order.get("page_count", 1),
+        client_name=order.get("client_name", ""),
+        certification_id=certification_id,
+        certified_date=datetime.now(ZoneInfo("America/New_York")).strftime("%B %d, %Y"),
+        qr_code_base64=qr_code_base64
+    )
+
+    # Create PDF document
+    doc = fitz.open()
+
+    # Convert cover page HTML to PDF page
+    try:
+        # Create cover page
+        cover_page = doc.new_page(width=612, height=792)  # Letter size
+        rect = fitz.Rect(36, 36, 576, 756)  # 0.5 inch margins
+
+        # Insert cover as HTML (simplified - in production would use proper HTML rendering)
+        # For now, create a styled text version
+        cover_text = f"""
+TRADUX
+Professional Translation Services
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CERTIFICATE OF TRANSLATION ACCURACY
+
+{certification_id}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Order Number: #{order.get("order_number", "")}
+Document Type: {order.get("document_type", "Document")}
+Languages: {order.get("translate_from", "Portuguese")} → {order.get("translate_to", "English")}
+Page Count: {order.get("page_count", 1)} page(s)
+Client: {order.get("client_name", "")}
+Certification Date: {datetime.now(ZoneInfo("America/New_York")).strftime("%B %d, %Y")}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+I hereby certify that the attached translation is, to the best of
+my knowledge and belief, a true and accurate translation of the
+original document.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+TRADUX Translations
+Professional Translation Services
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This certification can be verified using the ID above.
+TRADUX · contact@tradux.com
+"""
+        # Insert text
+        fontsize = 11
+        cover_page.insert_textbox(rect, cover_text, fontsize=fontsize, fontname="helv", align=1)
+
+        # Add QR code if available
+        if qr_code_base64:
+            try:
+                qr_bytes = base64.b64decode(qr_code_base64)
+                qr_rect = fitz.Rect(256, 520, 356, 620)  # Centered QR code
+                cover_page.insert_image(qr_rect, stream=qr_bytes)
+            except Exception as qr_err:
+                logger.warning(f"Could not insert QR code: {qr_err}")
+
+    except Exception as e:
+        logger.error(f"Error creating cover page: {e}")
+
+    # Add translation pages
+    try:
+        # Create a temporary PDF from the translation HTML
+        # In production, would use proper HTML to PDF conversion (weasyprint, etc.)
+        translation_page = doc.new_page(width=612, height=792)
+        rect = fitz.Rect(54, 54, 558, 738)  # 0.75 inch margins
+
+        # Clean HTML tags for text insertion (simplified)
+        import re
+        clean_text = re.sub(r'<[^>]+>', '\n', translation_html)
+        clean_text = re.sub(r'\n+', '\n', clean_text).strip()
+
+        # Insert text (this is simplified - production would use proper HTML rendering)
+        if clean_text:
+            translation_page.insert_textbox(rect, clean_text[:3000], fontsize=11, fontname="times-roman")
+
+    except Exception as e:
+        logger.error(f"Error adding translation pages: {e}")
+
+    # Get PDF bytes
+    pdf_bytes = doc.tobytes()
+    doc.close()
+
+    return pdf_bytes
+
+
+def generate_tradux_certification_id() -> str:
+    """Generate unique TRADUX certification ID"""
+    return f"TX-{datetime.now().strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}"
+
+
 def generate_translation_html_for_email(order: dict) -> str:
     """Generate a formatted HTML document from translation_html for email attachment"""
     translation_text = order.get("translation_html", "")
@@ -2364,6 +2917,95 @@ class TraduxTranslationStatus(BaseModel):
     # Error handling
     has_error: bool = False
     error_message: Optional[str] = None
+
+
+# ==================== MULTI-BRAND CONFIGURATION ====================
+class BrandConfig(BaseModel):
+    """Configuration for multi-brand support (Legacy vs TRADUX)"""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    brand_code: str  # "legacy" or "tradux"
+    brand_name: str
+    tagline: Optional[str] = None
+    # Colors
+    primary_color: str = "#1a2a4a"  # Legacy blue
+    secondary_color: str = "#c9a227"  # Legacy gold
+    accent_color: Optional[str] = None
+    # Logo
+    logo_html: Optional[str] = None  # HTML for logo rendering
+    logo_url: Optional[str] = None
+    # Contact info
+    company_name: str
+    company_email: str
+    company_phone: Optional[str] = None
+    company_address: Optional[str] = None
+    website_url: Optional[str] = None
+    # Certifier info
+    default_certifier_name: str
+    default_certifier_title: str = "Certified Translator"
+    certifier_credentials: Optional[str] = None  # ATA number, etc.
+    # Certification prefix
+    certification_prefix: str = "LT"  # LT for Legacy, TX for TRADUX
+    # Email settings
+    email_from_name: str
+    email_from_address: Optional[str] = None
+    # Social links
+    facebook_url: Optional[str] = None
+    instagram_url: Optional[str] = None
+    # Flags
+    is_active: bool = True
+    show_ata_badge: bool = True
+    show_bbb_badge: bool = True
+    # Timestamps
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# Default brand configurations
+BRAND_CONFIGS = {
+    "legacy": {
+        "brand_code": "legacy",
+        "brand_name": "Legacy Translations",
+        "tagline": "Professional Translation Services",
+        "primary_color": "#1a2a4a",
+        "secondary_color": "#c9a227",
+        "company_name": "Legacy Translations Inc.",
+        "company_email": "contact@legacytranslations.com",
+        "company_phone": "(617) 925-4154",
+        "company_address": "867 Boylston Street, 5th Floor #2073, Boston, MA 02116",
+        "website_url": "https://legacytranslations.com",
+        "default_certifier_name": "Beatriz Paiva",
+        "default_certifier_title": "Certified Translator",
+        "certifier_credentials": "ATA #275993",
+        "certification_prefix": "LT",
+        "email_from_name": "Legacy Translations",
+        "facebook_url": "https://www.facebook.com/legacytranslationsusa/",
+        "instagram_url": "https://www.instagram.com/legacytranslations/",
+        "show_ata_badge": True,
+        "show_bbb_badge": True
+    },
+    "tradux": {
+        "brand_code": "tradux",
+        "brand_name": "TRADUX",
+        "tagline": "Fast, Affordable, Professional",
+        "primary_color": "#1e3a5f",
+        "secondary_color": "#f97316",
+        "accent_color": "#ea580c",
+        "company_name": "TRADUX",
+        "company_email": "contact@tradux.com",
+        "website_url": "https://tradux.com",
+        "default_certifier_name": "TRADUX Translations",
+        "default_certifier_title": "Professional Translation Services",
+        "certification_prefix": "TX",
+        "email_from_name": "TRADUX",
+        "show_ata_badge": False,
+        "show_bbb_badge": False
+    }
+}
+
+
+def get_brand_config(brand_code: str = "legacy") -> dict:
+    """Get brand configuration by code"""
+    return BRAND_CONFIGS.get(brand_code, BRAND_CONFIGS["legacy"])
 
 
 # ==================== PAYMENT PROOF MODELS ====================
@@ -22786,7 +23428,7 @@ def _get_approval_page(token: str, client_name: str, order_number: str, document
 async def client_approve_translation(token: str, feedback: Optional[str] = None):
     """
     Client approves their translation.
-    Triggers certification and final delivery.
+    Automatically generates certification and sends certified PDF via email.
     """
     status = await db.tradux_translations.find_one({"client_approval_token": token})
     if not status:
@@ -22797,51 +23439,148 @@ async def client_approve_translation(token: str, feedback: Optional[str] = None)
 
     # Get order info
     order = await db.translation_orders.find_one({"id": status["order_id"]})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
 
-    # Update status
+    # Check if this is a TRADUX order (use TRADUX branding) or Legacy order
+    is_tradux = order.get("tradux_mode", False) or status.get("tradux_mode", True)
+
+    # Generate certification ID
+    if is_tradux:
+        certification_id = generate_tradux_certification_id()
+    else:
+        certification_id = f"LT-{datetime.now().strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}"
+
+    # Generate QR code for verification
+    base_url = os.environ.get("FRONTEND_URL", "https://portal.legacytranslations.com")
+    verification_url = f"{base_url}/#/verify/{certification_id}"
+    qr_code_base64 = generate_qr_code(verification_url)
+
+    # Create document hash
+    translation_content = status.get("final_translation", "")
+    document_hash = hashlib.sha256(translation_content.encode('utf-8')).hexdigest()
+
+    # Create certification record in database
+    certification = {
+        "certification_id": certification_id,
+        "order_id": status["order_id"],
+        "order_number": status.get("order_number"),
+        "document_type": order.get("document_type", "Document"),
+        "source_language": order.get("translate_from", "Portuguese"),
+        "target_language": order.get("translate_to", "English"),
+        "page_count": order.get("page_count", 1),
+        "document_hash": document_hash,
+        "certifier_name": "TRADUX Translations" if is_tradux else "Beatriz Paiva",
+        "certifier_title": "Professional Translation Services" if is_tradux else "Certified Translator",
+        "company_name": "TRADUX" if is_tradux else "Legacy Translations Inc.",
+        "client_name": order.get("client_name"),
+        "certified_at": datetime.utcnow(),
+        "is_valid": True,
+        "verification_url": verification_url,
+        "qr_code_data": qr_code_base64,
+        "is_tradux": is_tradux
+    }
+    await db.certifications.insert_one(certification)
+
+    # Generate certified PDF
+    try:
+        certified_pdf_bytes = await generate_tradux_certified_pdf(
+            translation_html=translation_content,
+            order=order,
+            certification_id=certification_id,
+            qr_code_base64=qr_code_base64
+        )
+        certified_pdf_base64 = base64.b64encode(certified_pdf_bytes).decode('utf-8')
+    except Exception as pdf_error:
+        logger.error(f"Error generating certified PDF: {pdf_error}")
+        certified_pdf_base64 = None
+
+    # Update TRADUX status
     await db.tradux_translations.update_one(
         {"client_approval_token": token},
         {"$set": {
             "client_approved": True,
             "client_approved_at": datetime.utcnow(),
             "client_feedback": feedback,
-            "current_step": "client_approved",
+            "current_step": "completed",
+            "certification_id": certification_id,
             "steps.client_approval.status": "completed",
             "steps.client_approval.message": "Client approved translation",
-            "updated_at": datetime.utcnow()
+            "steps.certification.status": "completed",
+            "steps.certification.message": f"Certification generated: {certification_id}",
+            "updated_at": datetime.utcnow(),
+            "completed_at": datetime.utcnow()
         }}
     )
 
-    # Update order - mark as ready for certification
+    # Update order - mark as delivered
     await db.translation_orders.update_one(
         {"id": status["order_id"]},
         {"$set": {
-            "translation_status": "ready",
-            "translation_html": status.get("final_translation"),  # Save translation to order
+            "translation_status": "delivered",
+            "translation_html": translation_content,
+            "certification_id": certification_id,
             "client_approved_translation": True,
             "client_approved_at": datetime.utcnow(),
+            "delivered_at": datetime.utcnow(),
             "updated_at": datetime.utcnow()
         }}
     )
 
+    # Send certified translation to client via email
+    client_email = order.get("client_email")
+    client_name = order.get("client_name", "Valued Customer")
+    order_number = order.get("order_number", "")
+    document_type = order.get("document_type", "Document")
+
+    if client_email:
+        try:
+            if is_tradux:
+                email_content = get_tradux_delivery_email(client_name, order_number, document_type)
+            else:
+                email_content = get_delivery_email_template(client_name)
+
+            if certified_pdf_base64:
+                # Send email with PDF attachment
+                await email_service.send_email_with_attachment(
+                    to=client_email,
+                    subject=f"Your Certified Translation - Order #{order_number}",
+                    content=email_content,
+                    attachment_data=certified_pdf_base64,
+                    attachment_filename=f"Certified_Translation_{order_number}.pdf",
+                    attachment_type="application/pdf"
+                )
+                logger.info(f"Certified translation sent to {client_email} for order {order_number}")
+            else:
+                # Send email without attachment (PDF generation failed)
+                await email_service.send_email(
+                    client_email,
+                    f"Your Translation is Ready - Order #{order_number}",
+                    email_content
+                )
+                logger.warning(f"Sent email without PDF attachment for order {order_number}")
+        except Exception as email_error:
+            logger.error(f"Failed to send delivery email: {email_error}")
+
     # Create notification for admin/PM
-    if order and order.get("assigned_pm_id"):
+    if order.get("assigned_pm_id"):
         notification = Notification(
             user_id=order["assigned_pm_id"],
-            type="client_approved_translation",
-            title="Client Approved Translation",
-            message=f"Order {status.get('order_number')}: Client has approved the translation. Ready for certification.",
+            type="translation_delivered",
+            title="Translation Delivered",
+            message=f"Order {order_number}: Client approved. Certification {certification_id} generated and delivered.",
             order_id=status["order_id"],
-            order_number=status.get("order_number")
+            order_number=order_number
         )
         await db.notifications.insert_one(notification.dict())
 
-    logger.info(f"Client approved translation for order {status.get('order_number')}. Ready for certification.")
+    logger.info(f"TRADUX order {order_number} completed. Certification: {certification_id}")
 
     return {
         "status": "approved",
-        "message": "Thank you! Your translation has been approved. You will receive the certified document shortly.",
-        "order_number": status.get("order_number")
+        "message": "Thank you! Your certified translation has been sent to your email.",
+        "order_number": order_number,
+        "certification_id": certification_id
     }
 
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import mammoth from 'mammoth';
 import * as pdfjsLib from 'pdfjs-dist';
+import { THEMES, getTheme } from './themes';
 
 // Configure PDF.js worker (pdfjs-dist 5.x uses .mjs files)
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -592,7 +593,10 @@ const TopBar = ({
   unreadNotifCount = 0,
   pendingZelleInvoices = [],
   invoiceNotifications = [],
-  onRefreshNotifications
+  onRefreshNotifications,
+  currentTheme = 'legacy',
+  setCurrentTheme,
+  theme
 }) => {
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
 
@@ -846,6 +850,22 @@ const TopBar = ({
             )}
           </div>
         )}
+
+        {/* Brand/Theme Selector */}
+        {setCurrentTheme && userRole === 'admin' && (
+          <div className="flex items-center">
+            <select
+              value={currentTheme}
+              onChange={(e) => setCurrentTheme(e.target.value)}
+              className="px-2 py-1 text-[10px] bg-gray-800 text-white border border-gray-600 rounded cursor-pointer hover:bg-gray-700"
+              title="Switch brand theme"
+            >
+              <option value="legacy">Legacy</option>
+              <option value="tradux">TRADUX</option>
+            </select>
+          </div>
+        )}
+
         <button
           onClick={onLogout}
           className="px-2 py-1.5 text-red-400 hover:bg-red-900/30 rounded text-xs"
@@ -30059,6 +30079,19 @@ function AdminApp() {
   const [user, setUser] = useState(null); // User info: { name, email, role, id }
   const [activeTab, setActiveTab] = useState('projects');
   const [selectedOrder, setSelectedOrder] = useState(null); // Order selected for translation
+
+  // Multi-brand theme support (Legacy vs TRADUX)
+  const [currentTheme, setCurrentTheme] = useState(() => {
+    const savedTheme = localStorage.getItem('admin_theme');
+    return savedTheme || 'legacy';
+  });
+  const theme = getTheme(currentTheme);
+
+  // Save theme to localStorage when changed
+  useEffect(() => {
+    localStorage.setItem('admin_theme', currentTheme);
+  }, [currentTheme]);
+
   // Global invoice notifications state
   const [globalInvoiceNotifications, setGlobalInvoiceNotifications] = useState([]);
   const [globalPendingZelle, setGlobalPendingZelle] = useState([]);
@@ -30291,6 +30324,9 @@ function AdminApp() {
         pendingZelleInvoices={globalPendingZelle}
         invoiceNotifications={globalInvoiceNotifications}
         onRefreshNotifications={fetchGlobalInvoiceNotifications}
+        currentTheme={currentTheme}
+        setCurrentTheme={setCurrentTheme}
+        theme={theme}
       />
       <div className="flex-1 overflow-auto">{renderContent()}</div>
       <FloatingChatWidget adminKey={adminKey} user={user} />
