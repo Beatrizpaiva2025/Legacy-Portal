@@ -4210,7 +4210,15 @@ async def get_payment_status(session_id: str):
             
             # Handle successful payment
             if new_status == 'completed':
-                await handle_successful_payment(session_id, transaction)
+                # Extract metadata and customer_details from Stripe session for email delivery
+                metadata = checkout_session.metadata or {}
+                customer_details = checkout_session.customer_details or {}
+                # Convert Stripe objects to dict if needed
+                if hasattr(metadata, 'to_dict'):
+                    metadata = metadata.to_dict()
+                if hasattr(customer_details, 'to_dict'):
+                    customer_details = customer_details.to_dict()
+                await handle_successful_payment(session_id, transaction, metadata, customer_details)
         
         return {
             "session_id": session_id,
@@ -4353,7 +4361,9 @@ async def stripe_webhook(request: Request):
                 # Get transaction and handle success
                 transaction = await db.payment_transactions.find_one({"session_id": session_id})
                 if transaction:
-                    await handle_successful_payment(session_id, transaction, metadata)
+                    # Extract customer_details from Stripe session (most reliable source for customer email)
+                    customer_details = session.get('customer_details', {})
+                    await handle_successful_payment(session_id, transaction, metadata, customer_details)
                     logger.info(f"Successfully processed payment for session: {session_id}")
         else:
             logger.info(f"Received unhandled webhook event type: {event['type']}")
@@ -4371,7 +4381,7 @@ async def stripe_webhook(request: Request):
         logger.error(f"Unexpected error handling webhook: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-async def handle_successful_payment(session_id: str, payment_transaction: dict, stripe_metadata: dict = None):
+async def handle_successful_payment(session_id: str, payment_transaction: dict, stripe_metadata: dict = None, stripe_customer_details: dict = None):
     """Handle successful payment by creating order, sending confirmation emails, and creating Protemos project"""
 
     try:
@@ -4383,10 +4393,28 @@ async def handle_successful_payment(session_id: str, payment_transaction: dict, 
             logger.error(f"Quote not found for payment session: {session_id}")
             return
 
-        # Get customer info from quote, with Stripe metadata as fallback
+        # Get customer info with multiple fallbacks for reliability
+        # Priority: 1) Stripe customer_details (most reliable - email used at checkout)
+        #           2) Quote data (from when quote was created)
+        #           3) Stripe metadata (passed when checkout was created)
         stripe_metadata = stripe_metadata or {}
-        customer_email = quote.get("customer_email") or stripe_metadata.get("customer_email")
-        customer_name = quote.get("customer_name") or stripe_metadata.get("customer_name") or "Valued Customer"
+        stripe_customer_details = stripe_customer_details or {}
+
+        # Get email from Stripe customer_details first (this is the email the customer actually used at checkout)
+        customer_email = (
+            stripe_customer_details.get("email") or
+            quote.get("customer_email") or
+            stripe_metadata.get("customer_email")
+        )
+        customer_name = (
+            stripe_customer_details.get("name") or
+            quote.get("customer_name") or
+            stripe_metadata.get("customer_name") or
+            "Valued Customer"
+        )
+
+        # Log for debugging
+        logger.info(f"Payment {session_id} - Customer email sources: stripe_details={stripe_customer_details.get('email')}, quote={quote.get('customer_email')}, metadata={stripe_metadata.get('customer_email')}, final={customer_email}")
 
         # Generate order number with P prefix (like P6377) to match admin panel format
         order_count = await db.translation_orders.count_documents({})
