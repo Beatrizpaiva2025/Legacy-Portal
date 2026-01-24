@@ -624,6 +624,80 @@ def get_delivery_email_template(client_name: str) -> str:
                             </p>'''
     return get_email_header() + content + get_email_footer(include_review_button=True)
 
+
+def get_tradux_approval_email_template(client_name: str, order_number: str, approval_url: str, document_type: str = "Document") -> str:
+    """Generate email template for client translation approval (looks like standard professional service)"""
+    content = f'''
+                            <p style="color: #1a2a4a; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
+                                Hello, {client_name}
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Great news! Your translation for <strong>{document_type}</strong> (Order #{order_number}) has been completed and is ready for your review.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 25px 0;">
+                                Please click the button below to review your translation. You can either approve it or request corrections if needed.
+                            </p>
+
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 30px 0;">
+                                <tr>
+                                    <td align="center">
+                                        <a href="{approval_url}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); color: #ffffff; text-decoration: none; padding: 18px 45px; border-radius: 50px; font-size: 16px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(26, 42, 74, 0.3);">
+                                            REVIEW MY TRANSLATION
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: #f0f4f8; border: 1px solid #e2e8f0; border-radius: 8px; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 20px;">
+                                        <p style="color: #1a2a4a; font-size: 14px; font-weight: 600; margin: 0 0 10px 0;">
+                                            What happens next?
+                                        </p>
+                                        <ul style="color: #4a5568; font-size: 13px; margin: 0; padding-left: 20px; line-height: 1.8;">
+                                            <li><strong>Approve:</strong> We'll generate your certified translation and send it to you</li>
+                                            <li><strong>Request Changes:</strong> Just describe what needs to be corrected and our team will review it</li>
+                                        </ul>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="color: #64748b; font-size: 13px; line-height: 1.7; margin: 25px 0 0 0;">
+                                If you have any questions, simply reply to this email and we'll be happy to help.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 20px 0;">
+                                Regards,
+                            </p>'''
+    return get_email_header() + content + get_email_footer(include_review_button=False)
+
+
+def get_tradux_correction_received_email_template(client_name: str, order_number: str) -> str:
+    """Generate email template confirming correction request was received"""
+    content = f'''
+                            <p style="color: #1a2a4a; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
+                                Hello, {client_name}
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Thank you for your feedback on Order #{order_number}.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                We have received your correction request and our translation team will review it carefully. You will receive an updated translation for approval shortly.
+                            </p>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 20px; text-align: center;">
+                                        <p style="color: #166534; font-size: 14px; font-weight: 600; margin: 0;">
+                                            ✅ Your request has been assigned to our team
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 20px 0;">
+                                Regards,
+                            </p>'''
+    return get_email_header() + content + get_email_footer(include_review_button=False)
+
+
 def generate_translation_html_for_email(order: dict) -> str:
     """Generate a formatted HTML document from translation_html for email attachment"""
     translation_text = order.get("translation_html", "")
@@ -22309,7 +22383,37 @@ Return the corrected HTML translation. Make ONLY the corrections listed above, d
             }}
         )
 
-        # Send notification email to admin
+        # Get the status record for the approval token
+        status_record = await db.tradux_translations.find_one({"id": status_id})
+        approval_token = status_record.get("client_approval_token") if status_record else None
+
+        # Send email to client with approval link
+        if order.get("client_email") and approval_token:
+            try:
+                client_name = order.get("client_name", "Valued Customer")
+                order_number = order.get("order_number", "")
+                document_type = order.get("document_type", "Document")
+
+                # Build approval URL (use environment variable for domain or default)
+                base_url = os.environ.get("BASE_URL", "https://legacytranslations.com")
+                approval_url = f"{base_url}/api/client/translation-approval/{approval_token}"
+
+                email_content = get_tradux_approval_email_template(
+                    client_name=client_name,
+                    order_number=order_number,
+                    approval_url=approval_url,
+                    document_type=document_type
+                )
+
+                await email_service.send_email(
+                    order["client_email"],
+                    f"Your Translation is Ready for Review - Order #{order_number}",
+                    email_content
+                )
+                logger.info(f"Approval email sent to {order['client_email']} for order {order_number}")
+            except Exception as email_error:
+                logger.error(f"Failed to send approval email: {email_error}")
+
         logger.info(f"TRADUX translation completed for order {order.get('order_number')}. Ready for client approval.")
 
     except Exception as e:
@@ -22338,39 +22442,344 @@ async def get_tradux_status(order_id: str, admin_key: str):
     return status
 
 
-@api_router.get("/client/translation-approval/{token}")
+@api_router.get("/client/translation-approval/{token}", response_class=HTMLResponse)
 async def get_client_translation_approval(token: str):
     """
-    Public endpoint for client to view and approve their translation.
+    Public HTML page for client to view and approve their translation.
     No authentication required - uses unique token.
     """
     status = await db.tradux_translations.find_one({"client_approval_token": token})
     if not status:
-        raise HTTPException(status_code=404, detail="Translation not found or invalid token")
-
-    if status.get("current_step") not in ["ready_for_client", "client_approved", "completed"]:
-        return {
-            "status": "in_progress",
-            "message": "Translation is still being processed. Please check back later.",
-            "progress_percent": status.get("progress_percent", 0),
-            "current_step": status.get("current_step")
-        }
+        return HTMLResponse(content=_get_error_page("Translation Not Found", "The translation link is invalid or has expired. Please contact support if you need assistance."), status_code=404)
 
     # Get order info
     order = await db.translation_orders.find_one({"id": status["order_id"]})
+    client_name = order.get("client_name", "Valued Customer") if order else "Valued Customer"
+    order_number = status.get("order_number", "")
+    document_type = order.get("document_type", "Document") if order else "Document"
 
-    return {
-        "status": "ready_for_review",
-        "order_number": status.get("order_number"),
-        "customer_name": order.get("customer_name") if order else None,
-        "document_type": order.get("document_type") if order else None,
-        "final_translation": status.get("final_translation"),
-        "quality_score": status.get("quality_score"),
-        "error_count": status.get("error_count", 0),
-        "corrections_applied": status.get("corrections_applied", []),
-        "client_approved": status.get("client_approved", False),
-        "client_approved_at": status.get("client_approved_at")
-    }
+    # Check if still processing
+    if status.get("current_step") not in ["ready_for_client", "client_approved", "completed", "changes_requested"]:
+        return HTMLResponse(content=_get_processing_page(client_name, order_number, status.get("progress_percent", 0)))
+
+    # Check if already approved
+    if status.get("client_approved"):
+        return HTMLResponse(content=_get_approved_page(client_name, order_number))
+
+    # Check if changes were requested
+    if status.get("current_step") == "changes_requested":
+        return HTMLResponse(content=_get_changes_requested_page(client_name, order_number))
+
+    # Show approval page with translation
+    final_translation = status.get("final_translation", "<p>Translation content not available</p>")
+
+    return HTMLResponse(content=_get_approval_page(token, client_name, order_number, document_type, final_translation))
+
+
+def _get_error_page(title: str, message: str) -> str:
+    """Generate error page HTML"""
+    return f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{title} - Legacy Translations</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{ font-family: 'Segoe UI', Tahoma, sans-serif; background: #f4f4f4; min-height: 100vh; display: flex; align-items: center; justify-content: center; }}
+        .container {{ background: white; padding: 60px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center; max-width: 500px; }}
+        h1 {{ color: #dc2626; font-size: 28px; margin-bottom: 20px; }}
+        p {{ color: #64748b; font-size: 16px; line-height: 1.6; }}
+        .icon {{ font-size: 64px; margin-bottom: 20px; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">❌</div>
+        <h1>{title}</h1>
+        <p>{message}</p>
+    </div>
+</body>
+</html>'''
+
+
+def _get_processing_page(client_name: str, order_number: str, progress: int) -> str:
+    """Generate processing status page HTML"""
+    return f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="10">
+    <title>Translation in Progress - Legacy Translations</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{ font-family: 'Segoe UI', Tahoma, sans-serif; background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; }}
+        .container {{ background: white; padding: 60px; border-radius: 12px; box-shadow: 0 4px 30px rgba(0,0,0,0.2); text-align: center; max-width: 500px; }}
+        h1 {{ color: #1a2a4a; font-size: 24px; margin-bottom: 10px; }}
+        .order {{ color: #64748b; font-size: 14px; margin-bottom: 30px; }}
+        .progress-container {{ background: #e2e8f0; border-radius: 50px; height: 20px; margin: 30px 0; overflow: hidden; }}
+        .progress-bar {{ background: linear-gradient(90deg, #c9a227, #e6c547); height: 100%; border-radius: 50px; transition: width 0.5s; }}
+        .progress-text {{ color: #1a2a4a; font-size: 32px; font-weight: bold; margin: 20px 0; }}
+        p {{ color: #64748b; font-size: 14px; }}
+        .spinner {{ width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top: 4px solid #c9a227; border-radius: 50%; animation: spin 1s linear infinite; margin: 20px auto; }}
+        @keyframes spin {{ 0% {{ transform: rotate(0deg); }} 100% {{ transform: rotate(360deg); }} }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Hello, {client_name}</h1>
+        <p class="order">Order #{order_number}</p>
+        <div class="spinner"></div>
+        <p>Your translation is being prepared...</p>
+        <div class="progress-container">
+            <div class="progress-bar" style="width: {progress}%"></div>
+        </div>
+        <div class="progress-text">{progress}%</div>
+        <p>This page will refresh automatically. Please wait.</p>
+    </div>
+</body>
+</html>'''
+
+
+def _get_approved_page(client_name: str, order_number: str) -> str:
+    """Generate already approved page HTML"""
+    return f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Translation Approved - Legacy Translations</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{ font-family: 'Segoe UI', Tahoma, sans-serif; background: linear-gradient(135deg, #166534 0%, #15803d 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; }}
+        .container {{ background: white; padding: 60px; border-radius: 12px; box-shadow: 0 4px 30px rgba(0,0,0,0.2); text-align: center; max-width: 500px; }}
+        .icon {{ font-size: 80px; margin-bottom: 20px; }}
+        h1 {{ color: #166534; font-size: 28px; margin-bottom: 15px; }}
+        p {{ color: #64748b; font-size: 16px; line-height: 1.6; margin-bottom: 10px; }}
+        .order {{ color: #94a3b8; font-size: 14px; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">✅</div>
+        <h1>Translation Approved!</h1>
+        <p>Thank you, {client_name}!</p>
+        <p>Your translation has been approved. You will receive your certified document via email shortly.</p>
+        <p class="order">Order #{order_number}</p>
+    </div>
+</body>
+</html>'''
+
+
+def _get_changes_requested_page(client_name: str, order_number: str) -> str:
+    """Generate changes requested confirmation page HTML"""
+    return f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Revision Requested - Legacy Translations</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{ font-family: 'Segoe UI', Tahoma, sans-serif; background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; }}
+        .container {{ background: white; padding: 60px; border-radius: 12px; box-shadow: 0 4px 30px rgba(0,0,0,0.2); text-align: center; max-width: 500px; }}
+        .icon {{ font-size: 80px; margin-bottom: 20px; }}
+        h1 {{ color: #1a2a4a; font-size: 28px; margin-bottom: 15px; }}
+        p {{ color: #64748b; font-size: 16px; line-height: 1.6; margin-bottom: 10px; }}
+        .order {{ color: #94a3b8; font-size: 14px; margin-top: 20px; }}
+        .info-box {{ background: #f0f4f8; border-radius: 8px; padding: 20px; margin-top: 20px; }}
+        .info-box p {{ color: #475569; font-size: 14px; margin: 0; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">📝</div>
+        <h1>Revision Request Received</h1>
+        <p>Thank you for your feedback, {client_name}!</p>
+        <div class="info-box">
+            <p>Our translation team is reviewing your request. You will receive an updated translation for approval via email soon.</p>
+        </div>
+        <p class="order">Order #{order_number}</p>
+    </div>
+</body>
+</html>'''
+
+
+def _get_approval_page(token: str, client_name: str, order_number: str, document_type: str, translation_html: str) -> str:
+    """Generate the main approval page with translation preview"""
+    return f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Review Your Translation - Legacy Translations</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{ font-family: 'Segoe UI', Tahoma, sans-serif; background: #f4f4f4; }}
+        .header {{ background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); color: white; padding: 30px 40px; }}
+        .header h1 {{ font-size: 24px; margin-bottom: 5px; }}
+        .header p {{ opacity: 0.8; font-size: 14px; }}
+        .gold-bar {{ background: linear-gradient(90deg, #c9a227 0%, #e6c547 50%, #c9a227 100%); height: 4px; }}
+        .container {{ max-width: 1200px; margin: 0 auto; padding: 30px; }}
+        .info-bar {{ background: white; border-radius: 8px; padding: 20px 30px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
+        .info-item {{ text-align: center; }}
+        .info-item .label {{ font-size: 12px; color: #94a3b8; text-transform: uppercase; }}
+        .info-item .value {{ font-size: 18px; color: #1a2a4a; font-weight: 600; }}
+        .translation-box {{ background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }}
+        .translation-header {{ padding: 20px 30px; border-bottom: 1px solid #e2e8f0; }}
+        .translation-header h2 {{ color: #1a2a4a; font-size: 18px; }}
+        .translation-content {{ padding: 30px; max-height: 500px; overflow-y: auto; font-family: 'Times New Roman', Georgia, serif; line-height: 1.6; }}
+        .actions {{ background: white; border-radius: 8px; padding: 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
+        .actions h3 {{ color: #1a2a4a; font-size: 18px; margin-bottom: 20px; }}
+        .btn {{ padding: 15px 40px; border: none; border-radius: 50px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s; }}
+        .btn-approve {{ background: linear-gradient(135deg, #166534 0%, #15803d 100%); color: white; }}
+        .btn-approve:hover {{ transform: scale(1.05); box-shadow: 0 4px 15px rgba(22,101,52,0.4); }}
+        .btn-changes {{ background: #f1f5f9; color: #475569; margin-left: 15px; }}
+        .btn-changes:hover {{ background: #e2e8f0; }}
+        .correction-form {{ display: none; margin-top: 30px; padding-top: 30px; border-top: 1px solid #e2e8f0; }}
+        .correction-form.show {{ display: block; }}
+        .correction-form textarea {{ width: 100%; height: 150px; padding: 15px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 14px; resize: vertical; font-family: inherit; }}
+        .correction-form textarea:focus {{ outline: none; border-color: #c9a227; }}
+        .correction-form label {{ display: block; font-weight: 600; color: #1a2a4a; margin-bottom: 10px; }}
+        .correction-form .hint {{ color: #94a3b8; font-size: 12px; margin-top: 5px; }}
+        .btn-submit-changes {{ background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); color: white; margin-top: 15px; }}
+        .btn-cancel {{ background: transparent; color: #94a3b8; border: 1px solid #e2e8f0; margin-left: 10px; }}
+        .footer {{ text-align: center; padding: 30px; color: #94a3b8; font-size: 12px; }}
+        .loading {{ display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }}
+        .loading.show {{ display: flex; }}
+        .loading-content {{ background: white; padding: 40px; border-radius: 12px; text-align: center; }}
+        .loading-spinner {{ width: 50px; height: 50px; border: 4px solid #e2e8f0; border-top: 4px solid #c9a227; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px; }}
+        @keyframes spin {{ 0% {{ transform: rotate(0deg); }} 100% {{ transform: rotate(360deg); }} }}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Legacy Translations</h1>
+        <p>Your translation is ready for review</p>
+    </div>
+    <div class="gold-bar"></div>
+
+    <div class="container">
+        <div class="info-bar">
+            <div class="info-item">
+                <div class="label">Client</div>
+                <div class="value">{client_name}</div>
+            </div>
+            <div class="info-item">
+                <div class="label">Order Number</div>
+                <div class="value">#{order_number}</div>
+            </div>
+            <div class="info-item">
+                <div class="label">Document Type</div>
+                <div class="value">{document_type}</div>
+            </div>
+        </div>
+
+        <div class="translation-box">
+            <div class="translation-header">
+                <h2>Your Translation</h2>
+            </div>
+            <div class="translation-content">
+                {translation_html}
+            </div>
+        </div>
+
+        <div class="actions">
+            <h3>What would you like to do?</h3>
+            <button class="btn btn-approve" onclick="approveTranslation()">✓ Approve Translation</button>
+            <button class="btn btn-changes" onclick="showCorrectionForm()">Request Changes</button>
+
+            <div class="correction-form" id="correctionForm">
+                <label for="corrections">Please describe the corrections needed:</label>
+                <textarea id="corrections" placeholder="Please describe in detail what needs to be changed. For example:&#10;- Page 1: The date should be January 15, 2024, not January 14, 2024&#10;- Page 2: My middle name is spelled incorrectly..."></textarea>
+                <p class="hint">Please be as specific as possible to help us make the correct changes.</p>
+                <button class="btn btn-submit-changes" onclick="submitChanges()">Submit Correction Request</button>
+                <button class="btn btn-cancel" onclick="hideCorrectionForm()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>© 2025 Legacy Translations Inc. · ATA Member #275993 · contact@legacytranslations.com</p>
+    </div>
+
+    <div class="loading" id="loading">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <p>Processing your request...</p>
+        </div>
+    </div>
+
+    <script>
+        const token = "{token}";
+
+        function showLoading() {{
+            document.getElementById('loading').classList.add('show');
+        }}
+
+        function hideLoading() {{
+            document.getElementById('loading').classList.remove('show');
+        }}
+
+        function showCorrectionForm() {{
+            document.getElementById('correctionForm').classList.add('show');
+        }}
+
+        function hideCorrectionForm() {{
+            document.getElementById('correctionForm').classList.remove('show');
+            document.getElementById('corrections').value = '';
+        }}
+
+        async function approveTranslation() {{
+            if (!confirm('Are you sure you want to approve this translation? Once approved, we will generate your certified document.')) {{
+                return;
+            }}
+            showLoading();
+            try {{
+                const response = await fetch(`/api/client/translation-approval/${{token}}/approve`, {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }}
+                }});
+                const data = await response.json();
+                if (response.ok) {{
+                    window.location.reload();
+                }} else {{
+                    alert(data.detail || 'An error occurred. Please try again.');
+                }}
+            }} catch (error) {{
+                alert('An error occurred. Please try again.');
+            }}
+            hideLoading();
+        }}
+
+        async function submitChanges() {{
+            const corrections = document.getElementById('corrections').value.trim();
+            if (corrections.length < 10) {{
+                alert('Please provide a detailed description of the changes needed (at least 10 characters).');
+                return;
+            }}
+            showLoading();
+            try {{
+                const response = await fetch(`/api/client/translation-approval/${{token}}/request-changes`, {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ changes_requested: corrections }})
+                }});
+                const data = await response.json();
+                if (response.ok) {{
+                    window.location.reload();
+                }} else {{
+                    alert(data.detail || 'An error occurred. Please try again.');
+                }}
+            }} catch (error) {{
+                alert('An error occurred. Please try again.');
+            }}
+            hideLoading();
+        }}
+    </script>
+</body>
+</html>'''
 
 
 @api_router.post("/client/translation-approval/{token}/approve")
@@ -22386,6 +22795,9 @@ async def client_approve_translation(token: str, feedback: Optional[str] = None)
     if status.get("client_approved"):
         return {"status": "already_approved", "message": "This translation has already been approved"}
 
+    # Get order info
+    order = await db.translation_orders.find_one({"id": status["order_id"]})
+
     # Update status
     await db.tradux_translations.update_one(
         {"client_approval_token": token},
@@ -22400,18 +22812,30 @@ async def client_approve_translation(token: str, feedback: Optional[str] = None)
         }}
     )
 
-    # Update order
+    # Update order - mark as ready for certification
     await db.translation_orders.update_one(
         {"id": status["order_id"]},
         {"$set": {
             "translation_status": "ready",
+            "translation_html": status.get("final_translation"),  # Save translation to order
             "client_approved_translation": True,
             "client_approved_at": datetime.utcnow(),
             "updated_at": datetime.utcnow()
         }}
     )
 
-    # TODO: Trigger certification generation and email delivery
+    # Create notification for admin/PM
+    if order and order.get("assigned_pm_id"):
+        notification = Notification(
+            user_id=order["assigned_pm_id"],
+            type="client_approved_translation",
+            title="Client Approved Translation",
+            message=f"Order {status.get('order_number')}: Client has approved the translation. Ready for certification.",
+            order_id=status["order_id"],
+            order_number=status.get("order_number")
+        )
+        await db.notifications.insert_one(notification.dict())
+
     logger.info(f"Client approved translation for order {status.get('order_number')}. Ready for certification.")
 
     return {
@@ -22421,12 +22845,19 @@ async def client_approve_translation(token: str, feedback: Optional[str] = None)
     }
 
 
+class ClientChangesRequest(BaseModel):
+    changes_requested: str
+
+
 @api_router.post("/client/translation-approval/{token}/request-changes")
-async def client_request_changes(token: str, changes_requested: str):
+async def client_request_changes(token: str, request: ClientChangesRequest):
     """
     Client requests changes to the translation.
-    Creates a task for admin review.
+    Marks order for HUMAN REVIEW - no more AI processing.
+    Sends confirmation email to client.
     """
+    changes_requested = request.changes_requested
+
     if not changes_requested or len(changes_requested.strip()) < 10:
         raise HTTPException(status_code=400, detail="Please provide a detailed description of the changes needed")
 
@@ -22434,40 +22865,62 @@ async def client_request_changes(token: str, changes_requested: str):
     if not status:
         raise HTTPException(status_code=404, detail="Translation not found or invalid token")
 
-    # Update status
+    # Get order info
+    order = await db.translation_orders.find_one({"id": status["order_id"]})
+
+    # Update TRADUX status - mark as needing human review
     await db.tradux_translations.update_one(
         {"client_approval_token": token},
         {"$set": {
             "client_feedback": changes_requested,
             "current_step": "changes_requested",
+            "needs_human_review": True,  # Flag for human review
             "steps.client_approval.status": "changes_requested",
             "steps.client_approval.message": changes_requested,
             "updated_at": datetime.utcnow()
         }}
     )
 
-    # Update order
+    # Update order - mark for human revision
     await db.translation_orders.update_one(
         {"id": status["order_id"]},
         {"$set": {
             "translation_status": "revision_requested",
+            "needs_human_review": True,  # Important: human must review
             "client_revision_notes": changes_requested,
             "updated_at": datetime.utcnow()
         }}
     )
 
-    # Create notification for admin
-    order = await db.translation_orders.find_one({"id": status["order_id"]})
-    if order and order.get("assigned_pm_id"):
-        notification = Notification(
-            user_id=order["assigned_pm_id"],
-            type="client_revision_request",
-            title="Client Requested Translation Changes",
-            message=f"Order {status.get('order_number')}: {changes_requested[:100]}...",
-            order_id=status["order_id"],
-            order_number=status.get("order_number")
-        )
-        await db.notifications.insert_one(notification.dict())
+    # Create HIGH PRIORITY notification for admin/PM
+    if order:
+        # Notify PM if assigned
+        if order.get("assigned_pm_id"):
+            notification = Notification(
+                user_id=order["assigned_pm_id"],
+                type="client_revision_request",
+                title="⚠️ Client Requested Translation Revision",
+                message=f"Order {status.get('order_number')}: Client needs changes. HUMAN REVIEW REQUIRED.\n\nClient notes: {changes_requested[:200]}...",
+                order_id=status["order_id"],
+                order_number=status.get("order_number")
+            )
+            await db.notifications.insert_one(notification.dict())
+
+        # Send confirmation email to client
+        try:
+            client_email = order.get("client_email")
+            client_name = order.get("client_name", "Valued Customer")
+            if client_email:
+                email_content = get_tradux_correction_received_email_template(client_name, status.get("order_number"))
+                await email_service.send_email(
+                    client_email,
+                    f"Revision Request Received - Order #{status.get('order_number')}",
+                    email_content
+                )
+        except Exception as e:
+            logger.error(f"Failed to send correction confirmation email: {e}")
+
+    logger.info(f"Client requested changes for order {status.get('order_number')}. Marked for HUMAN REVIEW.")
 
     return {
         "status": "changes_requested",
