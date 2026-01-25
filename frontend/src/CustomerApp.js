@@ -167,7 +167,7 @@ const CUSTOMER_TRANSLATIONS = {
     standardTranslation: 'Standard Translation',
     standardDesc: 'General use, no certification',
     swornTranslation: 'Sworn Translation',
-    swornDesc: 'For use outside USA - official sworn translator',
+    swornDesc: 'For use outside USA - official sworn translator (5 business days)',
     rmvTranslation: 'RMV Certified Translation',
     rmvDesc: 'Massachusetts Motor Vehicle - requires physical copy',
     perPage: '/page',
@@ -378,7 +378,7 @@ const CUSTOMER_TRANSLATIONS = {
     standardTranslation: 'Traducción Estándar',
     standardDesc: 'Uso general, sin certificación',
     swornTranslation: 'Traducción Jurada',
-    swornDesc: 'Para uso fuera de EE.UU. - traductor jurado oficial',
+    swornDesc: 'Para uso fuera de EE.UU. - traductor jurado oficial (5 días hábiles)',
     rmvTranslation: 'Traducción Certificada RMV',
     rmvDesc: 'Vehículos Motorizados de Massachusetts - requiere copia física',
     perPage: '/página',
@@ -589,7 +589,7 @@ const CUSTOMER_TRANSLATIONS = {
     standardTranslation: 'Tradução Padrão',
     standardDesc: 'Uso geral, sem certificação',
     swornTranslation: 'Tradução Juramentada',
-    swornDesc: 'Para uso fora dos EUA - tradutor juramentado oficial',
+    swornDesc: 'Para uso fora dos EUA - tradutor juramentado oficial (5 dias úteis)',
     rmvTranslation: 'Tradução Certificada RMV',
     rmvDesc: 'Departamento de Veículos de Massachusetts - requer cópia física',
     perPage: '/página',
@@ -2352,7 +2352,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
                 </div>
               )}
               {quote?.certification_fee > 0 && (
-                <div className="flex justify-between text-purple-600">
+                <div className="flex justify-between text-slate-600">
                   <span>{t.certification}</span>
                   <span>{formatLocalPrice(quote.certification_fee)}</span>
                 </div>
@@ -2390,15 +2390,15 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
 
             {/* Zelle Payment Option */}
             <div className="border-t pt-4 mt-4">
-              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-3">
-                  <svg className="w-5 h-5 text-purple-600" fill="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 text-slate-600" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
                   </svg>
-                  <span className="font-semibold text-purple-800">{t.payWithZelle}</span>
-                  <span className="text-xs text-purple-600 font-medium">{t.zelleUsaOnly}</span>
+                  <span className="font-semibold text-slate-700">{t.payWithZelle}</span>
+                  <span className="text-xs text-slate-500 font-medium">{t.zelleUsaOnly}</span>
                 </div>
-                <div className="text-sm text-purple-700 space-y-1 mb-3">
+                <div className="text-sm text-slate-600 space-y-1 mb-3">
                   <p>{t.zelleSendTo}: <strong>contact@legacytranslations.com</strong></p>
                   <p className="text-xs">{t.zelleIncludeEmail}</p>
                 </div>
@@ -2406,7 +2406,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
                   type="button"
                   onClick={() => setShowZelleModal(true)}
                   disabled={uploadedFiles.length === 0 || !guestName || !guestEmail}
-                  className="w-full py-2 bg-purple-600 text-white rounded-md text-sm font-medium hover:bg-purple-700 transition-colors disabled:bg-gray-400"
+                  className="w-full py-2 bg-slate-600 text-white rounded-md text-sm font-medium hover:bg-slate-700 transition-colors disabled:bg-gray-400"
                 >
                   {t.payWithZelleBtn}
                 </button>
@@ -2425,7 +2425,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold text-purple-800">{t.payWithZelle}</h3>
+              <h3 className="text-lg font-bold text-slate-700">{t.payWithZelle}</h3>
               <button
                 onClick={() => {
                   setShowZelleModal(false);
@@ -2457,12 +2457,12 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
                     setZelleDiscountError('');
                   }}
                   placeholder={t.enterCouponCode}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500 uppercase"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:border-slate-500 focus:ring-1 focus:ring-slate-500 uppercase"
                 />
                 <button
                   type="button"
                   onClick={validateZelleCoupon}
-                  className="px-4 py-2 bg-purple-600 text-white rounded-md text-sm font-medium hover:bg-purple-700 transition-colors"
+                  className="px-4 py-2 bg-slate-600 text-white rounded-md text-sm font-medium hover:bg-slate-700 transition-colors"
                 >
                   {t.apply}
                 </button>
@@ -2478,9 +2478,9 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
             </div>
 
             {/* Price Summary */}
-            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 mb-4">
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between text-purple-700">
+                <div className="flex justify-between text-slate-600">
                   <span>Subtotal:</span>
                   <span>{formatLocalPrice(quote?.total_price || 0)}</span>
                 </div>
@@ -2490,7 +2490,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
                     <span>-{formatLocalPrice(quote?.total_price - getZelleTotal())}</span>
                   </div>
                 )}
-                <div className="flex justify-between font-bold text-purple-800 text-base border-t border-purple-200 pt-2">
+                <div className="flex justify-between font-bold text-slate-700 text-base border-t border-slate-200 pt-2">
                   <span>{t.zelleAmountToPay}:</span>
                   <span>{formatLocalPrice(getZelleTotal())}</span>
                 </div>
@@ -2521,7 +2521,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
               <button
                 type="button"
                 onClick={() => zelleReceiptInputRef.current?.click()}
-                className="w-full p-3 border-2 border-dashed border-purple-300 rounded-lg text-purple-600 hover:border-purple-400 hover:bg-purple-50 transition-colors"
+                className="w-full p-3 border-2 border-dashed border-slate-300 rounded-lg text-slate-600 hover:border-slate-400 hover:bg-slate-50 transition-colors"
               >
                 {zelleReceipt ? (
                   <span className="flex items-center justify-center gap-2">
@@ -2545,7 +2545,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
             <button
               onClick={handleZellePayment}
               disabled={submitting || !zelleReceipt}
-              className="w-full py-3 bg-purple-600 text-white rounded-md font-semibold hover:bg-purple-700 disabled:bg-gray-400 transition-colors"
+              className="w-full py-3 bg-slate-600 text-white rounded-md font-semibold hover:bg-slate-700 disabled:bg-gray-400 transition-colors"
             >
               {submitting ? t.processingBtn : t.submitZelleOrder}
             </button>
