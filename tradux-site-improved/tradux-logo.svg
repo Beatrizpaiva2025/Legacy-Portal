@@ -1,0 +1,36 @@
+<svg width="400" height="100" viewBox="0 0 400 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- TRADU text in navy blue -->
+  <text x="0" y="72" font-family="'Segoe UI', Arial, sans-serif" font-size="62" font-weight="800" fill="#1E3A5F" letter-spacing="-2">TRADU</text>
+
+  <!-- X with network/AI connection design -->
+  <g transform="translate(255, 5)">
+    <!-- X shape in orange -->
+    <path d="M10 5 L45 45 L45 50 L50 50 L85 90 L75 90 L50 60 L50 55 L45 55 L20 90 L10 90 L40 50 L40 45 L5 5 L10 5 Z" fill="#F97316"/>
+    <path d="M85 5 L90 5 L55 45 L55 50 L90 90 L80 90 L50 55 L50 50 L45 50 L45 45 L80 5 L85 5 Z" fill="#F97316"/>
+
+    <!-- Center circle -->
+    <circle cx="47" cy="47" r="10" fill="#F97316"/>
+    <circle cx="47" cy="47" r="6" fill="white"/>
+
+    <!-- Connection nodes -->
+    <!-- Top left -->
+    <circle cx="18" cy="15" r="6" fill="#F97316"/>
+    <circle cx="18" cy="15" r="3" fill="white"/>
+    <line x1="22" y1="19" x2="41" y2="41" stroke="white" stroke-width="3" stroke-linecap="round"/>
+
+    <!-- Top right -->
+    <circle cx="76" cy="15" r="6" fill="#F97316"/>
+    <circle cx="76" cy="15" r="3" fill="white"/>
+    <line x1="72" y1="19" x2="53" y2="41" stroke="white" stroke-width="3" stroke-linecap="round"/>
+
+    <!-- Bottom left -->
+    <circle cx="18" cy="79" r="6" fill="#F97316"/>
+    <circle cx="18" cy="79" r="3" fill="white"/>
+    <line x1="22" y1="75" x2="41" y2="53" stroke="white" stroke-width="3" stroke-linecap="round"/>
+
+    <!-- Bottom right -->
+    <circle cx="76" cy="79" r="6" fill="#F97316"/>
+    <circle cx="76" cy="79" r="3" fill="white"/>
+    <line x1="72" y1="75" x2="53" y2="53" stroke="white" stroke-width="3" stroke-linecap="round"/>
+  </g>
+</svg>
