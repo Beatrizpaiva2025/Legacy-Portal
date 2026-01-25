@@ -19118,6 +19118,36 @@ async def process_quote_followups(admin_key: str):
                     discount_code = None
                     if discount_percent > 0:
                         discount_code = f"FOLLOWUP{discount_percent}-{quote['id'][:6].upper()}"
+
+                        # Create Stripe coupon and promotion code for checkout
+                        try:
+                            # Create a Stripe coupon
+                            stripe_coupon = stripe.Coupon.create(
+                                percent_off=discount_percent,
+                                duration="once",
+                                max_redemptions=1,
+                                redeem_by=int((now + timedelta(days=7)).timestamp()),
+                                metadata={
+                                    "source": "followup_reminder",
+                                    "quote_id": quote["id"]
+                                }
+                            )
+
+                            # Create a promotion code linked to the coupon
+                            stripe.PromotionCode.create(
+                                coupon=stripe_coupon.id,
+                                code=discount_code,
+                                max_redemptions=1,
+                                expires_at=int((now + timedelta(days=7)).timestamp()),
+                                metadata={
+                                    "source": "followup_reminder",
+                                    "quote_id": quote["id"]
+                                }
+                            )
+                            logger.info(f"Created Stripe promotion code: {discount_code}")
+                        except Exception as stripe_error:
+                            logger.error(f"Failed to create Stripe promotion code: {stripe_error}")
+
                         await db.discount_codes.insert_one({
                             "id": str(uuid.uuid4()),
                             "code": discount_code,
@@ -19201,6 +19231,36 @@ async def process_quote_followups(admin_key: str):
                     discount_code = None
                     if discount_percent > 0:
                         discount_code = f"QUOTE{discount_percent}-{order['order_number']}"
+
+                        # Create Stripe coupon and promotion code for checkout
+                        try:
+                            # Create a Stripe coupon
+                            stripe_coupon = stripe.Coupon.create(
+                                percent_off=discount_percent,
+                                duration="once",
+                                max_redemptions=1,
+                                redeem_by=int((now + timedelta(days=7)).timestamp()),
+                                metadata={
+                                    "source": "quote_order_followup",
+                                    "order_id": order["id"]
+                                }
+                            )
+
+                            # Create a promotion code linked to the coupon
+                            stripe.PromotionCode.create(
+                                coupon=stripe_coupon.id,
+                                code=discount_code,
+                                max_redemptions=1,
+                                expires_at=int((now + timedelta(days=7)).timestamp()),
+                                metadata={
+                                    "source": "quote_order_followup",
+                                    "order_id": order["id"]
+                                }
+                            )
+                            logger.info(f"Created Stripe promotion code for quote order: {discount_code}")
+                        except Exception as stripe_error:
+                            logger.error(f"Failed to create Stripe promotion code for quote order: {stripe_error}")
+
                         await db.discount_codes.insert_one({
                             "id": str(uuid.uuid4()),
                             "code": discount_code,
@@ -19276,33 +19336,34 @@ async def send_followup_email(email: str, name: str, quote: dict, reminder_numbe
 
     content = f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #fff;">
-        <div style="background: linear-gradient(135deg, #0d9488 0%, #0891b2 100%); padding: 20px; border-radius: 10px 10px 0 0;">
+        <div style="background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); padding: 20px; border-radius: 10px 10px 0 0;">
             <img src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png" alt="Legacy Translations" style="max-width: 150px;">
         </div>
+        <div style="background: linear-gradient(90deg, #c9a227 0%, #e6c547 50%, #c9a227 100%); height: 4px;"></div>
 
         <div style="padding: 30px;">
-            <h2 style="color: #0d9488; margin-top: 0;">Hello {name}!</h2>
+            <h2 style="color: #1a2a4a; margin-top: 0;">Hello {name}!</h2>
             <p>{intro}</p>
 
-            <div style="background: #f0fdfa; padding: 20px; border-radius: 10px; margin: 20px 0;">
+            <div style="background: #f0f7ff; padding: 20px; border-radius: 10px; margin: 20px 0; border-left: 4px solid #c9a227;">
                 <p><strong>Service:</strong> {quote.get('service_type', 'Translation').replace('_', ' ').title()}</p>
                 <p><strong>Languages:</strong> {quote.get('translate_from', 'Source')} → {quote.get('translate_to', 'Target')}</p>
-                <p style="font-size: 20px; color: #0d9488; font-weight: bold; margin: 10px 0 0 0;">Total: ${total_price:.2f}</p>
+                <p style="font-size: 20px; color: #1a2a4a; font-weight: bold; margin: 10px 0 0 0;">Total: ${total_price:.2f}</p>
             </div>
 
             {discount_section}
 
             <div style="text-align: center; margin: 30px 0;">
-                <a href="{frontend_url}" style="display: inline-block; padding: 15px 40px; background: #0d9488; color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">{cta_text}</a>
+                <a href="{frontend_url}" style="display: inline-block; padding: 15px 40px; background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">{cta_text}</a>
             </div>
 
-            <p style="color: #666; font-size: 14px;">If you have any questions, feel free to reply to this email or call us at +1(857)316-7770.</p>
+            <p style="color: #666; font-size: 14px;">If you have any questions, feel free to reply to this email or send a WhatsApp message at +1(857)316-7770.</p>
 
             <p>Best regards,<br>Legacy Translations Team</p>
         </div>
 
-        <div style="background: #f3f4f6; padding: 20px; text-align: center; border-radius: 0 0 10px 10px;">
-            <p style="margin: 0; color: #666; font-size: 12px;">Legacy Translations | www.legacytranslations.com</p>
+        <div style="background: #1a2a4a; padding: 20px; text-align: center; border-radius: 0 0 10px 10px;">
+            <p style="margin: 0; color: #a0aec0; font-size: 12px;">Legacy Translations | <a href="https://www.legacytranslations.com" style="color: #c9a227; text-decoration: none;">www.legacytranslations.com</a></p>
         </div>
     </div>
     """
@@ -19343,47 +19404,48 @@ async def send_quote_order_followup_email(email: str, name: str, order: dict, re
 
     content = f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #fff;">
-        <div style="background: linear-gradient(135deg, #0d9488 0%, #0891b2 100%); padding: 20px; border-radius: 10px 10px 0 0;">
+        <div style="background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); padding: 20px; border-radius: 10px 10px 0 0;">
             <img src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png" alt="Legacy Translations" style="max-width: 150px;">
         </div>
+        <div style="background: linear-gradient(90deg, #c9a227 0%, #e6c547 50%, #c9a227 100%); height: 4px;"></div>
 
         <div style="padding: 30px;">
-            <h2 style="color: #0d9488; margin-top: 0;">Hello {name}!</h2>
+            <h2 style="color: #1a2a4a; margin-top: 0;">Hello {name}!</h2>
             <p>{intro}</p>
 
-            <div style="background: #f0fdfa; padding: 20px; border-radius: 10px; margin: 20px 0;">
+            <div style="background: #f0f7ff; padding: 20px; border-radius: 10px; margin: 20px 0; border-left: 4px solid #c9a227;">
                 <p><strong>Quote #:</strong> {order_number}</p>
                 <p><strong>Service:</strong> {order.get('service_type', 'Translation').replace('_', ' ').title()}</p>
                 <p><strong>Languages:</strong> {order.get('translate_from', 'Source')} → {order.get('translate_to', 'Target')}</p>
                 <p><strong>Pages:</strong> {order.get('page_count', 1)}</p>
-                <p style="font-size: 20px; color: #0d9488; font-weight: bold; margin: 10px 0 0 0;">Total: ${total_price:.2f}</p>
+                <p style="font-size: 20px; color: #1a2a4a; font-weight: bold; margin: 10px 0 0 0;">Total: ${total_price:.2f}</p>
             </div>
 
             {discount_section}
 
             <div style="text-align: center; margin: 30px 0;">
-                <a href="{frontend_url}" style="display: inline-block; padding: 15px 40px; background: #0d9488; color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">{cta_text}</a>
+                <a href="{frontend_url}" style="display: inline-block; padding: 15px 40px; background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">{cta_text}</a>
             </div>
 
-            <h3 style="color: #0d9488;">Payment Options</h3>
+            <h3 style="color: #1a2a4a;">Payment Options</h3>
             <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-                <div style="flex: 1; min-width: 150px; background: #f0fdf4; padding: 15px; border-radius: 8px;">
+                <div style="flex: 1; min-width: 150px; background: #f0f7ff; padding: 15px; border-radius: 8px; border-left: 4px solid #c9a227;">
                     <p style="margin: 0;"><strong>Zelle</strong></p>
                     <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">857-208-1139</p>
                 </div>
-                <div style="flex: 1; min-width: 150px; background: #eff6ff; padding: 15px; border-radius: 8px;">
+                <div style="flex: 1; min-width: 150px; background: #f0f7ff; padding: 15px; border-radius: 8px; border-left: 4px solid #c9a227;">
                     <p style="margin: 0;"><strong>Venmo</strong></p>
                     <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">@legacytranslations</p>
                 </div>
             </div>
 
-            <p style="margin-top: 20px; color: #666; font-size: 14px;">Questions? Reply to this email or call +1(857)316-7770.</p>
+            <p style="margin-top: 20px; color: #666; font-size: 14px;">Questions? Reply to this email or send a WhatsApp message at +1(857)316-7770.</p>
 
             <p>Best regards,<br>Legacy Translations Team</p>
         </div>
 
-        <div style="background: #f3f4f6; padding: 20px; text-align: center; border-radius: 0 0 10px 10px;">
-            <p style="margin: 0; color: #666; font-size: 12px;">Legacy Translations | www.legacytranslations.com</p>
+        <div style="background: #1a2a4a; padding: 20px; text-align: center; border-radius: 0 0 10px 10px;">
+            <p style="margin: 0; color: #a0aec0; font-size: 12px;">Legacy Translations | <a href="https://www.legacytranslations.com" style="color: #c9a227; text-decoration: none;">www.legacytranslations.com</a></p>
         </div>
     </div>
     """
