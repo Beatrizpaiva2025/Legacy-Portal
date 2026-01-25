@@ -2063,11 +2063,11 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
 
             {/* Client Information */}
             <div className="border-b pb-4" ref={clientNameRef}>
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">{t('clientInformation')}</h2>
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">{t.clientInformation}</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t('clientName')} *
+                    {t.clientName} *
                   </label>
                   <input
                     type="text"
@@ -2083,12 +2083,12 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                     placeholder="John Smith"
                   />
                   {fieldErrors.client_name && (
-                    <p className="text-red-500 text-sm mt-1">{t('clientName')} is required</p>
+                    <p className="text-red-500 text-sm mt-1">{t.clientName} is required</p>
                   )}
                 </div>
                 <div ref={clientEmailRef}>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t('clientEmail')} *
+                    {t.clientEmail} *
                   </label>
                   <input
                     type="email"
@@ -2104,7 +2104,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                     placeholder="client@email.com"
                   />
                   {fieldErrors.client_email && (
-                    <p className="text-red-500 text-sm mt-1">{t('clientEmailRequired')}</p>
+                    <p className="text-red-500 text-sm mt-1">{t.clientEmailRequired}</p>
                   )}
                 </div>
               </div>
@@ -2112,7 +2112,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
 
             {/* Service Type */}
             <div>
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">{t('serviceType')}</h2>
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">{t.serviceType}</h2>
               <div className="space-y-3">
                 {/* Certified Translation */}
                 <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
@@ -2128,12 +2128,12 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                   />
                   <div className="flex-1">
                     <div className="font-medium flex items-center gap-1">
-                      {t('certifiedTranslation')}
-                      <span className="text-gray-400 cursor-help" title={t('certifiedTooltip')}>&#9432;</span>
+                      {t.certifiedTranslation}
+                      <span className="text-gray-400 cursor-help" title={t.certifiedTooltip}>&#9432;</span>
                     </div>
-                    <div className="text-sm text-gray-500">{t('certifiedDesc')}</div>
+                    <div className="text-sm text-gray-500">{t.certifiedDesc}</div>
                   </div>
-                  <div className="font-semibold text-teal-600">{formatPrice(24.99)}/{t('page')}</div>
+                  <div className="font-semibold text-teal-600">{formatPrice(24.99)}/{t.page}</div>
                 </label>
 
                 {/* Standard Translation */}
@@ -2150,12 +2150,12 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                   />
                   <div className="flex-1">
                     <div className="font-medium flex items-center gap-1">
-                      {t('standardTranslation')}
-                      <span className="text-gray-400 cursor-help" title={t('standardTooltip')}>&#9432;</span>
+                      {t.standardTranslation}
+                      <span className="text-gray-400 cursor-help" title={t.standardTooltip}>&#9432;</span>
                     </div>
-                    <div className="text-sm text-gray-500">{t('standardDesc')}</div>
+                    <div className="text-sm text-gray-500">{t.standardDesc}</div>
                   </div>
-                  <div className="font-semibold text-teal-600">{formatPrice(19.99)}/{t('page')}</div>
+                  <div className="font-semibold text-teal-600">{formatPrice(19.99)}/{t.page}</div>
                 </label>
 
                 {/* Sworn Translation */}
@@ -2172,12 +2172,12 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                   />
                   <div className="flex-1">
                     <div className="font-medium flex items-center gap-1">
-                      {t('swornTranslation')}
-                      <span className="text-gray-400 cursor-help" title={t('swornTooltip')}>&#9432;</span>
+                      {t.swornTranslation}
+                      <span className="text-gray-400 cursor-help" title={t.swornTooltip}>&#9432;</span>
                     </div>
-                    <div className="text-sm text-gray-500">{t('swornDesc')}</div>
+                    <div className="text-sm text-gray-500">{t.swornDesc}</div>
                   </div>
-                  <div className="font-semibold text-teal-600">{formatPrice(55.00)}/{t('page')}</div>
+                  <div className="font-semibold text-teal-600">{formatPrice(55.00)}/{t.page}</div>
                 </label>
 
                 {/* RMV Certified Translation */}
@@ -2194,28 +2194,28 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                   />
                   <div className="flex-1">
                     <div className="font-medium flex items-center gap-1">
-                      {t('rmvCertifiedTranslation')}
-                      <span className="text-gray-400 cursor-help" title={t('rmvTooltip')}>&#9432;</span>
+                      {t.rmvCertifiedTranslation}
+                      <span className="text-gray-400 cursor-help" title={t.rmvTooltip}>&#9432;</span>
                     </div>
-                    <div className="text-sm text-gray-500">{t('rmvDesc')}</div>
+                    <div className="text-sm text-gray-500">{t.rmvDesc}</div>
                   </div>
-                  <div className="font-semibold text-teal-600">{formatPrice(24.99)}/{t('page')}</div>
+                  <div className="font-semibold text-teal-600">{formatPrice(24.99)}/{t.page}</div>
                 </label>
               </div>
 
               {/* Service Type Descriptions */}
               <div className="mt-4 p-4 bg-gray-50 rounded-lg text-xs text-gray-600 space-y-2">
-                <p><strong>{t('certifiedTranslation')}:</strong> {t('certifiedDescFull')}</p>
-                <p><strong>{t('standardTranslation')}:</strong> {t('standardDescFull')}</p>
-                <p><strong>{t('swornTranslation')}:</strong> {t('swornDescFull')}</p>
-                <p><strong>{t('rmvCertifiedTranslation')}:</strong> {t('rmvDescFull')}</p>
+                <p><strong>{t.certifiedTranslation}:</strong> {t.certifiedDescFull}</p>
+                <p><strong>{t.standardTranslation}:</strong> {t.standardDescFull}</p>
+                <p><strong>{t.swornTranslation}:</strong> {t.swornDescFull}</p>
+                <p><strong>{t.rmvCertifiedTranslation}:</strong> {t.rmvDescFull}</p>
               </div>
             </div>
 
             {/* Languages */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('translateFrom')}</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t.translateFrom}</label>
                 <select
                   className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
                   value={formData.translate_from}
@@ -2229,7 +2229,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('translateTo')}</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t.translateTo}</label>
                 {formData.service_type === 'sworn' ? (
                   <div>
                     <select
@@ -2239,7 +2239,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                     >
                       <option value="pt-br">🇧🇷 Portuguese (Brasil)</option>
                     </select>
-                    <p className="text-xs text-gray-500 mt-1">{t('swornLanguageNote')}</p>
+                    <p className="text-xs text-gray-500 mt-1">{t.swornLanguageNote}</p>
                   </div>
                 ) : (
                   <select
@@ -2259,7 +2259,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
 
             {/* Document Upload */}
             <div ref={fileUploadRef}>
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">{t('uploadDocument')}</h2>
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">{t.uploadDocument}</h2>
               <div
                 {...getRootProps()}
                 className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
@@ -2272,18 +2272,18 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
               >
                 <input {...getInputProps()} />
                 <div className="text-3xl mb-2">📁</div>
-                <div className="font-medium text-teal-600">{t('uploadFiles')}</div>
-                <div className="text-sm text-gray-500">{t('fileTypes')}</div>
+                <div className="font-medium text-teal-600">{t.uploadFiles}</div>
+                <div className="text-sm text-gray-500">{t.fileTypes}</div>
               </div>
               {fieldErrors.file_upload && (
-                <p className="text-red-500 text-sm mt-2">{t('pleaseUploadDocument')}</p>
+                <p className="text-red-500 text-sm mt-2">{t.pleaseUploadDocument}</p>
               )}
 
               {isProcessing && (
                 <div className="mt-4 p-4 bg-blue-50 rounded-md text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                  <div className="text-blue-800 font-medium">{processingStatus || t('processing')}</div>
-                  <div className="text-xs text-blue-600 mt-1">{t('processingNote')}</div>
+                  <div className="text-blue-800 font-medium">{processingStatus || t.processing}</div>
+                  <div className="text-xs text-blue-600 mt-1">{t.processingNote}</div>
                 </div>
               )}
 
@@ -2303,7 +2303,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                           </div>
                           {item.ocrFailed && (
                             <div className="text-yellow-600 text-xs ml-6 mt-1">
-                              {t('couldNotExtractText')}
+                              {t.couldNotExtractText}
                             </div>
                           )}
                         </div>
@@ -2334,25 +2334,25 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
 
               {/* Having trouble link */}
               <div className="mt-3 text-center text-sm text-gray-500">
-                {t('havingTroubleUploading')}{' '}
+                {t.havingTroubleUploading}{' '}
                 <button
                   type="button"
                   onClick={() => setShowContactModal(true)}
                   className="text-teal-600 hover:text-teal-700 underline"
                 >
-                  {t('contactViaEmail')}
+                  {t.contactViaEmail}
                 </button>
               </div>
             </div>
 
             {/* Urgency */}
             <div>
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">{t('urgency')}</h2>
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">{t.urgency}</h2>
               <div className="space-y-2">
                 {[
-                  { id: 'no', label: t('partnerStandard'), fee: '' },
-                  { id: 'priority', label: t('partnerPriority'), fee: '+25%' },
-                  { id: 'urgent', label: t('partnerUrgent'), fee: '+100%' }
+                  { id: 'no', label: t.partnerStandard, fee: '' },
+                  { id: 'priority', label: t.partnerPriority, fee: '+25%' },
+                  { id: 'urgent', label: t.partnerUrgent, fee: '+100%' }
                 ].map((option) => (
                   <label key={option.id} className="flex items-center p-3 border rounded-md cursor-pointer hover:bg-gray-50">
                     <input
@@ -2373,7 +2373,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
             {/* Physical Copy / Shipping - USA Only */}
             {currency.isUSA && (
               <div>
-                <h2 className="text-lg font-semibold text-gray-800 mb-4">{t('physicalCopy')}</h2>
+                <h2 className="text-lg font-semibold text-gray-800 mb-4">{t.physicalCopy}</h2>
                 <div className="space-y-3">
                   <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
                     <input
@@ -2384,8 +2384,8 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                       className="mr-3 h-4 w-4 text-teal-600"
                     />
                     <div className="flex-1">
-                      <div className="font-medium">{t('physicalCopyRequired')}</div>
-                      <div className="text-sm text-gray-500">{t('physicalCopyDesc')}</div>
+                      <div className="font-medium">{t.physicalCopyRequired}</div>
+                      <div className="text-sm text-gray-500">{t.physicalCopyDesc}</div>
                     </div>
                     <div className="font-semibold text-teal-600">{formatPrice(18.99)}</div>
                   </label>
@@ -2393,7 +2393,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                   {formData.service_type === 'rmv' && (
                     <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
                       <p className="text-sm text-amber-800">
-                        <strong>Note:</strong> {t('rmvNote')}
+                        <strong>Note:</strong> {t.rmvNote}
                       </p>
                     </div>
                   )}
@@ -2462,30 +2462,30 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
             {/* Reference & Notes */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('reference')}</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t.reference}</label>
                 <input
                   type="text"
                   className="w-full px-4 py-2 border border-gray-300 rounded-md"
                   value={formData.reference}
                   onChange={(e) => setFormData({...formData, reference: e.target.value})}
-                  placeholder={t('referencePlaceholder')}
+                  placeholder={t.referencePlaceholder}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('notes')}</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t.notes}</label>
                 <input
                   type="text"
                   className="w-full px-4 py-2 border border-gray-300 rounded-md"
                   value={formData.notes}
                   onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                  placeholder={t('notesPlaceholder')}
+                  placeholder={t.notesPlaceholder}
                 />
               </div>
             </div>
 
             {/* Payment Method Selection */}
             <div className="space-y-4">
-              <label className="block text-sm font-medium text-gray-700">{t('paymentMethod')}</label>
+              <label className="block text-sm font-medium text-gray-700">{t.paymentMethod}</label>
               <div className="grid grid-cols-2 gap-4">
                 <label className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'invoice' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:border-gray-300'}`}>
                   <input
@@ -2497,8 +2497,8 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                     className="sr-only"
                   />
                   <div>
-                    <span className="font-medium">{t('payByInvoice')}</span>
-                    <p className="text-sm text-gray-500 mt-1">{t('invoiceSentToEmail')}</p>
+                    <span className="font-medium">{t.payByInvoice}</span>
+                    <p className="text-sm text-gray-500 mt-1">{t.invoiceSentToEmail}</p>
                   </div>
                 </label>
                 <label className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'zelle' ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-gray-300'}`}>
@@ -2511,8 +2511,8 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                     className="sr-only"
                   />
                   <div>
-                    <span className="font-medium">{t('payWithZelle')}</span>
-                    <p className="text-sm text-gray-500 mt-1">{t('sendToZelle')} {ZELLE_EMAIL}</p>
+                    <span className="font-medium">{t.payWithZelle}</span>
+                    <p className="text-sm text-gray-500 mt-1">{t.sendToZelle} {ZELLE_EMAIL}</p>
                   </div>
                 </label>
               </div>
@@ -2565,44 +2565,44 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
               disabled={submitting || wordCount === 0 || (paymentMethod === 'zelle' && !zelleReceipt)}
               className={`w-full py-3 text-white rounded-md font-semibold ${paymentMethod === 'zelle' ? 'bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400' : 'bg-teal-600 hover:bg-teal-700 disabled:bg-gray-400'}`}
             >
-              {submitting ? t('creatingOrder') : (paymentMethod === 'zelle' ? t('submitOrderZelle') : t('createOrder'))}
+              {submitting ? t.creatingOrder : (paymentMethod === 'zelle' ? t.submitOrderZelle : t.createOrder)}
             </button>
           </form>
         </div>
 
         {/* Quote Summary */}
         <div className="bg-white rounded-lg shadow-sm p-6 h-fit sticky top-8">
-          <h2 className="text-xl font-bold text-teal-600 mb-4">{t('quoteSummary')}</h2>
+          <h2 className="text-xl font-bold text-teal-600 mb-4">{t.quoteSummary}</h2>
 
           <div className="space-y-3 text-sm">
             <div className="flex justify-between">
-              <span className="text-gray-600">{t('service')}</span>
+              <span className="text-gray-600">{t.service}</span>
               <span className="font-medium">
-                {formData.service_type === 'certified' && t('certified')}
-                {formData.service_type === 'standard' && t('standardService')}
-                {formData.service_type === 'sworn' && t('sworn')}
-                {formData.service_type === 'rmv' && t('rmvCertified')}
+                {formData.service_type === 'certified' && t.certified}
+                {formData.service_type === 'standard' && t.standardService}
+                {formData.service_type === 'sworn' && t.sworn}
+                {formData.service_type === 'rmv' && t.rmvCertified}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600">{t('pages')}</span>
+              <span className="text-gray-600">{t.pages}</span>
               <span className="font-medium">{quote?.pages || 0}</span>
             </div>
 
             <div className="border-t pt-3 mt-3">
               <div className="flex justify-between">
-                <span className="text-gray-600">{t('basePrice')}</span>
+                <span className="text-gray-600">{t.basePrice}</span>
                 <span className="font-medium">{formatPrice(quote?.base_price || 0)}</span>
               </div>
               {quote?.urgency_fee > 0 && (
                 <div className="flex justify-between text-orange-600">
-                  <span>{t('urgencyFee')}</span>
+                  <span>{t.urgencyFee}</span>
                   <span>{formatPrice(quote.urgency_fee)}</span>
                 </div>
               )}
               {quote?.shipping_fee > 0 && (
                 <div className="flex justify-between text-blue-600">
-                  <span>{t('shipping')}</span>
+                  <span>{t.shipping}</span>
                   <span>{formatPrice(quote.shipping_fee)}</span>
                 </div>
               )}
@@ -2618,14 +2618,14 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
 
             <div className="border-t pt-3 mt-3">
               <div className="flex justify-between text-lg">
-                <span className="font-bold">{t('total')}</span>
+                <span className="font-bold">{t.total}</span>
                 <span className="font-bold text-teal-600">
                   {formatPrice(Math.max(0, (quote?.total_price || 0) - (appliedCoupon?.discount_amount || 0)))}
                 </span>
               </div>
               {appliedCoupon && (
                 <div className="text-xs text-green-600 text-right mt-1">
-                  {t('youSaveAmount')} {formatPrice(appliedCoupon.discount_amount)}!
+                  {t.youSaveAmount} {formatPrice(appliedCoupon.discount_amount)}!
                 </div>
               )}
             </div>
@@ -2633,7 +2633,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
             {/* Coupon/Discount Section */}
             <div className="border-t pt-4 mt-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                {t('coupon')}
+                {t.coupon}
               </label>
               {appliedCoupon ? (
                 /* Coupon Applied - Show discount */
@@ -2654,7 +2654,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                   >
                     {availableCoupons.length > 0 ? (
                       <>
-                        <option value="">{t('selectCoupon')}</option>
+                        <option value="">{t.selectCoupon}</option>
                         {availableCoupons.map((coupon) => (
                           <option key={coupon.code} value={coupon.code}>
                             {coupon.code}
@@ -2662,7 +2662,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                         ))}
                       </>
                     ) : (
-                      <option value="">{t('selectCoupon')}</option>
+                      <option value="">{t.selectCoupon}</option>
                     )}
                   </select>
                   <button
@@ -2671,7 +2671,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                     disabled={couponLoading || !selectedCoupon || availableCoupons.length === 0}
                     className="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
                   >
-                    {couponLoading ? '...' : t('apply')}
+                    {couponLoading ? '...' : t.apply}
                   </button>
                 </div>
               )}
@@ -2681,7 +2681,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
             </div>
 
             <div className="text-xs text-gray-500 mt-4">
-              * {t('paymentViaInvoice')}
+              * {t.paymentViaInvoice}
             </div>
           </div>
         </div>
