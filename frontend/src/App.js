@@ -2501,7 +2501,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                     <p className="text-sm text-gray-500 mt-1">{t.invoiceSentToEmail}</p>
                   </div>
                 </label>
-                <label className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'zelle' ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                <label className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'zelle' ? 'border-slate-400 bg-slate-50' : 'border-gray-200 hover:border-gray-300'}`}>
                   <input
                     type="radio"
                     name="paymentMethod"
@@ -2519,9 +2519,9 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
 
               {/* Zelle Instructions & Receipt Upload */}
               {paymentMethod === 'zelle' && (
-                <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg space-y-4">
-                  <h4 className="font-semibold text-purple-800">Zelle Payment Instructions</h4>
-                  <div className="space-y-2 text-sm text-purple-700">
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-4">
+                  <h4 className="font-semibold text-slate-700">Zelle Payment Instructions</h4>
+                  <div className="space-y-2 text-sm text-slate-600">
                     <p className="font-semibold">1. Open your bank app and select Zelle</p>
                     <p className="font-semibold">2. Send payment to: {ZELLE_EMAIL}</p>
                     <p className="font-semibold">3. Include your company name in the memo</p>
@@ -2540,7 +2540,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                     <button
                       type="button"
                       onClick={() => zelleReceiptInputRef.current?.click()}
-                      className="w-full py-3 border-2 border-dashed border-purple-300 rounded-lg text-purple-600 hover:border-purple-400 hover:bg-purple-100 transition-colors"
+                      className="w-full py-3 border-2 border-dashed border-slate-300 rounded-lg text-slate-600 hover:border-slate-400 hover:bg-slate-100 transition-colors"
                     >
                       {zelleReceipt ? (
                         <span className="flex items-center justify-center gap-2">
@@ -2563,7 +2563,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
             <button
               type="submit"
               disabled={submitting || wordCount === 0 || (paymentMethod === 'zelle' && !zelleReceipt)}
-              className={`w-full py-3 text-white rounded-md font-semibold ${paymentMethod === 'zelle' ? 'bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400' : 'bg-teal-600 hover:bg-teal-700 disabled:bg-gray-400'}`}
+              className={`w-full py-3 text-white rounded-md font-semibold ${paymentMethod === 'zelle' ? 'bg-slate-600 hover:bg-slate-700 disabled:bg-gray-400' : 'bg-teal-600 hover:bg-teal-700 disabled:bg-gray-400'}`}
             >
               {submitting ? t.creatingOrder : (paymentMethod === 'zelle' ? t.submitOrderZelle : t.createOrder)}
             </button>
