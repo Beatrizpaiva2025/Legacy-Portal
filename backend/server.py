@@ -11478,8 +11478,8 @@ async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate,
 
                                 # Prepare order details for email - prefer translator_deadline (TD) over client deadline
                                 deadline_str = "To be confirmed"
-                                # First try translator_deadline (set by PM specifically for translator), then fall back to client deadline
-                                deadline = current_order.get("translator_deadline") or current_order.get("deadline")
+                                # Priority: 1) translator_deadline from this request, 2) existing translator_deadline in DB, 3) client deadline
+                                deadline = update_data.translator_deadline or current_order.get("translator_deadline") or current_order.get("deadline")
                                 if deadline:
                                     if isinstance(deadline, datetime):
                                         deadline_str = deadline.strftime("%B %d, %Y at %I:%M %p")
