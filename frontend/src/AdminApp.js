@@ -29258,8 +29258,8 @@ const SalesControlPage = ({ adminKey }) => {
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select salesperson...</option>
-                  {salespeople.filter(sp => sp.status === 'active').map(sp => (
-                    <option key={sp.id} value={sp.id}>{sp.name}</option>
+                  {salespeople.filter(sp => sp.status === 'active' || sp.status === 'pending').map(sp => (
+                    <option key={sp.id} value={sp.id}>{sp.name} {sp.status === 'pending' ? '(Pending Setup)' : ''}</option>
                   ))}
                 </select>
               </div>
@@ -29342,8 +29342,8 @@ const SalesControlPage = ({ adminKey }) => {
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select salesperson...</option>
-                  {salespeople.filter(sp => sp.status === 'active').map(sp => (
-                    <option key={sp.id} value={sp.id}>{sp.name}</option>
+                  {salespeople.filter(sp => sp.status === 'active' || sp.status === 'pending').map(sp => (
+                    <option key={sp.id} value={sp.id}>{sp.name} {sp.status === 'pending' ? '(Pending Setup)' : ''}</option>
                   ))}
                 </select>
               </div>
