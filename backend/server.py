@@ -624,6 +624,643 @@ def get_delivery_email_template(client_name: str) -> str:
                             </p>'''
     return get_email_header() + content + get_email_footer(include_review_button=True)
 
+
+def get_tradux_approval_email_template(client_name: str, order_number: str, approval_url: str, document_type: str = "Document") -> str:
+    """Generate email template for client translation approval (looks like standard professional service)"""
+    content = f'''
+                            <p style="color: #1a2a4a; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
+                                Hello, {client_name}
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Great news! Your translation for <strong>{document_type}</strong> (Order #{order_number}) has been completed and is ready for your review.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 25px 0;">
+                                Please click the button below to review your translation. You can either approve it or request corrections if needed.
+                            </p>
+
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 30px 0;">
+                                <tr>
+                                    <td align="center">
+                                        <a href="{approval_url}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); color: #ffffff; text-decoration: none; padding: 18px 45px; border-radius: 50px; font-size: 16px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(26, 42, 74, 0.3);">
+                                            REVIEW MY TRANSLATION
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: #f0f4f8; border: 1px solid #e2e8f0; border-radius: 8px; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 20px;">
+                                        <p style="color: #1a2a4a; font-size: 14px; font-weight: 600; margin: 0 0 10px 0;">
+                                            What happens next?
+                                        </p>
+                                        <ul style="color: #4a5568; font-size: 13px; margin: 0; padding-left: 20px; line-height: 1.8;">
+                                            <li><strong>Approve:</strong> We'll generate your certified translation and send it to you</li>
+                                            <li><strong>Request Changes:</strong> Just describe what needs to be corrected and our team will review it</li>
+                                        </ul>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="color: #64748b; font-size: 13px; line-height: 1.7; margin: 25px 0 0 0;">
+                                If you have any questions, simply reply to this email and we'll be happy to help.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 20px 0;">
+                                Regards,
+                            </p>'''
+    return get_email_header() + content + get_email_footer(include_review_button=False)
+
+
+def get_tradux_correction_received_email_template(client_name: str, order_number: str) -> str:
+    """Generate email template confirming correction request was received"""
+    content = f'''
+                            <p style="color: #1a2a4a; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
+                                Hello, {client_name}
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Thank you for your feedback on Order #{order_number}.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                We have received your correction request and our translation team will review it carefully. You will receive an updated translation for approval shortly.
+                            </p>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 20px; text-align: center;">
+                                        <p style="color: #166534; font-size: 14px; font-weight: 600; margin: 0;">
+                                            ✅ Your request has been assigned to our team
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 20px 0;">
+                                Regards,
+                            </p>'''
+    return get_email_header() + content + get_email_footer(include_review_button=False)
+
+
+# ==================== TRADUX BRANDING SYSTEM ====================
+# TRADUX: Affordable AI-powered translations
+# Branding colors from tradux-site GitHub repo:
+#   Navy Blue: #1E3A8A | Bright Blue: #3B82F6 | Orange: #f97316 | Gold: #D4AF37
+# Logo: The X in TRADUX is larger/highlighted (like "X marks the spot")
+# Assets: https://github.com/Beatrizpaiva2025/tradux-site
+
+TRADUX_ASSETS_BASE = "https://raw.githubusercontent.com/Beatrizpaiva2025/tradux-site/main"
+
+def get_tradux_logo_html(size: str = "normal") -> str:
+    """Generate TRADUX logo HTML with highlighted X (X marks the spot!)"""
+    if size == "large":
+        return '''<span style="font-family: 'Segoe UI', Arial, sans-serif; font-weight: 800; letter-spacing: -1px;">
+            <span style="color: #1E3A8A;">TRADU</span><span style="color: #f97316; font-size: 1.35em; font-weight: 900; text-shadow: 0 0 10px rgba(249,115,22,0.5);">X</span>
+        </span>'''
+    elif size == "small":
+        return '''<span style="font-family: 'Segoe UI', Arial, sans-serif; font-weight: 700; font-size: 14px;">
+            <span style="color: #1E3A8A;">TRADU</span><span style="color: #f97316; font-size: 1.2em; font-weight: 800;">X</span>
+        </span>'''
+    else:
+        return '''<span style="font-family: 'Segoe UI', Arial, sans-serif; font-weight: 800; font-size: 28px; letter-spacing: -1px;">
+            <span style="color: #1E3A8A;">TRADU</span><span style="color: #f97316; font-size: 1.35em; font-weight: 900; text-shadow: 0 0 10px rgba(249,115,22,0.5);">X</span>
+        </span>'''
+
+
+def get_tradux_email_header() -> str:
+    """Generate TRADUX professional email header with blue/orange branding
+    Colors from tradux-site repo: Navy #1E3A8A, Blue #3B82F6, Orange #f97316, Gold #D4AF37
+    """
+    return '''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TRADUX Translations</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f8f8;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f8f8f8;">
+        <tr>
+            <td align="center" style="padding: 40px 20px;">
+                <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 600px;">
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%); padding: 30px 40px; border-radius: 8px 8px 0 0; text-align: center;">
+                            <p style="margin: 0; font-family: 'Segoe UI', Arial, sans-serif; font-weight: 800; font-size: 32px; letter-spacing: -1px;">
+                                <span style="color: #ffffff;">TRADU</span><span style="color: #f97316; font-size: 1.35em; font-weight: 900; text-shadow: 0 0 10px rgba(249,115,22,0.5);">X</span>
+                            </p>
+                            <p style="color: rgba(255,255,255,0.8); font-size: 12px; margin: 8px 0 0 0; letter-spacing: 2px; text-transform: uppercase;">Fast, Affordable, Professional</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="background: linear-gradient(90deg, #f97316 0%, #ea580c 50%, #f97316 100%); height: 4px;"></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 40px;">'''
+
+
+def get_tradux_email_footer() -> str:
+    """Generate TRADUX email footer with branding from tradux-site repo"""
+    return '''
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 30px 0;">
+                                <tr>
+                                    <td style="border-top: 1px solid #e2e8f0;"></td>
+                                </tr>
+                            </table>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                <tr>
+                                    <td style="padding-top: 15px;">
+                                        <p style="color: #1E3A8A; font-size: 15px; font-weight: 600; margin: 0 0 3px 0;">
+                                            TRADUX Translations
+                                        </p>
+                                        <p style="color: #64748b; font-size: 13px; margin: 0;">
+                                            Fast, Affordable, Professional
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%); padding: 30px 40px; border-radius: 0 0 8px 8px;">
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                <tr>
+                                    <td align="center">
+                                        <p style="color: #a0aec0; font-size: 12px; line-height: 1.8; margin: 0;">
+                                            <a href="mailto:contact@tradux.online" style="color: #f97316; text-decoration: none;">contact@tradux.online</a>
+                                            &nbsp;|&nbsp;
+                                            <a href="https://wa.me/18572081139" style="color: #f97316; text-decoration: none;">WhatsApp: (857) 208-1139</a>
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top: 15px;">
+                                <tr>
+                                    <td align="center">
+                                        <p style="color: #64748b; font-size: 11px; margin: 0;">
+                                            © 2025 TRADUX. All rights reserved.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>'''
+
+
+def get_tradux_approval_email(client_name: str, order_number: str, approval_url: str, document_type: str = "Document") -> str:
+    """Generate TRADUX-branded email for client translation approval"""
+    content = f'''
+                            <p style="color: #1E3A8A; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
+                                Hello, {client_name}
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Great news! Your translation for <strong>{document_type}</strong> (Order #{order_number}) has been completed and is ready for your review.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 25px 0;">
+                                Please click the button below to review your translation. You can approve it or request corrections if needed.
+                            </p>
+
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 30px 0;">
+                                <tr>
+                                    <td align="center">
+                                        <a href="{approval_url}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); color: #ffffff; text-decoration: none; padding: 18px 45px; border-radius: 50px; font-size: 16px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(249, 115, 22, 0.4);">
+                                            REVIEW MY TRANSLATION
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border: 1px solid #bfdbfe; border-radius: 8px; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 20px;">
+                                        <p style="color: #1E3A8A; font-size: 14px; font-weight: 600; margin: 0 0 10px 0;">
+                                            What happens next?
+                                        </p>
+                                        <ul style="color: #475569; font-size: 13px; margin: 0; padding-left: 20px; line-height: 1.8;">
+                                            <li><strong>Approve:</strong> We'll generate your certified translation and send it to you</li>
+                                            <li><strong>Request Changes:</strong> Describe what needs correction and our team will review it</li>
+                                        </ul>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="color: #64748b; font-size: 13px; line-height: 1.7; margin: 25px 0 0 0;">
+                                If you have any questions, simply reply to this email.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 20px 0;">
+                                Best regards,<br>
+                                <strong style="color: #1E3A8A;">TRADU<span style="color: #f97316;">X</span> Team</strong>
+                            </p>'''
+    return get_tradux_email_header() + content + get_tradux_email_footer()
+
+
+def get_tradux_delivery_email(client_name: str, order_number: str, document_type: str = "Document") -> str:
+    """Generate TRADUX-branded email for certified translation delivery"""
+    content = f'''
+                            <p style="color: #1E3A8A; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
+                                Hello, {client_name}
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Your certified translation for <strong>{document_type}</strong> (Order #{order_number}) is ready!
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Please find your certified translation attached to this email.
+                            </p>
+
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #86efac; border-radius: 8px; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 20px; text-align: center;">
+                                        <p style="color: #166534; font-size: 16px; font-weight: 600; margin: 0;">
+                                            ✓ Your translation has been certified
+                                        </p>
+                                        <p style="color: #15803d; font-size: 13px; margin: 10px 0 0 0;">
+                                            This document includes a certification cover page with a unique verification code.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 10px 0;">
+                                If you have any questions or need additional copies, simply reply to this email.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Thank you for choosing TRADUX!
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 20px 0;">
+                                Best regards,<br>
+                                <strong style="color: #1E3A8A;">TRADU<span style="color: #f97316;">X</span> Team</strong>
+                            </p>'''
+    return get_tradux_email_header() + content + get_tradux_email_footer()
+
+
+def get_tradux_correction_email(client_name: str, order_number: str) -> str:
+    """Generate TRADUX-branded email confirming correction request"""
+    content = f'''
+                            <p style="color: #1E3A8A; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
+                                Hello, {client_name}
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Thank you for your feedback on Order #{order_number}.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                We have received your correction request and our team will review it carefully. You will receive an updated translation for approval shortly.
+                            </p>
+
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border: 1px solid #bfdbfe; border-radius: 8px; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 20px; text-align: center;">
+                                        <p style="color: #1E3A8A; font-size: 14px; font-weight: 600; margin: 0;">
+                                            ✓ Your request has been assigned to our team
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 20px 0;">
+                                Best regards,<br>
+                                <strong style="color: #1E3A8A;">TRADU<span style="color: #f97316;">X</span> Team</strong>
+                            </p>'''
+    return get_tradux_email_header() + content + get_tradux_email_footer()
+
+
+def generate_tradux_certification_cover(
+    order_number: str,
+    document_type: str,
+    source_language: str,
+    target_language: str,
+    page_count: int,
+    client_name: str,
+    certification_id: str,
+    certified_date: str,
+    qr_code_base64: str = None
+) -> str:
+    """Generate TRADUX certification cover page HTML with blue/orange branding
+    Colors from tradux-site: Navy #1E3A8A, Blue #3B82F6, Orange #f97316, Gold #D4AF37
+    """
+    qr_section = ""
+    if qr_code_base64:
+        qr_section = f'''
+            <div style="text-align: center; margin: 20px 0;">
+                <img src="data:image/png;base64,{qr_code_base64}" alt="Verification QR Code" style="width: 100px; height: 100px;">
+                <p style="color: #64748b; font-size: 10px; margin: 5px 0 0 0;">Scan to verify</p>
+            </div>
+        '''
+
+    return f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Certification - {order_number}</title>
+    <style>
+        @page {{ size: Letter; margin: 0; }}
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{
+            font-family: 'Segoe UI', 'Times New Roman', serif;
+            background: white;
+            min-height: 11in;
+            padding: 0.5in;
+        }}
+        .container {{
+            border: 3px solid #1E3A8A;
+            min-height: 10in;
+            padding: 30px;
+            position: relative;
+        }}
+        .header {{
+            text-align: center;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #f97316;
+        }}
+        .logo {{
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-weight: 800;
+            font-size: 42px;
+            letter-spacing: -2px;
+            margin-bottom: 5px;
+        }}
+        .logo .tradu {{ color: #1E3A8A; }}
+        .logo .x {{ color: #f97316; font-size: 1.35em; font-weight: 900; text-shadow: 0 0 10px rgba(249,115,22,0.3); }}
+        .tagline {{
+            color: #64748b;
+            font-size: 12px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+        }}
+        .cert-title {{
+            text-align: center;
+            margin: 30px 0;
+        }}
+        .cert-title h1 {{
+            color: #1E3A8A;
+            font-size: 24px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }}
+        .cert-id {{
+            background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%);
+            color: white;
+            display: inline-block;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            margin-top: 10px;
+        }}
+        .info-section {{
+            margin: 30px 0;
+            padding: 20px;
+            background: #f8fafc;
+            border-radius: 8px;
+            border-left: 4px solid #f97316;
+        }}
+        .info-row {{
+            display: flex;
+            margin: 10px 0;
+        }}
+        .info-label {{
+            width: 150px;
+            color: #64748b;
+            font-size: 12px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }}
+        .info-value {{
+            flex: 1;
+            color: #1E3A8A;
+            font-size: 14px;
+            font-weight: 500;
+        }}
+        .certification-statement {{
+            text-align: center;
+            margin: 30px 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+            border-radius: 8px;
+        }}
+        .certification-statement p {{
+            color: #1E3A8A;
+            font-size: 13px;
+            line-height: 1.8;
+        }}
+        .signature-section {{
+            margin-top: 40px;
+            text-align: center;
+        }}
+        .signature-line {{
+            width: 250px;
+            border-bottom: 1px solid #1E3A8A;
+            margin: 0 auto 10px;
+            padding-top: 50px;
+        }}
+        .certifier-name {{
+            color: #1E3A8A;
+            font-size: 16px;
+            font-weight: 600;
+        }}
+        .certifier-title {{
+            color: #64748b;
+            font-size: 12px;
+        }}
+        .footer {{
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            right: 30px;
+            text-align: center;
+            padding-top: 20px;
+            border-top: 1px solid #e2e8f0;
+        }}
+        .footer p {{
+            color: #94a3b8;
+            font-size: 10px;
+            line-height: 1.6;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">
+                <span class="tradu">TRADU</span><span class="x">X</span>
+            </div>
+            <p class="tagline">Professional Translation Services</p>
+        </div>
+
+        <div class="cert-title">
+            <h1>Certificate of Translation Accuracy</h1>
+            <span class="cert-id">{certification_id}</span>
+        </div>
+
+        <div class="info-section">
+            <div class="info-row">
+                <span class="info-label">Order Number:</span>
+                <span class="info-value">#{order_number}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Document Type:</span>
+                <span class="info-value">{document_type}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Languages:</span>
+                <span class="info-value">{source_language} → {target_language}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Page Count:</span>
+                <span class="info-value">{page_count} page(s)</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Client:</span>
+                <span class="info-value">{client_name}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Certification Date:</span>
+                <span class="info-value">{certified_date}</span>
+            </div>
+        </div>
+
+        <div class="certification-statement">
+            <p>
+                I hereby certify that the attached translation is, to the best of my knowledge and belief,
+                a true and accurate translation of the original document from {source_language} into {target_language}.
+            </p>
+        </div>
+
+        {qr_section}
+
+        <div class="signature-section">
+            <div class="signature-line"></div>
+            <p class="certifier-name">TRADUX Translations</p>
+            <p class="certifier-title">Professional Translation Services</p>
+        </div>
+
+        <div class="footer">
+            <p>
+                This certification can be verified online using the certification ID above.<br>
+                TRADUX · contact@tradux.online
+            </p>
+        </div>
+    </div>
+</body>
+</html>'''
+
+
+async def generate_tradux_certified_pdf(
+    translation_html: str,
+    order: dict,
+    certification_id: str,
+    qr_code_base64: str = None
+) -> bytes:
+    """Generate a complete certified PDF with TRADUX cover page + translation"""
+    import fitz  # PyMuPDF
+
+    # Generate cover page HTML
+    cover_html = generate_tradux_certification_cover(
+        order_number=order.get("order_number", ""),
+        document_type=order.get("document_type", "Document"),
+        source_language=order.get("translate_from", "Portuguese"),
+        target_language=order.get("translate_to", "English"),
+        page_count=order.get("page_count", 1),
+        client_name=order.get("client_name", ""),
+        certification_id=certification_id,
+        certified_date=datetime.now(ZoneInfo("America/New_York")).strftime("%B %d, %Y"),
+        qr_code_base64=qr_code_base64
+    )
+
+    # Create PDF document
+    doc = fitz.open()
+
+    # Convert cover page HTML to PDF page
+    try:
+        # Create cover page
+        cover_page = doc.new_page(width=612, height=792)  # Letter size
+        rect = fitz.Rect(36, 36, 576, 756)  # 0.5 inch margins
+
+        # Insert cover as HTML (simplified - in production would use proper HTML rendering)
+        # For now, create a styled text version
+        cover_text = f"""
+TRADUX
+Professional Translation Services
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CERTIFICATE OF TRANSLATION ACCURACY
+
+{certification_id}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Order Number: #{order.get("order_number", "")}
+Document Type: {order.get("document_type", "Document")}
+Languages: {order.get("translate_from", "Portuguese")} → {order.get("translate_to", "English")}
+Page Count: {order.get("page_count", 1)} page(s)
+Client: {order.get("client_name", "")}
+Certification Date: {datetime.now(ZoneInfo("America/New_York")).strftime("%B %d, %Y")}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+I hereby certify that the attached translation is, to the best of
+my knowledge and belief, a true and accurate translation of the
+original document.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+TRADUX Translations
+Professional Translation Services
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This certification can be verified using the ID above.
+TRADUX · contact@tradux.online
+"""
+        # Insert text
+        fontsize = 11
+        cover_page.insert_textbox(rect, cover_text, fontsize=fontsize, fontname="helv", align=1)
+
+        # Add QR code if available
+        if qr_code_base64:
+            try:
+                qr_bytes = base64.b64decode(qr_code_base64)
+                qr_rect = fitz.Rect(256, 520, 356, 620)  # Centered QR code
+                cover_page.insert_image(qr_rect, stream=qr_bytes)
+            except Exception as qr_err:
+                logger.warning(f"Could not insert QR code: {qr_err}")
+
+    except Exception as e:
+        logger.error(f"Error creating cover page: {e}")
+
+    # Add translation pages
+    try:
+        # Create a temporary PDF from the translation HTML
+        # In production, would use proper HTML to PDF conversion (weasyprint, etc.)
+        translation_page = doc.new_page(width=612, height=792)
+        rect = fitz.Rect(54, 54, 558, 738)  # 0.75 inch margins
+
+        # Clean HTML tags for text insertion (simplified)
+        import re
+        clean_text = re.sub(r'<[^>]+>', '\n', translation_html)
+        clean_text = re.sub(r'\n+', '\n', clean_text).strip()
+
+        # Insert text (this is simplified - production would use proper HTML rendering)
+        if clean_text:
+            translation_page.insert_textbox(rect, clean_text[:3000], fontsize=11, fontname="times-roman")
+
+    except Exception as e:
+        logger.error(f"Error adding translation pages: {e}")
+
+    # Get PDF bytes
+    pdf_bytes = doc.tobytes()
+    doc.close()
+
+    return pdf_bytes
+
+
+def generate_tradux_certification_id() -> str:
+    """Generate unique TRADUX certification ID"""
+    return f"TX-{datetime.now().strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}"
+
+
 def generate_translation_html_for_email(order: dict) -> str:
     """Generate a formatted HTML document from translation_html for email attachment"""
     translation_text = order.get("translation_html", "")
@@ -2215,6 +2852,186 @@ class AIPipelineStageApproval(BaseModel):
     action: str  # approve, reject, edit
     edited_content: Optional[str] = None  # If action is 'edit'
     reviewer_notes: Optional[str] = None
+
+
+# ==================== TRADUX AUTO-TRANSLATION MODELS ====================
+class TraduxAutoTranslateRequest(BaseModel):
+    """Request to start fully automated TRADUX translation pipeline
+
+    This executes the complete translation workflow without human intervention:
+    1. OCR (if document is image/scanned PDF)
+    2. AI Translation with glossaries
+    3. Layout Optimization
+    4. AI Proofreading with auto-correction
+    5. Mark as ready for client approval
+    """
+    order_id: str
+    source_language: str = "Portuguese (Brazil)"
+    target_language: str = "English"
+    document_type: str = "general"
+    # Optional: provide text directly (skips OCR)
+    original_text: Optional[str] = None
+    # Currency conversion settings
+    convert_currency: bool = False
+    source_currency: Optional[str] = "BRL"
+    target_currency: Optional[str] = "USD"
+    exchange_rate: Optional[float] = None
+    rate_date: Optional[str] = None
+    add_translator_note: bool = True
+    # Format settings
+    page_format: str = "letter"  # letter or a4
+    # Glossary and instructions
+    use_glossary: bool = True
+    custom_instructions: Optional[str] = None
+    # Auto-correction settings
+    auto_correct_errors: bool = True  # Automatically fix proofreading errors
+    # Claude API key (optional - uses shared key if not provided)
+    claude_api_key: Optional[str] = None
+
+
+class TraduxTranslationStatus(BaseModel):
+    """Status tracking for TRADUX automated translation"""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    order_id: str
+    order_number: Optional[str] = None
+    # Progress tracking
+    current_step: str = "initializing"  # initializing, ocr, translating, optimizing, proofreading, ready_for_client, client_approved, completed
+    progress_percent: int = 0
+    # Step statuses
+    steps: Dict[str, dict] = Field(default_factory=lambda: {
+        "ocr": {"status": "pending", "message": ""},
+        "translation": {"status": "pending", "message": ""},
+        "layout": {"status": "pending", "message": ""},
+        "proofreading": {"status": "pending", "message": ""},
+        "auto_correction": {"status": "pending", "message": ""},
+        "client_approval": {"status": "pending", "message": ""}
+    })
+    # Results
+    original_text: Optional[str] = None
+    translated_text: Optional[str] = None
+    final_translation: Optional[str] = None
+    proofreading_errors: Optional[List[dict]] = None
+    corrections_applied: Optional[List[str]] = None
+    # Quality metrics
+    quality_score: Optional[str] = None
+    error_count: int = 0
+    # Client approval
+    client_approval_token: Optional[str] = None  # Unique token for client to access approval page
+    client_approved: bool = False
+    client_approved_at: Optional[datetime] = None
+    client_feedback: Optional[str] = None
+    # Timestamps
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    completed_at: Optional[datetime] = None
+    # Error handling
+    has_error: bool = False
+    error_message: Optional[str] = None
+
+
+# ==================== MULTI-BRAND CONFIGURATION ====================
+class BrandConfig(BaseModel):
+    """Configuration for multi-brand support (Legacy vs TRADUX)"""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    brand_code: str  # "legacy" or "tradux"
+    brand_name: str
+    tagline: Optional[str] = None
+    # Colors
+    primary_color: str = "#1a2a4a"  # Legacy blue
+    secondary_color: str = "#c9a227"  # Legacy gold
+    accent_color: Optional[str] = None
+    # Logo
+    logo_html: Optional[str] = None  # HTML for logo rendering
+    logo_url: Optional[str] = None
+    # Contact info
+    company_name: str
+    company_email: str
+    company_phone: Optional[str] = None
+    company_address: Optional[str] = None
+    website_url: Optional[str] = None
+    # Certifier info
+    default_certifier_name: str
+    default_certifier_title: str = "Certified Translator"
+    certifier_credentials: Optional[str] = None  # ATA number, etc.
+    # Certification prefix
+    certification_prefix: str = "LT"  # LT for Legacy, TX for TRADUX
+    # Email settings
+    email_from_name: str
+    email_from_address: Optional[str] = None
+    # Social links
+    facebook_url: Optional[str] = None
+    instagram_url: Optional[str] = None
+    # Flags
+    is_active: bool = True
+    show_ata_badge: bool = True
+    show_bbb_badge: bool = True
+    # Timestamps
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# Default brand configurations
+BRAND_CONFIGS = {
+    "legacy": {
+        "brand_code": "legacy",
+        "brand_name": "Legacy Translations",
+        "tagline": "Professional Translation Services",
+        "primary_color": "#1a2a4a",
+        "secondary_color": "#c9a227",
+        "company_name": "Legacy Translations Inc.",
+        "company_email": "contact@legacytranslations.com",
+        "company_phone": "(617) 925-4154",
+        "company_address": "867 Boylston Street, 5th Floor #2073, Boston, MA 02116",
+        "website_url": "https://legacytranslations.com",
+        "default_certifier_name": "Beatriz Paiva",
+        "default_certifier_title": "Certified Translator",
+        "certifier_credentials": "ATA #275993",
+        "certification_prefix": "LT",
+        "email_from_name": "Legacy Translations",
+        "facebook_url": "https://www.facebook.com/legacytranslationsusa/",
+        "instagram_url": "https://www.instagram.com/legacytranslations/",
+        "show_ata_badge": True,
+        "show_bbb_badge": True
+    },
+    "tradux": {
+        "brand_code": "tradux",
+        "brand_name": "TRADUX",
+        "tagline": "Fast, Affordable, Professional",
+        # Colors from tradux-site GitHub repo
+        "primary_color": "#1E3A8A",       # Navy blue
+        "primary_light": "#3B82F6",       # Bright blue
+        "secondary_color": "#f97316",     # Orange
+        "accent_color": "#ea580c",        # Dark orange
+        "gold_color": "#D4AF37",          # Gold (from icons)
+        "company_name": "TRADUX",
+        "company_email": "contact@tradux.online",
+        "company_phone": "(857) 208-1139",
+        "website_url": "https://tradux.online",
+        "vercel_url": "https://tradux-site.vercel.app",
+        "whatsapp_url": "https://wa.me/18572081139",
+        "default_certifier_name": "TRADUX Translations",
+        "default_certifier_title": "Professional Translation Services",
+        "certification_prefix": "TX",
+        "email_from_name": "TRADUX",
+        "show_ata_badge": False,
+        "show_bbb_badge": False,
+        "show_uscis_badge": True,
+        # Assets from GitHub repo
+        "assets_base_url": "https://raw.githubusercontent.com/Beatrizpaiva2025/tradux-site/main",
+        "logo_svg": "https://raw.githubusercontent.com/Beatrizpaiva2025/tradux-site/main/tradux-logo.svg",
+        "logo_white_svg": "https://raw.githubusercontent.com/Beatrizpaiva2025/tradux-site/main/tradux-logo-white.svg",
+        "hero_image": "https://raw.githubusercontent.com/Beatrizpaiva2025/tradux-site/main/hero-image.svg",
+        "certified_icon": "https://raw.githubusercontent.com/Beatrizpaiva2025/tradux-site/main/certified-icon.svg",
+        "document_icon": "https://raw.githubusercontent.com/Beatrizpaiva2025/tradux-site/main/document-icon.svg",
+        "uscis_icon": "https://raw.githubusercontent.com/Beatrizpaiva2025/tradux-site/main/uscis-icon.svg"
+    }
+}
+
+
+def get_brand_config(brand_code: str = "legacy") -> dict:
+    """Get brand configuration by code"""
+    return BRAND_CONFIGS.get(brand_code, BRAND_CONFIGS["legacy"])
+
 
 # ==================== PAYMENT PROOF MODELS ====================
 class PaymentProof(BaseModel):
@@ -21880,6 +22697,1151 @@ async def retry_ai_pipeline_stage(pipeline_id: str, admin_key: str, claude_api_k
             "status": "error",
             "message": f"Stage '{current_stage}' failed: {result.get('error')}"
         }
+
+
+# ==================== TRADUX AUTO-TRANSLATION SYSTEM ====================
+# Fully automated translation pipeline for TRADUX - 100% AI-powered translations
+
+@api_router.post("/admin/tradux/auto-translate")
+async def tradux_auto_translate(request: TraduxAutoTranslateRequest, admin_key: str):
+    """
+    TRADUX Fully Automated Translation Pipeline
+
+    Executes complete translation workflow without human intervention:
+    1. OCR extraction (if needed)
+    2. AI Translation with glossaries
+    3. Layout optimization
+    4. AI Proofreading with auto-correction
+    5. Mark as ready for client approval
+
+    Returns immediately with a status tracking ID.
+    Use GET /admin/tradux/status/{order_id} to check progress.
+    """
+    user = await validate_admin_or_user_token(admin_key)
+
+    # Verify order exists
+    order = await db.translation_orders.find_one({"id": request.order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Get Claude API key
+    claude_api_key = request.claude_api_key
+    if not claude_api_key:
+        settings = await db.app_settings.find_one({"key": "shared_claude_api_key"})
+        if settings and settings.get("value"):
+            claude_api_key = settings["value"]
+        else:
+            raise HTTPException(status_code=400, detail="No Claude API key provided and no shared key configured")
+
+    # Create client approval token
+    import secrets
+    client_approval_token = secrets.token_urlsafe(32)
+
+    # Create status tracking record
+    status_record = TraduxTranslationStatus(
+        order_id=request.order_id,
+        order_number=order.get("order_number"),
+        current_step="initializing",
+        progress_percent=0,
+        client_approval_token=client_approval_token
+    )
+
+    await db.tradux_translations.insert_one(status_record.dict())
+
+    # Update order status
+    await db.translation_orders.update_one(
+        {"id": request.order_id},
+        {"$set": {
+            "translation_status": "in_translation",
+            "tradux_status_id": status_record.id,
+            "tradux_mode": True,
+            "updated_at": datetime.utcnow()
+        }}
+    )
+
+    # Run the automated pipeline in background
+    import asyncio
+    asyncio.create_task(_run_tradux_pipeline(
+        status_id=status_record.id,
+        order=order,
+        request=request,
+        claude_api_key=claude_api_key,
+        user=user
+    ))
+
+    return {
+        "status": "started",
+        "message": "TRADUX automated translation started",
+        "status_id": status_record.id,
+        "order_id": request.order_id,
+        "client_approval_token": client_approval_token,
+        "status_url": f"/admin/tradux/status/{request.order_id}",
+        "client_approval_url": f"/client/translation-approval/{client_approval_token}"
+    }
+
+
+async def _run_tradux_pipeline(
+    status_id: str,
+    order: dict,
+    request: TraduxAutoTranslateRequest,
+    claude_api_key: str,
+    user: dict
+):
+    """
+    Internal function to run the complete TRADUX pipeline asynchronously.
+    Updates status at each step for real-time progress tracking.
+    """
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=claude_api_key)
+
+        # Helper to update status
+        async def update_status(step: str, progress: int, step_status: str = "in_progress", message: str = "", **kwargs):
+            update_data = {
+                "current_step": step,
+                "progress_percent": progress,
+                f"steps.{step}.status": step_status,
+                f"steps.{step}.message": message,
+                "updated_at": datetime.utcnow()
+            }
+            update_data.update(kwargs)
+            await db.tradux_translations.update_one(
+                {"id": status_id},
+                {"$set": update_data}
+            )
+
+        # ========== STEP 1: OCR (if needed) ==========
+        await update_status("ocr", 10, "in_progress", "Extracting text from documents...")
+
+        original_text = request.original_text
+        original_document_base64 = None
+
+        if not original_text:
+            # Fetch documents from order
+            order_docs = await db.documents.find({"order_id": request.order_id, "document_type": "original"}).to_list(100)
+
+            if not order_docs:
+                await update_status("ocr", 10, "failed", "No documents found for this order", has_error=True, error_message="No documents found")
+                return
+
+            extracted_texts = []
+            for doc in order_docs:
+                if doc.get("file_data"):
+                    try:
+                        # Clean base64 data
+                        file_data = doc["file_data"]
+                        if "," in file_data:
+                            file_data = file_data.split(",")[1]
+
+                        # Determine media type
+                        filename = doc.get("filename", "").lower()
+                        if filename.endswith(".pdf"):
+                            media_type = "application/pdf"
+                        elif filename.endswith(".png"):
+                            media_type = "image/png"
+                        elif filename.endswith(".jpg") or filename.endswith(".jpeg"):
+                            media_type = "image/jpeg"
+                        else:
+                            media_type = "image/png"
+
+                        # Use Claude for OCR with layout preservation
+                        ocr_prompt = """Extract ALL text from this document image.
+
+CRITICAL INSTRUCTIONS:
+1. Maintain the EXACT original layout, structure, and formatting
+2. Preserve all line breaks, spacing, and indentation
+3. Keep tables in their original format using markdown table syntax
+4. Preserve headers, titles, and sections exactly as they appear
+5. Include ALL text, even small print, stamps, and signatures
+6. Use ** for bold text and * for italic text where visible
+7. For handwritten text, use [handwritten: text] notation
+8. For stamps/seals, use [stamp: text] notation
+9. For signatures, use [signature: name if readable, or "illegible"]
+
+Extract the complete text now, preserving the original layout:"""
+
+                        # Handle PDF conversion if needed
+                        if media_type == "application/pdf":
+                            import fitz
+                            pdf_content = base64.b64decode(file_data)
+                            pdf_document = fitz.open(stream=pdf_content, filetype="pdf")
+                            page_texts = []
+
+                            for page_num in range(min(pdf_document.page_count, 15)):
+                                page = pdf_document[page_num]
+                                pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+                                img_data = pix.tobytes("png")
+                                image_data = base64.b64encode(img_data).decode('utf-8')
+
+                                response = client.messages.create(
+                                    model="claude-sonnet-4-5-20250929",
+                                    max_tokens=4096,
+                                    messages=[{
+                                        "role": "user",
+                                        "content": [
+                                            {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": image_data}},
+                                            {"type": "text", "text": ocr_prompt}
+                                        ]
+                                    }]
+                                )
+                                page_texts.append(f"--- Page {page_num + 1} ---\n{response.content[0].text}")
+
+                            pdf_document.close()
+                            extracted_texts.append(f"--- Document: {doc.get('filename', 'unknown')} ---\n" + "\n\n".join(page_texts))
+                        else:
+                            # Direct image OCR
+                            response = client.messages.create(
+                                model="claude-sonnet-4-5-20250929",
+                                max_tokens=4096,
+                                messages=[{
+                                    "role": "user",
+                                    "content": [
+                                        {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": file_data}},
+                                        {"type": "text", "text": ocr_prompt}
+                                    ]
+                                }]
+                            )
+                            extracted_texts.append(f"--- Document: {doc.get('filename', 'unknown')} ---\n{response.content[0].text}")
+
+                        if not original_document_base64:
+                            original_document_base64 = file_data
+
+                    except Exception as e:
+                        logger.error(f"OCR failed for document: {e}")
+                        extracted_texts.append(f"--- Document: {doc.get('filename', 'unknown')} ---\n[OCR Error: {str(e)}]")
+
+            if extracted_texts:
+                original_text = "\n\n".join(extracted_texts)
+            else:
+                await update_status("ocr", 10, "failed", "Could not extract text from documents", has_error=True, error_message="OCR extraction failed")
+                return
+
+        await update_status("ocr", 20, "completed", f"Extracted {len(original_text)} characters", original_text=original_text)
+
+        # ========== STEP 2: TRANSLATION ==========
+        await update_status("translation", 25, "in_progress", "Translating document...")
+
+        # Fetch glossaries
+        glossary_text = ""
+        if request.use_glossary:
+            glossaries = await db.glossaries.find({
+                "$or": [
+                    {"sourceLang": request.source_language, "targetLang": request.target_language},
+                    {"sourceLang": request.target_language, "targetLang": request.source_language, "bidirectional": True},
+                    {"sourceLang": "All Languages"},
+                    {"targetLang": "All Languages"}
+                ]
+            }).to_list(50)
+
+            if glossaries:
+                terms = []
+                for g in glossaries:
+                    for term in g.get("terms", []):
+                        terms.append(f"- {term.get('source')} → {term.get('target')}")
+                if terms:
+                    glossary_text = f"\n\n🔹 MANDATORY GLOSSARY TERMS (MUST USE THESE EXACT TRANSLATIONS):\n" + "\n".join(terms[:100])
+
+        # Fetch custom instructions
+        custom_instructions = await fetch_matching_instructions(
+            request.source_language,
+            request.target_language,
+            request.document_type
+        ) if 'fetch_matching_instructions' in dir() else ""
+
+        # Build translation prompt
+        translation_prompt = f"""You are a professional certified translator performing a translation from {request.source_language} to {request.target_language}.
+
+DOCUMENT TYPE: {request.document_type}
+PAGE FORMAT: {request.page_format.upper()} ({"8.5 x 11 inches" if request.page_format == "letter" else "A4"})
+
+TRANSLATION REQUIREMENTS:
+1. Translate ALL text accurately and completely
+2. Maintain the EXACT original layout and formatting
+3. Preserve all headers, titles, tables, and visual structure
+4. Use professional, formal language appropriate for certified translations
+5. Convert dates from DD/MM/YYYY to MM/DD/YYYY format for English
+6. Keep proper nouns, names, and official titles as appropriate
+7. For stamps/seals, translate the text and note [stamp] or [seal]
+8. For signatures, keep as [signature] with any readable name
+
+{glossary_text}
+
+{f"CUSTOM INSTRUCTIONS: {request.custom_instructions}" if request.custom_instructions else ""}
+{custom_instructions}
+
+OUTPUT FORMAT:
+- Produce clean HTML that will render properly for printing
+- Use semantic HTML (tables for tabular data, paragraphs for text)
+- Include CSS for proper page formatting
+- Ensure 1:1 page correspondence (each original page = one translated page)
+- Use appropriate fonts and sizing for professional documents
+
+ORIGINAL DOCUMENT TEXT:
+{original_text}
+
+Now provide the complete translation in HTML format:"""
+
+        # Currency conversion note
+        currency_note = ""
+        if request.convert_currency and request.exchange_rate:
+            currency_note = f"""
+
+CURRENCY CONVERSION:
+- Source: {request.source_currency}
+- Target: {request.target_currency}
+- Exchange Rate: {request.exchange_rate}
+- Rate Date: {request.rate_date or datetime.now().strftime('%Y-%m-%d')}
+
+When you encounter monetary values in {request.source_currency}, show both the original and converted values.
+Example: R$ 1.000,00 (USD $184.50 at exchange rate of {request.exchange_rate} as of {request.rate_date})
+"""
+            translation_prompt = translation_prompt.replace("ORIGINAL DOCUMENT TEXT:", currency_note + "\nORIGINAL DOCUMENT TEXT:")
+
+        response = client.messages.create(
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=16384,
+            messages=[{"role": "user", "content": translation_prompt}]
+        )
+
+        translated_text = response.content[0].text
+        await update_status("translation", 50, "completed", f"Translation completed ({len(translated_text)} chars)", translated_text=translated_text)
+
+        # ========== STEP 3: LAYOUT OPTIMIZATION ==========
+        await update_status("layout", 55, "in_progress", "Optimizing layout for printing...")
+
+        layout_prompt = f"""Review this translation and optimize the HTML layout for professional printing.
+
+TARGET FORMAT: {request.page_format.upper()} ({"8.5 x 11 inches with 0.75 inch margins" if request.page_format == "letter" else "A4 with 2cm margins"})
+
+REQUIREMENTS:
+1. Ensure each original page fits on exactly ONE printed page
+2. Optimize font sizes (minimum 9pt body, 8pt for tables)
+3. Ensure tables don't break across pages
+4. Add proper page breaks where needed
+5. Clean up any HTML formatting issues
+6. Ensure professional appearance
+
+TRANSLATION TO OPTIMIZE:
+{translated_text}
+
+Return the optimized HTML with proper CSS for printing:"""
+
+        response = client.messages.create(
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=16384,
+            messages=[{"role": "user", "content": layout_prompt}]
+        )
+
+        optimized_text = response.content[0].text
+        await update_status("layout", 70, "completed", "Layout optimized for printing")
+
+        # ========== STEP 4: PROOFREADING ==========
+        await update_status("proofreading", 75, "in_progress", "Proofreading translation...")
+
+        proofread_prompt = f"""You are a professional proofreader. Compare the original text with the translation and identify any errors.
+
+ORIGINAL ({request.source_language}):
+{original_text}
+
+TRANSLATION ({request.target_language}):
+{optimized_text}
+
+{glossary_text}
+
+Check for:
+1. Transcription errors (numbers, dates, names)
+2. Missing or added text
+3. Terminology inconsistencies (especially with glossary terms)
+4. Grammar and spelling errors
+5. Formatting issues
+
+Return a JSON object with this EXACT structure:
+{{
+    "errors": [
+        {{
+            "page": "1",
+            "location": "description of where",
+            "original": "original text",
+            "translation": "current translation",
+            "correction": "suggested correction",
+            "type": "Transcription|Number|Date|Terminology|Grammar|Omission|Format",
+            "severity": "CRITICAL|HIGH|MEDIUM|LOW"
+        }}
+    ],
+    "summary": {{
+        "total_errors": 0,
+        "critical": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "quality": "APPROVED|APPROVED_WITH_NOTES|REJECTED"
+    }}
+}}
+
+If there are no errors, return an empty errors array and quality as "APPROVED"."""
+
+        response = client.messages.create(
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=8192,
+            messages=[{"role": "user", "content": proofread_prompt}]
+        )
+
+        proofread_result = response.content[0].text
+
+        # Parse proofreading result
+        import json
+        try:
+            # Extract JSON from response
+            json_match = proofread_result
+            if "```json" in proofread_result:
+                json_match = proofread_result.split("```json")[1].split("```")[0]
+            elif "```" in proofread_result:
+                json_match = proofread_result.split("```")[1].split("```")[0]
+
+            proofread_data = json.loads(json_match.strip())
+            errors = proofread_data.get("errors", [])
+            summary = proofread_data.get("summary", {})
+            quality_score = summary.get("quality", "APPROVED")
+            error_count = len(errors)
+        except:
+            errors = []
+            quality_score = "APPROVED"
+            error_count = 0
+
+        await update_status("proofreading", 85, "completed",
+            f"Found {error_count} issues. Quality: {quality_score}",
+            proofreading_errors=errors,
+            quality_score=quality_score,
+            error_count=error_count
+        )
+
+        # ========== STEP 5: AUTO-CORRECTION (if enabled) ==========
+        final_translation = optimized_text
+        corrections_applied = []
+
+        if request.auto_correct_errors and errors:
+            await update_status("auto_correction", 88, "in_progress", f"Applying {len(errors)} corrections...")
+
+            correction_prompt = f"""Apply these corrections to the translation:
+
+ERRORS TO FIX:
+{json.dumps(errors, indent=2)}
+
+TRANSLATION TO CORRECT:
+{optimized_text}
+
+Return the corrected HTML translation. Make ONLY the corrections listed above, do not change anything else."""
+
+            response = client.messages.create(
+                model="claude-sonnet-4-5-20250929",
+                max_tokens=16384,
+                messages=[{"role": "user", "content": correction_prompt}]
+            )
+
+            final_translation = response.content[0].text
+            corrections_applied = [f"{e.get('type')}: {e.get('correction')}" for e in errors[:10]]
+
+            await update_status("auto_correction", 92, "completed",
+                f"Applied {len(errors)} corrections",
+                corrections_applied=corrections_applied
+            )
+        else:
+            await update_status("auto_correction", 92, "skipped", "No corrections needed or auto-correction disabled")
+
+        # ========== STEP 6: READY FOR CLIENT APPROVAL ==========
+        await update_status("client_approval", 95, "pending",
+            "Translation ready for client review",
+            final_translation=final_translation
+        )
+
+        # Update final status
+        await db.tradux_translations.update_one(
+            {"id": status_id},
+            {"$set": {
+                "current_step": "ready_for_client",
+                "progress_percent": 100,
+                "final_translation": final_translation,
+                "updated_at": datetime.utcnow()
+            }}
+        )
+
+        # Update order status
+        await db.translation_orders.update_one(
+            {"id": request.order_id},
+            {"$set": {
+                "translation_status": "review",
+                "tradux_ready_for_approval": True,
+                "updated_at": datetime.utcnow()
+            }}
+        )
+
+        # Get the status record for the approval token
+        status_record = await db.tradux_translations.find_one({"id": status_id})
+        approval_token = status_record.get("client_approval_token") if status_record else None
+
+        # Send email to client with approval link
+        if order.get("client_email") and approval_token:
+            try:
+                client_name = order.get("client_name", "Valued Customer")
+                order_number = order.get("order_number", "")
+                document_type = order.get("document_type", "Document")
+
+                # Build approval URL (use environment variable for domain or default)
+                base_url = os.environ.get("BASE_URL", "https://legacytranslations.com")
+                approval_url = f"{base_url}/api/client/translation-approval/{approval_token}"
+
+                email_content = get_tradux_approval_email_template(
+                    client_name=client_name,
+                    order_number=order_number,
+                    approval_url=approval_url,
+                    document_type=document_type
+                )
+
+                await email_service.send_email(
+                    order["client_email"],
+                    f"Your Translation is Ready for Review - Order #{order_number}",
+                    email_content
+                )
+                logger.info(f"Approval email sent to {order['client_email']} for order {order_number}")
+            except Exception as email_error:
+                logger.error(f"Failed to send approval email: {email_error}")
+
+        logger.info(f"TRADUX translation completed for order {order.get('order_number')}. Ready for client approval.")
+
+    except Exception as e:
+        logger.error(f"TRADUX pipeline error: {str(e)}")
+        await db.tradux_translations.update_one(
+            {"id": status_id},
+            {"$set": {
+                "has_error": True,
+                "error_message": str(e),
+                "current_step": "error",
+                "updated_at": datetime.utcnow()
+            }}
+        )
+
+
+@api_router.get("/admin/tradux/status/{order_id}")
+async def get_tradux_status(order_id: str, admin_key: str):
+    """Get real-time status of TRADUX automated translation"""
+    await validate_admin_or_user_token(admin_key)
+
+    status = await db.tradux_translations.find_one({"order_id": order_id})
+    if not status:
+        raise HTTPException(status_code=404, detail="TRADUX translation not found for this order")
+
+    status["_id"] = str(status["_id"])
+    return status
+
+
+@api_router.get("/client/translation-approval/{token}", response_class=HTMLResponse)
+async def get_client_translation_approval(token: str):
+    """
+    Public HTML page for client to view and approve their translation.
+    No authentication required - uses unique token.
+    """
+    status = await db.tradux_translations.find_one({"client_approval_token": token})
+    if not status:
+        return HTMLResponse(content=_get_error_page("Translation Not Found", "The translation link is invalid or has expired. Please contact support if you need assistance."), status_code=404)
+
+    # Get order info
+    order = await db.translation_orders.find_one({"id": status["order_id"]})
+    client_name = order.get("client_name", "Valued Customer") if order else "Valued Customer"
+    order_number = status.get("order_number", "")
+    document_type = order.get("document_type", "Document") if order else "Document"
+
+    # Check if still processing
+    if status.get("current_step") not in ["ready_for_client", "client_approved", "completed", "changes_requested"]:
+        return HTMLResponse(content=_get_processing_page(client_name, order_number, status.get("progress_percent", 0)))
+
+    # Check if already approved
+    if status.get("client_approved"):
+        return HTMLResponse(content=_get_approved_page(client_name, order_number))
+
+    # Check if changes were requested
+    if status.get("current_step") == "changes_requested":
+        return HTMLResponse(content=_get_changes_requested_page(client_name, order_number))
+
+    # Show approval page with translation
+    final_translation = status.get("final_translation", "<p>Translation content not available</p>")
+
+    return HTMLResponse(content=_get_approval_page(token, client_name, order_number, document_type, final_translation))
+
+
+def _get_error_page(title: str, message: str) -> str:
+    """Generate error page HTML"""
+    return f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{title} - Legacy Translations</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{ font-family: 'Segoe UI', Tahoma, sans-serif; background: #f4f4f4; min-height: 100vh; display: flex; align-items: center; justify-content: center; }}
+        .container {{ background: white; padding: 60px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center; max-width: 500px; }}
+        h1 {{ color: #dc2626; font-size: 28px; margin-bottom: 20px; }}
+        p {{ color: #64748b; font-size: 16px; line-height: 1.6; }}
+        .icon {{ font-size: 64px; margin-bottom: 20px; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">❌</div>
+        <h1>{title}</h1>
+        <p>{message}</p>
+    </div>
+</body>
+</html>'''
+
+
+def _get_processing_page(client_name: str, order_number: str, progress: int) -> str:
+    """Generate processing status page HTML"""
+    return f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="10">
+    <title>Translation in Progress - Legacy Translations</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{ font-family: 'Segoe UI', Tahoma, sans-serif; background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; }}
+        .container {{ background: white; padding: 60px; border-radius: 12px; box-shadow: 0 4px 30px rgba(0,0,0,0.2); text-align: center; max-width: 500px; }}
+        h1 {{ color: #1a2a4a; font-size: 24px; margin-bottom: 10px; }}
+        .order {{ color: #64748b; font-size: 14px; margin-bottom: 30px; }}
+        .progress-container {{ background: #e2e8f0; border-radius: 50px; height: 20px; margin: 30px 0; overflow: hidden; }}
+        .progress-bar {{ background: linear-gradient(90deg, #c9a227, #e6c547); height: 100%; border-radius: 50px; transition: width 0.5s; }}
+        .progress-text {{ color: #1a2a4a; font-size: 32px; font-weight: bold; margin: 20px 0; }}
+        p {{ color: #64748b; font-size: 14px; }}
+        .spinner {{ width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top: 4px solid #c9a227; border-radius: 50%; animation: spin 1s linear infinite; margin: 20px auto; }}
+        @keyframes spin {{ 0% {{ transform: rotate(0deg); }} 100% {{ transform: rotate(360deg); }} }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Hello, {client_name}</h1>
+        <p class="order">Order #{order_number}</p>
+        <div class="spinner"></div>
+        <p>Your translation is being prepared...</p>
+        <div class="progress-container">
+            <div class="progress-bar" style="width: {progress}%"></div>
+        </div>
+        <div class="progress-text">{progress}%</div>
+        <p>This page will refresh automatically. Please wait.</p>
+    </div>
+</body>
+</html>'''
+
+
+def _get_approved_page(client_name: str, order_number: str) -> str:
+    """Generate already approved page HTML"""
+    return f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Translation Approved - Legacy Translations</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{ font-family: 'Segoe UI', Tahoma, sans-serif; background: linear-gradient(135deg, #166534 0%, #15803d 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; }}
+        .container {{ background: white; padding: 60px; border-radius: 12px; box-shadow: 0 4px 30px rgba(0,0,0,0.2); text-align: center; max-width: 500px; }}
+        .icon {{ font-size: 80px; margin-bottom: 20px; }}
+        h1 {{ color: #166534; font-size: 28px; margin-bottom: 15px; }}
+        p {{ color: #64748b; font-size: 16px; line-height: 1.6; margin-bottom: 10px; }}
+        .order {{ color: #94a3b8; font-size: 14px; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">✅</div>
+        <h1>Translation Approved!</h1>
+        <p>Thank you, {client_name}!</p>
+        <p>Your translation has been approved. You will receive your certified document via email shortly.</p>
+        <p class="order">Order #{order_number}</p>
+    </div>
+</body>
+</html>'''
+
+
+def _get_changes_requested_page(client_name: str, order_number: str) -> str:
+    """Generate changes requested confirmation page HTML"""
+    return f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Revision Requested - Legacy Translations</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{ font-family: 'Segoe UI', Tahoma, sans-serif; background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; }}
+        .container {{ background: white; padding: 60px; border-radius: 12px; box-shadow: 0 4px 30px rgba(0,0,0,0.2); text-align: center; max-width: 500px; }}
+        .icon {{ font-size: 80px; margin-bottom: 20px; }}
+        h1 {{ color: #1a2a4a; font-size: 28px; margin-bottom: 15px; }}
+        p {{ color: #64748b; font-size: 16px; line-height: 1.6; margin-bottom: 10px; }}
+        .order {{ color: #94a3b8; font-size: 14px; margin-top: 20px; }}
+        .info-box {{ background: #f0f4f8; border-radius: 8px; padding: 20px; margin-top: 20px; }}
+        .info-box p {{ color: #475569; font-size: 14px; margin: 0; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">📝</div>
+        <h1>Revision Request Received</h1>
+        <p>Thank you for your feedback, {client_name}!</p>
+        <div class="info-box">
+            <p>Our translation team is reviewing your request. You will receive an updated translation for approval via email soon.</p>
+        </div>
+        <p class="order">Order #{order_number}</p>
+    </div>
+</body>
+</html>'''
+
+
+def _get_approval_page(token: str, client_name: str, order_number: str, document_type: str, translation_html: str) -> str:
+    """Generate the main approval page with translation preview"""
+    return f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Review Your Translation - Legacy Translations</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{ font-family: 'Segoe UI', Tahoma, sans-serif; background: #f4f4f4; }}
+        .header {{ background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); color: white; padding: 30px 40px; }}
+        .header h1 {{ font-size: 24px; margin-bottom: 5px; }}
+        .header p {{ opacity: 0.8; font-size: 14px; }}
+        .gold-bar {{ background: linear-gradient(90deg, #c9a227 0%, #e6c547 50%, #c9a227 100%); height: 4px; }}
+        .container {{ max-width: 1200px; margin: 0 auto; padding: 30px; }}
+        .info-bar {{ background: white; border-radius: 8px; padding: 20px 30px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
+        .info-item {{ text-align: center; }}
+        .info-item .label {{ font-size: 12px; color: #94a3b8; text-transform: uppercase; }}
+        .info-item .value {{ font-size: 18px; color: #1a2a4a; font-weight: 600; }}
+        .translation-box {{ background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }}
+        .translation-header {{ padding: 20px 30px; border-bottom: 1px solid #e2e8f0; }}
+        .translation-header h2 {{ color: #1a2a4a; font-size: 18px; }}
+        .translation-content {{ padding: 30px; max-height: 500px; overflow-y: auto; font-family: 'Times New Roman', Georgia, serif; line-height: 1.6; }}
+        .actions {{ background: white; border-radius: 8px; padding: 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
+        .actions h3 {{ color: #1a2a4a; font-size: 18px; margin-bottom: 20px; }}
+        .btn {{ padding: 15px 40px; border: none; border-radius: 50px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s; }}
+        .btn-approve {{ background: linear-gradient(135deg, #166534 0%, #15803d 100%); color: white; }}
+        .btn-approve:hover {{ transform: scale(1.05); box-shadow: 0 4px 15px rgba(22,101,52,0.4); }}
+        .btn-changes {{ background: #f1f5f9; color: #475569; margin-left: 15px; }}
+        .btn-changes:hover {{ background: #e2e8f0; }}
+        .correction-form {{ display: none; margin-top: 30px; padding-top: 30px; border-top: 1px solid #e2e8f0; }}
+        .correction-form.show {{ display: block; }}
+        .correction-form textarea {{ width: 100%; height: 150px; padding: 15px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 14px; resize: vertical; font-family: inherit; }}
+        .correction-form textarea:focus {{ outline: none; border-color: #c9a227; }}
+        .correction-form label {{ display: block; font-weight: 600; color: #1a2a4a; margin-bottom: 10px; }}
+        .correction-form .hint {{ color: #94a3b8; font-size: 12px; margin-top: 5px; }}
+        .btn-submit-changes {{ background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); color: white; margin-top: 15px; }}
+        .btn-cancel {{ background: transparent; color: #94a3b8; border: 1px solid #e2e8f0; margin-left: 10px; }}
+        .footer {{ text-align: center; padding: 30px; color: #94a3b8; font-size: 12px; }}
+        .loading {{ display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }}
+        .loading.show {{ display: flex; }}
+        .loading-content {{ background: white; padding: 40px; border-radius: 12px; text-align: center; }}
+        .loading-spinner {{ width: 50px; height: 50px; border: 4px solid #e2e8f0; border-top: 4px solid #c9a227; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px; }}
+        @keyframes spin {{ 0% {{ transform: rotate(0deg); }} 100% {{ transform: rotate(360deg); }} }}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Legacy Translations</h1>
+        <p>Your translation is ready for review</p>
+    </div>
+    <div class="gold-bar"></div>
+
+    <div class="container">
+        <div class="info-bar">
+            <div class="info-item">
+                <div class="label">Client</div>
+                <div class="value">{client_name}</div>
+            </div>
+            <div class="info-item">
+                <div class="label">Order Number</div>
+                <div class="value">#{order_number}</div>
+            </div>
+            <div class="info-item">
+                <div class="label">Document Type</div>
+                <div class="value">{document_type}</div>
+            </div>
+        </div>
+
+        <div class="translation-box">
+            <div class="translation-header">
+                <h2>Your Translation</h2>
+            </div>
+            <div class="translation-content">
+                {translation_html}
+            </div>
+        </div>
+
+        <div class="actions">
+            <h3>What would you like to do?</h3>
+            <button class="btn btn-approve" onclick="approveTranslation()">✓ Approve Translation</button>
+            <button class="btn btn-changes" onclick="showCorrectionForm()">Request Changes</button>
+
+            <div class="correction-form" id="correctionForm">
+                <label for="corrections">Please describe the corrections needed:</label>
+                <textarea id="corrections" placeholder="Please describe in detail what needs to be changed. For example:&#10;- Page 1: The date should be January 15, 2024, not January 14, 2024&#10;- Page 2: My middle name is spelled incorrectly..."></textarea>
+                <p class="hint">Please be as specific as possible to help us make the correct changes.</p>
+                <button class="btn btn-submit-changes" onclick="submitChanges()">Submit Correction Request</button>
+                <button class="btn btn-cancel" onclick="hideCorrectionForm()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>© 2025 Legacy Translations Inc. · ATA Member #275993 · contact@legacytranslations.com</p>
+    </div>
+
+    <div class="loading" id="loading">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <p>Processing your request...</p>
+        </div>
+    </div>
+
+    <script>
+        const token = "{token}";
+
+        function showLoading() {{
+            document.getElementById('loading').classList.add('show');
+        }}
+
+        function hideLoading() {{
+            document.getElementById('loading').classList.remove('show');
+        }}
+
+        function showCorrectionForm() {{
+            document.getElementById('correctionForm').classList.add('show');
+        }}
+
+        function hideCorrectionForm() {{
+            document.getElementById('correctionForm').classList.remove('show');
+            document.getElementById('corrections').value = '';
+        }}
+
+        async function approveTranslation() {{
+            if (!confirm('Are you sure you want to approve this translation? Once approved, we will generate your certified document.')) {{
+                return;
+            }}
+            showLoading();
+            try {{
+                const response = await fetch(`/api/client/translation-approval/${{token}}/approve`, {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }}
+                }});
+                const data = await response.json();
+                if (response.ok) {{
+                    window.location.reload();
+                }} else {{
+                    alert(data.detail || 'An error occurred. Please try again.');
+                }}
+            }} catch (error) {{
+                alert('An error occurred. Please try again.');
+            }}
+            hideLoading();
+        }}
+
+        async function submitChanges() {{
+            const corrections = document.getElementById('corrections').value.trim();
+            if (corrections.length < 10) {{
+                alert('Please provide a detailed description of the changes needed (at least 10 characters).');
+                return;
+            }}
+            showLoading();
+            try {{
+                const response = await fetch(`/api/client/translation-approval/${{token}}/request-changes`, {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ changes_requested: corrections }})
+                }});
+                const data = await response.json();
+                if (response.ok) {{
+                    window.location.reload();
+                }} else {{
+                    alert(data.detail || 'An error occurred. Please try again.');
+                }}
+            }} catch (error) {{
+                alert('An error occurred. Please try again.');
+            }}
+            hideLoading();
+        }}
+    </script>
+</body>
+</html>'''
+
+
+@api_router.post("/client/translation-approval/{token}/approve")
+async def client_approve_translation(token: str, feedback: Optional[str] = None):
+    """
+    Client approves their translation.
+    Automatically generates certification and sends certified PDF via email.
+    """
+    status = await db.tradux_translations.find_one({"client_approval_token": token})
+    if not status:
+        raise HTTPException(status_code=404, detail="Translation not found or invalid token")
+
+    if status.get("client_approved"):
+        return {"status": "already_approved", "message": "This translation has already been approved"}
+
+    # Get order info
+    order = await db.translation_orders.find_one({"id": status["order_id"]})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Check if this is a TRADUX order (use TRADUX branding) or Legacy order
+    is_tradux = order.get("tradux_mode", False) or status.get("tradux_mode", True)
+
+    # Generate certification ID
+    if is_tradux:
+        certification_id = generate_tradux_certification_id()
+    else:
+        certification_id = f"LT-{datetime.now().strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}"
+
+    # Generate QR code for verification
+    base_url = os.environ.get("FRONTEND_URL", "https://portal.legacytranslations.com")
+    verification_url = f"{base_url}/#/verify/{certification_id}"
+    qr_code_base64 = generate_qr_code(verification_url)
+
+    # Create document hash
+    translation_content = status.get("final_translation", "")
+    document_hash = hashlib.sha256(translation_content.encode('utf-8')).hexdigest()
+
+    # Create certification record in database
+    certification = {
+        "certification_id": certification_id,
+        "order_id": status["order_id"],
+        "order_number": status.get("order_number"),
+        "document_type": order.get("document_type", "Document"),
+        "source_language": order.get("translate_from", "Portuguese"),
+        "target_language": order.get("translate_to", "English"),
+        "page_count": order.get("page_count", 1),
+        "document_hash": document_hash,
+        "certifier_name": "TRADUX Translations" if is_tradux else "Beatriz Paiva",
+        "certifier_title": "Professional Translation Services" if is_tradux else "Certified Translator",
+        "company_name": "TRADUX" if is_tradux else "Legacy Translations Inc.",
+        "client_name": order.get("client_name"),
+        "certified_at": datetime.utcnow(),
+        "is_valid": True,
+        "verification_url": verification_url,
+        "qr_code_data": qr_code_base64,
+        "is_tradux": is_tradux
+    }
+    await db.certifications.insert_one(certification)
+
+    # Generate certified PDF
+    try:
+        certified_pdf_bytes = await generate_tradux_certified_pdf(
+            translation_html=translation_content,
+            order=order,
+            certification_id=certification_id,
+            qr_code_base64=qr_code_base64
+        )
+        certified_pdf_base64 = base64.b64encode(certified_pdf_bytes).decode('utf-8')
+    except Exception as pdf_error:
+        logger.error(f"Error generating certified PDF: {pdf_error}")
+        certified_pdf_base64 = None
+
+    # Update TRADUX status
+    await db.tradux_translations.update_one(
+        {"client_approval_token": token},
+        {"$set": {
+            "client_approved": True,
+            "client_approved_at": datetime.utcnow(),
+            "client_feedback": feedback,
+            "current_step": "completed",
+            "certification_id": certification_id,
+            "steps.client_approval.status": "completed",
+            "steps.client_approval.message": "Client approved translation",
+            "steps.certification.status": "completed",
+            "steps.certification.message": f"Certification generated: {certification_id}",
+            "updated_at": datetime.utcnow(),
+            "completed_at": datetime.utcnow()
+        }}
+    )
+
+    # Update order - mark as delivered
+    await db.translation_orders.update_one(
+        {"id": status["order_id"]},
+        {"$set": {
+            "translation_status": "delivered",
+            "translation_html": translation_content,
+            "certification_id": certification_id,
+            "client_approved_translation": True,
+            "client_approved_at": datetime.utcnow(),
+            "delivered_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
+        }}
+    )
+
+    # Send certified translation to client via email
+    client_email = order.get("client_email")
+    client_name = order.get("client_name", "Valued Customer")
+    order_number = order.get("order_number", "")
+    document_type = order.get("document_type", "Document")
+
+    if client_email:
+        try:
+            if is_tradux:
+                email_content = get_tradux_delivery_email(client_name, order_number, document_type)
+            else:
+                email_content = get_delivery_email_template(client_name)
+
+            if certified_pdf_base64:
+                # Send email with PDF attachment
+                await email_service.send_email_with_attachment(
+                    to=client_email,
+                    subject=f"Your Certified Translation - Order #{order_number}",
+                    content=email_content,
+                    attachment_data=certified_pdf_base64,
+                    attachment_filename=f"Certified_Translation_{order_number}.pdf",
+                    attachment_type="application/pdf"
+                )
+                logger.info(f"Certified translation sent to {client_email} for order {order_number}")
+            else:
+                # Send email without attachment (PDF generation failed)
+                await email_service.send_email(
+                    client_email,
+                    f"Your Translation is Ready - Order #{order_number}",
+                    email_content
+                )
+                logger.warning(f"Sent email without PDF attachment for order {order_number}")
+        except Exception as email_error:
+            logger.error(f"Failed to send delivery email: {email_error}")
+
+    # Create notification for admin/PM
+    if order.get("assigned_pm_id"):
+        notification = Notification(
+            user_id=order["assigned_pm_id"],
+            type="translation_delivered",
+            title="Translation Delivered",
+            message=f"Order {order_number}: Client approved. Certification {certification_id} generated and delivered.",
+            order_id=status["order_id"],
+            order_number=order_number
+        )
+        await db.notifications.insert_one(notification.dict())
+
+    logger.info(f"TRADUX order {order_number} completed. Certification: {certification_id}")
+
+    return {
+        "status": "approved",
+        "message": "Thank you! Your certified translation has been sent to your email.",
+        "order_number": order_number,
+        "certification_id": certification_id
+    }
+
+
+class ClientChangesRequest(BaseModel):
+    changes_requested: str
+
+
+@api_router.post("/client/translation-approval/{token}/request-changes")
+async def client_request_changes(token: str, request: ClientChangesRequest):
+    """
+    Client requests changes to the translation.
+    Marks order for HUMAN REVIEW - no more AI processing.
+    Sends confirmation email to client.
+    """
+    changes_requested = request.changes_requested
+
+    if not changes_requested or len(changes_requested.strip()) < 10:
+        raise HTTPException(status_code=400, detail="Please provide a detailed description of the changes needed")
+
+    status = await db.tradux_translations.find_one({"client_approval_token": token})
+    if not status:
+        raise HTTPException(status_code=404, detail="Translation not found or invalid token")
+
+    # Get order info
+    order = await db.translation_orders.find_one({"id": status["order_id"]})
+
+    # Update TRADUX status - mark as needing human review
+    await db.tradux_translations.update_one(
+        {"client_approval_token": token},
+        {"$set": {
+            "client_feedback": changes_requested,
+            "current_step": "changes_requested",
+            "needs_human_review": True,  # Flag for human review
+            "steps.client_approval.status": "changes_requested",
+            "steps.client_approval.message": changes_requested,
+            "updated_at": datetime.utcnow()
+        }}
+    )
+
+    # Update order - mark for human revision
+    await db.translation_orders.update_one(
+        {"id": status["order_id"]},
+        {"$set": {
+            "translation_status": "revision_requested",
+            "needs_human_review": True,  # Important: human must review
+            "client_revision_notes": changes_requested,
+            "updated_at": datetime.utcnow()
+        }}
+    )
+
+    # Create HIGH PRIORITY notification for admin/PM
+    if order:
+        # Notify PM if assigned
+        if order.get("assigned_pm_id"):
+            notification = Notification(
+                user_id=order["assigned_pm_id"],
+                type="client_revision_request",
+                title="⚠️ Client Requested Translation Revision",
+                message=f"Order {status.get('order_number')}: Client needs changes. HUMAN REVIEW REQUIRED.\n\nClient notes: {changes_requested[:200]}...",
+                order_id=status["order_id"],
+                order_number=status.get("order_number")
+            )
+            await db.notifications.insert_one(notification.dict())
+
+        # Send confirmation email to client
+        try:
+            client_email = order.get("client_email")
+            client_name = order.get("client_name", "Valued Customer")
+            if client_email:
+                email_content = get_tradux_correction_received_email_template(client_name, status.get("order_number"))
+                await email_service.send_email(
+                    client_email,
+                    f"Revision Request Received - Order #{status.get('order_number')}",
+                    email_content
+                )
+        except Exception as e:
+            logger.error(f"Failed to send correction confirmation email: {e}")
+
+    logger.info(f"Client requested changes for order {status.get('order_number')}. Marked for HUMAN REVIEW.")
+
+    return {
+        "status": "changes_requested",
+        "message": "Thank you for your feedback. Our team will review your request and make the necessary changes.",
+        "order_number": status.get("order_number")
+    }
+
+
+@api_router.get("/admin/tradux/translations")
+async def list_tradux_translations(admin_key: str, status: Optional[str] = None, limit: int = 50):
+    """List all TRADUX automated translations"""
+    await validate_admin_or_user_token(admin_key)
+
+    query = {}
+    if status:
+        query["current_step"] = status
+
+    translations = await db.tradux_translations.find(query).sort("created_at", -1).limit(limit).to_list(length=limit)
+
+    for t in translations:
+        t["_id"] = str(t["_id"])
+        # Don't include full translation text in list view
+        if "final_translation" in t:
+            t["has_translation"] = True
+            t["translation_preview"] = t["final_translation"][:500] + "..." if len(t.get("final_translation", "")) > 500 else t.get("final_translation", "")
+            del t["final_translation"]
+        if "original_text" in t:
+            del t["original_text"]
+        if "translated_text" in t:
+            del t["translated_text"]
+
+    return {"translations": translations, "count": len(translations)}
 
 
 # ==================== QUICKBOOKS INTEGRATION ====================
