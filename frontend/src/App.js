@@ -2944,7 +2944,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
 };
 
 // ==================== ORDERS LIST PAGE ====================
-const OrdersPage = ({ token }) => {
+const OrdersPage = ({ token, currency }) => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
@@ -2957,8 +2957,11 @@ const OrdersPage = ({ token }) => {
   const [messageContent, setMessageContent] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
 
-  // Format price helper
-  const formatPrice = (price) => `$${(price || 0).toFixed(2)}`;
+  // Format price helper with currency conversion
+  const formatPrice = (price) => {
+    const converted = (price || 0) * (currency?.rate || 1);
+    return `${currency?.symbol || '$'}${converted.toFixed(2)}`;
+  };
 
   useEffect(() => {
     fetchOrders();
@@ -3447,7 +3450,8 @@ const InvoicesPage = ({ token, t, currency }) => {
   };
 
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
+    const converted = (amount || 0) * (currency?.rate || 1);
+    return `${currency?.symbol || '$'}${converted.toFixed(2)}`;
   };
 
   const getStatusColor = (status) => {
@@ -3959,7 +3963,7 @@ const PaymentPlanPage = ({ token, t }) => {
                 </div>
                 <div className="text-right">
                   <div className="text-2xl font-bold text-blue-600">{tierInfo.discount_percent}% OFF</div>
-                  <div className="text-sm text-gray-600">${tierInfo.price_per_page}/{t?.page || 'page'}</div>
+                  <div className="text-sm text-gray-600">{currency?.symbol || '$'}{(tierInfo.price_per_page * (currency?.rate || 1)).toFixed(2)}/{t?.page || 'page'}</div>
                 </div>
               </div>
 
@@ -3983,7 +3987,7 @@ const PaymentPlanPage = ({ token, t }) => {
                 </div>
                 {tierInfo.monthly_savings > 0 && (
                   <p className="text-sm text-green-600 mt-2">
-                    {t?.youSaved || 'You saved'} <span className="font-semibold">${tierInfo.monthly_savings.toFixed(2)}</span> {t?.thisMonth || 'this month'}!
+                    {t?.youSaved || 'You saved'} <span className="font-semibold">{currency?.symbol || '$'}{(tierInfo.monthly_savings * (currency?.rate || 1)).toFixed(2)}</span> {t?.thisMonth || 'this month'}!
                   </p>
                 )}
               </div>
@@ -4034,9 +4038,9 @@ const PaymentPlanPage = ({ token, t }) => {
                     <td className="px-3 py-3 text-center">
                       <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-semibold">10%</span>
                     </td>
-                    <td className="px-3 py-3 text-center font-medium text-gray-700">$22.49</td>
-                    <td className="px-3 py-3 text-center text-green-600 text-xs">{t?.upTo || 'up to'} $72</td>
-                    <td className="px-3 py-3 text-center font-semibold text-blue-600">$7.50</td>
+                    <td className="px-3 py-3 text-center font-medium text-gray-700">{currency?.symbol || '$'}{(22.49 * (currency?.rate || 1)).toFixed(2)}</td>
+                    <td className="px-3 py-3 text-center text-green-600 text-xs">{t?.upTo || 'up to'} {currency?.symbol || '$'}{(72 * (currency?.rate || 1)).toFixed(0)}</td>
+                    <td className="px-3 py-3 text-center font-semibold text-blue-600">{currency?.symbol || '$'}{(7.50 * (currency?.rate || 1)).toFixed(2)}</td>
                   </tr>
                   <tr className={`border-b border-gray-100 ${tierInfo?.current_tier === 'silver' ? 'bg-blue-50 ring-2 ring-blue-400 ring-inset' : 'hover:bg-gray-50'}`}>
                     <td className="px-3 py-3">
@@ -4052,9 +4056,9 @@ const PaymentPlanPage = ({ token, t }) => {
                     <td className="px-3 py-3 text-center">
                       <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-semibold">15%</span>
                     </td>
-                    <td className="px-3 py-3 text-center font-medium text-gray-700">$21.24</td>
-                    <td className="px-3 py-3 text-center text-green-600 text-xs">{t?.upTo || 'up to'} $225</td>
-                    <td className="px-3 py-3 text-center font-semibold text-blue-600">$8.75</td>
+                    <td className="px-3 py-3 text-center font-medium text-gray-700">{currency?.symbol || '$'}{(21.24 * (currency?.rate || 1)).toFixed(2)}</td>
+                    <td className="px-3 py-3 text-center text-green-600 text-xs">{t?.upTo || 'up to'} {currency?.symbol || '$'}{(225 * (currency?.rate || 1)).toFixed(0)}</td>
+                    <td className="px-3 py-3 text-center font-semibold text-blue-600">{currency?.symbol || '$'}{(8.75 * (currency?.rate || 1)).toFixed(2)}</td>
                   </tr>
                   <tr className={`border-b border-gray-100 ${tierInfo?.current_tier === 'gold' ? 'bg-blue-50 ring-2 ring-blue-400 ring-inset' : 'hover:bg-gray-50'}`}>
                     <td className="px-3 py-3">
@@ -4070,9 +4074,9 @@ const PaymentPlanPage = ({ token, t }) => {
                     <td className="px-3 py-3 text-center">
                       <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-semibold">25%</span>
                     </td>
-                    <td className="px-3 py-3 text-center font-medium text-gray-700">$18.74</td>
-                    <td className="px-3 py-3 text-center text-green-600 text-xs">{t?.upTo || 'up to'} $618</td>
-                    <td className="px-3 py-3 text-center font-semibold text-blue-600">$11.25</td>
+                    <td className="px-3 py-3 text-center font-medium text-gray-700">{currency?.symbol || '$'}{(18.74 * (currency?.rate || 1)).toFixed(2)}</td>
+                    <td className="px-3 py-3 text-center text-green-600 text-xs">{t?.upTo || 'up to'} {currency?.symbol || '$'}{(618 * (currency?.rate || 1)).toFixed(0)}</td>
+                    <td className="px-3 py-3 text-center font-semibold text-blue-600">{currency?.symbol || '$'}{(11.25 * (currency?.rate || 1)).toFixed(2)}</td>
                   </tr>
                   <tr className={`${tierInfo?.current_tier === 'platinum' ? 'bg-blue-50 ring-2 ring-blue-400 ring-inset' : 'hover:bg-gray-50'}`}>
                     <td className="px-3 py-3 rounded-bl-lg">
@@ -4088,9 +4092,9 @@ const PaymentPlanPage = ({ token, t }) => {
                     <td className="px-3 py-3 text-center">
                       <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-semibold">35%</span>
                     </td>
-                    <td className="px-3 py-3 text-center font-medium text-gray-700">$16.24</td>
-                    <td className="px-3 py-3 text-center text-green-600 text-xs">$875+</td>
-                    <td className="px-3 py-3 text-center font-semibold text-blue-600 rounded-br-lg">$13.75</td>
+                    <td className="px-3 py-3 text-center font-medium text-gray-700">{currency?.symbol || '$'}{(16.24 * (currency?.rate || 1)).toFixed(2)}</td>
+                    <td className="px-3 py-3 text-center text-green-600 text-xs">{currency?.symbol || '$'}{(875 * (currency?.rate || 1)).toFixed(0)}+</td>
+                    <td className="px-3 py-3 text-center font-semibold text-blue-600 rounded-br-lg">{currency?.symbol || '$'}{(13.75 * (currency?.rate || 1)).toFixed(2)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -5145,7 +5149,7 @@ function App() {
       case 'new-order':
         return <NewOrderPage partner={partner} token={token} onOrderCreated={() => setActiveTab('orders')} t={t} currency={currency} />;
       case 'orders':
-        return <OrdersPage token={token} />;
+        return <OrdersPage token={token} currency={currency} />;
       case 'invoices':
         return <InvoicesPage token={token} t={t} currency={currency} />;
       case 'messages':
