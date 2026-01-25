@@ -276,7 +276,7 @@ const B2BLandingPage = () => {
     localStorage.setItem('ui_language', newLang);
   };
 
-  // Check for reset_token, verify route, or orders path and redirect appropriately
+  // Check for reset_token, verify route, ref parameter, or orders path and redirect appropriately
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const resetToken = urlParams.get('reset_token');
@@ -285,6 +285,11 @@ const B2BLandingPage = () => {
     // Check for verification route in hash
     const hash = window.location.hash;
     const verifyMatch = hash.match(/^#\/verify\/(.+)$/);
+
+    // Check for ref parameter in hash (e.g., #/partner?ref=GZNSEK)
+    const hashQueryString = hash.includes('?') ? hash.split('?')[1] : '';
+    const hashParams = new URLSearchParams(hashQueryString);
+    const refCode = hashParams.get('ref');
 
     // Redirect /orders/* paths to customer portal
     if (pathname.startsWith('/orders')) {
@@ -301,6 +306,12 @@ const B2BLandingPage = () => {
     if (resetToken) {
       // Redirect to partner portal with reset token
       window.location.href = `/#/partner?reset_token=${resetToken}`;
+      return;
+    }
+
+    // Redirect to registration page when ref parameter is present (salesperson referral link)
+    if (refCode) {
+      window.location.href = `/#/partner/login?ref=${refCode}&register=true`;
       return;
     }
 
