@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TRADUX Admin - AI Translation Management</title>
+    <link rel="icon" href="/images/tradux-icon.png" type="image/png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --tradux-navy: #1E3A8A;
+            --tradux-blue: #3B82F6;
+            --tradux-orange: #f97316;
+            --tradux-gold: #D4AF37;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1E3A8A 0%, #1e40af 100%);
+            min-height: 100vh;
+        }
+        .tradux-gradient {
+            background: linear-gradient(135deg, var(--tradux-navy) 0%, var(--tradux-blue) 100%);
+        }
+        .tradux-button {
+            background: linear-gradient(135deg, var(--tradux-orange) 0%, #ea580c 100%);
+        }
+        .tradux-button:hover {
+            background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%);
+        }
+        .loading-spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--tradux-orange);
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+
+    <script>
+        // TRADUX Admin - Standalone Version
+        const API = window.location.hostname === 'localhost'
+            ? 'http://localhost:8000/api'
+            : 'https://legacy-portal-production.up.railway.app/api';
+
+        // State
+        let state = {
+            isAuthenticated: false,
+            adminKey: localStorage.getItem('tradux_admin_key') || '',
+            orders: [],
+            selectedOrder: null,
+            loading: false,
+            loginError: '',
+            // Translation settings
+            sourceLanguage: 'Portuguese (Brazil)',
+            targetLanguage: 'English',
+            documentType: 'general',
+            pageFormat: 'letter',
+            convertCurrency: false,
+            // Status
+            traduxStatus: null,
+            processingStatus: ''
+        };
+
+        // Check saved auth on load
+        if (state.adminKey) {
+            state.isAuthenticated = true;
+            loadOrders();
+        }
+
+        function setState(newState) {
+            state = { ...state, ...newState };
+            render();
+        }
+
+        async function handleLogin() {
+            const keyInput = document.getElementById('adminKey');
+            const key = keyInput?.value || '';
+
+            if (!key) {
+                setState({ loginError: 'Please enter admin key' });
+                return;
+            }
+
+            setState({ loading: true, loginError: '' });
+
+            try {
+                const response = await fetch(`${API}/admin/orders?admin_key=${key}&brand=tradux`);
+                if (response.ok) {
+                    localStorage.setItem('tradux_admin_key', key);
+                    setState({ adminKey: key, isAuthenticated: true, loading: false });
+                    loadOrders();
+                } else {
+                    setState({ loginError: 'Invalid admin key', loading: false });
+                }
+            } catch (error) {
+                setState({ loginError: 'Connection error: ' + error.message, loading: false });
+            }
+        }
+
+        function handleLogout() {
+            localStorage.removeItem('tradux_admin_key');
+            setState({
+                isAuthenticated: false,
+                adminKey: '',
+                orders: [],
+                selectedOrder: null,
+                traduxStatus: null,
+                processingStatus: ''
+            });
+        }
+
+        async function loadOrders() {
+            setState({ loading: true });
+            try {
+                const response = await fetch(`${API}/admin/orders?admin_key=${state.adminKey}&brand=tradux`);
+                const data = await response.json();
+                setState({ orders: data || [], loading: false });
+            } catch (error) {
+                console.error('Error loading orders:', error);
+                setState({ loading: false });
+            }
+        }
+
+        function selectOrder(order) {
+            setState({ selectedOrder: order, traduxStatus: null, processingStatus: '' });
+        }
+
+        async function startAutoTranslation() {
+            if (!state.selectedOrder) {
+                setState({ processingStatus: 'Please select an order first' });
+                return;
+            }
+
+            setState({
+                processingStatus: 'Starting TRADUX auto-translation...',
+                traduxStatus: { progress_percent: 0, current_step: 'initializing' }
+            });
+
+            try {
+                const response = await fetch(`${API}/admin/tradux/auto-translate?admin_key=${state.adminKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        order_id: state.selectedOrder.id,
+                        source_language: state.sourceLanguage,
+                        target_language: state.targetLanguage,
+                        document_type: state.documentType,
+                        page_format: state.pageFormat,
+                        convert_currency: state.convertCurrency,
+                        use_glossary: true,
+                        auto_correct_errors: true
+                    })
+                });
+
+                if (response.ok) {
+                    setState({ processingStatus: 'TRADUX translation started! Monitoring progress...' });
+                    pollStatus();
+                } else {
+                    const error = await response.json();
+                    setState({ processingStatus: 'Error: ' + (error.detail || 'Unknown error'), traduxStatus: null });
+                }
+            } catch (error) {
+                setState({ processingStatus: 'Error: ' + error.message, traduxStatus: null });
+            }
+        }
+
+        async function pollStatus() {
+            if (!state.selectedOrder) return;
+
+            try {
+                const response = await fetch(`${API}/admin/tradux/status/${state.selectedOrder.id}?admin_key=${state.adminKey}`);
+                const data = await response.json();
+                setState({ traduxStatus: data });
+
+                if (data.current_step === 'ready_for_client' || data.current_step === 'completed') {
+                    setState({ processingStatus: 'Translation complete! Ready for client approval.' });
+                } else if (data.has_error) {
+                    setState({ processingStatus: 'Error: ' + data.error_message });
+                } else {
+                    setTimeout(pollStatus, 3000);
+                }
+            } catch (error) {
+                console.error('Error polling status:', error);
+            }
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            return new Date(dateStr).toLocaleString('en-US', { timeZone: 'America/New_York' });
+        }
+
+        function render() {
+            const app = document.getElementById('app');
+
+            if (!state.isAuthenticated) {
+                // Login Screen
+                app.innerHTML = `
+                    <div class="min-h-screen flex items-center justify-center p-4">
+                        <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
+                            <div class="text-center mb-8">
+                                <div class="flex items-center justify-center gap-1 mb-2">
+                                    <span class="text-4xl font-bold text-[#1E3A8A]">TRADU</span>
+                                    <span class="text-4xl font-bold text-[#f97316]">X</span>
+                                </div>
+                                <p class="text-gray-500 text-sm">AI-Powered Translation Admin</p>
+                            </div>
+
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Admin Key</label>
+                                    <input
+                                        type="password"
+                                        id="adminKey"
+                                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                                        placeholder="Enter your admin key"
+                                        onkeypress="if(event.key==='Enter')handleLogin()"
+                                    />
+                                </div>
+
+                                ${state.loginError ? `<div class="text-red-500 text-sm text-center">${state.loginError}</div>` : ''}
+
+                                <button
+                                    onclick="handleLogin()"
+                                    class="w-full py-3 tradux-button text-white font-bold rounded-lg transition-all hover:scale-[1.02] flex items-center justify-center gap-2"
+                                    ${state.loading ? 'disabled' : ''}
+                                >
+                                    ${state.loading ? '<div class="loading-spinner"></div>' : 'Login'}
+                                </button>
+                            </div>
+
+                            <div class="mt-6 pt-6 border-t text-center text-xs text-gray-400">
+                                <p>100% AI-Powered Certified Translations</p>
+                                <p class="mt-1">tradux.online</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                // Main Admin Interface
+                app.innerHTML = `
+                    <!-- Header -->
+                    <header class="tradux-gradient text-white p-4 shadow-lg">
+                        <div class="max-w-7xl mx-auto flex justify-between items-center">
+                            <div class="flex items-center gap-4">
+                                <div class="flex items-center gap-1">
+                                    <span class="text-2xl font-bold">TRADU</span>
+                                    <span class="text-2xl font-bold text-orange-400">X</span>
+                                </div>
+                                <span class="text-sm opacity-70 hidden sm:inline">Admin Portal</span>
+                            </div>
+                            <button onclick="handleLogout()" class="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm transition-all">
+                                Logout
+                            </button>
+                        </div>
+                    </header>
+
+                    <div class="max-w-7xl mx-auto p-4 sm:p-6">
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+                            <!-- Orders List -->
+                            <div class="bg-white rounded-xl shadow-lg p-4">
+                                <div class="flex justify-between items-center mb-4">
+                                    <h2 class="text-lg font-bold text-gray-800">TRADUX Orders</h2>
+                                    <button onclick="loadOrders()" class="p-2 text-gray-600 hover:bg-gray-100 rounded-lg" title="Refresh">
+                                        🔄
+                                    </button>
+                                </div>
+
+                                ${state.loading ? `
+                                    <div class="text-center py-8">
+                                        <div class="loading-spinner mx-auto"></div>
+                                        <p class="text-gray-500 mt-2">Loading...</p>
+                                    </div>
+                                ` : state.orders.length === 0 ? `
+                                    <div class="text-center py-8 text-gray-500">
+                                        <div class="text-4xl mb-2">📋</div>
+                                        <p>No TRADUX orders found</p>
+                                        <p class="text-xs mt-2">Orders with brand "tradux" will appear here</p>
+                                    </div>
+                                ` : `
+                                    <div class="space-y-2 max-h-[500px] overflow-y-auto">
+                                        ${state.orders.map(order => `
+                                            <div
+                                                onclick="selectOrder(${JSON.stringify(order).replace(/"/g, '&quot;')})"
+                                                class="p-3 rounded-lg cursor-pointer transition-all ${
+                                                    state.selectedOrder?.id === order.id
+                                                        ? 'bg-orange-100 border-2 border-orange-500 shadow-md'
+                                                        : 'bg-gray-50 hover:bg-gray-100 border border-gray-200'
+                                                }"
+                                            >
+                                                <div class="font-medium text-gray-800">${order.client_name || 'Unknown'}</div>
+                                                <div class="text-sm text-gray-600">${order.service_type || 'Translation'}</div>
+                                                <div class="text-xs text-gray-500 mt-1">${formatDate(order.created_at)}</div>
+                                                <span class="inline-block mt-1 px-2 py-0.5 rounded text-xs ${
+                                                    order.status === 'Completed' ? 'bg-green-100 text-green-700' :
+                                                    order.status === 'In progress' ? 'bg-yellow-100 text-yellow-700' :
+                                                    'bg-gray-100 text-gray-700'
+                                                }">
+                                                    ${order.status || 'Pending'}
+                                                </span>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                `}
+                            </div>
+
+                            <!-- Translation Panel -->
+                            <div class="lg:col-span-2 space-y-4">
+
+                                <!-- TRADUX Header -->
+                                <div class="tradux-button rounded-xl p-4 text-white">
+                                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                        <div>
+                                            <h3 class="text-lg font-bold">TRADUX Auto-Translation</h3>
+                                            <p class="text-sm opacity-90">100% AI-powered - No human intervention</p>
+                                        </div>
+                                        <div class="text-right">
+                                            <div class="text-2xl font-bold">~5 min</div>
+                                            <div class="text-xs opacity-80">Average time</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Process Steps -->
+                                <div class="bg-orange-50 border border-orange-200 rounded-xl p-4">
+                                    <h4 class="text-sm font-bold text-orange-800 mb-3">Automated Workflow:</h4>
+                                    <div class="grid grid-cols-5 gap-2">
+                                        ${['OCR', 'Translate', 'Layout', 'Proofread', 'Approve'].map((step, i) => `
+                                            <div class="text-center p-2 bg-white rounded-lg border">
+                                                <div class="w-8 h-8 mx-auto mb-1 rounded-full flex items-center justify-center text-white text-sm font-bold bg-orange-500">${i+1}</div>
+                                                <div class="text-xs font-medium">${step}</div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+
+                                <!-- Settings -->
+                                <div class="bg-white rounded-xl shadow-lg p-4">
+                                    <h4 class="text-sm font-bold text-gray-700 mb-3">Translation Settings:</h4>
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-xs text-gray-600 mb-1">Source Language</label>
+                                            <select onchange="setState({sourceLanguage: this.value})" class="w-full px-3 py-2 border rounded-lg text-sm">
+                                                <option value="Portuguese (Brazil)" ${state.sourceLanguage === 'Portuguese (Brazil)' ? 'selected' : ''}>Portuguese (Brazil)</option>
+                                                <option value="Spanish" ${state.sourceLanguage === 'Spanish' ? 'selected' : ''}>Spanish</option>
+                                                <option value="French" ${state.sourceLanguage === 'French' ? 'selected' : ''}>French</option>
+                                                <option value="German" ${state.sourceLanguage === 'German' ? 'selected' : ''}>German</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs text-gray-600 mb-1">Target Language</label>
+                                            <select onchange="setState({targetLanguage: this.value})" class="w-full px-3 py-2 border rounded-lg text-sm">
+                                                <option value="English" ${state.targetLanguage === 'English' ? 'selected' : ''}>English</option>
+                                                <option value="Portuguese (Brazil)" ${state.targetLanguage === 'Portuguese (Brazil)' ? 'selected' : ''}>Portuguese (Brazil)</option>
+                                                <option value="Spanish" ${state.targetLanguage === 'Spanish' ? 'selected' : ''}>Spanish</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs text-gray-600 mb-1">Document Type</label>
+                                            <select onchange="setState({documentType: this.value})" class="w-full px-3 py-2 border rounded-lg text-sm">
+                                                <option value="general">General Document</option>
+                                                <option value="birth_certificate">Birth Certificate</option>
+                                                <option value="marriage_certificate">Marriage Certificate</option>
+                                                <option value="diploma">Diploma / Academic</option>
+                                                <option value="bank_statement">Bank Statement</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs text-gray-600 mb-1">Page Format</label>
+                                            <select onchange="setState({pageFormat: this.value})" class="w-full px-3 py-2 border rounded-lg text-sm">
+                                                <option value="letter">US Letter</option>
+                                                <option value="a4">A4</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="mt-3 p-3 bg-gray-50 rounded-lg">
+                                        <label class="flex items-center gap-2 text-sm cursor-pointer">
+                                            <input type="checkbox" ${state.convertCurrency ? 'checked' : ''} onchange="setState({convertCurrency: this.checked})" class="rounded">
+                                            <span>Enable Currency Conversion (BRL → USD)</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <!-- Status Display -->
+                                ${state.traduxStatus ? `
+                                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                                        <div class="flex items-center justify-between mb-3">
+                                            <h4 class="text-sm font-bold text-blue-800">Translation Progress</h4>
+                                            <span class="text-lg font-bold text-blue-600">${state.traduxStatus.progress_percent || 0}%</span>
+                                        </div>
+                                        <div class="w-full bg-blue-200 rounded-full h-3 mb-3">
+                                            <div class="tradux-button h-3 rounded-full transition-all" style="width: ${state.traduxStatus.progress_percent || 0}%"></div>
+                                        </div>
+                                        <div class="text-sm text-blue-700">
+                                            <span class="font-medium">Current Step:</span> ${state.traduxStatus.current_step || 'Initializing...'}
+                                        </div>
+                                        ${state.traduxStatus.has_error ? `
+                                            <div class="mt-2 p-2 bg-red-100 border border-red-300 rounded text-sm text-red-700">
+                                                Error: ${state.traduxStatus.error_message}
+                                            </div>
+                                        ` : ''}
+                                        ${state.traduxStatus.current_step === 'ready_for_client' ? `
+                                            <div class="mt-3 p-3 bg-green-100 border border-green-300 rounded-lg">
+                                                <div class="text-green-800 font-medium">✅ Translation Complete!</div>
+                                                <div class="text-sm text-green-700 mt-1">Ready for client approval</div>
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                ` : ''}
+
+                                <!-- Start Button -->
+                                <div class="flex justify-center">
+                                    <button
+                                        onclick="startAutoTranslation()"
+                                        ${!state.selectedOrder || (state.traduxStatus && state.traduxStatus.progress_percent > 0 && state.traduxStatus.progress_percent < 100) ? 'disabled' : ''}
+                                        class="px-8 py-4 text-lg font-bold rounded-xl shadow-lg transition-all flex items-center gap-3 ${
+                                            !state.selectedOrder || (state.traduxStatus && state.traduxStatus.progress_percent > 0 && state.traduxStatus.progress_percent < 100)
+                                                ? 'bg-gray-400 cursor-not-allowed text-white'
+                                                : 'tradux-button text-white hover:scale-105'
+                                        }"
+                                    >
+                                        <span class="text-2xl">⚡</span>
+                                        <span>Start TRADUX Auto-Translation</span>
+                                    </button>
+                                </div>
+
+                                <!-- Processing Status -->
+                                ${state.processingStatus ? `
+                                    <div class="p-3 rounded-lg text-sm font-medium text-center ${
+                                        state.processingStatus.includes('Error') ? 'bg-red-100 text-red-700' :
+                                        state.processingStatus.includes('complete') || state.processingStatus.includes('Complete') ? 'bg-green-100 text-green-700' :
+                                        state.processingStatus.includes('select') ? 'bg-yellow-100 text-yellow-700' :
+                                        'bg-blue-100 text-blue-700'
+                                    }">
+                                        ${state.processingStatus}
+                                    </div>
+                                ` : ''}
+
+                                <!-- Selected Order Info -->
+                                ${state.selectedOrder ? `
+                                    <div class="bg-white rounded-xl shadow-lg p-4">
+                                        <h4 class="text-sm font-bold text-gray-700 mb-3">Selected Order:</h4>
+                                        <div class="grid grid-cols-2 gap-3 text-sm">
+                                            <div><span class="text-gray-500">Client:</span> <span class="font-medium">${state.selectedOrder.client_name || '-'}</span></div>
+                                            <div><span class="text-gray-500">Email:</span> <span class="font-medium">${state.selectedOrder.client_email || '-'}</span></div>
+                                            <div><span class="text-gray-500">Service:</span> <span class="font-medium">${state.selectedOrder.service_type || '-'}</span></div>
+                                            <div><span class="text-gray-500">Status:</span> <span class="font-medium">${state.selectedOrder.status || '-'}</span></div>
+                                            <div><span class="text-gray-500">Languages:</span> <span class="font-medium">${state.selectedOrder.source_language || '-'} → ${state.selectedOrder.target_language || '-'}</span></div>
+                                            <div><span class="text-gray-500">Pages:</span> <span class="font-medium">${state.selectedOrder.page_count || 'N/A'}</span></div>
+                                        </div>
+                                    </div>
+                                ` : `
+                                    <div class="bg-gray-50 rounded-xl p-8 text-center text-gray-500">
+                                        <div class="text-4xl mb-2">👈</div>
+                                        <p>Select an order from the list to begin</p>
+                                    </div>
+                                `}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Footer -->
+                    <footer class="text-center py-6 text-white/70 text-sm mt-8">
+                        <div class="flex items-center justify-center gap-1 mb-2">
+                            <span class="font-bold">TRADU</span>
+                            <span class="font-bold text-orange-400">X</span>
+                        </div>
+                        <p>tradux.online - AI-Powered Certified Translations</p>
+                    </footer>
+                `;
+            }
+        }
+
+        // Initial render
+        render();
+    </script>
+</body>
+</html>

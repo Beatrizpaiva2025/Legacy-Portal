@@ -1,5 +1,9 @@
 {
   "buildCommand": "yarn build",
   "installCommand": "yarn install --frozen-lockfile",
-  "framework": "create-react-app"
+  "framework": "create-react-app",
+  "rewrites": [
+    { "source": "/admin", "destination": "/admin/index.html" },
+    { "source": "/admin/", "destination": "/admin/index.html" }
+  ]
 }
