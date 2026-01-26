@@ -11772,6 +11772,19 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               </button>
             </div>
 
+            {/* TM Stats */}
+            <div className="mb-3 flex items-center gap-4 text-xs">
+              <span className="bg-gray-100 px-3 py-1 rounded">
+                Total: <strong>{translationMemories.length}</strong> entries
+              </span>
+              <span className="bg-purple-50 text-purple-700 px-3 py-1 rounded">
+                📤 Uploaded: <strong>{translationMemories.filter(tm => tm.is_uploaded).length}</strong>
+              </span>
+              <span className="bg-green-50 text-green-700 px-3 py-1 rounded">
+                🤖 Auto-generated: <strong>{translationMemories.filter(tm => !tm.is_uploaded).length}</strong>
+              </span>
+            </div>
+
             {/* TM Entries Table */}
             {translationMemories.length > 0 ? (
               <div className="border rounded overflow-hidden">
@@ -11784,6 +11797,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <table className="w-full text-xs">
                   <thead className="bg-gray-100">
                     <tr>
+                      <th className="px-3 py-2 text-left font-medium">Source</th>
                       <th className="px-3 py-2 text-left font-medium">Languages</th>
                       <th className="px-3 py-2 text-left font-medium">Source Text</th>
                       <th className="px-3 py-2 text-left font-medium">Target Text</th>
@@ -11856,7 +11870,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 </table>
                 {translationMemories.length > 100 && (
                   <div className="p-2 bg-gray-50 text-center text-xs text-gray-500">
-                    Showing 100 of {translationMemories.length} entries. Download to see all.
+                    Showing 100 of {translationMemories.length} entries (newest first). Download to see all.
                   </div>
                 )}
               </div>
