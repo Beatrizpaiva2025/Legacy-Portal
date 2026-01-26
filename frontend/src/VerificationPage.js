@@ -9,11 +9,12 @@ const VerificationPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Document content verification states
-  const [documentContent, setDocumentContent] = useState('');
-  const [contentVerificationResult, setContentVerificationResult] = useState(null);
-  const [verifyingContent, setVerifyingContent] = useState(false);
-  const [showContentVerifier, setShowContentVerifier] = useState(false);
+  // PDF verification states
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [pdfVerificationResult, setPdfVerificationResult] = useState(null);
+  const [verifyingPdf, setVerifyingPdf] = useState(false);
+  const [showPdfVerifier, setShowPdfVerifier] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
 
   useEffect(() => {
     // Extract certification ID from URL
@@ -32,8 +33,8 @@ const VerificationPage = () => {
   const verifyCertification = async (certId) => {
     setLoading(true);
     setError('');
-    setContentVerificationResult(null);
-    setDocumentContent('');
+    setPdfVerificationResult(null);
+    setSelectedFile(null);
     try {
       const response = await axios.get(`${API}/certifications/verify/${certId}`);
       setVerificationResult(response.data);
@@ -46,26 +47,58 @@ const VerificationPage = () => {
     }
   };
 
-  const verifyDocumentContent = async () => {
-    if (!documentContent.trim() || !certificationId) return;
+  const handleFileSelect = (file) => {
+    if (file && file.type === 'application/pdf') {
+      setSelectedFile(file);
+      setPdfVerificationResult(null);
+    } else if (file) {
+      alert('Please select a PDF file.');
+    }
+  };
 
-    setVerifyingContent(true);
-    setContentVerificationResult(null);
+  const handleDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true);
+    } else if (e.type === 'dragleave') {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFileSelect(e.dataTransfer.files[0]);
+    }
+  };
+
+  const verifyPdfDocument = async () => {
+    if (!selectedFile || !certificationId) return;
+
+    setVerifyingPdf(true);
+    setPdfVerificationResult(null);
     try {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+
       const response = await axios.post(
-        `${API}/certifications/verify-content/${certificationId}`,
-        { document_content: documentContent }
+        `${API}/certifications/verify-pdf/${certificationId}`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
       );
-      setContentVerificationResult(response.data);
+      setPdfVerificationResult(response.data);
     } catch (err) {
-      console.error('Content verification error:', err);
-      setContentVerificationResult({
+      console.error('PDF verification error:', err);
+      setPdfVerificationResult({
         is_authentic: false,
-        content_matches: false,
-        message: 'Error verifying document content. Please try again.'
+        pdf_matches: false,
+        message: 'Error verifying PDF document. Please try again.'
       });
     } finally {
-      setVerifyingContent(false);
+      setVerifyingPdf(false);
     }
   };
 
@@ -262,10 +295,10 @@ const VerificationPage = () => {
                 </div>
               </div>
 
-              {/* Document Content Verification Section */}
+              {/* PDF Document Verification Section */}
               <div className="mt-6 border border-slate-200 rounded-lg overflow-hidden">
                 <button
-                  onClick={() => setShowContentVerifier(!showContentVerifier)}
+                  onClick={() => setShowPdfVerifier(!showPdfVerifier)}
                   className="w-full px-5 py-4 bg-slate-50 hover:bg-slate-100 transition-colors flex items-center justify-between"
                 >
                   <div className="flex items-center gap-3">
@@ -276,11 +309,11 @@ const VerificationPage = () => {
                     </div>
                     <div className="text-left">
                       <h3 className="font-bold text-slate-800">Verify Document Integrity</h3>
-                      <p className="text-sm text-slate-500">Check if your document has been altered</p>
+                      <p className="text-sm text-slate-500">Upload PDF to check if it has been altered</p>
                     </div>
                   </div>
                   <svg
-                    className={`w-5 h-5 text-slate-400 transition-transform ${showContentVerifier ? 'rotate-180' : ''}`}
+                    className={`w-5 h-5 text-slate-400 transition-transform ${showPdfVerifier ? 'rotate-180' : ''}`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -289,47 +322,92 @@ const VerificationPage = () => {
                   </svg>
                 </button>
 
-                {showContentVerifier && (
+                {showPdfVerifier && (
                   <div className="p-5 border-t border-slate-200">
                     <p className="text-sm text-slate-600 mb-4">
-                      Paste the translation text content below to verify if it matches the certified original.
-                      Any alterations will be detected.
+                      Upload the certified PDF document to verify if it matches the original.
+                      Any modifications to the file will be detected.
                     </p>
 
-                    <textarea
-                      value={documentContent}
-                      onChange={(e) => setDocumentContent(e.target.value)}
-                      placeholder="Paste the translation text here to verify its authenticity..."
-                      className="w-full h-40 px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm resize-none"
-                    />
+                    {/* Drag and Drop Zone */}
+                    <div
+                      className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                        dragActive
+                          ? 'border-slate-500 bg-slate-50'
+                          : selectedFile
+                          ? 'border-emerald-300 bg-emerald-50'
+                          : 'border-slate-300 hover:border-slate-400'
+                      }`}
+                      onDragEnter={handleDrag}
+                      onDragLeave={handleDrag}
+                      onDragOver={handleDrag}
+                      onDrop={handleDrop}
+                    >
+                      {selectedFile ? (
+                        <div className="flex flex-col items-center">
+                          <svg className="w-12 h-12 text-emerald-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <p className="font-medium text-slate-800">{selectedFile.name}</p>
+                          <p className="text-sm text-slate-500 mt-1">
+                            {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                          <button
+                            onClick={() => setSelectedFile(null)}
+                            className="mt-3 text-sm text-red-600 hover:text-red-700 font-medium"
+                          >
+                            Remove file
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center">
+                          <svg className="w-12 h-12 text-slate-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                          </svg>
+                          <p className="font-medium text-slate-700">Drag and drop your PDF here</p>
+                          <p className="text-sm text-slate-500 mt-1">or</p>
+                          <label className="mt-3 cursor-pointer">
+                            <span className="px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-colors text-sm font-medium">
+                              Select PDF File
+                            </span>
+                            <input
+                              type="file"
+                              accept=".pdf,application/pdf"
+                              className="hidden"
+                              onChange={(e) => handleFileSelect(e.target.files[0])}
+                            />
+                          </label>
+                        </div>
+                      )}
+                    </div>
 
                     <button
-                      onClick={verifyDocumentContent}
-                      disabled={!documentContent.trim() || verifyingContent}
+                      onClick={verifyPdfDocument}
+                      disabled={!selectedFile || verifyingPdf}
                       className="mt-4 w-full px-6 py-3 bg-slate-800 text-white rounded-lg hover:bg-slate-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors font-medium"
                     >
-                      {verifyingContent ? (
+                      {verifyingPdf ? (
                         <span className="flex items-center justify-center gap-2">
                           <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                           </svg>
-                          Verifying Content...
+                          Verifying PDF...
                         </span>
                       ) : (
-                        'Verify Document Content'
+                        'Verify PDF Document'
                       )}
                     </button>
 
-                    {/* Content Verification Result */}
-                    {contentVerificationResult && (
+                    {/* PDF Verification Result */}
+                    {pdfVerificationResult && (
                       <div className={`mt-4 p-4 rounded-lg ${
-                        contentVerificationResult.content_matches
+                        pdfVerificationResult.pdf_matches
                           ? 'bg-emerald-50 border border-emerald-200'
                           : 'bg-red-50 border border-red-200'
                       }`}>
                         <div className="flex items-start gap-3">
-                          {contentVerificationResult.content_matches ? (
+                          {pdfVerificationResult.pdf_matches ? (
                             <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0">
                               <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -344,24 +422,24 @@ const VerificationPage = () => {
                           )}
                           <div>
                             <h4 className={`font-bold ${
-                              contentVerificationResult.content_matches ? 'text-emerald-800' : 'text-red-800'
+                              pdfVerificationResult.pdf_matches ? 'text-emerald-800' : 'text-red-800'
                             }`}>
-                              {contentVerificationResult.content_matches
-                                ? 'Document Authentic - No Alterations'
+                              {pdfVerificationResult.pdf_matches
+                                ? 'PDF Authentic - No Alterations'
                                 : 'ALTERATIONS DETECTED'}
                             </h4>
                             <p className={`text-sm mt-1 ${
-                              contentVerificationResult.content_matches ? 'text-emerald-700' : 'text-red-700'
+                              pdfVerificationResult.pdf_matches ? 'text-emerald-700' : 'text-red-700'
                             }`}>
-                              {contentVerificationResult.message}
+                              {pdfVerificationResult.message}
                             </p>
-                            {contentVerificationResult.original_hash && contentVerificationResult.submitted_hash && (
+                            {pdfVerificationResult.original_hash && pdfVerificationResult.submitted_hash && (
                               <div className="mt-3 text-xs space-y-1">
                                 <p className="font-mono text-slate-500">
-                                  Original hash: {contentVerificationResult.original_hash}
+                                  Original hash: {pdfVerificationResult.original_hash}
                                 </p>
                                 <p className="font-mono text-slate-500">
-                                  Submitted hash: {contentVerificationResult.submitted_hash}
+                                  Uploaded hash: {pdfVerificationResult.submitted_hash}
                                 </p>
                               </div>
                             )}

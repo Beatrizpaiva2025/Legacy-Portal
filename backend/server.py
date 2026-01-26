@@ -13401,6 +13401,17 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                     translator_name=translator_name
                 )
 
+                # Compute PDF hash for integrity verification
+                pdf_hash = hashlib.sha256(combined_pdf_bytes).hexdigest()
+
+                # Update certification with PDF hash if we have certification data
+                if certification_data and certification_data.get("certification_id"):
+                    await db.certifications.update_one(
+                        {"certification_id": certification_data["certification_id"]},
+                        {"$set": {"pdf_hash": pdf_hash}}
+                    )
+                    logger.info(f"Stored PDF hash for certification: {certification_data['certification_id']}")
+
                 # Add combined PDF as the single attachment
                 all_attachments = [{
                     "content": base64.b64encode(combined_pdf_bytes).decode('utf-8'),
@@ -24843,6 +24854,99 @@ async def verify_document_content(certification_id: str, data: DocumentVerifyReq
 
     except Exception as e:
         logger.error(f"Error verifying document content: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/certifications/verify-pdf/{certification_id}")
+async def verify_pdf_document(certification_id: str, file: UploadFile = File(...)):
+    """
+    Public endpoint to verify if an uploaded PDF matches the certified original.
+    This detects if the PDF has been altered after certification by comparing file hashes.
+    """
+    try:
+        # Validate file type
+        if not file.filename.lower().endswith('.pdf'):
+            raise HTTPException(status_code=400, detail="Only PDF files are accepted")
+
+        # Read file content
+        file_content = await file.read()
+        if len(file_content) > 50 * 1024 * 1024:  # 50MB limit
+            raise HTTPException(status_code=400, detail="File too large. Maximum size is 50MB.")
+
+        # Find certification
+        certification = await db.certifications.find_one({"certification_id": certification_id})
+
+        if not certification:
+            return {
+                "certification_id": certification_id,
+                "is_authentic": False,
+                "pdf_matches": False,
+                "original_hash": "NOT FOUND",
+                "submitted_hash": "N/A",
+                "message": "Certification not found. This document may not be certified by Legacy Translations."
+            }
+
+        # Check if revoked
+        if certification.get("revoked_at"):
+            return {
+                "certification_id": certification_id,
+                "is_authentic": False,
+                "pdf_matches": False,
+                "original_hash": certification.get("pdf_hash", "")[:20] + "..." if certification.get("pdf_hash") else "N/A",
+                "submitted_hash": "N/A",
+                "certified_at": certification.get("certified_at"),
+                "message": f"This certification was revoked. Reason: {certification.get('revocation_reason', 'Not specified')}"
+            }
+
+        # Check if PDF hash exists
+        original_pdf_hash = certification.get("pdf_hash")
+        if not original_pdf_hash:
+            return {
+                "certification_id": certification_id,
+                "is_authentic": False,
+                "pdf_matches": False,
+                "original_hash": "NOT AVAILABLE",
+                "submitted_hash": "N/A",
+                "certified_at": certification.get("certified_at"),
+                "message": "⚠ PDF verification not available for this certification. This document was certified before PDF hash tracking was implemented. Please use text content verification instead."
+            }
+
+        # Compute hash of uploaded PDF
+        submitted_pdf_hash = hashlib.sha256(file_content).hexdigest()
+
+        # Compare hashes
+        pdf_matches = submitted_pdf_hash == original_pdf_hash
+
+        if pdf_matches:
+            return {
+                "certification_id": certification_id,
+                "is_authentic": True,
+                "pdf_matches": True,
+                "original_hash": original_pdf_hash[:20] + "...",
+                "submitted_hash": submitted_pdf_hash[:20] + "...",
+                "certified_at": certification.get("certified_at"),
+                "document_type": certification.get("document_type"),
+                "source_language": certification.get("source_language"),
+                "target_language": certification.get("target_language"),
+                "message": "✓ PDF VERIFIED: The uploaded file is identical to the certified original. No alterations detected."
+            }
+        else:
+            return {
+                "certification_id": certification_id,
+                "is_authentic": False,
+                "pdf_matches": False,
+                "original_hash": original_pdf_hash[:20] + "...",
+                "submitted_hash": submitted_pdf_hash[:20] + "...",
+                "certified_at": certification.get("certified_at"),
+                "document_type": certification.get("document_type"),
+                "source_language": certification.get("source_language"),
+                "target_language": certification.get("target_language"),
+                "message": "⚠ ALTERATIONS DETECTED: The uploaded PDF does NOT match the certified original. This document has been modified after certification."
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error verifying PDF document: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.get("/certifications/{certification_id}")
