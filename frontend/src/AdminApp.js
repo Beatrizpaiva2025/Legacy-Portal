@@ -1894,7 +1894,27 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
   // Translation Memory state
   const [translationMemories, setTranslationMemories] = useState([]);
-  const [tmFilter, setTmFilter] = useState({ sourceLang: '', targetLang: '' });
+  const [tmFilter, setTmFilter] = useState({ sourceLang: '', targetLang: '', field: '' });
+
+  // TM Upload Modal state
+  const [showTmUploadModal, setShowTmUploadModal] = useState(false);
+  const [tmUploadFile, setTmUploadFile] = useState(null);
+  const [tmUploadConfig, setTmUploadConfig] = useState({
+    sourceLang: 'Portuguese (Brazil)',
+    targetLang: 'English',
+    field: 'General'
+  });
+
+  // TM Edit Modal state
+  const [showTmEditModal, setShowTmEditModal] = useState(false);
+  const [editingTmEntry, setEditingTmEntry] = useState(null);
+  const [tmEditForm, setTmEditForm] = useState({
+    source: '',
+    target: '',
+    sourceLang: '',
+    targetLang: '',
+    field: 'General'
+  });
 
   // Translator's Note for Financial Documents (Bank Statements, Tax Returns)
   const [translatorNoteEnabled, setTranslatorNoteEnabled] = useState(false);
@@ -11633,34 +11653,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   type="file"
                   accept=".csv,.tmx,.xml,.xlsx,.xls,.sdltm"
                   className="hidden"
-                  onChange={async (e) => {
+                  onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
-
-                    const sourceLang = tmFilter.sourceLang || 'Portuguese (Brazil)';
-                    const targetLang = tmFilter.targetLang || 'English';
-
-                    const formData = new FormData();
-                    formData.append('file', file);
-                    formData.append('sourceLang', sourceLang);
-                    formData.append('targetLang', targetLang);
-                    formData.append('field', 'General');
-
-                    try {
-                      setProcessingStatus('Uploading TM...');
-                      const response = await axios.post(
-                        `${API}/admin/translation-memory/upload?admin_key=${adminKey}`,
-                        formData,
-                        { headers: { 'Content-Type': 'multipart/form-data' } }
-                      );
-                      setProcessingStatus(`✅ ${response.data.message}`);
-                      // Refresh TM list
-                      const res = await axios.get(`${API}/admin/translation-memory?admin_key=${adminKey}`);
-                      setTranslationMemories(res.data.memories || []);
-                    } catch (err) {
-                      alert('Upload failed: ' + (err.response?.data?.detail || err.message));
-                      setProcessingStatus('');
-                    }
+                    setTmUploadFile(file);
+                    setShowTmUploadModal(true);
                     e.target.value = ''; // Reset file input
                   }}
                 />
@@ -11742,12 +11739,27 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <option value="">All Target Languages</option>
                 {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
               </select>
+              <select
+                value={tmFilter.field}
+                onChange={(e) => setTmFilter({ ...tmFilter, field: e.target.value })}
+                className="px-3 py-1.5 text-xs border rounded"
+              >
+                <option value="">All Fields</option>
+                <option value="General">General</option>
+                <option value="Financial">Financial</option>
+                <option value="Education">Education</option>
+                <option value="Legal">Legal</option>
+                <option value="Medical">Medical</option>
+                <option value="Technical">Technical</option>
+                <option value="Personal Documents">Personal Documents</option>
+              </select>
               <button
                 onClick={async () => {
                   try {
                     let url = `${API}/admin/translation-memory?admin_key=${adminKey}`;
                     if (tmFilter.sourceLang) url += `&sourceLang=${encodeURIComponent(tmFilter.sourceLang)}`;
                     if (tmFilter.targetLang) url += `&targetLang=${encodeURIComponent(tmFilter.targetLang)}`;
+                    if (tmFilter.field) url += `&field=${encodeURIComponent(tmFilter.field)}`;
                     const res = await axios.get(url);
                     setTranslationMemories(res.data.memories || []);
                   } catch (err) {
@@ -11763,6 +11775,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             {/* TM Entries Table */}
             {translationMemories.length > 0 ? (
               <div className="border rounded overflow-hidden">
+                <div className="px-3 py-2 bg-gray-50 border-b text-xs text-gray-600 flex justify-between items-center">
+                  <span>Showing {Math.min(translationMemories.length, 500)} of {translationMemories.length} entries</span>
+                  {translationMemories.length > 500 && (
+                    <span className="text-orange-600">Use filters to narrow results or download full TM</span>
+                  )}
+                </div>
                 <table className="w-full text-xs">
                   <thead className="bg-gray-100">
                     <tr>
@@ -11775,7 +11793,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {translationMemories.slice(0, 100).map((tm) => (
+                    {translationMemories.slice(0, 500).map((tm) => (
                       <tr key={tm.id} className="hover:bg-gray-50">
                         <td className="px-3 py-2">
                           <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px]">
@@ -11797,20 +11815,40 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           </span>
                         </td>
                         <td className="px-3 py-2 text-center">
-                          <button
-                            onClick={async () => {
-                              if (!window.confirm('Delete this TM entry?')) return;
-                              try {
-                                await axios.delete(`${API}/admin/translation-memory/${tm.id}?admin_key=${adminKey}`);
-                                setTranslationMemories(translationMemories.filter(t => t.id !== tm.id));
-                              } catch (err) {
-                                alert('Failed to delete: ' + err.message);
-                              }
-                            }}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            🗑️
-                          </button>
+                          <div className="flex items-center justify-center space-x-1">
+                            <button
+                              onClick={() => {
+                                setEditingTmEntry(tm);
+                                setTmEditForm({
+                                  source: tm.source,
+                                  target: tm.target,
+                                  sourceLang: tm.sourceLang,
+                                  targetLang: tm.targetLang,
+                                  field: tm.field || 'General'
+                                });
+                                setShowTmEditModal(true);
+                              }}
+                              className="text-blue-500 hover:text-blue-700"
+                              title="Edit entry"
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              onClick={async () => {
+                                if (!window.confirm('Delete this TM entry?')) return;
+                                try {
+                                  await axios.delete(`${API}/admin/translation-memory/${tm.id}?admin_key=${adminKey}`);
+                                  setTranslationMemories(translationMemories.filter(t => t.id !== tm.id));
+                                } catch (err) {
+                                  alert('Failed to delete: ' + err.message);
+                                }
+                              }}
+                              className="text-red-500 hover:text-red-700"
+                              title="Delete entry"
+                            >
+                              🗑️
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -12472,6 +12510,250 @@ translation juramentada | certified translation`}
                 className="px-4 py-2 text-xs bg-purple-600 text-white rounded hover:bg-purple-700"
               >
                 Upload
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TM Upload Modal */}
+      {showTmUploadModal && tmUploadFile && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="p-4 border-b bg-purple-50">
+              <h3 className="font-bold text-purple-700">Upload Translation Memory</h3>
+              <p className="text-xs text-purple-600 mt-1">Configure language pair and field for your TM file</p>
+            </div>
+            <div className="p-4 space-y-4">
+              {/* File Info */}
+              <div className="flex items-center gap-2 p-2 bg-gray-50 rounded border">
+                <span className="text-lg">📄</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-gray-700 truncate">{tmUploadFile.name}</p>
+                  <p className="text-[10px] text-gray-500">{(tmUploadFile.size / 1024).toFixed(1)} KB</p>
+                </div>
+              </div>
+
+              {/* Language Pair */}
+              <div className="bg-blue-50 border border-blue-200 rounded p-3">
+                <label className="block text-xs font-bold mb-2">Language Pair</label>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <label className="block text-[10px] text-gray-500 mb-1">Source Language</label>
+                    <select
+                      value={tmUploadConfig.sourceLang}
+                      onChange={(e) => setTmUploadConfig({ ...tmUploadConfig, sourceLang: e.target.value })}
+                      className="w-full px-2 py-1.5 text-xs border rounded"
+                    >
+                      {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                    </select>
+                  </div>
+                  <span className="text-lg font-bold text-blue-600 mt-4">→</span>
+                  <div className="flex-1">
+                    <label className="block text-[10px] text-gray-500 mb-1">Target Language</label>
+                    <select
+                      value={tmUploadConfig.targetLang}
+                      onChange={(e) => setTmUploadConfig({ ...tmUploadConfig, targetLang: e.target.value })}
+                      className="w-full px-2 py-1.5 text-xs border rounded"
+                    >
+                      {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Field */}
+              <div>
+                <label className="block text-xs font-medium mb-1">Field</label>
+                <select
+                  value={tmUploadConfig.field}
+                  onChange={(e) => setTmUploadConfig({ ...tmUploadConfig, field: e.target.value })}
+                  className="w-full px-3 py-2 text-xs border rounded"
+                >
+                  <option>General</option>
+                  <option>Financial</option>
+                  <option>Education</option>
+                  <option>Legal</option>
+                  <option>Medical</option>
+                  <option>Technical</option>
+                  <option>Personal Documents</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="p-4 border-t flex justify-end space-x-2">
+              <button
+                onClick={() => {
+                  setShowTmUploadModal(false);
+                  setTmUploadFile(null);
+                }}
+                className="px-4 py-2 text-xs border rounded hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  const formData = new FormData();
+                  formData.append('file', tmUploadFile);
+                  formData.append('sourceLang', tmUploadConfig.sourceLang);
+                  formData.append('targetLang', tmUploadConfig.targetLang);
+                  formData.append('field', tmUploadConfig.field);
+
+                  try {
+                    setShowTmUploadModal(false);
+                    setProcessingStatus('Uploading TM...');
+                    const response = await axios.post(
+                      `${API}/admin/translation-memory/upload?admin_key=${adminKey}`,
+                      formData,
+                      { headers: { 'Content-Type': 'multipart/form-data' } }
+                    );
+                    setProcessingStatus(`✅ ${response.data.message}`);
+                    // Refresh TM list
+                    const res = await axios.get(`${API}/admin/translation-memory?admin_key=${adminKey}`);
+                    setTranslationMemories(res.data.memories || []);
+                  } catch (err) {
+                    alert('Upload failed: ' + (err.response?.data?.detail || err.message));
+                    setProcessingStatus('');
+                  }
+                  setTmUploadFile(null);
+                }}
+                className="px-4 py-2 text-xs bg-purple-600 text-white rounded hover:bg-purple-700"
+              >
+                Upload
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TM Edit Modal */}
+      {showTmEditModal && editingTmEntry && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4">
+            <div className="p-4 border-b bg-purple-50">
+              <h3 className="font-bold text-purple-700">Edit Translation Memory Entry</h3>
+              <p className="text-xs text-purple-600 mt-1">Modify the source text, target text, or metadata</p>
+            </div>
+            <div className="p-4 space-y-4">
+              {/* Language Pair */}
+              <div className="bg-blue-50 border border-blue-200 rounded p-3">
+                <label className="block text-xs font-bold mb-2">Language Pair</label>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <label className="block text-[10px] text-gray-500 mb-1">Source Language</label>
+                    <select
+                      value={tmEditForm.sourceLang}
+                      onChange={(e) => setTmEditForm({ ...tmEditForm, sourceLang: e.target.value })}
+                      className="w-full px-2 py-1.5 text-xs border rounded"
+                    >
+                      {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                    </select>
+                  </div>
+                  <span className="text-lg font-bold text-blue-600 mt-4">→</span>
+                  <div className="flex-1">
+                    <label className="block text-[10px] text-gray-500 mb-1">Target Language</label>
+                    <select
+                      value={tmEditForm.targetLang}
+                      onChange={(e) => setTmEditForm({ ...tmEditForm, targetLang: e.target.value })}
+                      className="w-full px-2 py-1.5 text-xs border rounded"
+                    >
+                      {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Source Text */}
+              <div>
+                <label className="block text-xs font-medium mb-1">Source Text</label>
+                <textarea
+                  value={tmEditForm.source}
+                  onChange={(e) => setTmEditForm({ ...tmEditForm, source: e.target.value })}
+                  className="w-full px-3 py-2 text-xs border rounded resize-none"
+                  rows={3}
+                  placeholder="Original text..."
+                />
+              </div>
+
+              {/* Target Text */}
+              <div>
+                <label className="block text-xs font-medium mb-1">Target Text</label>
+                <textarea
+                  value={tmEditForm.target}
+                  onChange={(e) => setTmEditForm({ ...tmEditForm, target: e.target.value })}
+                  className="w-full px-3 py-2 text-xs border rounded resize-none"
+                  rows={3}
+                  placeholder="Translated text..."
+                />
+              </div>
+
+              {/* Field */}
+              <div>
+                <label className="block text-xs font-medium mb-1">Field</label>
+                <select
+                  value={tmEditForm.field}
+                  onChange={(e) => setTmEditForm({ ...tmEditForm, field: e.target.value })}
+                  className="w-full px-3 py-2 text-xs border rounded"
+                >
+                  <option>General</option>
+                  <option>Financial</option>
+                  <option>Education</option>
+                  <option>Legal</option>
+                  <option>Medical</option>
+                  <option>Technical</option>
+                  <option>Personal Documents</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="p-4 border-t flex justify-end space-x-2">
+              <button
+                onClick={() => {
+                  setShowTmEditModal(false);
+                  setEditingTmEntry(null);
+                }}
+                className="px-4 py-2 text-xs border rounded hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (!tmEditForm.source.trim() || !tmEditForm.target.trim()) {
+                    alert('Source and target text are required');
+                    return;
+                  }
+
+                  try {
+                    await axios.put(
+                      `${API}/admin/translation-memory/${editingTmEntry.id}?admin_key=${adminKey}`,
+                      {
+                        source: tmEditForm.source,
+                        target: tmEditForm.target,
+                        sourceLang: tmEditForm.sourceLang,
+                        targetLang: tmEditForm.targetLang,
+                        field: tmEditForm.field
+                      }
+                    );
+
+                    // Update local state
+                    setTranslationMemories(translationMemories.map(tm =>
+                      tm.id === editingTmEntry.id
+                        ? { ...tm, ...tmEditForm }
+                        : tm
+                    ));
+
+                    setShowTmEditModal(false);
+                    setEditingTmEntry(null);
+                    setProcessingStatus('✅ TM entry updated successfully');
+                  } catch (err) {
+                    alert('Failed to update: ' + (err.response?.data?.detail || err.message));
+                  }
+                }}
+                className="px-4 py-2 text-xs bg-purple-600 text-white rounded hover:bg-purple-700"
+              >
+                Save Changes
               </button>
             </div>
           </div>
