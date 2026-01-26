@@ -5301,73 +5301,72 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     <meta charset="UTF-8">
     <title>${certTitle} - ${orderNumber || 'Document'}</title>
     <style>
-        @page { size: ${pageSizeCSS}; margin: 0.6in 0.75in; }
+        @page { size: ${pageSizeCSS}; margin: 0.5in 0.6in 0.6in 0.6in; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Times New Roman', Georgia, serif;
             font-size: 13px;
             line-height: 1.5;
             color: #333;
-            padding: 40px 50px;
         }
         .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 10px;
-            padding-bottom: 10px;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
             border: none;
         }
         .header-line {
             height: 3px;
             background: linear-gradient(to right, #3B82F6, #60A5FA);
-            margin-bottom: 15px;
+            margin-bottom: 12px;
             border: none;
         }
-        .logo-left { width: 120px; height: 50px; display: flex; align-items: center; }
+        .logo-left { width: 130px; height: 55px; display: flex; align-items: center; }
         .logo-left img { max-width: 100%; max-height: 100%; }
         .logo-placeholder {
-            width: 120px; height: 50px; border: 1px dashed #ccc;
+            width: 130px; height: 55px; border: 1px dashed #ccc;
             display: flex; align-items: center; justify-content: center;
             font-size: 10px; color: #999; background: #fafafa;
         }
-        .header-center { text-align: center; flex: 1; padding: 0 20px; }
-        .company-name { font-size: 16px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
-        .company-address { font-size: 10px; line-height: 1.4; color: #333; }
-        .logo-right { width: 80px; height: 50px; display: flex; align-items: center; justify-content: flex-end; }
+        .header-center { text-align: center; flex: 1; padding: 0 15px; }
+        .company-name { font-size: 15px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
+        .company-address { font-size: 9px; line-height: 1.3; color: #333; }
+        .logo-right { width: 85px; height: 55px; display: flex; align-items: center; justify-content: flex-end; }
         .logo-right img { max-width: 100%; max-height: 100%; }
         .logo-placeholder-right {
-            width: 80px; height: 50px; border: 1px dashed #ccc;
+            width: 85px; height: 55px; border: 1px dashed #ccc;
             display: flex; align-items: center; justify-content: center;
             font-size: 9px; color: #1a365d; background: #fafafa; text-align: center; font-style: italic;
         }
-        .order-number { text-align: right; margin-bottom: 30px; font-size: 13px; }
-        .main-title { text-align: center; font-size: 28px; font-weight: normal; margin-bottom: 25px; color: #1a365d; }
-        .subtitle { text-align: center; font-size: 14px; margin-bottom: 35px; line-height: 1.6; }
-        .body-text { text-align: justify; margin-bottom: 18px; line-height: 1.7; font-size: 13px; }
-        .body-text:last-of-type { margin-bottom: 50px; }
-        .footer-section { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 40px; }
-        .signature-block { line-height: 1.4; }
-        .signature-name { font-weight: bold; font-size: 14px; }
-        .signature-title { font-weight: bold; font-size: 13px; }
-        .signature-date { font-size: 13px; }
-        .stamp-container { width: 140px; height: 140px; position: relative; }
+        .order-number { text-align: right; margin-bottom: 20px; font-size: 12px; margin-top: 5px; }
+        .main-title { text-align: center; font-size: 26px; font-weight: normal; margin-bottom: 20px; color: #1a365d; line-height: 1.2; }
+        .subtitle { text-align: center; font-size: 13px; margin-bottom: 25px; line-height: 1.5; }
+        .body-text { text-align: justify; margin-bottom: 14px; line-height: 1.6; font-size: 12px; }
+        .body-text:last-of-type { margin-bottom: 30px; }
+        .footer-section { display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; padding-top: 20px; }
+        .signature-block { line-height: 1.3; }
+        .signature-name { font-weight: bold; font-size: 13px; }
+        .signature-title { font-weight: bold; font-size: 12px; }
+        .signature-date { font-size: 12px; }
+        .stamp-container { width: 130px; height: 130px; position: relative; }
         .stamp {
-            width: 140px; height: 140px; border: 3px solid #2563eb; border-radius: 50%;
+            width: 130px; height: 130px; border: 3px solid #2563eb; border-radius: 50%;
             position: relative; display: flex; align-items: center; justify-content: center; background: white;
         }
         .stamp::before {
-            content: ''; position: absolute; top: 8px; left: 8px; right: 8px; bottom: 8px;
+            content: ''; position: absolute; top: 7px; left: 7px; right: 7px; bottom: 7px;
             border: 1px solid #2563eb; border-radius: 50%;
         }
         .stamp-text-top {
-            position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
-            font-size: 9px; font-weight: bold; color: #2563eb; letter-spacing: 2px;
+            position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+            font-size: 8px; font-weight: bold; color: #2563eb; letter-spacing: 1.5px;
         }
-        .stamp-center { text-align: center; padding: 0 15px; }
-        .stamp-company { font-size: 11px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
-        .stamp-ata { font-size: 9px; color: #2563eb; }
-        .cover-page { page-break-after: always; padding: 30px 40px; }
+        .stamp-center { text-align: center; padding: 0 12px; }
+        .stamp-company { font-size: 10px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
+        .stamp-ata { font-size: 8px; color: #2563eb; }
+        .cover-page { page-break-after: always; min-height: 100%; display: flex; flex-direction: column; }
         .translation-page { page-break-before: always; padding-top: 15px; }
         .cover-page + .translation-page { page-break-before: auto; }
         .translation-content { text-align: center; }
@@ -5928,73 +5927,72 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     <meta charset="UTF-8">
     <title>${orderNumber || 'P0000'}_${documentType.replace(/\s+/g, '_')}_${translationType === 'sworn' ? 'Sworn' : 'Certified'}_Translation</title>
     <style>
-        @page { size: ${pageSizeCSS}; margin: 0.6in 0.75in; }
+        @page { size: ${pageSizeCSS}; margin: 0.5in 0.6in 0.6in 0.6in; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Times New Roman', Georgia, serif;
             font-size: 13px;
             line-height: 1.5;
             color: #333;
-            padding: 40px 50px;
         }
         .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 10px;
-            padding-bottom: 10px;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
             border: none;
         }
         .header-line {
             height: 3px;
             background: linear-gradient(to right, #3B82F6, #60A5FA);
-            margin-bottom: 15px;
+            margin-bottom: 12px;
             border: none;
         }
-        .logo-left { width: 120px; height: 50px; display: flex; align-items: center; }
+        .logo-left { width: 130px; height: 55px; display: flex; align-items: center; }
         .logo-left img { max-width: 100%; max-height: 100%; }
         .logo-placeholder {
-            width: 120px; height: 50px; border: 1px dashed #ccc;
+            width: 130px; height: 55px; border: 1px dashed #ccc;
             display: flex; align-items: center; justify-content: center;
             font-size: 10px; color: #999; background: #fafafa;
         }
-        .header-center { text-align: center; flex: 1; padding: 0 20px; }
-        .company-name { font-size: 16px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
-        .company-address { font-size: 10px; line-height: 1.4; color: #333; }
-        .logo-right { width: 80px; height: 50px; display: flex; align-items: center; justify-content: flex-end; }
+        .header-center { text-align: center; flex: 1; padding: 0 15px; }
+        .company-name { font-size: 15px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
+        .company-address { font-size: 9px; line-height: 1.3; color: #333; }
+        .logo-right { width: 85px; height: 55px; display: flex; align-items: center; justify-content: flex-end; }
         .logo-right img { max-width: 100%; max-height: 100%; }
         .logo-placeholder-right {
-            width: 80px; height: 50px; border: 1px dashed #ccc;
+            width: 85px; height: 55px; border: 1px dashed #ccc;
             display: flex; align-items: center; justify-content: center;
             font-size: 9px; color: #1a365d; background: #fafafa; text-align: center; font-style: italic;
         }
-        .order-number { text-align: right; margin-bottom: 30px; font-size: 13px; }
-        .main-title { text-align: center; font-size: 28px; font-weight: normal; margin-bottom: 25px; color: #1a365d; }
-        .subtitle { text-align: center; font-size: 14px; margin-bottom: 35px; line-height: 1.6; }
-        .body-text { text-align: justify; margin-bottom: 18px; line-height: 1.7; font-size: 13px; }
-        .body-text:last-of-type { margin-bottom: 50px; }
-        .footer-section { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 40px; }
-        .signature-block { line-height: 1.4; }
-        .signature-name { font-weight: bold; font-size: 14px; }
-        .signature-title { font-weight: bold; font-size: 13px; }
-        .signature-date { font-size: 13px; }
-        .stamp-container { width: 140px; height: 140px; position: relative; }
+        .order-number { text-align: right; margin-bottom: 20px; font-size: 12px; margin-top: 5px; }
+        .main-title { text-align: center; font-size: 26px; font-weight: normal; margin-bottom: 20px; color: #1a365d; line-height: 1.2; }
+        .subtitle { text-align: center; font-size: 13px; margin-bottom: 25px; line-height: 1.5; }
+        .body-text { text-align: justify; margin-bottom: 14px; line-height: 1.6; font-size: 12px; }
+        .body-text:last-of-type { margin-bottom: 30px; }
+        .footer-section { display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; padding-top: 20px; }
+        .signature-block { line-height: 1.3; }
+        .signature-name { font-weight: bold; font-size: 13px; }
+        .signature-title { font-weight: bold; font-size: 12px; }
+        .signature-date { font-size: 12px; }
+        .stamp-container { width: 130px; height: 130px; position: relative; }
         .stamp {
-            width: 140px; height: 140px; border: 3px solid #2563eb; border-radius: 50%;
+            width: 130px; height: 130px; border: 3px solid #2563eb; border-radius: 50%;
             position: relative; display: flex; align-items: center; justify-content: center; background: white;
         }
         .stamp::before {
-            content: ''; position: absolute; top: 8px; left: 8px; right: 8px; bottom: 8px;
+            content: ''; position: absolute; top: 7px; left: 7px; right: 7px; bottom: 7px;
             border: 1px solid #2563eb; border-radius: 50%;
         }
         .stamp-text-top {
-            position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
-            font-size: 9px; font-weight: bold; color: #2563eb; letter-spacing: 2px;
+            position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+            font-size: 8px; font-weight: bold; color: #2563eb; letter-spacing: 1.5px;
         }
-        .stamp-center { text-align: center; padding: 0 15px; }
-        .stamp-company { font-size: 11px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
-        .stamp-ata { font-size: 9px; color: #2563eb; }
-        .cover-page { page-break-after: always; padding: 30px 40px; }
+        .stamp-center { text-align: center; padding: 0 12px; }
+        .stamp-company { font-size: 10px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
+        .stamp-ata { font-size: 8px; color: #2563eb; }
+        .cover-page { page-break-after: always; min-height: 100%; display: flex; flex-direction: column; }
         .translation-page { page-break-before: always; padding-top: 15px; }
         .cover-page + .translation-page { page-break-before: auto; }
         .page-title { font-size: 13px; font-weight: bold; text-align: center; margin: 15px 0 10px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; page-break-after: avoid; }
@@ -25476,72 +25474,71 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     <meta charset="UTF-8">
     <title>${certTitle} - ${order?.order_number || 'Document'}</title>
     <style>
-        @page { size: ${pageSizeCSS}; margin: 0.6in 0.75in; }
+        @page { size: ${pageSizeCSS}; margin: 0.5in 0.6in 0.6in 0.6in; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Times New Roman', Georgia, serif;
             font-size: 13px;
             line-height: 1.5;
             color: #333;
-            padding: 40px 50px;
         }
         .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 10px;
-            padding-bottom: 10px;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
             border: none;
         }
         .header-line {
             height: 3px;
             background: linear-gradient(to right, #3B82F6, #60A5FA);
-            margin-bottom: 15px;
+            margin-bottom: 12px;
             border: none;
         }
-        .logo-left { width: 120px; height: 50px; display: flex; align-items: center; }
+        .logo-left { width: 130px; height: 55px; display: flex; align-items: center; }
         .logo-left img { max-width: 100%; max-height: 100%; }
         .logo-placeholder {
-            width: 120px; height: 50px; border: 1px dashed #ccc;
+            width: 130px; height: 55px; border: 1px dashed #ccc;
             display: flex; align-items: center; justify-content: center;
             font-size: 10px; color: #999; background: #fafafa;
         }
-        .header-center { text-align: center; flex: 1; padding: 0 20px; }
-        .company-name { font-size: 16px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
-        .company-address { font-size: 10px; line-height: 1.4; color: #333; }
-        .logo-right { width: 80px; height: 50px; display: flex; align-items: center; justify-content: flex-end; }
+        .header-center { text-align: center; flex: 1; padding: 0 15px; }
+        .company-name { font-size: 15px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
+        .company-address { font-size: 9px; line-height: 1.3; color: #333; }
+        .logo-right { width: 85px; height: 55px; display: flex; align-items: center; justify-content: flex-end; }
         .logo-right img { max-width: 100%; max-height: 100%; }
         .logo-placeholder-right {
-            width: 80px; height: 50px; border: 1px dashed #ccc;
+            width: 85px; height: 55px; border: 1px dashed #ccc;
             display: flex; align-items: center; justify-content: center;
             font-size: 9px; color: #1a365d; background: #fafafa; text-align: center; font-style: italic;
         }
-        .order-number { text-align: right; margin-bottom: 30px; font-size: 13px; }
-        .main-title { text-align: center; font-size: 28px; font-weight: normal; margin-bottom: 25px; color: #1a365d; }
-        .subtitle { text-align: center; font-size: 14px; margin-bottom: 35px; line-height: 1.6; }
-        .body-text { text-align: justify; margin-bottom: 18px; line-height: 1.7; font-size: 13px; }
-        .footer-section { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 40px; }
-        .signature-block { text-align: left; }
+        .order-number { text-align: right; margin-bottom: 20px; font-size: 12px; margin-top: 5px; }
+        .main-title { text-align: center; font-size: 26px; font-weight: normal; margin-bottom: 20px; color: #1a365d; line-height: 1.2; }
+        .subtitle { text-align: center; font-size: 13px; margin-bottom: 25px; line-height: 1.5; }
+        .body-text { text-align: justify; margin-bottom: 14px; line-height: 1.6; font-size: 12px; }
+        .footer-section { display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; padding-top: 20px; }
+        .signature-block { text-align: left; line-height: 1.3; }
         .signature-name { font-size: 13px; font-weight: bold; margin-top: 5px; }
         .signature-title { font-size: 11px; color: #666; }
         .signature-date { font-size: 11px; color: #666; margin-top: 5px; }
-        .stamp-container { width: 140px; height: 140px; position: relative; }
+        .stamp-container { width: 130px; height: 130px; position: relative; }
         .stamp {
-            width: 140px; height: 140px; border: 3px solid #2563eb; border-radius: 50%;
+            width: 130px; height: 130px; border: 3px solid #2563eb; border-radius: 50%;
             position: relative; display: flex; align-items: center; justify-content: center; background: white;
         }
         .stamp::before {
-            content: ''; position: absolute; top: 8px; left: 8px; right: 8px; bottom: 8px;
+            content: ''; position: absolute; top: 7px; left: 7px; right: 7px; bottom: 7px;
             border: 1px solid #2563eb; border-radius: 50%;
         }
         .stamp-text-top {
-            position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
-            font-size: 9px; font-weight: bold; color: #2563eb; letter-spacing: 2px;
+            position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+            font-size: 8px; font-weight: bold; color: #2563eb; letter-spacing: 1.5px;
         }
-        .stamp-center { text-align: center; padding: 0 15px; }
-        .stamp-company { font-size: 11px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
-        .stamp-ata { font-size: 9px; color: #2563eb; }
-        .cover-page { page-break-after: always; padding: 30px 40px; }
+        .stamp-center { text-align: center; padding: 0 12px; }
+        .stamp-company { font-size: 10px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
+        .stamp-ata { font-size: 8px; color: #2563eb; }
+        .cover-page { page-break-after: always; min-height: 100%; display: flex; flex-direction: column; }
         .translation-page { page-break-after: always; }
         .translation-text-page { page-break-after: always; }
         .original-documents-page { page-break-after: always; }
