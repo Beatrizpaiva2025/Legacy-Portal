@@ -1905,6 +1905,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     field: 'General'
   });
 
+  // TM Edit Modal state
+  const [showTmEditModal, setShowTmEditModal] = useState(false);
+  const [editingTmEntry, setEditingTmEntry] = useState(null);
+  const [tmEditForm, setTmEditForm] = useState({
+    source: '',
+    target: '',
+    sourceLang: '',
+    targetLang: '',
+    field: 'General'
+  });
+
   // Translator's Note for Financial Documents (Bank Statements, Tax Returns)
   const [translatorNoteEnabled, setTranslatorNoteEnabled] = useState(false);
   const [translatorNoteSettings, setTranslatorNoteSettings] = useState({
@@ -11804,20 +11815,40 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           </span>
                         </td>
                         <td className="px-3 py-2 text-center">
-                          <button
-                            onClick={async () => {
-                              if (!window.confirm('Delete this TM entry?')) return;
-                              try {
-                                await axios.delete(`${API}/admin/translation-memory/${tm.id}?admin_key=${adminKey}`);
-                                setTranslationMemories(translationMemories.filter(t => t.id !== tm.id));
-                              } catch (err) {
-                                alert('Failed to delete: ' + err.message);
-                              }
-                            }}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            🗑️
-                          </button>
+                          <div className="flex items-center justify-center space-x-1">
+                            <button
+                              onClick={() => {
+                                setEditingTmEntry(tm);
+                                setTmEditForm({
+                                  source: tm.source,
+                                  target: tm.target,
+                                  sourceLang: tm.sourceLang,
+                                  targetLang: tm.targetLang,
+                                  field: tm.field || 'General'
+                                });
+                                setShowTmEditModal(true);
+                              }}
+                              className="text-blue-500 hover:text-blue-700"
+                              title="Edit entry"
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              onClick={async () => {
+                                if (!window.confirm('Delete this TM entry?')) return;
+                                try {
+                                  await axios.delete(`${API}/admin/translation-memory/${tm.id}?admin_key=${adminKey}`);
+                                  setTranslationMemories(translationMemories.filter(t => t.id !== tm.id));
+                                } catch (err) {
+                                  alert('Failed to delete: ' + err.message);
+                                }
+                              }}
+                              className="text-red-500 hover:text-red-700"
+                              title="Delete entry"
+                            >
+                              🗑️
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -12590,6 +12621,139 @@ translation juramentada | certified translation`}
                 className="px-4 py-2 text-xs bg-purple-600 text-white rounded hover:bg-purple-700"
               >
                 Upload
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TM Edit Modal */}
+      {showTmEditModal && editingTmEntry && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4">
+            <div className="p-4 border-b bg-purple-50">
+              <h3 className="font-bold text-purple-700">Edit Translation Memory Entry</h3>
+              <p className="text-xs text-purple-600 mt-1">Modify the source text, target text, or metadata</p>
+            </div>
+            <div className="p-4 space-y-4">
+              {/* Language Pair */}
+              <div className="bg-blue-50 border border-blue-200 rounded p-3">
+                <label className="block text-xs font-bold mb-2">Language Pair</label>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <label className="block text-[10px] text-gray-500 mb-1">Source Language</label>
+                    <select
+                      value={tmEditForm.sourceLang}
+                      onChange={(e) => setTmEditForm({ ...tmEditForm, sourceLang: e.target.value })}
+                      className="w-full px-2 py-1.5 text-xs border rounded"
+                    >
+                      {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                    </select>
+                  </div>
+                  <span className="text-lg font-bold text-blue-600 mt-4">→</span>
+                  <div className="flex-1">
+                    <label className="block text-[10px] text-gray-500 mb-1">Target Language</label>
+                    <select
+                      value={tmEditForm.targetLang}
+                      onChange={(e) => setTmEditForm({ ...tmEditForm, targetLang: e.target.value })}
+                      className="w-full px-2 py-1.5 text-xs border rounded"
+                    >
+                      {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Source Text */}
+              <div>
+                <label className="block text-xs font-medium mb-1">Source Text</label>
+                <textarea
+                  value={tmEditForm.source}
+                  onChange={(e) => setTmEditForm({ ...tmEditForm, source: e.target.value })}
+                  className="w-full px-3 py-2 text-xs border rounded resize-none"
+                  rows={3}
+                  placeholder="Original text..."
+                />
+              </div>
+
+              {/* Target Text */}
+              <div>
+                <label className="block text-xs font-medium mb-1">Target Text</label>
+                <textarea
+                  value={tmEditForm.target}
+                  onChange={(e) => setTmEditForm({ ...tmEditForm, target: e.target.value })}
+                  className="w-full px-3 py-2 text-xs border rounded resize-none"
+                  rows={3}
+                  placeholder="Translated text..."
+                />
+              </div>
+
+              {/* Field */}
+              <div>
+                <label className="block text-xs font-medium mb-1">Field</label>
+                <select
+                  value={tmEditForm.field}
+                  onChange={(e) => setTmEditForm({ ...tmEditForm, field: e.target.value })}
+                  className="w-full px-3 py-2 text-xs border rounded"
+                >
+                  <option>General</option>
+                  <option>Financial</option>
+                  <option>Education</option>
+                  <option>Legal</option>
+                  <option>Medical</option>
+                  <option>Technical</option>
+                  <option>Personal Documents</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="p-4 border-t flex justify-end space-x-2">
+              <button
+                onClick={() => {
+                  setShowTmEditModal(false);
+                  setEditingTmEntry(null);
+                }}
+                className="px-4 py-2 text-xs border rounded hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (!tmEditForm.source.trim() || !tmEditForm.target.trim()) {
+                    alert('Source and target text are required');
+                    return;
+                  }
+
+                  try {
+                    await axios.put(
+                      `${API}/admin/translation-memory/${editingTmEntry.id}?admin_key=${adminKey}`,
+                      {
+                        source: tmEditForm.source,
+                        target: tmEditForm.target,
+                        sourceLang: tmEditForm.sourceLang,
+                        targetLang: tmEditForm.targetLang,
+                        field: tmEditForm.field
+                      }
+                    );
+
+                    // Update local state
+                    setTranslationMemories(translationMemories.map(tm =>
+                      tm.id === editingTmEntry.id
+                        ? { ...tm, ...tmEditForm }
+                        : tm
+                    ));
+
+                    setShowTmEditModal(false);
+                    setEditingTmEntry(null);
+                    setProcessingStatus('✅ TM entry updated successfully');
+                  } catch (err) {
+                    alert('Failed to update: ' + (err.response?.data?.detail || err.message));
+                  }
+                }}
+                className="px-4 py-2 text-xs bg-purple-600 text-white rounded hover:bg-purple-700"
+              >
+                Save Changes
               </button>
             </div>
           </div>

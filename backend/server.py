@@ -17544,6 +17544,52 @@ async def delete_translation_memory(entry_id: str, admin_key: str):
 
     return {"status": "success"}
 
+class TranslationMemoryUpdate(BaseModel):
+    source: str
+    target: str
+    field: Optional[str] = None
+    sourceLang: Optional[str] = None
+    targetLang: Optional[str] = None
+
+@api_router.put("/admin/translation-memory/{entry_id}")
+async def update_translation_memory(entry_id: str, data: TranslationMemoryUpdate, admin_key: str):
+    """Update a translation memory entry - Admin, PM, and in-house translators"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Admin, PM, and in-house translators can update TM
+    user_role = user_info.get("role")
+    is_in_house_translator = user_role == "translator" and user_info.get("translator_type") == "in_house"
+
+    if user_role not in ["admin", "pm"] and not is_in_house_translator and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Only admin, PM, or in-house translators can update Translation Memory")
+
+    # Build update data
+    update_data = {
+        "source": data.source.strip(),
+        "target": data.target.strip(),
+        "updated_at": datetime.utcnow(),
+        "updated_by": user_info.get("user_id", "system")
+    }
+
+    if data.field:
+        update_data["field"] = data.field
+    if data.sourceLang:
+        update_data["sourceLang"] = data.sourceLang
+    if data.targetLang:
+        update_data["targetLang"] = data.targetLang
+
+    result = await db.translation_memory.update_one(
+        {"id": entry_id},
+        {"$set": update_data}
+    )
+
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Entry not found")
+
+    return {"status": "success", "message": "TM entry updated successfully"}
+
 @api_router.delete("/admin/translation-memory")
 async def clear_translation_memory(admin_key: str, sourceLang: Optional[str] = None, targetLang: Optional[str] = None):
     """Clear translation memory entries - Admin, PM, and in-house translators"""
