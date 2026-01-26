@@ -10964,20 +10964,103 @@ async def generate_combined_delivery_pdf(
         # Check for translation HTML (workspace content)
         translation_html = order.get("translation_html")
         if translation_html and not translated_file:
-            # Create a simple text page with the translation content
-            page = doc.new_page(width=page_width, height=page_height)
+            # Convert HTML content to PDF pages
+            try:
+                from bs4 import BeautifulSoup
+                import textwrap
 
-            # Header
-            page.draw_rect(fitz.Rect(50, 40, page_width - 50, 43), color=blue_color, fill=blue_color)
-            page.insert_text((page_width/2 - 60, 30), "Legacy Translations", fontsize=12, fontname="helv", color=blue_color)
+                # Parse HTML and extract text
+                soup = BeautifulSoup(translation_html, 'html.parser')
 
-            # Title
-            page.insert_text((80, 80), "TRANSLATED DOCUMENT", fontsize=12, fontname="helvB", color=blue_color)
-            page.insert_text((80, 100), f"Order: {order_number} | {source_lang} → {target_lang}", fontsize=9, fontname="helv", color=gray_color)
+                # Remove script and style elements
+                for script in soup(["script", "style"]):
+                    script.decompose()
 
-            # Content note
-            page.insert_text((80, 140), "Translation content available in HTML format.", fontsize=10, fontname="helv", color=gray_color)
-            page.insert_text((80, 160), "Please refer to the attached HTML file for full formatted content.", fontsize=10, fontname="helv", color=gray_color)
+                # Get text content, preserving some structure
+                text_content = soup.get_text(separator='\n')
+
+                # Clean up excessive whitespace while preserving paragraphs
+                lines = []
+                for line in text_content.split('\n'):
+                    cleaned = line.strip()
+                    if cleaned:
+                        lines.append(cleaned)
+                    elif lines and lines[-1] != '':
+                        lines.append('')  # Preserve paragraph breaks
+
+                # PDF settings
+                margin = 72  # 1 inch margins
+                line_height = 14
+                max_chars_per_line = 85
+                max_lines_per_page = 45
+                content_start_y = 120
+
+                # Split into pages
+                current_page_lines = []
+                all_pages = []
+
+                for line in lines:
+                    if line == '':
+                        current_page_lines.append('')
+                    else:
+                        # Wrap long lines
+                        wrapped = textwrap.wrap(line, width=max_chars_per_line) or ['']
+                        for wrapped_line in wrapped:
+                            current_page_lines.append(wrapped_line)
+                            if len(current_page_lines) >= max_lines_per_page:
+                                all_pages.append(current_page_lines)
+                                current_page_lines = []
+
+                # Add remaining lines
+                if current_page_lines:
+                    all_pages.append(current_page_lines)
+
+                # If no content, create at least one page
+                if not all_pages:
+                    all_pages = [["[No translation content found]"]]
+
+                logger.info(f"Converting translation HTML to {len(all_pages)} PDF page(s)")
+
+                # Create PDF pages
+                for page_num, page_lines in enumerate(all_pages):
+                    page = doc.new_page(width=page_width, height=page_height)
+
+                    # Header
+                    page.draw_rect(fitz.Rect(50, 40, page_width - 50, 43), color=blue_color, fill=blue_color)
+                    page.insert_text((page_width/2 - 60, 30), "Legacy Translations", fontsize=12, fontname="helv", color=blue_color)
+
+                    # Title (only on first page)
+                    if page_num == 0:
+                        page.insert_text((margin, 80), "TRANSLATED DOCUMENT", fontsize=12, fontname="helvB", color=blue_color)
+                        page.insert_text((margin, 100), f"Order: {order_number} | {source_lang} → {target_lang}", fontsize=9, fontname="helv", color=gray_color)
+
+                    # Content
+                    y = content_start_y
+                    for line in page_lines:
+                        if line:
+                            page.insert_text((margin, y), line, fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
+                        y += line_height
+
+                    # Page number
+                    if len(all_pages) > 1:
+                        page.insert_text((page_width - 100, page_height - 30), f"Page {page_num + 1} of {len(all_pages)}", fontsize=8, fontname="helv", color=gray_color)
+
+                    # Footer line
+                    page.draw_rect(fitz.Rect(50, page_height - 50, page_width - 50, page_height - 47), color=blue_color, fill=blue_color)
+
+            except Exception as html_err:
+                logger.error(f"Error converting HTML to PDF: {str(html_err)}")
+                import traceback
+                traceback.print_exc()
+
+                # Fallback: create a simple page with error message
+                page = doc.new_page(width=page_width, height=page_height)
+                page.draw_rect(fitz.Rect(50, 40, page_width - 50, 43), color=blue_color, fill=blue_color)
+                page.insert_text((page_width/2 - 60, 30), "Legacy Translations", fontsize=12, fontname="helv", color=blue_color)
+                page.insert_text((80, 80), "TRANSLATED DOCUMENT", fontsize=12, fontname="helvB", color=blue_color)
+                page.insert_text((80, 100), f"Order: {order_number} | {source_lang} → {target_lang}", fontsize=9, fontname="helv", color=gray_color)
+                page.insert_text((80, 140), "Translation content could not be rendered.", fontsize=10, fontname="helv", color=gray_color)
+                page.insert_text((80, 160), "Please contact support for the full document.", fontsize=10, fontname="helv", color=gray_color)
 
     # ==================== ORIGINAL DOCUMENT PAGES ====================
     if include_original:
