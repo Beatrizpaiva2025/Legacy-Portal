@@ -1123,6 +1123,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
       setSuccess(t.paymentSuccessful);
       // Clear saved form data on success
       sessionStorage.removeItem('pendingOrderData');
+      sessionStorage.removeItem('customerOrderFormData');
       // Clean URL
       window.history.replaceState({}, document.title, window.location.pathname);
     } else if (paymentCanceled === 'true') {
@@ -1150,6 +1151,59 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, [t]);
+
+  // Restore form data on component mount (for when user navigates away and comes back)
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const paymentSuccess = urlParams.get('payment_success');
+
+    // Don't restore if payment was successful (form should be cleared)
+    if (paymentSuccess === 'true') return;
+
+    const savedData = sessionStorage.getItem('customerOrderFormData');
+    if (savedData) {
+      try {
+        const parsed = JSON.parse(savedData);
+        if (parsed.formData) setFormData(parsed.formData);
+        if (parsed.guestName && !customer) setGuestName(parsed.guestName);
+        if (parsed.guestEmail && !customer) setGuestEmail(parsed.guestEmail);
+        if (parsed.certifications) setCertifications(parsed.certifications);
+        if (parsed.needsPhysicalCopy !== undefined) setNeedsPhysicalCopy(parsed.needsPhysicalCopy);
+        if (parsed.shippingAddress) setShippingAddress(parsed.shippingAddress);
+        if (parsed.uploadedFiles && parsed.uploadedFiles.length > 0) {
+          setUploadedFiles(parsed.uploadedFiles);
+          setWordCount(parsed.uploadedFiles.reduce((sum, f) => sum + (f.wordCount || 0), 0));
+        }
+        if (parsed.discountCode) setDiscountCode(parsed.discountCode);
+        if (parsed.appliedDiscount) setAppliedDiscount(parsed.appliedDiscount);
+      } catch (e) {
+        console.error('Error restoring form data:', e);
+      }
+    }
+  }, []); // Run only on mount
+
+  // Auto-save form data whenever it changes
+  useEffect(() => {
+    // Don't save if form is completely empty (initial state)
+    const hasData = uploadedFiles.length > 0 || guestName || guestEmail ||
+                    formData.notes || formData.reference ||
+                    needsPhysicalCopy || certifications.length > 0;
+
+    if (hasData) {
+      const dataToSave = {
+        formData,
+        guestName,
+        guestEmail,
+        certifications,
+        needsPhysicalCopy,
+        shippingAddress,
+        uploadedFiles,
+        discountCode,
+        appliedDiscount
+      };
+      sessionStorage.setItem('customerOrderFormData', JSON.stringify(dataToSave));
+    }
+  }, [formData, guestName, guestEmail, certifications, needsPhysicalCopy, shippingAddress, uploadedFiles, discountCode, appliedDiscount]);
 
   // Calculate quote function (defined before useEffect that calls it)
   const calculateQuote = useCallback(() => {
@@ -1510,7 +1564,8 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
         customer_email: guestEmail,
         customer_name: guestName,
         origin_url: window.location.origin,
-        currency: userCurrency.currency // Multi-currency support
+        currency: userCurrency.currency, // Multi-currency support
+        locale: uiLang // Send UI language for Stripe checkout translation
       });
 
       // Step 3: Save form data before redirecting to Stripe
@@ -1622,6 +1677,8 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
       });
       setUploadedFiles([]);
       setQuote(null);
+      // Clear saved form data after successful order
+      sessionStorage.removeItem('customerOrderFormData');
 
     } catch (err) {
       setError(err.response?.data?.detail || t.failedToProcess);
@@ -1744,6 +1801,8 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
       });
       setUploadedFiles([]);
       setQuote(null);
+      // Clear saved form data after successful order
+      sessionStorage.removeItem('customerOrderFormData');
 
     } catch (err) {
       setError(err.response?.data?.detail || t.failedToProcess);

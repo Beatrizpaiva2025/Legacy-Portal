@@ -1773,6 +1773,7 @@ class PaymentCheckoutRequest(BaseModel):
     customer_email: Optional[str] = None
     customer_name: Optional[str] = None
     currency: Optional[str] = "usd"  # usd, brl, eur, gbp
+    locale: Optional[str] = "en"  # en, es, pt-BR - for Stripe checkout UI translation
 
 class ZelleOrderRequest(BaseModel):
     quote_id: str
@@ -2152,6 +2153,7 @@ class PartnerInvoicePayStripe(BaseModel):
     invoice_id: str
     origin_url: str
     currency: Optional[str] = "usd"  # Support multi-currency (usd, brl, etc.)
+    locale: Optional[str] = "en"  # en, es, pt-BR - for Stripe checkout UI translation
 
 class PartnerInvoicePayZelle(BaseModel):
     invoice_id: str
@@ -4947,8 +4949,13 @@ async def create_payment_checkout(request: PaymentCheckoutRequest):
         payment_methods = currency_info["payment_methods"]
 
         # Create Stripe checkout session
+        # Map frontend language codes to Stripe locale codes
+        stripe_locale_map = {'en': 'en', 'es': 'es', 'pt': 'pt-BR'}
+        stripe_locale = stripe_locale_map.get(request.locale, 'en')
+
         checkout_params = {
             'payment_method_types': payment_methods,
+            'locale': stripe_locale,  # Translate Stripe checkout UI to user's language
             'line_items': [{
                 'price_data': {
                     'currency': currency,
@@ -11073,8 +11080,13 @@ async def create_invoice_stripe_checkout(invoice_id: str, request: PartnerInvoic
             amount_in_currency = base_amount_usd
 
         # Create Stripe checkout session
+        # Map frontend language codes to Stripe locale codes
+        stripe_locale_map = {'en': 'en', 'es': 'es', 'pt': 'pt-BR'}
+        stripe_locale = stripe_locale_map.get(request.locale, 'en')
+
         checkout_params = {
             'payment_method_types': payment_methods,
+            'locale': stripe_locale,  # Translate Stripe checkout UI to user's language
             'line_items': [{
                 'price_data': {
                     'currency': currency,
