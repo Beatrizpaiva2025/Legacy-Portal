@@ -10296,9 +10296,9 @@ async def get_partner_statistics(admin_key: str):
     if user_role != "admin" and not user_info.get("is_master"):
         raise HTTPException(status_code=403, detail="Admin access required")
 
-    # Get all partner orders
+    # Get all partner orders (exclude manual entries - they are not real partners)
     partner_orders = await db.translation_orders.find({
-        "partner_id": {"$exists": True, "$ne": None}
+        "partner_id": {"$exists": True, "$nin": [None, "manual"]}
     }).to_list(10000)
 
     # Get all partners for contact info
@@ -10331,6 +10331,10 @@ async def get_partner_statistics(admin_key: str):
     for order in partner_orders:
         company = order.get("partner_company", "Unknown")
         partner_id = order.get("partner_id")
+
+        # Skip entries that are not real partners
+        if company in ["Unknown", "Manual Entry", ""] or partner_id == "manual":
+            continue
 
         if company not in partner_stats:
             # Partner from order not in partners collection - add them
