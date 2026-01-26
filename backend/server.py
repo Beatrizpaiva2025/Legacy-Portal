@@ -3812,35 +3812,320 @@ def extract_tables_from_textract(blocks: list) -> list:
 def reconstruct_layout_html_from_textract(blocks: list, page_width: int = 800, page_height: int = 1100) -> str:
     """
     Reconstruct the original page layout from Textract blocks using HTML with CSS positioning.
-    This preserves the visual layout of the document by using absolute positioning.
+    Uses LAYOUT blocks when available for better structure preservation.
 
     Returns HTML that visually represents the document layout.
     """
     block_map = {block['Id']: block for block in blocks if 'Id' in block}
 
-    # Collect all elements with their positions
-    elements = []
-    table_regions = []  # Track table bounding boxes to avoid duplicating text
+    # Check if LAYOUT blocks are available (from LAYOUT feature)
+    layout_blocks = [b for b in blocks if b.get('BlockType', '').startswith('LAYOUT_')]
+    has_layout_feature = len(layout_blocks) > 0
 
-    # First, identify table regions
+    if has_layout_feature:
+        # Use LAYOUT blocks for better structure - these don't overlap
+        return _reconstruct_from_layout_blocks(blocks, block_map, page_width, page_height)
+    else:
+        # Fallback to LINE/TABLE processing for detect_document_text responses
+        return _reconstruct_from_line_blocks(blocks, block_map, page_width, page_height)
+
+
+def _get_text_from_block(block: dict, block_map: dict) -> str:
+    """Extract text content from a block by following its CHILD relationships."""
+    if 'Text' in block:
+        return block['Text']
+
+    text_parts = []
+    if 'Relationships' in block:
+        for rel in block['Relationships']:
+            if rel['Type'] == 'CHILD':
+                for child_id in rel['Ids']:
+                    child_block = block_map.get(child_id)
+                    if child_block:
+                        child_type = child_block.get('BlockType', '')
+                        if child_type == 'WORD':
+                            text_parts.append(child_block.get('Text', ''))
+                        elif child_type == 'LINE':
+                            text_parts.append(child_block.get('Text', ''))
+                        elif child_type in ['LAYOUT_TEXT', 'LAYOUT_TITLE', 'LAYOUT_SECTION_HEADER']:
+                            text_parts.append(_get_text_from_block(child_block, block_map))
+
+    return ' '.join(text_parts)
+
+
+def _reconstruct_from_layout_blocks(blocks: list, block_map: dict, page_width: int, page_height: int) -> str:
+    """
+    Reconstruct layout using LAYOUT blocks from Textract LAYOUT feature.
+    LAYOUT blocks provide non-overlapping regions for document structure.
+    """
+    elements = []
+    processed_table_ids = set()
+
+    # Process LAYOUT blocks in order
+    for block in blocks:
+        block_type = block.get('BlockType', '')
+
+        if not block_type.startswith('LAYOUT_'):
+            continue
+
+        bbox = block.get('Geometry', {}).get('BoundingBox', {})
+        if not bbox:
+            continue
+
+        top = bbox.get('Top', 0)
+        left = bbox.get('Left', 0)
+        width = bbox.get('Width', 0)
+        height = bbox.get('Height', 0)
+
+        if block_type == 'LAYOUT_TABLE':
+            # Find the corresponding TABLE block for this layout region
+            table_block = None
+            if 'Relationships' in block:
+                for rel in block['Relationships']:
+                    if rel['Type'] == 'CHILD':
+                        for child_id in rel['Ids']:
+                            child = block_map.get(child_id)
+                            if child and child.get('BlockType') == 'TABLE':
+                                table_block = child
+                                processed_table_ids.add(child_id)
+                                break
+
+            if table_block:
+                table_html = _build_table_html(table_block, block_map)
+                elements.append({
+                    'type': 'table',
+                    'html': table_html,
+                    'top': top,
+                    'left': left,
+                    'width': width,
+                    'height': height
+                })
+
+        elif block_type in ['LAYOUT_TEXT', 'LAYOUT_TITLE', 'LAYOUT_SECTION_HEADER',
+                           'LAYOUT_HEADER', 'LAYOUT_FOOTER', 'LAYOUT_PAGE_NUMBER']:
+            # Get text content from child LINE blocks
+            text_lines = []
+            if 'Relationships' in block:
+                for rel in block['Relationships']:
+                    if rel['Type'] == 'CHILD':
+                        for child_id in rel['Ids']:
+                            child = block_map.get(child_id)
+                            if child and child.get('BlockType') == 'LINE':
+                                text_lines.append(child.get('Text', ''))
+
+            text = '\n'.join(text_lines) if text_lines else _get_text_from_block(block, block_map)
+
+            if text.strip():
+                # Determine styling based on block type
+                font_weight = 'bold' if block_type in ['LAYOUT_TITLE', 'LAYOUT_SECTION_HEADER'] else 'normal'
+                font_size = '16px' if block_type == 'LAYOUT_TITLE' else '14px' if block_type == 'LAYOUT_SECTION_HEADER' else '12px'
+
+                elements.append({
+                    'type': 'text',
+                    'text': text,
+                    'top': top,
+                    'left': left,
+                    'width': width,
+                    'height': height,
+                    'font_weight': font_weight,
+                    'font_size': font_size,
+                    'block_type': block_type
+                })
+
+        elif block_type == 'LAYOUT_LIST':
+            # Get list items from child blocks
+            list_items = []
+            if 'Relationships' in block:
+                for rel in block['Relationships']:
+                    if rel['Type'] == 'CHILD':
+                        for child_id in rel['Ids']:
+                            child = block_map.get(child_id)
+                            if child and child.get('BlockType') == 'LINE':
+                                list_items.append(child.get('Text', ''))
+
+            if list_items:
+                elements.append({
+                    'type': 'list',
+                    'items': list_items,
+                    'top': top,
+                    'left': left,
+                    'width': width,
+                    'height': height
+                })
+
+        elif block_type == 'LAYOUT_KEY_VALUE_SET':
+            # Get key-value text
+            text = _get_text_from_block(block, block_map)
+            if text.strip():
+                elements.append({
+                    'type': 'text',
+                    'text': text,
+                    'top': top,
+                    'left': left,
+                    'width': width,
+                    'height': height,
+                    'font_weight': 'normal',
+                    'font_size': '12px',
+                    'block_type': block_type
+                })
+
+    # Process any TABLE blocks not covered by LAYOUT_TABLE
+    for block in blocks:
+        if block.get('BlockType') == 'TABLE' and block.get('Id') not in processed_table_ids:
+            bbox = block.get('Geometry', {}).get('BoundingBox', {})
+            if bbox:
+                table_html = _build_table_html(block, block_map)
+                elements.append({
+                    'type': 'table',
+                    'html': table_html,
+                    'top': bbox.get('Top', 0),
+                    'left': bbox.get('Left', 0),
+                    'width': bbox.get('Width', 1),
+                    'height': bbox.get('Height', 0)
+                })
+
+    # Sort elements by vertical position then horizontal
+    elements.sort(key=lambda x: (x['top'], x['left']))
+
+    # Build HTML with flow-based layout (not absolute) for better rendering
+    html_parts = []
+    html_parts.append('<div style="font-family: \'Courier New\', monospace; font-size: 12px; line-height: 1.6; background: white; padding: 20px;">')
+
+    for elem in elements:
+        margin_left = int(elem['left'] * 100)  # Convert to percentage for indentation
+
+        if elem['type'] == 'text':
+            font_weight = elem.get('font_weight', 'normal')
+            font_size = elem.get('font_size', '12px')
+            text_escaped = elem['text'].replace('\n', '<br>')
+            html_parts.append(
+                f'<div style="margin-left: {margin_left}px; margin-bottom: 8px; '
+                f'font-weight: {font_weight}; font-size: {font_size};">{text_escaped}</div>'
+            )
+
+        elif elem['type'] == 'table':
+            table_width_percent = int(elem['width'] * 100)
+            html_parts.append(
+                f'<div style="margin-left: {margin_left}px; margin-bottom: 12px; '
+                f'max-width: {table_width_percent}%;">{elem["html"]}</div>'
+            )
+
+        elif elem['type'] == 'list':
+            html_parts.append(f'<ul style="margin-left: {margin_left}px; margin-bottom: 8px;">')
+            for item in elem['items']:
+                html_parts.append(f'  <li>{item}</li>')
+            html_parts.append('</ul>')
+
+    html_parts.append('</div>')
+
+    return '\n'.join(html_parts)
+
+
+def _build_table_html(table_block: dict, block_map: dict) -> str:
+    """Build HTML table from a TABLE block."""
+    cells = []
+    if 'Relationships' in table_block:
+        for rel in table_block['Relationships']:
+            if rel['Type'] == 'CHILD':
+                for child_id in rel['Ids']:
+                    child_block = block_map.get(child_id)
+                    if child_block and child_block['BlockType'] == 'CELL':
+                        cells.append(child_block)
+
+    if not cells:
+        return '<table><tr><td>(empty table)</td></tr></table>'
+
+    # Determine table dimensions
+    max_row = max(cell.get('RowIndex', 1) for cell in cells)
+    max_col = max(cell.get('ColumnIndex', 1) for cell in cells)
+
+    # Create table grid with cell span info
+    table_grid = [[{'text': '', 'rowspan': 1, 'colspan': 1, 'skip': False} for _ in range(max_col)] for _ in range(max_row)]
+
+    for cell in cells:
+        row_idx = cell.get('RowIndex', 1) - 1
+        col_idx = cell.get('ColumnIndex', 1) - 1
+        rowspan = cell.get('RowSpan', 1)
+        colspan = cell.get('ColumnSpan', 1)
+
+        # Get cell text
+        cell_text = ''
+        if 'Relationships' in cell:
+            for rel in cell['Relationships']:
+                if rel['Type'] == 'CHILD':
+                    for child_id in rel['Ids']:
+                        child_block = block_map.get(child_id)
+                        if child_block and child_block['BlockType'] == 'WORD':
+                            cell_text += child_block.get('Text', '') + ' '
+
+        if row_idx < max_row and col_idx < max_col:
+            table_grid[row_idx][col_idx] = {
+                'text': cell_text.strip(),
+                'rowspan': rowspan,
+                'colspan': colspan,
+                'skip': False
+            }
+
+            # Mark spanned cells to skip
+            for r in range(row_idx, min(row_idx + rowspan, max_row)):
+                for c in range(col_idx, min(col_idx + colspan, max_col)):
+                    if r != row_idx or c != col_idx:
+                        table_grid[r][c]['skip'] = True
+
+    # Build HTML table
+    table_html = '<table style="border-collapse: collapse; width: 100%; font-size: inherit;">\n'
+    for row_idx, row in enumerate(table_grid):
+        table_html += '  <tr>\n'
+        for col_idx, cell_info in enumerate(row):
+            if cell_info['skip']:
+                continue
+
+            tag = 'th' if row_idx == 0 else 'td'
+            style = 'border: 1px solid #666; padding: 4px 8px; text-align: left; vertical-align: top;'
+            if row_idx == 0:
+                style += ' background-color: #e8e8e8; font-weight: bold;'
+
+            span_attrs = ''
+            if cell_info['rowspan'] > 1:
+                span_attrs += f' rowspan="{cell_info["rowspan"]}"'
+            if cell_info['colspan'] > 1:
+                span_attrs += f' colspan="{cell_info["colspan"]}"'
+
+            table_html += f'    <{tag} style="{style}"{span_attrs}>{cell_info["text"]}</{tag}>\n'
+        table_html += '  </tr>\n'
+    table_html += '</table>'
+
+    return table_html
+
+
+def _reconstruct_from_line_blocks(blocks: list, block_map: dict, page_width: int, page_height: int) -> str:
+    """
+    Fallback reconstruction using LINE and TABLE blocks when LAYOUT feature not used.
+    Uses improved overlap detection to avoid duplicate text.
+    """
+    elements = []
+    table_regions = []
+
+    # First, identify table regions with padding
     for block in blocks:
         if block['BlockType'] == 'TABLE':
             bbox = block.get('Geometry', {}).get('BoundingBox', {})
             if bbox:
+                # Add small padding to table region to catch edge text
+                padding = 0.005
                 table_regions.append({
-                    'top': bbox.get('Top', 0),
-                    'left': bbox.get('Left', 0),
-                    'width': bbox.get('Width', 0),
-                    'height': bbox.get('Height', 0),
-                    'bottom': bbox.get('Top', 0) + bbox.get('Height', 0),
-                    'right': bbox.get('Left', 0) + bbox.get('Width', 0)
+                    'top': bbox.get('Top', 0) - padding,
+                    'left': bbox.get('Left', 0) - padding,
+                    'bottom': bbox.get('Top', 0) + bbox.get('Height', 0) + padding,
+                    'right': bbox.get('Left', 0) + bbox.get('Width', 0) + padding
                 })
 
-    def is_in_table_region(top, left):
-        """Check if a position is inside any table region"""
+    def is_in_table_region(top, left, bottom, right):
+        """Check if a bounding box overlaps with any table region"""
         for tr in table_regions:
-            if (tr['top'] <= top <= tr['bottom'] and
-                tr['left'] <= left <= tr['right']):
+            # Check for any overlap, not just point containment
+            if not (right < tr['left'] or left > tr['right'] or
+                    bottom < tr['top'] or top > tr['bottom']):
                 return True
         return False
 
@@ -3850,9 +4135,13 @@ def reconstruct_layout_html_from_textract(blocks: list, page_width: int = 800, p
             bbox = block['Geometry']['BoundingBox']
             top = bbox.get('Top', 0)
             left = bbox.get('Left', 0)
+            width = bbox.get('Width', 0)
+            height = bbox.get('Height', 0)
+            bottom = top + height
+            right = left + width
 
-            # Skip lines inside table regions
-            if is_in_table_region(top, left):
+            # Skip lines that overlap with table regions
+            if is_in_table_region(top, left, bottom, right):
                 continue
 
             elements.append({
@@ -3860,65 +4149,15 @@ def reconstruct_layout_html_from_textract(blocks: list, page_width: int = 800, p
                 'text': block.get('Text', ''),
                 'top': top,
                 'left': left,
-                'width': bbox.get('Width', 0),
-                'height': bbox.get('Height', 0),
-                'confidence': block.get('Confidence', 100)
+                'width': width,
+                'height': height
             })
 
     # Process TABLE blocks
     for block in blocks:
         if block['BlockType'] == 'TABLE':
             bbox = block.get('Geometry', {}).get('BoundingBox', {})
-
-            # Find all cells for this table
-            cells = []
-            if 'Relationships' in block:
-                for rel in block['Relationships']:
-                    if rel['Type'] == 'CHILD':
-                        for child_id in rel['Ids']:
-                            child_block = block_map.get(child_id)
-                            if child_block and child_block['BlockType'] == 'CELL':
-                                cells.append(child_block)
-
-            if not cells:
-                continue
-
-            # Determine table dimensions
-            max_row = max(cell.get('RowIndex', 1) for cell in cells)
-            max_col = max(cell.get('ColumnIndex', 1) for cell in cells)
-
-            # Create table grid
-            table_grid = [['' for _ in range(max_col)] for _ in range(max_row)]
-
-            for cell in cells:
-                row_idx = cell.get('RowIndex', 1) - 1
-                col_idx = cell.get('ColumnIndex', 1) - 1
-
-                # Get cell text
-                cell_text = ''
-                if 'Relationships' in cell:
-                    for rel in cell['Relationships']:
-                        if rel['Type'] == 'CHILD':
-                            for child_id in rel['Ids']:
-                                child_block = block_map.get(child_id)
-                                if child_block and child_block['BlockType'] == 'WORD':
-                                    cell_text += child_block.get('Text', '') + ' '
-
-                if row_idx < max_row and col_idx < max_col:
-                    table_grid[row_idx][col_idx] = cell_text.strip()
-
-            # Build HTML table
-            table_html = '<table style="border-collapse: collapse; width: 100%; font-size: inherit;">\n'
-            for row_idx, row in enumerate(table_grid):
-                table_html += '  <tr>\n'
-                for col_idx, cell_text in enumerate(row):
-                    tag = 'th' if row_idx == 0 else 'td'
-                    style = 'border: 1px solid #666; padding: 4px 8px; text-align: left;'
-                    if row_idx == 0:
-                        style += ' background-color: #e8e8e8; font-weight: bold;'
-                    table_html += f'    <{tag} style="{style}">{cell_text}</{tag}>\n'
-                table_html += '  </tr>\n'
-            table_html += '</table>'
+            table_html = _build_table_html(block, block_map)
 
             elements.append({
                 'type': 'table',
@@ -3932,28 +4171,46 @@ def reconstruct_layout_html_from_textract(blocks: list, page_width: int = 800, p
     # Sort elements by vertical position then horizontal
     elements.sort(key=lambda x: (x['top'], x['left']))
 
-    # Build HTML output with visual positioning
+    # Use flow-based layout for cleaner output
     html_parts = []
-    html_parts.append(f'''<div style="position: relative; width: 100%; min-height: {page_height}px; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.4; background: white; padding: 20px; box-sizing: border-box;">''')
+    html_parts.append('<div style="font-family: \'Courier New\', monospace; font-size: 12px; line-height: 1.6; background: white; padding: 20px;">')
+
+    # Group elements by approximate vertical position (within 2% of page height)
+    row_threshold = 0.02
+    current_row = []
+    current_row_top = -1
+    rows = []
 
     for elem in elements:
-        top_px = int(elem['top'] * page_height)
-        left_px = int(elem['left'] * page_width)
-        width_percent = elem['width'] * 100
+        if current_row_top < 0 or abs(elem['top'] - current_row_top) > row_threshold:
+            if current_row:
+                rows.append(current_row)
+            current_row = [elem]
+            current_row_top = elem['top']
+        else:
+            current_row.append(elem)
 
-        if elem['type'] == 'text':
-            # Text element with absolute positioning
-            html_parts.append(
-                f'<div style="position: absolute; top: {top_px}px; left: {left_px}px; '
-                f'white-space: nowrap;">{elem["text"]}</div>'
-            )
-        elif elem['type'] == 'table':
-            # Table with calculated width
-            table_width_px = int(elem['width'] * page_width)
-            html_parts.append(
-                f'<div style="position: absolute; top: {top_px}px; left: {left_px}px; '
-                f'width: {table_width_px}px;">{elem["html"]}</div>'
-            )
+    if current_row:
+        rows.append(current_row)
+
+    # Render rows
+    for row in rows:
+        # Sort row elements by horizontal position
+        row.sort(key=lambda x: x['left'])
+
+        row_html = '<div style="display: flex; flex-wrap: wrap; align-items: flex-start; margin-bottom: 4px;">'
+
+        for elem in row:
+            margin_left = int(elem['left'] * page_width * 0.5)  # Scaled margin
+
+            if elem['type'] == 'text':
+                row_html += f'<span style="margin-left: {margin_left}px; white-space: pre-wrap;">{elem["text"]}</span>'
+            elif elem['type'] == 'table':
+                table_width = int(elem['width'] * 100)
+                row_html += f'<div style="margin-left: {margin_left}px; width: {table_width}%;">{elem["html"]}</div>'
+
+        row_html += '</div>'
+        html_parts.append(row_html)
 
     html_parts.append('</div>')
 
