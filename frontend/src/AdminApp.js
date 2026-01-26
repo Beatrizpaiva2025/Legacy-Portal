@@ -15204,14 +15204,14 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {filtered.map((order) => {
-              const created = new Date(order.created_at);
+              const created = parseUTCDate(order.created_at);
               // Translator deadline - when translator must return
               const hasTranslatorDeadline = order.translator_deadline ? true : false;
-              const translatorDeadline = hasTranslatorDeadline ? new Date(order.translator_deadline) : null;
+              const translatorDeadline = hasTranslatorDeadline ? parseUTCDate(order.translator_deadline) : null;
               const translatorDaysUntil = hasTranslatorDeadline ? Math.ceil((translatorDeadline - new Date()) / (1000 * 60 * 60 * 24)) : null;
               // Client deadline - when to deliver to client
               const hasClientDeadline = order.deadline ? true : false;
-              const clientDeadline = hasClientDeadline ? new Date(order.deadline) : null;
+              const clientDeadline = hasClientDeadline ? parseUTCDate(order.deadline) : null;
               const clientDaysUntil = hasClientDeadline ? Math.ceil((clientDeadline - new Date()) / (1000 * 60 * 60 * 24)) : null;
               return (
                 <tr key={order.id} className="hover:bg-blue-50/50 transition-colors">
@@ -15227,8 +15227,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   </td>
                   {/* Order Date */}
                   <td className="px-3 py-3 text-gray-600">
-                    {created.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}
-                    <span className="text-xs text-gray-400 block">{created.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+                    {created.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', timeZone: NY_TIMEZONE })}
+                    <span className="text-xs text-gray-400 block">{created.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: NY_TIMEZONE })}</span>
                   </td>
                   {/* Client with email and send buttons */}
                   <td className="px-3 py-3">
@@ -15407,8 +15407,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         className={`${(isAdmin || isPM) ? 'cursor-pointer hover:text-blue-600' : ''}`}
                         title={(isAdmin || isPM) ? "Click to edit translator deadline" : ""}
                       >
-                        {translatorDeadline.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' })}
-                        <span className="text-xs text-gray-500 block">{translatorDeadline.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+                        {translatorDeadline.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', timeZone: NY_TIMEZONE })}
+                        <span className="text-xs text-gray-500 block">{translatorDeadline.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: NY_TIMEZONE })}</span>
                         {translatorDaysUntil > 0 && order.translation_status !== 'delivered' && (
                           <span className={`text-xs font-medium ${translatorDaysUntil <= 2 ? 'text-red-600' : 'text-yellow-600'}`}>({translatorDaysUntil}d)</span>
                         )}
@@ -15450,8 +15450,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         className={`${isAdmin ? 'cursor-pointer hover:text-blue-600' : ''}`}
                         title={isAdmin ? "Click to edit client deadline" : ""}
                       >
-                        {clientDeadline.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' })}
-                        <span className="text-xs text-gray-500 block">{clientDeadline.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+                        {clientDeadline.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', timeZone: NY_TIMEZONE })}
+                        <span className="text-xs text-gray-500 block">{clientDeadline.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: NY_TIMEZONE })}</span>
                         {clientDaysUntil > 0 && order.translation_status !== 'delivered' && (
                           <span className={`text-xs font-medium ${clientDaysUntil <= 2 ? 'text-red-600' : 'text-yellow-600'}`}>({clientDaysUntil}d)</span>
                         )}
@@ -15477,7 +15477,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         </span>
                         {order.translation_ready_at && (
                           <span className="text-xs text-gray-500">
-                            {new Date(order.translation_ready_at).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' })}
+                            {parseUTCDate(order.translation_ready_at).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', timeZone: NY_TIMEZONE })}
                           </span>
                         )}
                       </div>
