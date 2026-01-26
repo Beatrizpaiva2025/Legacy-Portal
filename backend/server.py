@@ -12909,8 +12909,27 @@ async def generate_combined_delivery_pdf(
         page.draw_rect(fitz.Rect(0, page_height - 40, page_width, page_height), color=(0.97, 0.97, 0.97), fill=(0.97, 0.97, 0.97))
         page.insert_text((page_width/2 - 150, page_height - 20), "Legacy Translations Inc. · 867 Boylston St, Boston, MA · (857) 316-7770 · ATA #275993", fontsize=7, fontname="helv", color=gray_color)
 
-    # Save to bytes
-    pdf_bytes = doc.tobytes()
+    # Save to bytes with encryption to prevent modifications
+    # Generate a unique owner password for this document
+    owner_password = secrets.token_hex(16)
+
+    # Permissions: Allow printing and copying, but NO modifications or annotations
+    # This makes the PDF read-only similar to Adobe's certified signature
+    permissions = (
+        fitz.PDF_PERM_PRINT |       # Allow printing
+        fitz.PDF_PERM_PRINT_HQ |    # Allow high-quality printing
+        fitz.PDF_PERM_COPY |        # Allow copying text (for accessibility)
+        fitz.PDF_PERM_ACCESSIBILITY # Allow accessibility features
+        # Note: PDF_PERM_MODIFY, PDF_PERM_ANNOTATE, PDF_PERM_FORM are NOT included
+        # This prevents editing, annotations, and form filling
+    )
+
+    pdf_bytes = doc.tobytes(
+        encryption=fitz.PDF_ENCRYPT_AES_256,  # Strong AES-256 encryption
+        owner_pw=owner_password,              # Owner password (required to modify)
+        user_pw="",                           # No password needed to open/view
+        permissions=permissions               # Restricted permissions
+    )
     doc.close()
 
     return pdf_bytes
@@ -13674,8 +13693,20 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                     ver_page.insert_text((150, 590), "Legacy Translations Inc. | 867 Boylston Street, Boston, MA 02116", fontsize=8, fontname="helv", color=gray_color)
                     ver_page.insert_text((200, 605), "(857) 316-7770 | contact@legacytranslations.com", fontsize=8, fontname="helv", color=gray_color)
 
-                # Save combined PDF
-                combined_pdf_bytes = pdf_doc.tobytes()
+                # Save combined PDF with encryption to prevent modifications
+                owner_password = secrets.token_hex(16)
+                permissions = (
+                    fitz.PDF_PERM_PRINT |
+                    fitz.PDF_PERM_PRINT_HQ |
+                    fitz.PDF_PERM_COPY |
+                    fitz.PDF_PERM_ACCESSIBILITY
+                )
+                combined_pdf_bytes = pdf_doc.tobytes(
+                    encryption=fitz.PDF_ENCRYPT_AES_256,
+                    owner_pw=owner_password,
+                    user_pw="",
+                    permissions=permissions
+                )
                 pdf_doc.close()
 
                 all_attachments = [{
@@ -17439,7 +17470,7 @@ class TranslationMemoryCreate(BaseModel):
     entries: List[TranslationMemoryEntry]
 
 @api_router.get("/admin/translation-memory")
-async def get_translation_memory(admin_key: str, sourceLang: Optional[str] = None, targetLang: Optional[str] = None):
+async def get_translation_memory(admin_key: str, sourceLang: Optional[str] = None, targetLang: Optional[str] = None, field: Optional[str] = None):
     """Get all translation memory entries - Admin, PM, and in-house translators"""
     user_info = await validate_admin_or_user_token(admin_key)
     if not user_info:
@@ -17458,8 +17489,10 @@ async def get_translation_memory(admin_key: str, sourceLang: Optional[str] = Non
         query["sourceLang"] = sourceLang
     if targetLang:
         query["targetLang"] = targetLang
+    if field:
+        query["field"] = field
 
-    memories = await db.translation_memory.find(query).sort("created_at", -1).to_list(500)
+    memories = await db.translation_memory.find(query).sort("created_at", -1).to_list(5000)
     for mem in memories:
         if '_id' in mem:
             del mem['_id']
@@ -17552,6 +17585,52 @@ async def delete_translation_memory(entry_id: str, admin_key: str):
         raise HTTPException(status_code=404, detail="Entry not found")
 
     return {"status": "success"}
+
+class TranslationMemoryUpdate(BaseModel):
+    source: str
+    target: str
+    field: Optional[str] = None
+    sourceLang: Optional[str] = None
+    targetLang: Optional[str] = None
+
+@api_router.put("/admin/translation-memory/{entry_id}")
+async def update_translation_memory(entry_id: str, data: TranslationMemoryUpdate, admin_key: str):
+    """Update a translation memory entry - Admin, PM, and in-house translators"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Admin, PM, and in-house translators can update TM
+    user_role = user_info.get("role")
+    is_in_house_translator = user_role == "translator" and user_info.get("translator_type") == "in_house"
+
+    if user_role not in ["admin", "pm"] and not is_in_house_translator and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Only admin, PM, or in-house translators can update Translation Memory")
+
+    # Build update data
+    update_data = {
+        "source": data.source.strip(),
+        "target": data.target.strip(),
+        "updated_at": datetime.utcnow(),
+        "updated_by": user_info.get("user_id", "system")
+    }
+
+    if data.field:
+        update_data["field"] = data.field
+    if data.sourceLang:
+        update_data["sourceLang"] = data.sourceLang
+    if data.targetLang:
+        update_data["targetLang"] = data.targetLang
+
+    result = await db.translation_memory.update_one(
+        {"id": entry_id},
+        {"$set": update_data}
+    )
+
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Entry not found")
+
+    return {"status": "success", "message": "TM entry updated successfully"}
 
 @api_router.delete("/admin/translation-memory")
 async def clear_translation_memory(admin_key: str, sourceLang: Optional[str] = None, targetLang: Optional[str] = None):
@@ -17738,6 +17817,90 @@ async def upload_translation_memory(
                             "source": source_text,
                             "target": target_text
                         })
+
+        elif filename.endswith('.xlsx') or filename.endswith('.xls'):
+            # Parse Excel file
+            try:
+                import openpyxl
+                import io
+
+                workbook = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+                sheet = workbook.active
+
+                # Try to find header row and determine columns
+                source_col = 0
+                target_col = 1
+                header_row = list(sheet.iter_rows(min_row=1, max_row=1, values_only=True))[0] if sheet.max_row > 0 else []
+
+                if header_row:
+                    header_lower = [str(h).lower().strip() if h else '' for h in header_row]
+                    for i, h in enumerate(header_lower):
+                        if 'source' in h or 'original' in h or 'origem' in h or 'português' in h:
+                            source_col = i
+                        elif 'target' in h or 'translation' in h or 'destino' in h or 'tradução' in h or 'english' in h or 'inglês' in h:
+                            target_col = i
+
+                for row in sheet.iter_rows(min_row=2, values_only=True):  # Skip header
+                    if len(row) > max(source_col, target_col):
+                        source_text = str(row[source_col]).strip() if row[source_col] else ""
+                        target_text = str(row[target_col]).strip() if row[target_col] else ""
+
+                        if source_text and target_text and source_text != 'None' and target_text != 'None':
+                            entries.append({
+                                "source": source_text,
+                                "target": target_text
+                            })
+
+                workbook.close()
+            except ImportError:
+                raise HTTPException(status_code=400, detail="Excel support not available. Please use CSV or TMX format.")
+
+        elif filename.endswith('.sdltm'):
+            # Parse SDL Trados TM file (SQLite database)
+            try:
+                import sqlite3
+                import tempfile
+                import os
+
+                # Write content to temp file (sqlite needs file path)
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.sdltm') as tmp:
+                    tmp.write(content)
+                    tmp_path = tmp.name
+
+                try:
+                    conn = sqlite3.connect(tmp_path)
+                    cursor = conn.cursor()
+
+                    # SDL TM stores translations in translation_units table
+                    cursor.execute("""
+                        SELECT source_segment, target_segment
+                        FROM translation_units
+                        WHERE source_segment IS NOT NULL AND target_segment IS NOT NULL
+                    """)
+
+                    for row in cursor.fetchall():
+                        source_text = row[0].strip() if row[0] else ""
+                        target_text = row[1].strip() if row[1] else ""
+
+                        if source_text and target_text:
+                            entries.append({
+                                "source": source_text,
+                                "target": target_text
+                            })
+
+                    conn.close()
+                finally:
+                    os.unlink(tmp_path)
+
+            except Exception as e:
+                logger.warning(f"Error parsing SDLTM file: {e}")
+                raise HTTPException(status_code=400, detail=f"Error parsing Trados TM file: {str(e)}")
+
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported file format. Use CSV, Excel (.xlsx/.xls), TMX/XML, or Trados TM (.sdltm)")
+
+        if not entries:
+            raise HTTPException(status_code=400, detail="No valid entries found in the file")
 
         # Insert entries into database
         for entry in entries:
