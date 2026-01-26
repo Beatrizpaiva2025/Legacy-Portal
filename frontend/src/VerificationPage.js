@@ -9,6 +9,12 @@ const VerificationPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Document content verification states
+  const [documentContent, setDocumentContent] = useState('');
+  const [contentVerificationResult, setContentVerificationResult] = useState(null);
+  const [verifyingContent, setVerifyingContent] = useState(false);
+  const [showContentVerifier, setShowContentVerifier] = useState(false);
+
   useEffect(() => {
     // Extract certification ID from URL
     const hash = window.location.hash;
@@ -26,6 +32,8 @@ const VerificationPage = () => {
   const verifyCertification = async (certId) => {
     setLoading(true);
     setError('');
+    setContentVerificationResult(null);
+    setDocumentContent('');
     try {
       const response = await axios.get(`${API}/certifications/verify/${certId}`);
       setVerificationResult(response.data);
@@ -35,6 +43,29 @@ const VerificationPage = () => {
       setVerificationResult({ is_valid: false });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const verifyDocumentContent = async () => {
+    if (!documentContent.trim() || !certificationId) return;
+
+    setVerifyingContent(true);
+    setContentVerificationResult(null);
+    try {
+      const response = await axios.post(
+        `${API}/certifications/verify-content/${certificationId}`,
+        { document_content: documentContent }
+      );
+      setContentVerificationResult(response.data);
+    } catch (err) {
+      console.error('Content verification error:', err);
+      setContentVerificationResult({
+        is_authentic: false,
+        content_matches: false,
+        message: 'Error verifying document content. Please try again.'
+      });
+    } finally {
+      setVerifyingContent(false);
     }
   };
 
@@ -222,8 +253,124 @@ const VerificationPage = () => {
                       record is stored in our tamper-proof database with a unique document hash that ensures
                       the translation has not been altered since certification.
                     </p>
+                    {verificationResult.document_hash && (
+                      <p className="text-slate-400 text-xs mt-2 font-mono">
+                        Document Hash: {verificationResult.document_hash.substring(0, 20)}...
+                      </p>
+                    )}
                   </div>
                 </div>
+              </div>
+
+              {/* Document Content Verification Section */}
+              <div className="mt-6 border border-slate-200 rounded-lg overflow-hidden">
+                <button
+                  onClick={() => setShowContentVerifier(!showContentVerifier)}
+                  className="w-full px-5 py-4 bg-slate-50 hover:bg-slate-100 transition-colors flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                      <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </div>
+                    <div className="text-left">
+                      <h3 className="font-bold text-slate-800">Verify Document Integrity</h3>
+                      <p className="text-sm text-slate-500">Check if your document has been altered</p>
+                    </div>
+                  </div>
+                  <svg
+                    className={`w-5 h-5 text-slate-400 transition-transform ${showContentVerifier ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {showContentVerifier && (
+                  <div className="p-5 border-t border-slate-200">
+                    <p className="text-sm text-slate-600 mb-4">
+                      Paste the translation text content below to verify if it matches the certified original.
+                      Any alterations will be detected.
+                    </p>
+
+                    <textarea
+                      value={documentContent}
+                      onChange={(e) => setDocumentContent(e.target.value)}
+                      placeholder="Paste the translation text here to verify its authenticity..."
+                      className="w-full h-40 px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm resize-none"
+                    />
+
+                    <button
+                      onClick={verifyDocumentContent}
+                      disabled={!documentContent.trim() || verifyingContent}
+                      className="mt-4 w-full px-6 py-3 bg-slate-800 text-white rounded-lg hover:bg-slate-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors font-medium"
+                    >
+                      {verifyingContent ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Verifying Content...
+                        </span>
+                      ) : (
+                        'Verify Document Content'
+                      )}
+                    </button>
+
+                    {/* Content Verification Result */}
+                    {contentVerificationResult && (
+                      <div className={`mt-4 p-4 rounded-lg ${
+                        contentVerificationResult.content_matches
+                          ? 'bg-emerald-50 border border-emerald-200'
+                          : 'bg-red-50 border border-red-200'
+                      }`}>
+                        <div className="flex items-start gap-3">
+                          {contentVerificationResult.content_matches ? (
+                            <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0">
+                              <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            </div>
+                          ) : (
+                            <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                              <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                              </svg>
+                            </div>
+                          )}
+                          <div>
+                            <h4 className={`font-bold ${
+                              contentVerificationResult.content_matches ? 'text-emerald-800' : 'text-red-800'
+                            }`}>
+                              {contentVerificationResult.content_matches
+                                ? 'Document Authentic - No Alterations'
+                                : 'ALTERATIONS DETECTED'}
+                            </h4>
+                            <p className={`text-sm mt-1 ${
+                              contentVerificationResult.content_matches ? 'text-emerald-700' : 'text-red-700'
+                            }`}>
+                              {contentVerificationResult.message}
+                            </p>
+                            {contentVerificationResult.original_hash && contentVerificationResult.submitted_hash && (
+                              <div className="mt-3 text-xs space-y-1">
+                                <p className="font-mono text-slate-500">
+                                  Original hash: {contentVerificationResult.original_hash}
+                                </p>
+                                <p className="font-mono text-slate-500">
+                                  Submitted hash: {contentVerificationResult.submitted_hash}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
