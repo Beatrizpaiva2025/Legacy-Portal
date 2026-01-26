@@ -861,7 +861,6 @@ const TopBar = ({
               title="Switch brand theme"
             >
               <option value="legacy">Legacy</option>
-              <option value="tradux">TRADUX</option>
             </select>
           </div>
         )}
@@ -1807,8 +1806,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [translationResults, setTranslationResults] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStatus, setProcessingStatus] = useState('');
-  const [traduxStatus, setTraduxStatus] = useState(null); // TRADUX auto-translation status
-  const [convertCurrency, setConvertCurrency] = useState(false); // TRADUX currency conversion
   const [selectedResultIndex, setSelectedResultIndex] = useState(0);
   const [translationEditMode, setTranslationEditMode] = useState(false); // Edit mode for in-house translators in TRANSLATION tab
 
@@ -6349,7 +6346,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           { id: 'translate', label: 'TRANSLATION', icon: '📄', roles: ['admin', 'pm', 'translator'] },
           { id: 'review', label: 'REVIEW', icon: '📋', roles: ['admin', 'pm', 'translator_contractor'] }, // Hidden for in-house - merged into TRANSLATION
           { id: 'proofreading', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm', 'translator_inhouse'] },
-          { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin'] }, // Only admin can deliver to client
+          { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'pm', 'translator_inhouse', 'translator_contractor'] }, // Admin, PM, In-house and Contractor
           { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin', 'pm', 'translator_inhouse'] },
           { id: 'tm', label: 'TM', icon: '🧠', roles: ['admin', 'pm', 'translator_inhouse'] },
           { id: 'instructions', label: 'INSTRUCTIONS', icon: '📋', roles: ['admin', 'pm', 'translator_inhouse'] }
@@ -7731,21 +7728,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <span className="mr-2">📋</span>
                 <span className="text-sm font-medium">Fill Template</span>
               </label>
-              <label className={`flex items-center px-3 py-2 rounded-lg cursor-pointer transition-all ${workflowMode === 'tradux' ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg scale-105' : 'bg-white text-gray-600 hover:bg-orange-50 border-2 border-orange-200'}`}>
-                <input
-                  type="radio"
-                  name="workflowMode"
-                  value="tradux"
-                  checked={workflowMode === 'tradux'}
-                  onChange={() => handleWorkflowModeChange('tradux')}
-                  className="sr-only"
-                />
-                <span className="mr-2">⚡</span>
-                <span className="text-sm font-bold">TRADUX Auto</span>
-              </label>
             </div>
             <p className="text-[10px] text-gray-500 text-center mt-2">
-              {workflowMode === 'ai' ? 'Upload document and translate with AI' : workflowMode === 'external' ? 'Upload original + existing translation for review' : workflowMode === 'ocr' ? 'Extract text for external CAT tools (SDL Trados, MemoQ, etc.)' : workflowMode === 'tradux' ? '⚡ 100% Automated: OCR → Translation → Proofreading → Client Approval (No human intervention)' : 'Fill document template with original for reference'}
+              {workflowMode === 'ai' ? 'Upload document and translate with AI' : workflowMode === 'external' ? 'Upload original + existing translation for review' : workflowMode === 'ocr' ? 'Extract text for external CAT tools (SDL Trados, MemoQ, etc.)' : 'Fill document template with original for reference'}
             </p>
           </div>
 
@@ -9032,253 +9017,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             </>
           )}
 
-          {/* ============ TRADUX AUTO MODE ============ */}
-          {workflowMode === 'tradux' && (
-            <>
-              {/* TRADUX Header */}
-              <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-lg p-4 mb-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-bold flex items-center gap-2">
-                      ⚡ TRADUX Auto-Translation
-                    </h3>
-                    <p className="text-sm opacity-90 mt-1">100% AI-powered translation - No human intervention required</p>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold">~5 min</div>
-                    <div className="text-xs opacity-80">Average processing time</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* TRADUX Process Steps */}
-              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-4">
-                <h4 className="text-sm font-bold text-orange-800 mb-3">Automated Workflow:</h4>
-                <div className="grid grid-cols-5 gap-2">
-                  <div className="text-center p-3 bg-white rounded-lg border">
-                    <div className="text-2xl mb-1">📄</div>
-                    <div className="text-xs font-medium">1. OCR</div>
-                    <div className="text-[10px] text-gray-500">Extract text</div>
-                  </div>
-                  <div className="text-center p-3 bg-white rounded-lg border">
-                    <div className="text-2xl mb-1">🤖</div>
-                    <div className="text-xs font-medium">2. Translate</div>
-                    <div className="text-[10px] text-gray-500">AI + Glossary</div>
-                  </div>
-                  <div className="text-center p-3 bg-white rounded-lg border">
-                    <div className="text-2xl mb-1">📐</div>
-                    <div className="text-xs font-medium">3. Layout</div>
-                    <div className="text-[10px] text-gray-500">Optimize</div>
-                  </div>
-                  <div className="text-center p-3 bg-white rounded-lg border">
-                    <div className="text-2xl mb-1">✅</div>
-                    <div className="text-xs font-medium">4. Proofread</div>
-                    <div className="text-[10px] text-gray-500">Auto-correct</div>
-                  </div>
-                  <div className="text-center p-3 bg-white rounded-lg border">
-                    <div className="text-2xl mb-1">👤</div>
-                    <div className="text-xs font-medium">5. Client</div>
-                    <div className="text-[10px] text-gray-500">Approval</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* TRADUX Settings */}
-              <div className="bg-white border rounded-lg p-4 mb-4">
-                <h4 className="text-sm font-bold text-gray-700 mb-3">Translation Settings:</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Source Language</label>
-                    <select
-                      value={sourceLanguage}
-                      onChange={(e) => setSourceLanguage(e.target.value)}
-                      className="w-full px-3 py-2 border rounded text-sm"
-                    >
-                      <option value="Portuguese (Brazil)">Portuguese (Brazil)</option>
-                      <option value="Spanish">Spanish</option>
-                      <option value="French">French</option>
-                      <option value="German">German</option>
-                      <option value="Italian">Italian</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Target Language</label>
-                    <select
-                      value={targetLanguage}
-                      onChange={(e) => setTargetLanguage(e.target.value)}
-                      className="w-full px-3 py-2 border rounded text-sm"
-                    >
-                      <option value="English">English</option>
-                      <option value="Portuguese (Brazil)">Portuguese (Brazil)</option>
-                      <option value="Spanish">Spanish</option>
-                      <option value="French">French</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 mt-3">
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Document Type</label>
-                    <select
-                      value={documentType}
-                      onChange={(e) => setDocumentType(e.target.value)}
-                      className="w-full px-3 py-2 border rounded text-sm"
-                    >
-                      <option value="general">General Document</option>
-                      <option value="birth_certificate">Birth Certificate</option>
-                      <option value="marriage_certificate">Marriage Certificate</option>
-                      <option value="diploma">Diploma / Academic</option>
-                      <option value="bank_statement">Bank Statement</option>
-                      <option value="power_of_attorney">Power of Attorney</option>
-                      <option value="medical">Medical Record</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Page Format</label>
-                    <select
-                      value={pageFormat || 'letter'}
-                      onChange={(e) => setPageFormat && setPageFormat(e.target.value)}
-                      className="w-full px-3 py-2 border rounded text-sm"
-                    >
-                      <option value="letter">US Letter (8.5" x 11")</option>
-                      <option value="a4">A4 (210mm x 297mm)</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Currency Conversion */}
-                <div className="mt-4 p-3 bg-gray-50 rounded">
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={convertCurrency || false}
-                      onChange={(e) => setConvertCurrency && setConvertCurrency(e.target.checked)}
-                      className="rounded"
-                    />
-                    <span>Enable Currency Conversion (BRL → USD)</span>
-                  </label>
-                </div>
-
-                {/* Auto-Correct */}
-                <div className="mt-2 p-3 bg-gray-50 rounded">
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={true}
-                      className="rounded"
-                      disabled
-                    />
-                    <span>Auto-correct proofreading errors</span>
-                    <span className="text-xs text-gray-500">(Always enabled for TRADUX)</span>
-                  </label>
-                </div>
-              </div>
-
-              {/* TRADUX Status Display */}
-              {traduxStatus && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-sm font-bold text-blue-800">Translation Progress</h4>
-                    <span className="text-lg font-bold text-blue-600">{traduxStatus.progress_percent || 0}%</span>
-                  </div>
-                  <div className="w-full bg-blue-200 rounded-full h-3 mb-3">
-                    <div
-                      className="bg-gradient-to-r from-orange-500 to-red-500 h-3 rounded-full transition-all duration-500"
-                      style={{ width: `${traduxStatus.progress_percent || 0}%` }}
-                    ></div>
-                  </div>
-                  <div className="text-sm text-blue-700">
-                    <span className="font-medium">Current Step:</span> {traduxStatus.current_step || 'Initializing...'}
-                  </div>
-                  {traduxStatus.has_error && (
-                    <div className="mt-2 p-2 bg-red-100 border border-red-300 rounded text-sm text-red-700">
-                      Error: {traduxStatus.error_message}
-                    </div>
-                  )}
-                  {traduxStatus.current_step === 'ready_for_client' && (
-                    <div className="mt-3 p-3 bg-green-100 border border-green-300 rounded">
-                      <div className="text-green-800 font-medium mb-2">✅ Translation Complete!</div>
-                      <div className="text-sm text-green-700">
-                        Client approval link: <a href={`/client/translation-approval/${traduxStatus.client_approval_token}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Open Approval Page</a>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Start TRADUX Button */}
-              <div className="flex justify-center">
-                <button
-                  onClick={async () => {
-                    if (!selectedOrderId) {
-                      setProcessingStatus('⚠️ Please select an order first from the START tab');
-                      return;
-                    }
-                    setProcessingStatus('⚡ Starting TRADUX auto-translation...');
-                    setTraduxStatus({ progress_percent: 0, current_step: 'initializing' });
-                    try {
-                      const response = await axios.post(`${API}/admin/tradux/auto-translate?admin_key=${adminKey}`, {
-                        order_id: selectedOrderId,
-                        source_language: sourceLanguage || 'Portuguese (Brazil)',
-                        target_language: targetLanguage || 'English',
-                        document_type: documentType || 'general',
-                        page_format: pageFormat || 'letter',
-                        convert_currency: convertCurrency || false,
-                        use_glossary: true,
-                        auto_correct_errors: true
-                      });
-                      setProcessingStatus('✅ TRADUX translation started! Monitoring progress...');
-
-                      // Start polling for status updates
-                      const pollInterval = setInterval(async () => {
-                        try {
-                          const statusResponse = await axios.get(`${API}/admin/tradux/status/${selectedOrderId}?admin_key=${adminKey}`);
-                          setTraduxStatus(statusResponse.data);
-
-                          if (statusResponse.data.current_step === 'ready_for_client' ||
-                              statusResponse.data.current_step === 'completed' ||
-                              statusResponse.data.has_error) {
-                            clearInterval(pollInterval);
-                            if (statusResponse.data.current_step === 'ready_for_client') {
-                              setProcessingStatus('✅ Translation complete! Ready for client approval.');
-                            }
-                          }
-                        } catch (err) {
-                          console.error('Error polling status:', err);
-                        }
-                      }, 3000);
-
-                    } catch (error) {
-                      console.error('TRADUX error:', error);
-                      setProcessingStatus('❌ Error: ' + (error.response?.data?.detail || error.message));
-                      setTraduxStatus(null);
-                    }
-                  }}
-                  disabled={!selectedOrderId || (traduxStatus && traduxStatus.progress_percent > 0 && traduxStatus.progress_percent < 100)}
-                  className={`px-8 py-4 text-lg font-bold rounded-lg shadow-lg transition-all flex items-center gap-3 ${
-                    !selectedOrderId || (traduxStatus && traduxStatus.progress_percent > 0 && traduxStatus.progress_percent < 100)
-                      ? 'bg-gray-400 cursor-not-allowed text-white'
-                      : 'bg-gradient-to-r from-orange-500 to-red-500 text-white hover:from-orange-600 hover:to-red-600 hover:scale-105'
-                  }`}
-                >
-                  <span className="text-2xl">⚡</span>
-                  <span>Start TRADUX Auto-Translation</span>
-                </button>
-              </div>
-
-              {/* Processing Status */}
-              {processingStatus && (
-                <div className={`mt-4 p-3 rounded text-sm font-medium text-center ${
-                  processingStatus.includes('❌') ? 'bg-red-100 text-red-700' :
-                  processingStatus.includes('✅') ? 'bg-green-100 text-green-700' :
-                  processingStatus.includes('⚠️') ? 'bg-yellow-100 text-yellow-700' :
-                  'bg-blue-100 text-blue-700 animate-pulse'
-                }`}>
-                  {processingStatus}
-                </div>
-              )}
-            </>
-          )}
         </div>
       )}
 

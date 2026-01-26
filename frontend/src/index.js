@@ -4,6 +4,7 @@ import { HashRouter, Routes, Route } from "react-router-dom";
 import "./index.css";
 import App from "./App";
 import AdminApp from "./AdminApp";
+import TraduxAdminApp from "./TraduxAdminApp";
 import CustomerApp from "./CustomerApp";
 import SalespersonApp from "./SalespersonApp";
 import B2BLandingPage from "./B2BLandingPage";
@@ -15,7 +16,9 @@ root.render(
   <React.StrictMode>
     <HashRouter>
       <Routes>
-        {/* Admin Panel - /#/admin */}
+        {/* TRADUX Admin Panel - /#/tradux-admin */}
+        <Route path="/tradux-admin/*" element={<TraduxAdminApp />} />
+        {/* Legacy Admin Panel - /#/admin */}
         <Route path="/admin/*" element={<AdminApp />} />
         {/* Customer Portal - /#/customer */}
         <Route path="/customer/*" element={<CustomerApp />} />
