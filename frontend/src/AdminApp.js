@@ -18124,7 +18124,13 @@ const FollowupsPage = ({ adminKey }) => {
     try {
       const response = await axios.post(`${API}/admin/quotes/process-followups?admin_key=${adminKey}`);
       const result = response.data;
-      alert(`Follow-ups processed!\n\nReminders sent: ${result.reminders_sent}\nMarked as lost: ${result.marked_lost}${result.errors?.length > 0 ? `\nErrors: ${result.errors.length}` : ''}`);
+      const errorDetails = result.errors?.length > 0
+        ? `\n\nErrors (${result.errors.length}):\n${result.errors.slice(0, 5).join('\n')}${result.errors.length > 5 ? `\n... and ${result.errors.length - 5} more` : ''}`
+        : '';
+      if (result.errors?.length > 0) {
+        console.log('Follow-up errors:', result.errors);
+      }
+      alert(`Follow-ups processed!\n\nReminders sent: ${result.reminders_sent}\nMarked as lost: ${result.marked_lost}${errorDetails}`);
       fetchFollowupStatus();
     } catch (err) {
       alert('Failed to process follow-ups. Check console for details.');
