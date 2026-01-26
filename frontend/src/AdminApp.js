@@ -11653,9 +11653,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         formData,
                         { headers: { 'Content-Type': 'multipart/form-data' } }
                       );
-                      setProcessingStatus(`✅ ${response.data.message}`);
-                      // Refresh TM list
-                      const res = await axios.get(`${API}/admin/translation-memory?admin_key=${adminKey}`);
+                      setProcessingStatus(`✅ ${response.data.message} (Added: ${response.data.added}, Updated: ${response.data.updated})`);
+                      // Refresh TM list with current filters
+                      const filterParams = new URLSearchParams();
+                      filterParams.append('admin_key', adminKey);
+                      if (tmFilter.sourceLang) filterParams.append('sourceLang', tmFilter.sourceLang);
+                      if (tmFilter.targetLang) filterParams.append('targetLang', tmFilter.targetLang);
+                      const res = await axios.get(`${API}/admin/translation-memory?${filterParams.toString()}`);
                       setTranslationMemories(res.data.memories || []);
                     } catch (err) {
                       alert('Upload failed: ' + (err.response?.data?.detail || err.message));
@@ -11760,12 +11764,26 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               </button>
             </div>
 
+            {/* TM Stats */}
+            <div className="mb-3 flex items-center gap-4 text-xs">
+              <span className="bg-gray-100 px-3 py-1 rounded">
+                Total: <strong>{translationMemories.length}</strong> entries
+              </span>
+              <span className="bg-purple-50 text-purple-700 px-3 py-1 rounded">
+                📤 Uploaded: <strong>{translationMemories.filter(tm => tm.is_uploaded).length}</strong>
+              </span>
+              <span className="bg-green-50 text-green-700 px-3 py-1 rounded">
+                🤖 Auto-generated: <strong>{translationMemories.filter(tm => !tm.is_uploaded).length}</strong>
+              </span>
+            </div>
+
             {/* TM Entries Table */}
             {translationMemories.length > 0 ? (
               <div className="border rounded overflow-hidden">
                 <table className="w-full text-xs">
                   <thead className="bg-gray-100">
                     <tr>
+                      <th className="px-3 py-2 text-left font-medium">Source</th>
                       <th className="px-3 py-2 text-left font-medium">Languages</th>
                       <th className="px-3 py-2 text-left font-medium">Source Text</th>
                       <th className="px-3 py-2 text-left font-medium">Target Text</th>
@@ -11776,7 +11794,14 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   </thead>
                   <tbody className="divide-y">
                     {translationMemories.slice(0, 100).map((tm) => (
-                      <tr key={tm.id} className="hover:bg-gray-50">
+                      <tr key={tm.id} className={`hover:bg-gray-50 ${tm.is_uploaded ? 'bg-purple-50/30' : ''}`}>
+                        <td className="px-3 py-2">
+                          {tm.is_uploaded ? (
+                            <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-[10px]">📤 Upload</span>
+                          ) : (
+                            <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-[10px]">🤖 Auto</span>
+                          )}
+                        </td>
                         <td className="px-3 py-2">
                           <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px]">
                             {tm.sourceLang?.substring(0, 10)} → {tm.targetLang?.substring(0, 10)}
@@ -11818,7 +11843,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 </table>
                 {translationMemories.length > 100 && (
                   <div className="p-2 bg-gray-50 text-center text-xs text-gray-500">
-                    Showing 100 of {translationMemories.length} entries. Download to see all.
+                    Showing 100 of {translationMemories.length} entries (newest first). Download to see all.
                   </div>
                 )}
               </div>
