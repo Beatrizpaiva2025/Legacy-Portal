@@ -2264,6 +2264,24 @@ class CertificationVerifyResponse(BaseModel):
     certifier_credentials: Optional[str] = None
     company_name: Optional[str] = None
     client_name: Optional[str] = None
+    document_hash: Optional[str] = None  # SHA-256 hash for integrity verification
+    message: str
+
+class DocumentVerifyRequest(BaseModel):
+    """Request model for verifying document content against stored hash"""
+    document_content: str  # The text content to verify
+
+class DocumentVerifyResponse(BaseModel):
+    """Response model for document content verification"""
+    certification_id: str
+    is_authentic: bool  # True if content matches the certified document
+    content_matches: bool  # True if hash matches
+    original_hash: str  # Stored hash (truncated for display)
+    submitted_hash: str  # Hash of submitted content (truncated for display)
+    certified_at: Optional[datetime] = None
+    document_type: Optional[str] = None
+    source_language: Optional[str] = None
+    target_language: Optional[str] = None
     message: str
 
 # Make.com Webhook URL for QuickBooks integration
@@ -24749,11 +24767,82 @@ async def verify_certification(certification_id: str):
             certifier_credentials=certification.get("certifier_credentials"),
             company_name=certification.get("company_name"),
             client_name=certification.get("client_name"),
+            document_hash=certification.get("document_hash"),
             message="✓ This document has been certified by Legacy Translations Inc."
         )
 
     except Exception as e:
         logger.error(f"Error verifying certification: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/certifications/verify-content/{certification_id}")
+async def verify_document_content(certification_id: str, data: DocumentVerifyRequest):
+    """
+    Public endpoint to verify if document content matches the certified original.
+    This detects if the document has been altered after certification.
+    """
+    try:
+        # Find certification
+        certification = await db.certifications.find_one({"certification_id": certification_id})
+
+        if not certification:
+            return DocumentVerifyResponse(
+                certification_id=certification_id,
+                is_authentic=False,
+                content_matches=False,
+                original_hash="NOT FOUND",
+                submitted_hash="N/A",
+                message="Certification not found. This document may not be certified by Legacy Translations."
+            )
+
+        # Check if revoked
+        if certification.get("revoked_at"):
+            return DocumentVerifyResponse(
+                certification_id=certification_id,
+                is_authentic=False,
+                content_matches=False,
+                original_hash=certification.get("document_hash", "")[:20] + "...",
+                submitted_hash="N/A",
+                certified_at=certification.get("certified_at"),
+                message=f"This certification was revoked. Reason: {certification.get('revocation_reason', 'Not specified')}"
+            )
+
+        # Compute hash of submitted content
+        submitted_hash = hashlib.sha256(data.document_content.encode('utf-8')).hexdigest()
+        original_hash = certification.get("document_hash", "")
+
+        # Compare hashes
+        content_matches = submitted_hash == original_hash
+
+        if content_matches:
+            return DocumentVerifyResponse(
+                certification_id=certification_id,
+                is_authentic=True,
+                content_matches=True,
+                original_hash=original_hash[:20] + "...",
+                submitted_hash=submitted_hash[:20] + "...",
+                certified_at=certification.get("certified_at"),
+                document_type=certification.get("document_type"),
+                source_language=certification.get("source_language"),
+                target_language=certification.get("target_language"),
+                message="✓ DOCUMENT VERIFIED: The content matches the certified original. No alterations detected."
+            )
+        else:
+            return DocumentVerifyResponse(
+                certification_id=certification_id,
+                is_authentic=False,
+                content_matches=False,
+                original_hash=original_hash[:20] + "...",
+                submitted_hash=submitted_hash[:20] + "...",
+                certified_at=certification.get("certified_at"),
+                document_type=certification.get("document_type"),
+                source_language=certification.get("source_language"),
+                target_language=certification.get("target_language"),
+                message="⚠ ALTERATIONS DETECTED: The document content does NOT match the certified original. This document has been modified after certification."
+            )
+
+    except Exception as e:
+        logger.error(f"Error verifying document content: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.get("/certifications/{certification_id}")
