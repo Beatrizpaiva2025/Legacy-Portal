@@ -1510,7 +1510,8 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
         customer_email: guestEmail,
         customer_name: guestName,
         origin_url: window.location.origin,
-        currency: userCurrency.currency // Multi-currency support
+        currency: userCurrency.currency, // Multi-currency support
+        locale: uiLang // Send UI language for Stripe checkout translation
       });
 
       // Step 3: Save form data before redirecting to Stripe

@@ -3404,7 +3404,7 @@ const OrdersPage = ({ token, currency }) => {
 };
 
 // ==================== INVOICES PAGE ====================
-const InvoicesPage = ({ token, t, currency }) => {
+const InvoicesPage = ({ token, t, currency, lang }) => {
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
@@ -3458,7 +3458,8 @@ const InvoicesPage = ({ token, t, currency }) => {
       const response = await axios.post(`${API}/partner/invoices/${selectedInvoice.id}/pay-stripe`, {
         invoice_id: selectedInvoice.id,
         origin_url: window.location.origin,
-        currency: currency?.code?.toLowerCase() || 'usd' // Pass currency for BRL/PIX support (fallback to USD)
+        currency: currency?.code?.toLowerCase() || 'usd', // Pass currency for BRL/PIX support (fallback to USD)
+        locale: lang || 'en' // Send UI language for Stripe checkout translation
       });
       if (response.data.checkout_url) {
         window.location.href = response.data.checkout_url;
@@ -5219,7 +5220,7 @@ function App() {
       case 'orders':
         return <OrdersPage token={token} currency={currency} />;
       case 'invoices':
-        return <InvoicesPage token={token} t={t} currency={currency} />;
+        return <InvoicesPage token={token} t={t} currency={currency} lang={lang} />;
       case 'messages':
         return <MessagesPage token={token} />;
       case 'payment-plan':
