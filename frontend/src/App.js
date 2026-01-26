@@ -2496,7 +2496,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
             {/* Payment Method Selection */}
             <div className="space-y-4">
               <label className="block text-sm font-medium text-gray-700">{t.paymentMethod}</label>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <label className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'invoice' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:border-gray-300'}`}>
                   <input
                     type="radio"
@@ -2522,33 +2522,21 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                   />
                   <div>
                     <span className="font-medium">{t.payWithZelle}</span>
-                    <span className="text-xs text-slate-500 font-medium ml-1">{t.zelleUsaOnly}</span>
-                    <p className="text-sm text-gray-500 mt-1">{t.sendToZelle} {ZELLE_EMAIL}</p>
-                  </div>
-                </label>
-                <label className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'pix' ? 'border-green-500 bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                  <input
-                    type="radio"
-                    name="paymentMethod"
-                    value="pix"
-                    checked={paymentMethod === 'pix'}
-                    onChange={() => setPaymentMethod('pix')}
-                    className="sr-only"
-                  />
-                  <div>
+                    <span className="text-xs text-slate-500 font-medium ml-1">(USA)</span>
+                    <span className="text-xs text-slate-500 font-medium"> or </span>
                     <span className="font-medium">{t.payWithPix}</span>
-                    <span className="text-xs text-green-600 font-medium ml-1">{t.pixBrazilOnly}</span>
-                    <p className="text-sm text-gray-500 mt-1">{t.sendToZelle} {PIX_EMAIL}</p>
+                    <span className="text-xs text-green-600 font-medium ml-1">(Brazil)</span>
+                    <p className="text-sm text-gray-500 mt-1">{ZELLE_EMAIL}</p>
                   </div>
                 </label>
               </div>
 
-              {/* Zelle Instructions & Receipt Upload */}
+              {/* Zelle/PIX Instructions & Receipt Upload */}
               {paymentMethod === 'zelle' && (
                 <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-4">
-                  <h4 className="font-semibold text-slate-700">Zelle Payment Instructions</h4>
+                  <h4 className="font-semibold text-slate-700">Zelle / PIX Payment Instructions</h4>
                   <div className="space-y-2 text-sm text-slate-600">
-                    <p className="font-semibold">1. Open your bank app and select Zelle</p>
+                    <p className="font-semibold">1. Open your bank app and select Zelle (USA) or PIX (Brazil)</p>
                     <p className="font-semibold">2. Send payment to: {ZELLE_EMAIL}</p>
                     <p className="font-semibold">3. Include your company name in the memo</p>
                     <p className="font-semibold">4. Upload your payment receipt below</p>
@@ -2580,49 +2568,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                   </div>
 
                   {paymentMethod === 'zelle' && !zelleReceipt && (
-                    <p className="text-sm text-red-500">* Receipt is required for Zelle payments</p>
-                  )}
-                </div>
-              )}
-
-              {/* PIX Instructions & Receipt Upload */}
-              {paymentMethod === 'pix' && (
-                <div className="p-4 bg-green-50 border border-green-200 rounded-lg space-y-4">
-                  <h4 className="font-semibold text-green-700">PIX Payment Instructions</h4>
-                  <div className="space-y-2 text-sm text-green-600">
-                    <p className="font-semibold">1. Open your bank app and select PIX</p>
-                    <p className="font-semibold">2. Send payment to: {PIX_EMAIL}</p>
-                    <p className="font-semibold">3. Include your company name in the description</p>
-                    <p className="font-semibold">4. Upload your payment receipt below</p>
-                  </div>
-
-                  {/* Receipt Upload */}
-                  <div>
-                    <input
-                      type="file"
-                      ref={zelleReceiptInputRef}
-                      accept="image/*,.pdf"
-                      className="hidden"
-                      onChange={(e) => setZelleReceipt(e.target.files[0])}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => zelleReceiptInputRef.current?.click()}
-                      className="w-full py-3 border-2 border-dashed border-green-300 rounded-lg text-green-600 hover:border-green-400 hover:bg-green-100 transition-colors"
-                    >
-                      {zelleReceipt ? (
-                        <span className="flex items-center justify-center gap-2">
-                          <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                          {zelleReceipt.name}
-                        </span>
-                      ) : (
-                        <span>Click to upload payment receipt</span>
-                      )}
-                    </button>
-                  </div>
-
-                  {paymentMethod === 'pix' && !zelleReceipt && (
-                    <p className="text-sm text-red-500">* Receipt is required for PIX payments</p>
+                    <p className="text-sm text-red-500">* Receipt is required for Zelle/PIX payments</p>
                   )}
                 </div>
               )}
@@ -2630,10 +2576,10 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
 
             <button
               type="submit"
-              disabled={submitting || wordCount === 0 || ((paymentMethod === 'zelle' || paymentMethod === 'pix') && !zelleReceipt)}
-              className={`w-full py-3 text-white rounded-md font-semibold ${paymentMethod === 'zelle' ? 'bg-slate-600 hover:bg-slate-700 disabled:bg-gray-400' : paymentMethod === 'pix' ? 'bg-green-600 hover:bg-green-700 disabled:bg-gray-400' : 'bg-teal-600 hover:bg-teal-700 disabled:bg-gray-400'}`}
+              disabled={submitting || wordCount === 0 || (paymentMethod === 'zelle' && !zelleReceipt)}
+              className={`w-full py-3 text-white rounded-md font-semibold ${paymentMethod === 'zelle' ? 'bg-slate-600 hover:bg-slate-700 disabled:bg-gray-400' : 'bg-teal-600 hover:bg-teal-700 disabled:bg-gray-400'}`}
             >
-              {submitting ? t.creatingOrder : ((paymentMethod === 'zelle' || paymentMethod === 'pix') ? t.submitOrderZelle : t.createOrder)}
+              {submitting ? t.creatingOrder : (paymentMethod === 'zelle' ? t.submitOrderZelle : t.createOrder)}
             </button>
           </form>
         </div>
