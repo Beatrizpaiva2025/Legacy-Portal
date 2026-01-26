@@ -12909,8 +12909,27 @@ async def generate_combined_delivery_pdf(
         page.draw_rect(fitz.Rect(0, page_height - 40, page_width, page_height), color=(0.97, 0.97, 0.97), fill=(0.97, 0.97, 0.97))
         page.insert_text((page_width/2 - 150, page_height - 20), "Legacy Translations Inc. · 867 Boylston St, Boston, MA · (857) 316-7770 · ATA #275993", fontsize=7, fontname="helv", color=gray_color)
 
-    # Save to bytes
-    pdf_bytes = doc.tobytes()
+    # Save to bytes with encryption to prevent modifications
+    # Generate a unique owner password for this document
+    owner_password = secrets.token_hex(16)
+
+    # Permissions: Allow printing and copying, but NO modifications or annotations
+    # This makes the PDF read-only similar to Adobe's certified signature
+    permissions = (
+        fitz.PDF_PERM_PRINT |       # Allow printing
+        fitz.PDF_PERM_PRINT_HQ |    # Allow high-quality printing
+        fitz.PDF_PERM_COPY |        # Allow copying text (for accessibility)
+        fitz.PDF_PERM_ACCESSIBILITY # Allow accessibility features
+        # Note: PDF_PERM_MODIFY, PDF_PERM_ANNOTATE, PDF_PERM_FORM are NOT included
+        # This prevents editing, annotations, and form filling
+    )
+
+    pdf_bytes = doc.tobytes(
+        encryption=fitz.PDF_ENCRYPT_AES_256,  # Strong AES-256 encryption
+        owner_pw=owner_password,              # Owner password (required to modify)
+        user_pw="",                           # No password needed to open/view
+        permissions=permissions               # Restricted permissions
+    )
     doc.close()
 
     return pdf_bytes
@@ -13674,8 +13693,20 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                     ver_page.insert_text((150, 590), "Legacy Translations Inc. | 867 Boylston Street, Boston, MA 02116", fontsize=8, fontname="helv", color=gray_color)
                     ver_page.insert_text((200, 605), "(857) 316-7770 | contact@legacytranslations.com", fontsize=8, fontname="helv", color=gray_color)
 
-                # Save combined PDF
-                combined_pdf_bytes = pdf_doc.tobytes()
+                # Save combined PDF with encryption to prevent modifications
+                owner_password = secrets.token_hex(16)
+                permissions = (
+                    fitz.PDF_PERM_PRINT |
+                    fitz.PDF_PERM_PRINT_HQ |
+                    fitz.PDF_PERM_COPY |
+                    fitz.PDF_PERM_ACCESSIBILITY
+                )
+                combined_pdf_bytes = pdf_doc.tobytes(
+                    encryption=fitz.PDF_ENCRYPT_AES_256,
+                    owner_pw=owner_password,
+                    user_pw="",
+                    permissions=permissions
+                )
                 pdf_doc.close()
 
                 all_attachments = [{
