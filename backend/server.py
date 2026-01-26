@@ -17428,7 +17428,7 @@ class TranslationMemoryCreate(BaseModel):
     entries: List[TranslationMemoryEntry]
 
 @api_router.get("/admin/translation-memory")
-async def get_translation_memory(admin_key: str, sourceLang: Optional[str] = None, targetLang: Optional[str] = None):
+async def get_translation_memory(admin_key: str, sourceLang: Optional[str] = None, targetLang: Optional[str] = None, field: Optional[str] = None):
     """Get all translation memory entries - Admin, PM, and in-house translators"""
     user_info = await validate_admin_or_user_token(admin_key)
     if not user_info:
@@ -17447,8 +17447,10 @@ async def get_translation_memory(admin_key: str, sourceLang: Optional[str] = Non
         query["sourceLang"] = sourceLang
     if targetLang:
         query["targetLang"] = targetLang
+    if field:
+        query["field"] = field
 
-    memories = await db.translation_memory.find(query).sort("created_at", -1).to_list(500)
+    memories = await db.translation_memory.find(query).sort("created_at", -1).to_list(5000)
     for mem in memories:
         if '_id' in mem:
             del mem['_id']
@@ -17727,6 +17729,90 @@ async def upload_translation_memory(
                             "source": source_text,
                             "target": target_text
                         })
+
+        elif filename.endswith('.xlsx') or filename.endswith('.xls'):
+            # Parse Excel file
+            try:
+                import openpyxl
+                import io
+
+                workbook = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+                sheet = workbook.active
+
+                # Try to find header row and determine columns
+                source_col = 0
+                target_col = 1
+                header_row = list(sheet.iter_rows(min_row=1, max_row=1, values_only=True))[0] if sheet.max_row > 0 else []
+
+                if header_row:
+                    header_lower = [str(h).lower().strip() if h else '' for h in header_row]
+                    for i, h in enumerate(header_lower):
+                        if 'source' in h or 'original' in h or 'origem' in h or 'português' in h:
+                            source_col = i
+                        elif 'target' in h or 'translation' in h or 'destino' in h or 'tradução' in h or 'english' in h or 'inglês' in h:
+                            target_col = i
+
+                for row in sheet.iter_rows(min_row=2, values_only=True):  # Skip header
+                    if len(row) > max(source_col, target_col):
+                        source_text = str(row[source_col]).strip() if row[source_col] else ""
+                        target_text = str(row[target_col]).strip() if row[target_col] else ""
+
+                        if source_text and target_text and source_text != 'None' and target_text != 'None':
+                            entries.append({
+                                "source": source_text,
+                                "target": target_text
+                            })
+
+                workbook.close()
+            except ImportError:
+                raise HTTPException(status_code=400, detail="Excel support not available. Please use CSV or TMX format.")
+
+        elif filename.endswith('.sdltm'):
+            # Parse SDL Trados TM file (SQLite database)
+            try:
+                import sqlite3
+                import tempfile
+                import os
+
+                # Write content to temp file (sqlite needs file path)
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.sdltm') as tmp:
+                    tmp.write(content)
+                    tmp_path = tmp.name
+
+                try:
+                    conn = sqlite3.connect(tmp_path)
+                    cursor = conn.cursor()
+
+                    # SDL TM stores translations in translation_units table
+                    cursor.execute("""
+                        SELECT source_segment, target_segment
+                        FROM translation_units
+                        WHERE source_segment IS NOT NULL AND target_segment IS NOT NULL
+                    """)
+
+                    for row in cursor.fetchall():
+                        source_text = row[0].strip() if row[0] else ""
+                        target_text = row[1].strip() if row[1] else ""
+
+                        if source_text and target_text:
+                            entries.append({
+                                "source": source_text,
+                                "target": target_text
+                            })
+
+                    conn.close()
+                finally:
+                    os.unlink(tmp_path)
+
+            except Exception as e:
+                logger.warning(f"Error parsing SDLTM file: {e}")
+                raise HTTPException(status_code=400, detail=f"Error parsing Trados TM file: {str(e)}")
+
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported file format. Use CSV, Excel (.xlsx/.xls), TMX/XML, or Trados TM (.sdltm)")
+
+        if not entries:
+            raise HTTPException(status_code=400, detail="No valid entries found in the file")
 
         # Insert entries into database
         for entry in entries:
