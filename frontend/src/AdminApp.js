@@ -1817,6 +1817,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [isProofreading, setIsProofreading] = useState(false);
   const [proofreadingError, setProofreadingError] = useState('');
   const [highlightedErrorIndex, setHighlightedErrorIndex] = useState(null);
+  const [highlightedPmErrorIndex, setHighlightedPmErrorIndex] = useState(null);
 
   // Rejection modal state (PM/Admin)
   const [showRejectModal, setShowRejectModal] = useState(false);
@@ -4019,11 +4020,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     let highlightedHtml = currentResult.translatedText;
 
     // Create a list of errors to highlight with their original index, sorted by length (longest first)
+    // Use traducao_errada (English text found in translation) for highlighting, not the Portuguese original
     const errorsToHighlight = proofreadingResult.erros
       .map((erro, idx) => ({
-        text: erro.found || erro.original || erro.traducao_errada || '',
+        text: erro.traducao_errada || erro.found || '',
         severity: erro.severidade || erro.gravidade || 'MÉDIO',
-        suggestion: erro.sugestao || erro.correcao || '',
+        suggestion: erro.correcao || erro.sugestao || '',
         type: erro.tipo || 'Geral',
         index: idx,
         applied: erro.applied
@@ -4079,6 +4081,64 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         setHighlightedErrorIndex(null);
       }, 3000);
     }
+  };
+
+  // Handle click on error row in table - scroll to and highlight in translation preview
+  const handleErrorRowClick = (errorIndex, foundText) => {
+    if (!foundText) return;
+
+    setHighlightedErrorIndex(errorIndex);
+
+    // Find and scroll to the highlighted mark in the translation preview iframe
+    setTimeout(() => {
+      const iframe = document.querySelector('.translation-preview-iframe');
+      if (iframe && iframe.contentDocument) {
+        const mark = iframe.contentDocument.querySelector(`mark[data-error-index="${errorIndex}"]`);
+        if (mark) {
+          mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Add a temporary pulse effect
+          mark.style.animation = 'pulse 0.5s ease-in-out 3';
+        }
+      }
+    }, 100);
+
+    // Clear the highlight after 3 seconds
+    setTimeout(() => {
+      setHighlightedErrorIndex(null);
+    }, 3000);
+  };
+
+  // Handle click on PM error row in table - scroll to and highlight in translation preview
+  const handlePmErrorRowClick = (errorIndex, foundText) => {
+    if (!foundText) return;
+
+    setHighlightedPmErrorIndex(errorIndex);
+
+    // Find and scroll to the text in the translation preview
+    setTimeout(() => {
+      const translationPreview = document.querySelector('.pm-translation-preview');
+      if (translationPreview) {
+        // Try to find and highlight the text
+        const content = translationPreview.innerHTML;
+        if (content.toLowerCase().includes(foundText.toLowerCase())) {
+          const escapedText = foundText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const regex = new RegExp(`(${escapedText})`, 'gi');
+          translationPreview.innerHTML = content.replace(
+            regex,
+            '<mark style="background-color: #fef3c7; border: 2px solid #f59e0b; padding: 2px 4px; border-radius: 3px; animation: pulse 0.5s ease-in-out 3;">$1</mark>'
+          );
+          const mark = translationPreview.querySelector('mark');
+          if (mark) {
+            mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }
+      }
+    }, 100);
+
+    // Clear the highlight after 3 seconds
+    setTimeout(() => {
+      setHighlightedPmErrorIndex(null);
+    }, 3000);
   };
 
   // Helper function to try replacing text with multiple strategies
@@ -9803,7 +9863,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       <iframe
                         srcDoc={getHighlightedTranslation()}
                         title="Translation Preview"
-                        className="w-full border-0"
+                        className="w-full border-0 translation-preview-iframe"
                         style={{flex: '1 1 0', minHeight: 0}}
                       />
                     ) : (
@@ -9932,14 +9992,16 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                   <tr
                                     key={idx}
                                     data-error-row={idx}
-                                    className={`border-t transition-all duration-300 ${
+                                    onClick={() => handleErrorRowClick(idx, foundText)}
+                                    className={`border-t transition-all duration-300 cursor-pointer hover:ring-2 hover:ring-indigo-300 ${
                                       highlightedErrorIndex === idx ? 'ring-2 ring-indigo-500 ring-inset shadow-lg scale-[1.01]' :
                                       erro.applied ? 'bg-green-50 opacity-60' :
                                       severity === 'CRÍTICO' ? 'bg-red-50' :
                                       severity === 'ALTO' ? 'bg-blue-50' :
                                       severity === 'MÉDIO' ? 'bg-yellow-50' :
                                       'bg-blue-50'
-                                    }`}>
+                                    }`}
+                                    title="Click to highlight in translation">
                                     <td className="px-2 py-2">
                                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                                         severity === 'CRÍTICO' ? 'bg-red-500 text-white' :
@@ -27228,7 +27290,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   {translatedContent ? (
                     translatedContent.html ? (
                       <div
-                        className="border rounded p-4 bg-white"
+                        className="border rounded p-4 bg-white pm-translation-preview"
                         dangerouslySetInnerHTML={{ __html: translatedContent.html }}
                       />
                     ) : translatedContent.contentType?.includes('image') ? (
@@ -27257,7 +27319,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                       {/* Show PM uploaded HTML content */}
                       {pmTranslationHtml && (
                         <div
-                          className="border rounded p-4 bg-white mb-4"
+                          className="border rounded p-4 bg-white mb-4 pm-translation-preview"
                           dangerouslySetInnerHTML={{ __html: pmTranslationHtml }}
                         />
                       )}
@@ -27392,29 +27454,41 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                             </tr>
                           </thead>
                           <tbody>
-                            {proofreadingResult.erros.map((erro, idx) => (
-                              <tr key={idx} className={`border-t ${
-                                erro.gravidade === 'CRÍTICO' ? 'bg-red-50' :
-                                erro.gravidade === 'ALTO' ? 'bg-blue-50' :
-                                erro.gravidade === 'MÉDIO' ? 'bg-yellow-50' :
-                                'bg-blue-50'
-                              }`}>
+                            {proofreadingResult.erros.map((erro, idx) => {
+                              const severity = erro.severidade || erro.gravidade || 'MÉDIO';
+                              const foundText = erro.traducao_errada || erro.found || '';
+                              const suggestionText = erro.correcao || erro.sugestao || '';
+                              return (
+                              <tr
+                                key={idx}
+                                data-pm-error-row={idx}
+                                onClick={() => handlePmErrorRowClick(idx, foundText)}
+                                className={`border-t cursor-pointer hover:ring-2 hover:ring-indigo-300 transition-all ${
+                                  highlightedPmErrorIndex === idx ? 'ring-2 ring-indigo-500 ring-inset shadow-lg' :
+                                  severity === 'CRÍTICO' ? 'bg-red-50' :
+                                  severity === 'ALTO' ? 'bg-blue-50' :
+                                  severity === 'MÉDIO' ? 'bg-yellow-50' :
+                                  'bg-blue-50'
+                                }`}
+                                title="Click to highlight in translation"
+                              >
                                 <td className="p-2">{erro.tipo}</td>
                                 <td className="p-2 font-mono">{erro.original || '-'}</td>
-                                <td className="p-2 font-mono text-red-600">{erro.found || '-'}</td>
-                                <td className="p-2 font-mono text-green-600">{erro.sugerido || '-'}</td>
+                                <td className="p-2 font-mono text-red-600">{foundText || '-'}</td>
+                                <td className="p-2 font-mono text-green-600">{suggestionText || '-'}</td>
                                 <td className="p-2 text-center">
                                   <span className={`px-1 py-0.5 rounded text-white ${
-                                    erro.gravidade === 'CRÍTICO' ? 'bg-red-500' :
-                                    erro.gravidade === 'ALTO' ? 'bg-blue-500' :
-                                    erro.gravidade === 'MÉDIO' ? 'bg-yellow-500' :
+                                    severity === 'CRÍTICO' ? 'bg-red-500' :
+                                    severity === 'ALTO' ? 'bg-blue-500' :
+                                    severity === 'MÉDIO' ? 'bg-yellow-500' :
                                     'bg-blue-500'
                                   }`}>
-                                    {erro.gravidade}
+                                    {severity}
                                   </span>
                                 </td>
                               </tr>
-                            ))}
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
