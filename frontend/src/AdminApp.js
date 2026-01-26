@@ -1802,7 +1802,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
   const [files, setFiles] = useState([]);
   const [ocrResults, setOcrResults] = useState([]);
-  const [ocrViewMode, setOcrViewMode] = useState('text'); // 'text' or 'html' for layout view
+  const [ocrViewMode, setOcrViewMode] = useState('text'); // 'text', 'html', or 'sidebyside' for layout view
+  const [editedOcrText, setEditedOcrText] = useState(''); // Editable OCR text for proofreading
+  const [ocrApproved, setOcrApproved] = useState(false); // Whether OCR extraction has been reviewed/approved
   const [translationResults, setTranslationResults] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStatus, setProcessingStatus] = useState('');
@@ -8631,32 +8633,45 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           </button>
                         </div>
                       </div>
-                      {/* View Mode Toggle */}
-                      {ocrResults.some(r => r.html) && (
-                        <div className="flex items-center gap-2 mb-2 text-xs">
-                          <span className="text-gray-600">View:</span>
-                          <button
-                            onClick={() => setOcrViewMode('text')}
-                            className={`px-2 py-1 rounded ${ocrViewMode === 'text' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
-                          >
-                            Plain Text
-                          </button>
+
+                      {/* View Mode Toggle - Enhanced with Side-by-Side */}
+                      <div className="flex items-center gap-2 mb-2 text-xs">
+                        <span className="text-gray-600">View:</span>
+                        <button
+                          onClick={() => setOcrViewMode('text')}
+                          className={`px-2 py-1 rounded ${ocrViewMode === 'text' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+                        >
+                          Plain Text
+                        </button>
+                        {ocrResults.some(r => r.html) && (
                           <button
                             onClick={() => setOcrViewMode('html')}
                             className={`px-2 py-1 rounded ${ocrViewMode === 'html' ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-700'}`}
                           >
                             Visual Layout
                           </button>
-                        </div>
-                      )}
+                        )}
+                        {originalImages.length > 0 && (
+                          <button
+                            onClick={() => setOcrViewMode('sidebyside')}
+                            className={`px-2 py-1 rounded ${ocrViewMode === 'sidebyside' ? 'bg-orange-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+                          >
+                            Side-by-Side
+                          </button>
+                        )}
+                      </div>
 
-                      {/* Text View */}
+                      {/* Text View - Now Editable */}
                       {ocrViewMode === 'text' && (
-                        <textarea
-                          value={ocrResults.map(r => r.text).join('\n\n---\n\n')}
-                          readOnly
-                          className="w-full h-40 text-xs font-mono border rounded p-2 bg-gray-50"
-                        />
+                        <div>
+                          <textarea
+                            value={editedOcrText || ocrResults.map(r => r.text).join('\n\n---\n\n')}
+                            onChange={(e) => setEditedOcrText(e.target.value)}
+                            className="w-full h-48 text-xs font-mono border rounded p-2 bg-white"
+                            placeholder="OCR extracted text - you can edit this before translation"
+                          />
+                          <p className="text-[10px] text-gray-500 mt-1">You can edit the text above to correct any OCR errors before translation.</p>
+                        </div>
                       )}
 
                       {/* HTML Visual Layout View */}
@@ -8668,6 +8683,63 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           }}
                         />
                       )}
+
+                      {/* Side-by-Side View - Original vs Extracted */}
+                      {ocrViewMode === 'sidebyside' && originalImages.length > 0 && (
+                        <div className="grid grid-cols-2 gap-3 h-96">
+                          {/* Original Document */}
+                          <div className="border rounded overflow-hidden">
+                            <div className="bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700 border-b">
+                              Original Document
+                            </div>
+                            <div className="h-full overflow-auto p-2 bg-gray-50">
+                              {originalImages.map((img, idx) => (
+                                <div key={idx} className="mb-2">
+                                  <img
+                                    src={img.data}
+                                    alt={`Original page ${idx + 1}`}
+                                    className="max-w-full border shadow-sm"
+                                  />
+                                  {originalImages.length > 1 && (
+                                    <p className="text-[10px] text-gray-500 text-center mt-1">Page {idx + 1}</p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          {/* Extracted Text */}
+                          <div className="border rounded overflow-hidden">
+                            <div className="bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700 border-b">
+                              Extracted Text (Editable)
+                            </div>
+                            <textarea
+                              value={editedOcrText || ocrResults.map(r => r.text).join('\n\n--- Page Break ---\n\n')}
+                              onChange={(e) => setEditedOcrText(e.target.value)}
+                              className="w-full h-full text-xs font-mono p-2 border-0 resize-none"
+                              placeholder="OCR extracted text"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Proofreading Status */}
+                      <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-yellow-600 text-sm">⚠️</span>
+                            <span className="text-xs text-yellow-800">Review the extraction before translating. Check tables, spacing, and special characters.</span>
+                          </div>
+                          <label className="flex items-center gap-1 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={ocrApproved || false}
+                              onChange={(e) => setOcrApproved(e.target.checked)}
+                              className="rounded text-green-600"
+                            />
+                            <span className="text-xs font-medium text-green-700">Extraction Approved</span>
+                          </label>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -8682,17 +8754,34 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   <span className="mr-2">←</span> Back: Details
                 </button>
                 {ocrResults.length > 0 && (
-                  <button
-                    onClick={() => {
-                      // Load OCR text into translation - use HTML if available for better formatting
-                      const textToTranslate = ocrResults.map(r => r.html || r.text).join('\n\n--- Page Break ---\n\n');
-                      setOriginalText(textToTranslate);
-                      setActiveSubTab('translate');
-                    }}
-                    className="px-6 py-2 bg-green-600 text-white text-sm font-medium rounded hover:bg-green-700 flex items-center"
-                  >
-                    Go to Translation <span className="ml-2">→</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {!ocrApproved && (
+                      <span className="text-xs text-yellow-600 bg-yellow-50 px-2 py-1 rounded">
+                        Review extraction first
+                      </span>
+                    )}
+                    <button
+                      onClick={() => {
+                        if (!ocrApproved && !window.confirm('The extraction has not been approved. Continue anyway?')) {
+                          return;
+                        }
+                        // Use edited text if available, otherwise use OCR results
+                        const textToTranslate = editedOcrText || ocrResults.map(r => r.html || r.text).join('\n\n--- Page Break ---\n\n');
+                        setOriginalText(textToTranslate);
+                        // Reset OCR proofreading state
+                        setEditedOcrText('');
+                        setOcrApproved(false);
+                        setActiveSubTab('translate');
+                      }}
+                      className={`px-6 py-2 text-white text-sm font-medium rounded flex items-center ${
+                        ocrApproved
+                          ? 'bg-green-600 hover:bg-green-700'
+                          : 'bg-yellow-600 hover:bg-yellow-700'
+                      }`}
+                    >
+                      {ocrApproved ? '✓ ' : ''}Go to Translation <span className="ml-2">→</span>
+                    </button>
+                  </div>
                 )}
               </div>
             </>
