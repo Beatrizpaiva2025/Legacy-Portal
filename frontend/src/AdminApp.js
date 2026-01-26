@@ -8494,46 +8494,48 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           </button>
                           <button
                             onClick={() => {
-                              const text = ocrResults.map(r => r.text).join('\n\n<hr style="border: 2px dashed #ccc; margin: 20px 0;">\n\n');
+                              // Use HTML layout if available, otherwise plain text
+                              const content = ocrResults.map(r => r.html || `<pre style="white-space: pre-wrap;">${r.text}</pre>`).join('\n<hr style="border: 2px dashed #ccc; margin: 20px 0; page-break-after: always;">\n');
                               const htmlContent = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>OCR Extracted Text</title>
+  <title>OCR Extracted Text - Visual Layout</title>
   <style>
     body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
     table { border-collapse: collapse; width: 100%; margin: 10px 0; }
     td, th { border: 1px solid #333; padding: 8px; text-align: left; }
     tr:nth-child(even) { background-color: #f9f9f9; }
     pre { white-space: pre-wrap; word-wrap: break-word; font-family: inherit; }
+    @media print { .page-break { page-break-after: always; } }
   </style>
 </head>
 <body>
-  <h1>OCR Extracted Text</h1>
-  <div>${text}</div>
+  ${content}
 </body>
 </html>`;
                               const blob = new Blob([htmlContent], { type: 'text/html' });
                               const url = URL.createObjectURL(blob);
                               const a = document.createElement('a');
                               a.href = url;
-                              a.download = 'ocr_text_for_cat.html';
+                              a.download = 'ocr_visual_layout.html';
                               a.click();
                               URL.revokeObjectURL(url);
                             }}
                             className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
-                            title="Download as HTML"
+                            title="Download as HTML (Visual Layout)"
                           >
                             HTML
                           </button>
                           <button
                             onClick={() => {
-                              const text = ocrResults.map(r => r.text).join('\n\n<br style="page-break-before: always;">\n\n');
+                              // Use HTML layout if available for Word export
+                              const content = ocrResults.map(r => r.html || `<pre style="white-space: pre-wrap;">${r.text}</pre>`).join('\n<br style="page-break-before: always;">\n');
                               const docContent = `<!DOCTYPE html>
 <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
 <head>
   <meta charset="UTF-8">
-  <title>OCR Extracted Text</title>
+  <title>OCR Extracted Text - Visual Layout</title>
   <!--[if gte mso 9]>
   <xml>
     <w:WordDocument>
@@ -8551,7 +8553,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   </style>
 </head>
 <body>
-  <div>${text}</div>
+  ${content}
 </body>
 </html>`;
                               const blob = new Blob([docContent], { type: 'application/msword' });
@@ -8612,13 +8614,26 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               )}
 
               {/* Navigation */}
-              <div className="mt-4 flex justify-start">
+              <div className="mt-4 flex justify-between">
                 <button
                   onClick={() => setActiveSubTab('start')}
                   className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded hover:bg-gray-300 flex items-center"
                 >
                   <span className="mr-2">←</span> Back: Details
                 </button>
+                {ocrResults.length > 0 && (
+                  <button
+                    onClick={() => {
+                      // Load OCR text into translation - use HTML if available for better formatting
+                      const textToTranslate = ocrResults.map(r => r.html || r.text).join('\n\n--- Page Break ---\n\n');
+                      setOriginalText(textToTranslate);
+                      setActiveSubTab('translate');
+                    }}
+                    className="px-6 py-2 bg-green-600 text-white text-sm font-medium rounded hover:bg-green-700 flex items-center"
+                  >
+                    Go to Translation <span className="ml-2">→</span>
+                  </button>
+                )}
               </div>
             </>
           )}
