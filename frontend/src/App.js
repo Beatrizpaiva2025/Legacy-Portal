@@ -222,7 +222,61 @@ const TRANSLATIONS = {
     welcomeGiftCouponLabel: 'Your Coupon Code',
     welcomeGiftCouponDesc: '1 free page (up to 250 words) + certification',
     welcomeGiftValid: 'Valid for 30 days',
-    welcomeGiftUse: 'Use at checkout on your first order'
+    welcomeGiftUse: 'Use at checkout on your first order',
+    // New Order Form - Partner Portal
+    clientInformation: 'Client Information',
+    clientName: 'Client Name',
+    clientEmail: 'Client Email',
+    standardTranslation: 'Standard Translation',
+    standardDesc: 'General use, no certification',
+    swornTranslation: 'Sworn Translation',
+    swornDesc: 'For use outside USA - official sworn translation (5 business days)',
+    rmvCertifiedTranslation: 'RMV Certified Translation',
+    rmvDesc: 'Massachusetts Motor Vehicle - requires physical copy',
+    physicalCopy: 'Physical Copy',
+    physicalCopyRequired: 'Physical copy required',
+    physicalCopyDesc: 'USPS Priority Mail (1-3 business days)',
+    havingTroubleUploading: 'Having trouble uploading?',
+    contactViaEmail: 'Contact us via email',
+    certifiedTooltip: 'Includes a signed Statement of Accuracy, stamp, and signature; accepted by most institutions.',
+    standardTooltip: 'Accurate translation for general use; does not include certification.',
+    swornTooltip: 'Completed by a sworn translator registered in the country of use; required for specific countries.',
+    rmvTooltip: 'Certified on official letterhead with all required elements; accepted by the RMV for licenses, IDs, and related purposes.',
+    // Partner Portal Urgency (different times)
+    partnerStandard: 'Standard (24 hours)',
+    partnerPriority: 'Priority (12 hours)',
+    partnerUrgent: 'Urgent (6 hours)',
+    // Service type descriptions footer
+    certifiedDescFull: 'Includes a signed Statement of Accuracy, stamp, and signature; accepted by most institutions.',
+    standardDescFull: 'Accurate translation for general use; does not include certification.',
+    swornDescFull: 'Completed by a sworn translator registered in the country of use; required for specific countries.',
+    rmvDescFull: 'Certified on official letterhead with all required elements; accepted by the RMV for licenses, IDs, and related purposes.',
+    rmvNote: 'RMV Certified translations require physical delivery.',
+    swornLanguageNote: 'Sworn translations are only available for Portuguese (Brasil)',
+    clientEmailRequired: 'Client email is required',
+    pleaseUploadDocument: 'Please upload a document',
+    couldNotExtractText: 'Could not extract text - counted as 1 page',
+    removeFile: 'Remove file',
+    // Payment method
+    payByInvoice: 'Pay by Invoice',
+    invoiceSentToEmail: 'Invoice sent to your email',
+    sendToZelle: 'Send to',
+    // Quote Summary
+    quoteSummary: 'Quote Summary',
+    service: 'Service',
+    certified: 'Certified',
+    standardService: 'Standard',
+    sworn: 'Sworn',
+    rmvCertified: 'RMV Certified',
+    shipping: 'Shipping (USPS Priority)',
+    creatingOrder: 'Creating Order...',
+    submitOrderZelle: 'Submit Order with Zelle',
+    createOrder: 'Create Order',
+    youSaveAmount: 'You save',
+    coupon: 'Coupon',
+    selectCoupon: 'Select coupon...',
+    apply: 'Apply',
+    paymentViaInvoice: 'Payment via invoice (Net 30)'
   },
   es: {
     // Login
@@ -418,7 +472,61 @@ const TRANSLATIONS = {
     welcomeGiftCouponLabel: 'Tu Código de Cupón',
     welcomeGiftCouponDesc: '1 página gratis (hasta 250 palabras) + certificación',
     welcomeGiftValid: 'Válido por 30 días',
-    welcomeGiftUse: 'Usar al finalizar tu primer pedido'
+    welcomeGiftUse: 'Usar al finalizar tu primer pedido',
+    // New Order Form - Partner Portal
+    clientInformation: 'Información del Cliente',
+    clientName: 'Nombre del Cliente',
+    clientEmail: 'Correo del Cliente',
+    standardTranslation: 'Traducción Estándar',
+    standardDesc: 'Uso general, sin certificación',
+    swornTranslation: 'Traducción Jurada',
+    swornDesc: 'Para uso fuera de EE.UU. - traducción jurada oficial (5 días hábiles)',
+    rmvCertifiedTranslation: 'Traducción Certificada RMV',
+    rmvDesc: 'Massachusetts Motor Vehicle - requiere copia física',
+    physicalCopy: 'Copia Física',
+    physicalCopyRequired: 'Se requiere copia física',
+    physicalCopyDesc: 'USPS Priority Mail (1-3 días hábiles)',
+    havingTroubleUploading: '¿Tiene problemas para subir?',
+    contactViaEmail: 'Contáctenos por correo',
+    certifiedTooltip: 'Incluye una Declaración de Precisión firmada, sello y firma; aceptado por la mayoría de las instituciones.',
+    standardTooltip: 'Traducción precisa para uso general; no incluye certificación.',
+    swornTooltip: 'Realizada por un traductor jurado registrado en el país de uso; requerido para países específicos.',
+    rmvTooltip: 'Certificada en papel membretado oficial con todos los elementos requeridos; aceptada por el RMV para licencias, identificaciones y propósitos relacionados.',
+    // Partner Portal Urgency (different times)
+    partnerStandard: 'Estándar (24 horas)',
+    partnerPriority: 'Prioridad (12 horas)',
+    partnerUrgent: 'Urgente (6 horas)',
+    // Service type descriptions footer
+    certifiedDescFull: 'Incluye una Declaración de Precisión firmada, sello y firma; aceptado por la mayoría de las instituciones.',
+    standardDescFull: 'Traducción precisa para uso general; no incluye certificación.',
+    swornDescFull: 'Realizada por un traductor jurado registrado en el país de uso; requerido para países específicos.',
+    rmvDescFull: 'Certificada en papel membretado oficial con todos los elementos requeridos; aceptada por el RMV para licencias, identificaciones y propósitos relacionados.',
+    rmvNote: 'Las traducciones Certificadas RMV requieren entrega física.',
+    swornLanguageNote: 'Las traducciones juradas solo están disponibles para Portugués (Brasil)',
+    clientEmailRequired: 'El correo del cliente es requerido',
+    pleaseUploadDocument: 'Por favor suba un documento',
+    couldNotExtractText: 'No se pudo extraer texto - contado como 1 página',
+    removeFile: 'Eliminar archivo',
+    // Payment method
+    payByInvoice: 'Pagar por Factura',
+    invoiceSentToEmail: 'Factura enviada a su correo',
+    sendToZelle: 'Enviar a',
+    // Quote Summary
+    quoteSummary: 'Resumen de Cotización',
+    service: 'Servicio',
+    certified: 'Certificada',
+    standardService: 'Estándar',
+    sworn: 'Jurada',
+    rmvCertified: 'Certificada RMV',
+    shipping: 'Envío (USPS Priority)',
+    creatingOrder: 'Creando Pedido...',
+    submitOrderZelle: 'Enviar Pedido con Zelle',
+    createOrder: 'Crear Pedido',
+    youSaveAmount: 'Ahorra',
+    coupon: 'Cupón',
+    selectCoupon: 'Seleccionar cupón...',
+    apply: 'Aplicar',
+    paymentViaInvoice: 'Pago via factura (Net 30)'
   },
   pt: {
     // Login
@@ -614,7 +722,61 @@ const TRANSLATIONS = {
     welcomeGiftCouponLabel: 'Seu Código de Cupom',
     welcomeGiftCouponDesc: '1 página grátis (até 250 palavras) + certificação',
     welcomeGiftValid: 'Válido por 30 dias',
-    welcomeGiftUse: 'Use no checkout do seu primeiro pedido'
+    welcomeGiftUse: 'Use no checkout do seu primeiro pedido',
+    // New Order Form - Partner Portal
+    clientInformation: 'Informações do Cliente',
+    clientName: 'Nome do Cliente',
+    clientEmail: 'E-mail do Cliente',
+    standardTranslation: 'Tradução Padrão',
+    standardDesc: 'Uso geral, sem certificação',
+    swornTranslation: 'Tradução Juramentada',
+    swornDesc: 'Para uso fora dos EUA - tradução juramentada oficial (5 dias úteis)',
+    rmvCertifiedTranslation: 'Tradução Certificada RMV',
+    rmvDesc: 'Massachusetts Motor Vehicle - requer cópia física',
+    physicalCopy: 'Cópia Física',
+    physicalCopyRequired: 'Cópia física necessária',
+    physicalCopyDesc: 'USPS Priority Mail (1-3 dias úteis)',
+    havingTroubleUploading: 'Está com problemas para enviar?',
+    contactViaEmail: 'Entre em contato por e-mail',
+    certifiedTooltip: 'Inclui uma Declaração de Precisão assinada, carimbo e assinatura; aceito pela maioria das instituições.',
+    standardTooltip: 'Tradução precisa para uso geral; não inclui certificação.',
+    swornTooltip: 'Realizada por um tradutor juramentado registrado no país de uso; exigido para países específicos.',
+    rmvTooltip: 'Certificada em papel timbrado oficial com todos os elementos necessários; aceita pelo RMV para licenças, identificações e fins relacionados.',
+    // Partner Portal Urgency (different times)
+    partnerStandard: 'Padrão (24 horas)',
+    partnerPriority: 'Prioridade (12 horas)',
+    partnerUrgent: 'Urgente (6 horas)',
+    // Service type descriptions footer
+    certifiedDescFull: 'Inclui uma Declaração de Precisão assinada, carimbo e assinatura; aceito pela maioria das instituições.',
+    standardDescFull: 'Tradução precisa para uso geral; não inclui certificação.',
+    swornDescFull: 'Realizada por um tradutor juramentado registrado no país de uso; exigido para países específicos.',
+    rmvDescFull: 'Certificada em papel timbrado oficial com todos os elementos necessários; aceita pelo RMV para licenças, identificações e fins relacionados.',
+    rmvNote: 'Traduções Certificadas RMV requerem entrega física.',
+    swornLanguageNote: 'Traduções juramentadas só estão disponíveis para Português (Brasil)',
+    clientEmailRequired: 'E-mail do cliente é obrigatório',
+    pleaseUploadDocument: 'Por favor, envie um documento',
+    couldNotExtractText: 'Não foi possível extrair texto - contado como 1 página',
+    removeFile: 'Remover arquivo',
+    // Payment method
+    payByInvoice: 'Pagar por Fatura',
+    invoiceSentToEmail: 'Fatura enviada para seu e-mail',
+    sendToZelle: 'Enviar para',
+    // Quote Summary
+    quoteSummary: 'Resumo da Cotação',
+    service: 'Serviço',
+    certified: 'Certificada',
+    standardService: 'Padrão',
+    sworn: 'Juramentada',
+    rmvCertified: 'Certificada RMV',
+    shipping: 'Envio (USPS Priority)',
+    creatingOrder: 'Criando Pedido...',
+    submitOrderZelle: 'Enviar Pedido com Zelle',
+    createOrder: 'Criar Pedido',
+    youSaveAmount: 'Você economiza',
+    coupon: 'Cupom',
+    selectCoupon: 'Selecionar cupom...',
+    apply: 'Aplicar',
+    paymentViaInvoice: 'Pagamento via fatura (Net 30)'
   }
 };
 
@@ -1347,8 +1509,8 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
 const Sidebar = ({ activeTab, setActiveTab, partner, onLogout, t }) => {
   const menuItems = [
     { id: 'new-order', label: t.newOrder, icon: '➕' },
-    { id: 'orders', label: t.myOrders, icon: '📋' },
-    { id: 'invoices', label: t.invoices, icon: '💰' },
+    { id: 'orders', label: t.myOrders, icon: '📦' },
+    { id: 'invoices', label: t.invoices, icon: '🧾' },
     { id: 'messages', label: t.messages, icon: '✉️' },
     { id: 'payment-plan', label: t.paymentPlanMenu, icon: '💳' }
   ];
@@ -1901,11 +2063,11 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
 
             {/* Client Information */}
             <div className="border-b pb-4" ref={clientNameRef}>
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">Client Information</h2>
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">{t.clientInformation}</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Client Name *
+                    {t.clientName} *
                   </label>
                   <input
                     type="text"
@@ -1921,12 +2083,12 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                     placeholder="John Smith"
                   />
                   {fieldErrors.client_name && (
-                    <p className="text-red-500 text-sm mt-1">Client name is required</p>
+                    <p className="text-red-500 text-sm mt-1">{t.clientName} is required</p>
                   )}
                 </div>
                 <div ref={clientEmailRef}>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Client Email *
+                    {t.clientEmail} *
                   </label>
                   <input
                     type="email"
@@ -1942,7 +2104,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                     placeholder="client@email.com"
                   />
                   {fieldErrors.client_email && (
-                    <p className="text-red-500 text-sm mt-1">Client email is required</p>
+                    <p className="text-red-500 text-sm mt-1">{t.clientEmailRequired}</p>
                   )}
                 </div>
               </div>
@@ -1950,7 +2112,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
 
             {/* Service Type */}
             <div>
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">Service Type</h2>
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">{t.serviceType}</h2>
               <div className="space-y-3">
                 {/* Certified Translation */}
                 <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
@@ -1966,12 +2128,12 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                   />
                   <div className="flex-1">
                     <div className="font-medium flex items-center gap-1">
-                      Certified Translation
-                      <span className="text-gray-400 cursor-help" title="Includes a signed Statement of Accuracy, stamp, and signature; accepted by most institutions.">&#9432;</span>
+                      {t.certifiedTranslation}
+                      <span className="text-gray-400 cursor-help" title={t.certifiedTooltip}>&#9432;</span>
                     </div>
-                    <div className="text-sm text-gray-500">Official documents, legal, immigration</div>
+                    <div className="text-sm text-gray-500">{t.certifiedDesc}</div>
                   </div>
-                  <div className="font-semibold text-teal-600">{formatPrice(24.99)}/page</div>
+                  <div className="font-semibold text-teal-600">{formatPrice(24.99)}/{t.page}</div>
                 </label>
 
                 {/* Standard Translation */}
@@ -1988,12 +2150,12 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                   />
                   <div className="flex-1">
                     <div className="font-medium flex items-center gap-1">
-                      Standard Translation
-                      <span className="text-gray-400 cursor-help" title="Accurate translation for general use; does not include certification.">&#9432;</span>
+                      {t.standardTranslation}
+                      <span className="text-gray-400 cursor-help" title={t.standardTooltip}>&#9432;</span>
                     </div>
-                    <div className="text-sm text-gray-500">General use, no certification</div>
+                    <div className="text-sm text-gray-500">{t.standardDesc}</div>
                   </div>
-                  <div className="font-semibold text-teal-600">{formatPrice(19.99)}/page</div>
+                  <div className="font-semibold text-teal-600">{formatPrice(19.99)}/{t.page}</div>
                 </label>
 
                 {/* Sworn Translation */}
@@ -2010,12 +2172,12 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                   />
                   <div className="flex-1">
                     <div className="font-medium flex items-center gap-1">
-                      Sworn Translation
-                      <span className="text-gray-400 cursor-help" title="Completed by a sworn translator registered in the country of use; required for specific countries.">&#9432;</span>
+                      {t.swornTranslation}
+                      <span className="text-gray-400 cursor-help" title={t.swornTooltip}>&#9432;</span>
                     </div>
-                    <div className="text-sm text-gray-500">For use outside USA - official sworn translator</div>
+                    <div className="text-sm text-gray-500">{t.swornDesc}</div>
                   </div>
-                  <div className="font-semibold text-teal-600">{formatPrice(55.00)}/page</div>
+                  <div className="font-semibold text-teal-600">{formatPrice(55.00)}/{t.page}</div>
                 </label>
 
                 {/* RMV Certified Translation */}
@@ -2032,28 +2194,28 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                   />
                   <div className="flex-1">
                     <div className="font-medium flex items-center gap-1">
-                      RMV Certified Translation
-                      <span className="text-gray-400 cursor-help" title="Certified on official letterhead with all required elements; accepted by the RMV for licenses, IDs, and related purposes.">&#9432;</span>
+                      {t.rmvCertifiedTranslation}
+                      <span className="text-gray-400 cursor-help" title={t.rmvTooltip}>&#9432;</span>
                     </div>
-                    <div className="text-sm text-gray-500">Massachusetts Motor Vehicle - requires physical copy</div>
+                    <div className="text-sm text-gray-500">{t.rmvDesc}</div>
                   </div>
-                  <div className="font-semibold text-teal-600">{formatPrice(24.99)}/page</div>
+                  <div className="font-semibold text-teal-600">{formatPrice(24.99)}/{t.page}</div>
                 </label>
               </div>
 
               {/* Service Type Descriptions */}
               <div className="mt-4 p-4 bg-gray-50 rounded-lg text-xs text-gray-600 space-y-2">
-                <p><strong>Certified:</strong> Includes a signed Statement of Accuracy, stamp, and signature; accepted by most institutions.</p>
-                <p><strong>Standard:</strong> Accurate translation for general use; does not include certification.</p>
-                <p><strong>Sworn:</strong> Completed by a sworn translator registered in the country of use; required for specific countries.</p>
-                <p><strong>RMV Certified:</strong> Certified on official letterhead with all required elements; accepted by the RMV for licenses, IDs, and related purposes.</p>
+                <p><strong>{t.certifiedTranslation}:</strong> {t.certifiedDescFull}</p>
+                <p><strong>{t.standardTranslation}:</strong> {t.standardDescFull}</p>
+                <p><strong>{t.swornTranslation}:</strong> {t.swornDescFull}</p>
+                <p><strong>{t.rmvCertifiedTranslation}:</strong> {t.rmvDescFull}</p>
               </div>
             </div>
 
             {/* Languages */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Translate From</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t.translateFrom}</label>
                 <select
                   className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
                   value={formData.translate_from}
@@ -2067,7 +2229,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Translate To</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t.translateTo}</label>
                 {formData.service_type === 'sworn' ? (
                   <div>
                     <select
@@ -2077,7 +2239,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                     >
                       <option value="pt-br">🇧🇷 Portuguese (Brasil)</option>
                     </select>
-                    <p className="text-xs text-gray-500 mt-1">Sworn translations are only available for Portuguese (Brasil)</p>
+                    <p className="text-xs text-gray-500 mt-1">{t.swornLanguageNote}</p>
                   </div>
                 ) : (
                   <select
@@ -2097,7 +2259,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
 
             {/* Document Upload */}
             <div ref={fileUploadRef}>
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">Upload Document</h2>
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">{t.uploadDocument}</h2>
               <div
                 {...getRootProps()}
                 className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
@@ -2110,18 +2272,18 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
               >
                 <input {...getInputProps()} />
                 <div className="text-3xl mb-2">📁</div>
-                <div className="font-medium text-teal-600">+ Upload File(s)</div>
-                <div className="text-sm text-gray-500">PDF, DOCX, Images, TXT</div>
+                <div className="font-medium text-teal-600">{t.uploadFiles}</div>
+                <div className="text-sm text-gray-500">{t.fileTypes}</div>
               </div>
               {fieldErrors.file_upload && (
-                <p className="text-red-500 text-sm mt-2">Please upload a document</p>
+                <p className="text-red-500 text-sm mt-2">{t.pleaseUploadDocument}</p>
               )}
 
               {isProcessing && (
                 <div className="mt-4 p-4 bg-blue-50 rounded-md text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                  <div className="text-blue-800 font-medium">{processingStatus || 'Processing document...'}</div>
-                  <div className="text-xs text-blue-600 mt-1">This may take a moment for large or image-based files</div>
+                  <div className="text-blue-800 font-medium">{processingStatus || t.processing}</div>
+                  <div className="text-xs text-blue-600 mt-1">{t.processingNote}</div>
                 </div>
               )}
 
@@ -2141,7 +2303,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                           </div>
                           {item.ocrFailed && (
                             <div className="text-yellow-600 text-xs ml-6 mt-1">
-                              Could not extract text - counted as 1 page
+                              {t.couldNotExtractText}
                             </div>
                           )}
                         </div>
@@ -2172,25 +2334,25 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
 
               {/* Having trouble link */}
               <div className="mt-3 text-center text-sm text-gray-500">
-                Having trouble uploading?{' '}
+                {t.havingTroubleUploading}{' '}
                 <button
                   type="button"
                   onClick={() => setShowContactModal(true)}
                   className="text-teal-600 hover:text-teal-700 underline"
                 >
-                  Contact us via email
+                  {t.contactViaEmail}
                 </button>
               </div>
             </div>
 
             {/* Urgency */}
             <div>
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">Urgency</h2>
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">{t.urgency}</h2>
               <div className="space-y-2">
                 {[
-                  { id: 'no', label: 'Standard (2-3 days)', fee: '' },
-                  { id: 'priority', label: 'Priority (24 hours)', fee: '+25%' },
-                  { id: 'urgent', label: 'Urgent (12 hours)', fee: '+100%' }
+                  { id: 'no', label: t.partnerStandard, fee: '' },
+                  { id: 'priority', label: t.partnerPriority, fee: '+25%' },
+                  { id: 'urgent', label: t.partnerUrgent, fee: '+100%' }
                 ].map((option) => (
                   <label key={option.id} className="flex items-center p-3 border rounded-md cursor-pointer hover:bg-gray-50">
                     <input
@@ -2211,7 +2373,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
             {/* Physical Copy / Shipping - USA Only */}
             {currency.isUSA && (
               <div>
-                <h2 className="text-lg font-semibold text-gray-800 mb-4">Physical Copy</h2>
+                <h2 className="text-lg font-semibold text-gray-800 mb-4">{t.physicalCopy}</h2>
                 <div className="space-y-3">
                   <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
                     <input
@@ -2222,8 +2384,8 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                       className="mr-3 h-4 w-4 text-teal-600"
                     />
                     <div className="flex-1">
-                      <div className="font-medium">Physical copy required</div>
-                      <div className="text-sm text-gray-500">USPS Priority Mail (1-3 business days)</div>
+                      <div className="font-medium">{t.physicalCopyRequired}</div>
+                      <div className="text-sm text-gray-500">{t.physicalCopyDesc}</div>
                     </div>
                     <div className="font-semibold text-teal-600">{formatPrice(18.99)}</div>
                   </label>
@@ -2231,7 +2393,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                   {formData.service_type === 'rmv' && (
                     <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
                       <p className="text-sm text-amber-800">
-                        <strong>Note:</strong> RMV Certified translations require physical delivery.
+                        <strong>Note:</strong> {t.rmvNote}
                       </p>
                     </div>
                   )}
@@ -2300,30 +2462,30 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
             {/* Reference & Notes */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Reference (optional)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t.reference}</label>
                 <input
                   type="text"
                   className="w-full px-4 py-2 border border-gray-300 rounded-md"
                   value={formData.reference}
                   onChange={(e) => setFormData({...formData, reference: e.target.value})}
-                  placeholder="PO number, project name..."
+                  placeholder={t.referencePlaceholder}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t.notes}</label>
                 <input
                   type="text"
                   className="w-full px-4 py-2 border border-gray-300 rounded-md"
                   value={formData.notes}
                   onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                  placeholder="Special instructions..."
+                  placeholder={t.notesPlaceholder}
                 />
               </div>
             </div>
 
             {/* Payment Method Selection */}
             <div className="space-y-4">
-              <label className="block text-sm font-medium text-gray-700">Payment Method</label>
+              <label className="block text-sm font-medium text-gray-700">{t.paymentMethod}</label>
               <div className="grid grid-cols-2 gap-4">
                 <label className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'invoice' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:border-gray-300'}`}>
                   <input
@@ -2335,11 +2497,11 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                     className="sr-only"
                   />
                   <div>
-                    <span className="font-medium">Pay by Invoice</span>
-                    <p className="text-sm text-gray-500 mt-1">Invoice sent to your email</p>
+                    <span className="font-medium">{t.payByInvoice}</span>
+                    <p className="text-sm text-gray-500 mt-1">{t.invoiceSentToEmail}</p>
                   </div>
                 </label>
-                <label className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'zelle' ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                <label className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'zelle' ? 'border-slate-400 bg-slate-50' : 'border-gray-200 hover:border-gray-300'}`}>
                   <input
                     type="radio"
                     name="paymentMethod"
@@ -2349,17 +2511,17 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                     className="sr-only"
                   />
                   <div>
-                    <span className="font-medium">Pay with Zelle</span>
-                    <p className="text-sm text-gray-500 mt-1">Send to {ZELLE_EMAIL}</p>
+                    <span className="font-medium">{t.payWithZelle}</span>
+                    <p className="text-sm text-gray-500 mt-1">{t.sendToZelle} {ZELLE_EMAIL}</p>
                   </div>
                 </label>
               </div>
 
               {/* Zelle Instructions & Receipt Upload */}
               {paymentMethod === 'zelle' && (
-                <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg space-y-4">
-                  <h4 className="font-semibold text-purple-800">Zelle Payment Instructions</h4>
-                  <div className="space-y-2 text-sm text-purple-700">
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-4">
+                  <h4 className="font-semibold text-slate-700">Zelle Payment Instructions</h4>
+                  <div className="space-y-2 text-sm text-slate-600">
                     <p className="font-semibold">1. Open your bank app and select Zelle</p>
                     <p className="font-semibold">2. Send payment to: {ZELLE_EMAIL}</p>
                     <p className="font-semibold">3. Include your company name in the memo</p>
@@ -2378,7 +2540,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                     <button
                       type="button"
                       onClick={() => zelleReceiptInputRef.current?.click()}
-                      className="w-full py-3 border-2 border-dashed border-purple-300 rounded-lg text-purple-600 hover:border-purple-400 hover:bg-purple-100 transition-colors"
+                      className="w-full py-3 border-2 border-dashed border-slate-300 rounded-lg text-slate-600 hover:border-slate-400 hover:bg-slate-100 transition-colors"
                     >
                       {zelleReceipt ? (
                         <span className="flex items-center justify-center gap-2">
@@ -2401,46 +2563,46 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
             <button
               type="submit"
               disabled={submitting || wordCount === 0 || (paymentMethod === 'zelle' && !zelleReceipt)}
-              className={`w-full py-3 text-white rounded-md font-semibold ${paymentMethod === 'zelle' ? 'bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400' : 'bg-teal-600 hover:bg-teal-700 disabled:bg-gray-400'}`}
+              className={`w-full py-3 text-white rounded-md font-semibold ${paymentMethod === 'zelle' ? 'bg-slate-600 hover:bg-slate-700 disabled:bg-gray-400' : 'bg-teal-600 hover:bg-teal-700 disabled:bg-gray-400'}`}
             >
-              {submitting ? 'Creating Order...' : (paymentMethod === 'zelle' ? 'Submit Order with Zelle' : 'Create Order')}
+              {submitting ? t.creatingOrder : (paymentMethod === 'zelle' ? t.submitOrderZelle : t.createOrder)}
             </button>
           </form>
         </div>
 
         {/* Quote Summary */}
         <div className="bg-white rounded-lg shadow-sm p-6 h-fit sticky top-8">
-          <h2 className="text-xl font-bold text-teal-600 mb-4">Quote Summary</h2>
+          <h2 className="text-xl font-bold text-teal-600 mb-4">{t.quoteSummary}</h2>
 
           <div className="space-y-3 text-sm">
             <div className="flex justify-between">
-              <span className="text-gray-600">Service</span>
+              <span className="text-gray-600">{t.service}</span>
               <span className="font-medium">
-                {formData.service_type === 'certified' && 'Certified'}
-                {formData.service_type === 'standard' && 'Standard'}
-                {formData.service_type === 'sworn' && 'Sworn'}
-                {formData.service_type === 'rmv' && 'RMV Certified'}
+                {formData.service_type === 'certified' && t.certified}
+                {formData.service_type === 'standard' && t.standardService}
+                {formData.service_type === 'sworn' && t.sworn}
+                {formData.service_type === 'rmv' && t.rmvCertified}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600">Pages</span>
+              <span className="text-gray-600">{t.pages}</span>
               <span className="font-medium">{quote?.pages || 0}</span>
             </div>
 
             <div className="border-t pt-3 mt-3">
               <div className="flex justify-between">
-                <span className="text-gray-600">Base Price</span>
+                <span className="text-gray-600">{t.basePrice}</span>
                 <span className="font-medium">{formatPrice(quote?.base_price || 0)}</span>
               </div>
               {quote?.urgency_fee > 0 && (
                 <div className="flex justify-between text-orange-600">
-                  <span>Urgency Fee</span>
+                  <span>{t.urgencyFee}</span>
                   <span>{formatPrice(quote.urgency_fee)}</span>
                 </div>
               )}
               {quote?.shipping_fee > 0 && (
                 <div className="flex justify-between text-blue-600">
-                  <span>Shipping (USPS Priority)</span>
+                  <span>{t.shipping}</span>
                   <span>{formatPrice(quote.shipping_fee)}</span>
                 </div>
               )}
@@ -2456,14 +2618,14 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
 
             <div className="border-t pt-3 mt-3">
               <div className="flex justify-between text-lg">
-                <span className="font-bold">Total</span>
+                <span className="font-bold">{t.total}</span>
                 <span className="font-bold text-teal-600">
                   {formatPrice(Math.max(0, (quote?.total_price || 0) - (appliedCoupon?.discount_amount || 0)))}
                 </span>
               </div>
               {appliedCoupon && (
                 <div className="text-xs text-green-600 text-right mt-1">
-                  You save {formatPrice(appliedCoupon.discount_amount)}!
+                  {t.youSaveAmount} {formatPrice(appliedCoupon.discount_amount)}!
                 </div>
               )}
             </div>
@@ -2471,7 +2633,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
             {/* Coupon/Discount Section */}
             <div className="border-t pt-4 mt-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Coupon
+                {t.coupon}
               </label>
               {appliedCoupon ? (
                 /* Coupon Applied - Show discount */
@@ -2492,7 +2654,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                   >
                     {availableCoupons.length > 0 ? (
                       <>
-                        <option value="">Select coupon...</option>
+                        <option value="">{t.selectCoupon}</option>
                         {availableCoupons.map((coupon) => (
                           <option key={coupon.code} value={coupon.code}>
                             {coupon.code}
@@ -2500,7 +2662,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                         ))}
                       </>
                     ) : (
-                      <option value="">No Coupon available now</option>
+                      <option value="">{t.selectCoupon}</option>
                     )}
                   </select>
                   <button
@@ -2509,7 +2671,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                     disabled={couponLoading || !selectedCoupon || availableCoupons.length === 0}
                     className="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
                   >
-                    {couponLoading ? '...' : 'Apply'}
+                    {couponLoading ? '...' : t.apply}
                   </button>
                 </div>
               )}
@@ -2519,7 +2681,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
             </div>
 
             <div className="text-xs text-gray-500 mt-4">
-              * Payment via invoice (Net 30)
+              * {t.paymentViaInvoice}
             </div>
           </div>
         </div>
@@ -2782,7 +2944,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
 };
 
 // ==================== ORDERS LIST PAGE ====================
-const OrdersPage = ({ token }) => {
+const OrdersPage = ({ token, currency }) => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
@@ -2795,8 +2957,11 @@ const OrdersPage = ({ token }) => {
   const [messageContent, setMessageContent] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
 
-  // Format price helper
-  const formatPrice = (price) => `$${(price || 0).toFixed(2)}`;
+  // Format price helper with currency conversion
+  const formatPrice = (price) => {
+    const converted = (price || 0) * (currency?.rate || 1);
+    return `${currency?.symbol || '$'}${converted.toFixed(2)}`;
+  };
 
   useEffect(() => {
     fetchOrders();
@@ -3285,7 +3450,8 @@ const InvoicesPage = ({ token, t, currency }) => {
   };
 
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
+    const converted = (amount || 0) * (currency?.rate || 1);
+    return `${currency?.symbol || '$'}${converted.toFixed(2)}`;
   };
 
   const getStatusColor = (status) => {
@@ -3649,272 +3815,296 @@ const PaymentPlanPage = ({ token, t }) => {
   }
 
   return (
-    <div className="p-8 max-w-2xl">
+    <div className="p-8">
       <h1 className="text-2xl font-bold text-gray-800 mb-6">{t?.paymentPlanTitle || 'Payment Plan'}</h1>
 
-      {/* Payment Plan Terms Explanation */}
-      <div className="bg-gray-50 rounded-lg border border-gray-200 p-5 mb-6">
-        <h2 className="text-sm font-semibold text-gray-700 mb-3">
-          {t?.paymentPlanTermsTitle || 'Payment Terms'}
-        </h2>
-        <ul className="space-y-2 text-sm text-gray-600">
-          <li className="flex items-start gap-2">
-            <span className="text-gray-400">•</span>
-            <span>{t?.paymentPlanTerm1 || 'Biweekly invoicing available upon completion of 10 paid translations.'}</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-gray-400">•</span>
-            <span>{t?.paymentPlanTerm2 || 'Net 30 payment terms granted after 3 consecutive months of timely invoice settlement.'}</span>
-          </li>
-        </ul>
-      </div>
-
-      {/* Current Plan Card */}
-      <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
-        <h2 className="text-sm font-medium text-gray-500 mb-2">{t?.currentPlan || 'Current Plan'}</h2>
-        <div className="flex items-center gap-3">
-          <span className="text-2xl">💳</span>
-          <div>
-            <div className="text-xl font-semibold text-gray-800">{getPlanDisplayName(qualification?.current_plan)}</div>
-            {qualification?.plan_approved && qualification?.current_plan !== 'pay_per_order' && (
-              <span className="inline-block mt-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">Approved</span>
-            )}
+      {/* Two Column Layout */}
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* Left Column - Payment Plan Info */}
+        <div className="lg:w-1/2 space-y-6">
+          {/* Payment Plan Terms Explanation */}
+          <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
+            <h2 className="text-sm font-semibold text-gray-700 mb-3">
+              {t?.paymentPlanTermsTitle || 'Payment Terms'}
+            </h2>
+            <ul className="space-y-2 text-sm text-gray-600">
+              <li className="flex items-start gap-2">
+                <span className="text-gray-400">•</span>
+                <span>{t?.paymentPlanTerm1 || 'Biweekly invoicing available upon completion of 10 paid translations.'}</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-gray-400">•</span>
+                <span>{t?.paymentPlanTerm2 || 'Net 30 payment terms granted after 3 consecutive months of timely invoice settlement.'}</span>
+              </li>
+            </ul>
           </div>
-        </div>
-      </div>
 
-      {/* Qualification Status */}
-      <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
-        <h2 className="text-sm font-medium text-gray-500 mb-4">{t?.qualificationStatus || 'Qualification Status'}</h2>
-
-        {/* Progress Bar */}
-        <div className="mb-4">
-          <div className="flex justify-between text-sm mb-2">
-            <span className="text-gray-600">{qualification?.total_paid_orders || 0} {t?.translationsCompleted || 'translations completed'}</span>
-            <span className="text-gray-500">{qualification?.orders_required || 10} required</span>
-          </div>
-          <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
-            <div
-              className={`h-full transition-all duration-500 ${qualification?.qualifies_for_invoice ? 'bg-green-500' : 'bg-teal-500'}`}
-              style={{ width: `${Math.min(100, ((qualification?.total_paid_orders || 0) / (qualification?.orders_required || 10)) * 100)}%` }}
-            />
-          </div>
-        </div>
-
-        {qualification?.qualifies_for_invoice ? (
-          <div className="flex items-center gap-2 text-green-600">
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-            </svg>
-            <span className="font-medium">{t?.qualifiedForInvoice || 'You qualify for biweekly invoice!'}</span>
-          </div>
-        ) : (
-          <div className="text-gray-600">
-            <span>{qualification?.orders_remaining || 10} {t?.translationsRemaining || 'more translations to qualify'}</span>
-          </div>
-        )}
-      </div>
-
-      {/* Upgrade Section */}
-      {qualification?.current_plan === 'pay_per_order' && (
-        <div className="bg-white rounded-lg shadow-sm border p-6">
-          <h2 className="text-sm font-medium text-gray-500 mb-4">{t?.requestUpgrade || 'Request Upgrade'}</h2>
-
-          {qualification?.upgrade_pending ? (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-              <div className="flex items-center gap-2 text-amber-700">
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd"/>
+          {/* Current Plan Card */}
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <h2 className="text-sm font-medium text-gray-500 mb-2">{t?.currentPlan || 'Current Plan'}</h2>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                 </svg>
-                <span className="font-medium">{t?.upgradeRequested || 'Upgrade Requested'}</span>
               </div>
-              <p className="text-sm text-amber-600 mt-2">{t?.awaitingApproval || 'Awaiting admin approval'}</p>
-              <p className="text-sm text-amber-600 mt-1">Requested: {getPlanDisplayName(qualification?.requested_plan)}</p>
+              <div>
+                <div className="text-xl font-semibold text-gray-800">{getPlanDisplayName(qualification?.current_plan)}</div>
+                {qualification?.plan_approved && qualification?.current_plan !== 'pay_per_order' && (
+                  <span className="inline-block mt-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">Approved</span>
+                )}
+              </div>
             </div>
-          ) : success ? (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <div className="flex items-center gap-2 text-green-700">
+          </div>
+
+          {/* Qualification Status */}
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <h2 className="text-sm font-medium text-gray-500 mb-4">{t?.qualificationStatus || 'Qualification Status'}</h2>
+
+            {/* Progress Bar */}
+            <div className="mb-4">
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-gray-600">{qualification?.total_paid_orders || 0} {t?.translationsCompleted || 'translations completed'}</span>
+                <span className="text-gray-500">{qualification?.orders_required || 10} required</span>
+              </div>
+              <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+                <div
+                  className={`h-full transition-all duration-500 ${qualification?.qualifies_for_invoice ? 'bg-green-500' : 'bg-blue-500'}`}
+                  style={{ width: `${Math.min(100, ((qualification?.total_paid_orders || 0) / (qualification?.orders_required || 10)) * 100)}%` }}
+                />
+              </div>
+            </div>
+
+            {qualification?.qualifies_for_invoice ? (
+              <div className="flex items-center gap-2 text-green-600">
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
                 </svg>
-                <span className="font-medium">{t?.upgradeSuccess || 'Upgrade request submitted successfully!'}</span>
+                <span className="font-medium">{t?.qualifiedForInvoice || 'You qualify for biweekly invoice!'}</span>
               </div>
-            </div>
-          ) : qualification?.qualifies_for_invoice ? (
-            <div className="space-y-4">
-              <p className="text-sm text-gray-600">{t?.selectPlanToUpgrade || 'Select the plan you want:'}</p>
+            ) : (
+              <div className="text-gray-600">
+                <span>{qualification?.orders_remaining || 10} {t?.translationsRemaining || 'more translations to qualify'}</span>
+              </div>
+            )}
+          </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <label className={`flex flex-col p-4 rounded-lg border-2 cursor-pointer transition-all ${selectedPlan === 'biweekly' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:border-teal-300'}`}>
-                  <input type="radio" name="upgrade_plan" value="biweekly" checked={selectedPlan === 'biweekly'} onChange={(e) => setSelectedPlan(e.target.value)} className="sr-only" />
-                  <span className="font-medium text-gray-800">{t?.biweeklyInvoice || 'Biweekly Invoice'}</span>
-                  <span className="text-xs text-gray-500 mt-1">{t?.biweeklyInvoiceDesc || 'Receive invoice every 2 weeks'}</span>
-                </label>
-                <label className={`flex flex-col p-4 rounded-lg border-2 cursor-pointer transition-all ${selectedPlan === 'monthly' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:border-teal-300'}`}>
-                  <input type="radio" name="upgrade_plan" value="monthly" checked={selectedPlan === 'monthly'} onChange={(e) => setSelectedPlan(e.target.value)} className="sr-only" />
-                  <span className="font-medium text-gray-800">{t?.monthlyInvoice || 'Monthly Invoice'}</span>
-                  <span className="text-xs text-gray-500 mt-1">{t?.monthlyInvoiceDesc || 'Receive monthly invoice'}</span>
-                </label>
+          {/* Upgrade Section */}
+          {qualification?.current_plan === 'pay_per_order' && (
+            <div className="bg-white rounded-lg shadow-sm border p-6">
+              <h2 className="text-sm font-medium text-gray-500 mb-4">{t?.requestUpgrade || 'Request Upgrade'}</h2>
+
+              {qualification?.upgrade_pending ? (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 text-amber-700">
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd"/>
+                    </svg>
+                    <span className="font-medium">{t?.upgradeRequested || 'Upgrade Requested'}</span>
+                  </div>
+                  <p className="text-sm text-amber-600 mt-2">{t?.awaitingApproval || 'Awaiting admin approval'}</p>
+                  <p className="text-sm text-amber-600 mt-1">Requested: {getPlanDisplayName(qualification?.requested_plan)}</p>
+                </div>
+              ) : success ? (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 text-green-700">
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+                    </svg>
+                    <span className="font-medium">{t?.upgradeSuccess || 'Upgrade request submitted successfully!'}</span>
+                  </div>
+                </div>
+              ) : qualification?.qualifies_for_invoice ? (
+                <div className="space-y-4">
+                  <p className="text-sm text-gray-600">{t?.selectPlanToUpgrade || 'Select the plan you want:'}</p>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className={`flex flex-col p-4 rounded-lg border-2 cursor-pointer transition-all ${selectedPlan === 'biweekly' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`}>
+                      <input type="radio" name="upgrade_plan" value="biweekly" checked={selectedPlan === 'biweekly'} onChange={(e) => setSelectedPlan(e.target.value)} className="sr-only" />
+                      <span className="font-medium text-gray-800">{t?.biweeklyInvoice || 'Biweekly Invoice'}</span>
+                      <span className="text-xs text-gray-500 mt-1">{t?.biweeklyInvoiceDesc || 'Receive invoice every 2 weeks'}</span>
+                    </label>
+                    <label className={`flex flex-col p-4 rounded-lg border-2 cursor-pointer transition-all ${selectedPlan === 'monthly' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`}>
+                      <input type="radio" name="upgrade_plan" value="monthly" checked={selectedPlan === 'monthly'} onChange={(e) => setSelectedPlan(e.target.value)} className="sr-only" />
+                      <span className="font-medium text-gray-800">{t?.monthlyInvoice || 'Monthly Invoice'}</span>
+                      <span className="text-xs text-gray-500 mt-1">{t?.monthlyInvoiceDesc || 'Receive monthly invoice'}</span>
+                    </label>
+                  </div>
+
+                  <button
+                    onClick={handleRequestUpgrade}
+                    disabled={submitting}
+                    className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-gray-300 transition-colors"
+                  >
+                    {submitting ? '...' : (t?.submitUpgradeRequest || 'Submit Upgrade Request')}
+                  </button>
+                </div>
+              ) : (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
+                  <svg className="w-8 h-8 text-gray-400 mx-auto mb-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/>
+                  </svg>
+                  <p className="text-sm text-gray-600">{t?.notQualifiedYet || 'Not yet qualified'}</p>
+                  <p className="text-xs text-gray-500 mt-1">{qualification?.orders_remaining} {t?.translationsRemaining || 'more translations to qualify'}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Current Tier Status */}
+          {tierInfo && (
+            <div className="bg-white rounded-lg shadow-sm border p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-sm font-medium text-gray-500 mb-1">{t?.yourCurrentTier || 'Your Current Tier'}</h2>
+                  <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold capitalize ${getTierColor(tierInfo.current_tier)}`}>
+                    {tierInfo.current_tier}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <div className="text-2xl font-bold text-blue-600">{tierInfo.discount_percent}% OFF</div>
+                  <div className="text-sm text-gray-600">{currency?.symbol || '$'}{(tierInfo.price_per_page * (currency?.rate || 1)).toFixed(2)}/{t?.page || 'page'}</div>
+                </div>
               </div>
 
-              <button
-                onClick={handleRequestUpgrade}
-                disabled={submitting}
-                className="w-full py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-medium disabled:bg-gray-300 transition-colors"
-              >
-                {submitting ? '...' : (t?.submitUpgradeRequest || 'Submit Upgrade Request')}
-              </button>
-            </div>
-          ) : (
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
-              <svg className="w-8 h-8 text-gray-400 mx-auto mb-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/>
-              </svg>
-              <p className="text-sm text-gray-600">{t?.notQualifiedYet || 'Not yet qualified'}</p>
-              <p className="text-xs text-gray-500 mt-1">{qualification?.orders_remaining} {t?.translationsRemaining || 'more translations to qualify'}</p>
+              {/* Volume Progress */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-gray-600">{tierInfo.volume_stats?.total_pages || 0} {t?.pagesLast30Days || 'pages in last 30 days'}</span>
+                  {tierInfo.next_tier && (
+                    <span className="text-gray-500">{tierInfo.pages_to_next_tier} {t?.pagesToNextTier || 'pages to'} {tierInfo.next_tier}</span>
+                  )}
+                </div>
+                <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-blue-500 transition-all duration-500"
+                    style={{
+                      width: tierInfo.next_tier
+                        ? `${Math.min(100, ((tierInfo.volume_stats?.total_pages || 0) / (tierInfo.volume_stats?.total_pages + tierInfo.pages_to_next_tier)) * 100)}%`
+                        : '100%'
+                    }}
+                  />
+                </div>
+                {tierInfo.monthly_savings > 0 && (
+                  <p className="text-sm text-green-600 mt-2">
+                    {t?.youSaved || 'You saved'} <span className="font-semibold">{currency?.symbol || '$'}{(tierInfo.monthly_savings * (currency?.rate || 1)).toFixed(2)}</span> {t?.thisMonth || 'this month'}!
+                  </p>
+                )}
+              </div>
             </div>
           )}
         </div>
-      )}
 
-      {/* Current Tier Status */}
-      {tierInfo && (
-        <div className="bg-gradient-to-br from-blue-50 to-slate-100 rounded-lg shadow-sm border border-blue-200 p-6 mt-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <span className="text-3xl">{getTierIcon(tierInfo.current_tier)}</span>
+        {/* Right Column - Partner Discount Structure */}
+        <div className="lg:w-1/2">
+          <div className="bg-white rounded-lg shadow-sm border p-6 h-full">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+              </div>
               <div>
-                <h2 className="text-lg font-bold text-slate-800">{t?.yourCurrentTier || 'Your Current Tier'}</h2>
-                <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold capitalize ${getTierColor(tierInfo.current_tier)}`}>
-                  {tierInfo.current_tier}
-                </span>
+                <h2 className="text-lg font-bold text-gray-800">{t?.discountStructure || 'Partner Discount Structure'}</h2>
+                <p className="text-xs text-gray-500">{t?.certifiedTranslationNote || 'Prices for "Certified Translation" services'}</p>
               </div>
             </div>
-            <div className="text-right">
-              <div className="text-2xl font-bold text-green-600">{tierInfo.discount_percent}% OFF</div>
-              <div className="text-sm text-slate-600">${tierInfo.price_per_page}/{t?.page || 'page'}</div>
+            <p className="text-sm text-gray-600 mb-4">{t?.discountDescription || 'Earn volume discounts based on your monthly page count'}</p>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-blue-600 text-white">
+                    <th className="px-3 py-3 text-left rounded-tl-lg">{t?.tier || 'Tier'}</th>
+                    <th className="px-3 py-3 text-center">{t?.monthlyVolume || 'Monthly Volume'}</th>
+                    <th className="px-3 py-3 text-center">{t?.discount || 'Discount'}</th>
+                    <th className="px-3 py-3 text-center">{t?.pricePerPage || 'Price/Page'}</th>
+                    <th className="px-3 py-3 text-center">{t?.monthlySavings || 'Savings'}</th>
+                    <th className="px-3 py-3 text-center rounded-tr-lg">{t?.partnerMargin || 'Margin*'}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className={`border-b border-gray-100 ${tierInfo?.current_tier === 'bronze' ? 'bg-blue-50 ring-2 ring-blue-400 ring-inset' : 'hover:bg-gray-50'}`}>
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 bg-amber-100 rounded-full flex items-center justify-center">
+                          <span className="text-xs font-bold text-amber-700">B</span>
+                        </div>
+                        <span className="font-semibold text-gray-700">Bronze</span>
+                        {tierInfo?.current_tier === 'bronze' && <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full">{t?.current || 'Current'}</span>}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 text-center text-gray-600">10-29</td>
+                    <td className="px-3 py-3 text-center">
+                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-semibold">10%</span>
+                    </td>
+                    <td className="px-3 py-3 text-center font-medium text-gray-700">{currency?.symbol || '$'}{(22.49 * (currency?.rate || 1)).toFixed(2)}</td>
+                    <td className="px-3 py-3 text-center text-green-600 text-xs">{t?.upTo || 'up to'} {currency?.symbol || '$'}{(72 * (currency?.rate || 1)).toFixed(0)}</td>
+                    <td className="px-3 py-3 text-center font-semibold text-blue-600">{currency?.symbol || '$'}{(7.50 * (currency?.rate || 1)).toFixed(2)}</td>
+                  </tr>
+                  <tr className={`border-b border-gray-100 ${tierInfo?.current_tier === 'silver' ? 'bg-blue-50 ring-2 ring-blue-400 ring-inset' : 'hover:bg-gray-50'}`}>
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 bg-slate-200 rounded-full flex items-center justify-center">
+                          <span className="text-xs font-bold text-slate-600">S</span>
+                        </div>
+                        <span className="font-semibold text-gray-700">Silver</span>
+                        {tierInfo?.current_tier === 'silver' && <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full">{t?.current || 'Current'}</span>}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 text-center text-gray-600">30-59</td>
+                    <td className="px-3 py-3 text-center">
+                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-semibold">15%</span>
+                    </td>
+                    <td className="px-3 py-3 text-center font-medium text-gray-700">{currency?.symbol || '$'}{(21.24 * (currency?.rate || 1)).toFixed(2)}</td>
+                    <td className="px-3 py-3 text-center text-green-600 text-xs">{t?.upTo || 'up to'} {currency?.symbol || '$'}{(225 * (currency?.rate || 1)).toFixed(0)}</td>
+                    <td className="px-3 py-3 text-center font-semibold text-blue-600">{currency?.symbol || '$'}{(8.75 * (currency?.rate || 1)).toFixed(2)}</td>
+                  </tr>
+                  <tr className={`border-b border-gray-100 ${tierInfo?.current_tier === 'gold' ? 'bg-blue-50 ring-2 ring-blue-400 ring-inset' : 'hover:bg-gray-50'}`}>
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 bg-yellow-100 rounded-full flex items-center justify-center">
+                          <span className="text-xs font-bold text-yellow-700">G</span>
+                        </div>
+                        <span className="font-semibold text-gray-700">Gold</span>
+                        {tierInfo?.current_tier === 'gold' && <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full">{t?.current || 'Current'}</span>}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 text-center text-gray-600">60-99</td>
+                    <td className="px-3 py-3 text-center">
+                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-semibold">25%</span>
+                    </td>
+                    <td className="px-3 py-3 text-center font-medium text-gray-700">{currency?.symbol || '$'}{(18.74 * (currency?.rate || 1)).toFixed(2)}</td>
+                    <td className="px-3 py-3 text-center text-green-600 text-xs">{t?.upTo || 'up to'} {currency?.symbol || '$'}{(618 * (currency?.rate || 1)).toFixed(0)}</td>
+                    <td className="px-3 py-3 text-center font-semibold text-blue-600">{currency?.symbol || '$'}{(11.25 * (currency?.rate || 1)).toFixed(2)}</td>
+                  </tr>
+                  <tr className={`${tierInfo?.current_tier === 'platinum' ? 'bg-blue-50 ring-2 ring-blue-400 ring-inset' : 'hover:bg-gray-50'}`}>
+                    <td className="px-3 py-3 rounded-bl-lg">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+                          <span className="text-xs font-bold text-blue-700">P</span>
+                        </div>
+                        <span className="font-semibold text-gray-700">Platinum</span>
+                        {tierInfo?.current_tier === 'platinum' && <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full">{t?.current || 'Current'}</span>}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 text-center text-gray-600">100+</td>
+                    <td className="px-3 py-3 text-center">
+                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-semibold">35%</span>
+                    </td>
+                    <td className="px-3 py-3 text-center font-medium text-gray-700">{currency?.symbol || '$'}{(16.24 * (currency?.rate || 1)).toFixed(2)}</td>
+                    <td className="px-3 py-3 text-center text-green-600 text-xs">{currency?.symbol || '$'}{(875 * (currency?.rate || 1)).toFixed(0)}+</td>
+                    <td className="px-3 py-3 text-center font-semibold text-blue-600 rounded-br-lg">{currency?.symbol || '$'}{(13.75 * (currency?.rate || 1)).toFixed(2)}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
+
+            <p className="text-xs text-gray-500 mt-4">
+              *{t?.marginNote || 'Partner margin calculated based on resale at $30/page (common market rate)'}
+            </p>
           </div>
-
-          {/* Volume Progress */}
-          <div className="bg-white rounded-lg p-4 mb-4">
-            <div className="flex justify-between text-sm mb-2">
-              <span className="text-slate-600">{tierInfo.volume_stats?.total_pages || 0} {t?.pagesLast30Days || 'pages in last 30 days'}</span>
-              {tierInfo.next_tier && (
-                <span className="text-slate-500">{tierInfo.pages_to_next_tier} {t?.pagesToNextTier || 'pages to'} {tierInfo.next_tier}</span>
-              )}
-            </div>
-            <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-blue-500 to-teal-500 transition-all duration-500"
-                style={{
-                  width: tierInfo.next_tier
-                    ? `${Math.min(100, ((tierInfo.volume_stats?.total_pages || 0) / (tierInfo.volume_stats?.total_pages + tierInfo.pages_to_next_tier)) * 100)}%`
-                    : '100%'
-                }}
-              />
-            </div>
-            {tierInfo.monthly_savings > 0 && (
-              <p className="text-sm text-green-600 mt-2">
-                {t?.youSaved || 'You saved'} <span className="font-semibold">${tierInfo.monthly_savings.toFixed(2)}</span> {t?.thisMonth || 'this month'}!
-              </p>
-            )}
-          </div>
         </div>
-      )}
-
-      {/* Partner Discount Tiers */}
-      <div className="bg-gradient-to-br from-blue-50 to-slate-100 rounded-lg shadow-sm border border-blue-200 p-6 mt-6">
-        <div className="flex items-center gap-2 mb-4">
-          <span className="text-2xl">💰</span>
-          <h2 className="text-lg font-bold text-slate-800">{t?.discountStructure || 'Partner Discount Structure'}</h2>
-        </div>
-        <p className="text-sm text-slate-600 mb-4">{t?.discountDescription || 'Earn volume discounts based on your monthly page count'}</p>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
-                <th className="px-3 py-3 text-left rounded-tl-lg">{t?.tier || 'Tier'}</th>
-                <th className="px-3 py-3 text-center">{t?.monthlyVolume || 'Monthly Volume'}</th>
-                <th className="px-3 py-3 text-center">{t?.discount || 'Discount'}</th>
-                <th className="px-3 py-3 text-center">{t?.pricePerPage || 'Price/Page'}</th>
-                <th className="px-3 py-3 text-center">{t?.monthlySavings || 'Monthly Savings'}</th>
-                <th className="px-3 py-3 text-center rounded-tr-lg">{t?.partnerMargin || 'Partner Margin*'}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className={`border-b border-amber-100 ${tierInfo?.current_tier === 'bronze' ? 'bg-amber-100 ring-2 ring-amber-400 ring-inset' : 'bg-amber-50'}`}>
-                <td className="px-3 py-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">🥉</span>
-                    <span className="font-semibold text-amber-700">Bronze</span>
-                    {tierInfo?.current_tier === 'bronze' && <span className="text-xs bg-amber-500 text-white px-2 py-0.5 rounded-full">{t?.current || 'Current'}</span>}
-                  </div>
-                </td>
-                <td className="px-3 py-3 text-center text-slate-700">10-29 {t?.pages || 'pages'}</td>
-                <td className="px-3 py-3 text-center">
-                  <span className="px-2 py-1 bg-amber-200 text-amber-800 rounded-full text-xs font-semibold">10%</span>
-                </td>
-                <td className="px-3 py-3 text-center font-medium text-slate-700">$22.49</td>
-                <td className="px-3 py-3 text-center text-green-600">{t?.upTo || 'up to'} $72</td>
-                <td className="px-3 py-3 text-center font-semibold text-blue-600">$7.50/{t?.page || 'page'}</td>
-              </tr>
-              <tr className={`border-b border-slate-100 ${tierInfo?.current_tier === 'silver' ? 'bg-slate-200 ring-2 ring-slate-400 ring-inset' : 'bg-slate-50'}`}>
-                <td className="px-3 py-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">🥈</span>
-                    <span className="font-semibold text-slate-600">Silver</span>
-                    {tierInfo?.current_tier === 'silver' && <span className="text-xs bg-slate-500 text-white px-2 py-0.5 rounded-full">{t?.current || 'Current'}</span>}
-                  </div>
-                </td>
-                <td className="px-3 py-3 text-center text-slate-700">30-59 {t?.pages || 'pages'}</td>
-                <td className="px-3 py-3 text-center">
-                  <span className="px-2 py-1 bg-slate-300 text-slate-700 rounded-full text-xs font-semibold">15%</span>
-                </td>
-                <td className="px-3 py-3 text-center font-medium text-slate-700">$21.24</td>
-                <td className="px-3 py-3 text-center text-green-600">{t?.upTo || 'up to'} $225</td>
-                <td className="px-3 py-3 text-center font-semibold text-blue-600">$8.75/{t?.page || 'page'}</td>
-              </tr>
-              <tr className={`border-b border-yellow-100 ${tierInfo?.current_tier === 'gold' ? 'bg-yellow-100 ring-2 ring-yellow-400 ring-inset' : 'bg-yellow-50'}`}>
-                <td className="px-3 py-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">🥇</span>
-                    <span className="font-semibold text-yellow-700">Gold</span>
-                    {tierInfo?.current_tier === 'gold' && <span className="text-xs bg-yellow-500 text-white px-2 py-0.5 rounded-full">{t?.current || 'Current'}</span>}
-                  </div>
-                </td>
-                <td className="px-3 py-3 text-center text-slate-700">60-99 {t?.pages || 'pages'}</td>
-                <td className="px-3 py-3 text-center">
-                  <span className="px-2 py-1 bg-yellow-300 text-yellow-800 rounded-full text-xs font-semibold">25%</span>
-                </td>
-                <td className="px-3 py-3 text-center font-medium text-slate-700">$18.74</td>
-                <td className="px-3 py-3 text-center text-green-600">{t?.upTo || 'up to'} $618</td>
-                <td className="px-3 py-3 text-center font-semibold text-blue-600">$11.25/{t?.page || 'page'}</td>
-              </tr>
-              <tr className={`${tierInfo?.current_tier === 'platinum' ? 'bg-purple-100 ring-2 ring-purple-400 ring-inset' : 'bg-purple-50'}`}>
-                <td className="px-3 py-3 rounded-bl-lg">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">💎</span>
-                    <span className="font-semibold text-purple-700">Platinum</span>
-                    {tierInfo?.current_tier === 'platinum' && <span className="text-xs bg-purple-500 text-white px-2 py-0.5 rounded-full">{t?.current || 'Current'}</span>}
-                  </div>
-                </td>
-                <td className="px-3 py-3 text-center text-slate-700">100+ {t?.pages || 'pages'}</td>
-                <td className="px-3 py-3 text-center">
-                  <span className="px-2 py-1 bg-purple-300 text-purple-800 rounded-full text-xs font-semibold">35%</span>
-                </td>
-                <td className="px-3 py-3 text-center font-medium text-slate-700">$16.24</td>
-                <td className="px-3 py-3 text-center text-green-600">$875+</td>
-                <td className="px-3 py-3 text-center font-semibold text-blue-600 rounded-br-lg">$13.75/{t?.page || 'page'}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <p className="text-xs text-slate-500 mt-4 italic">
-          *{t?.marginNote || 'Partner margin calculated based on resale at $30/page (common market rate)'}
-        </p>
       </div>
     </div>
   );
@@ -4959,7 +5149,7 @@ function App() {
       case 'new-order':
         return <NewOrderPage partner={partner} token={token} onOrderCreated={() => setActiveTab('orders')} t={t} currency={currency} />;
       case 'orders':
-        return <OrdersPage token={token} />;
+        return <OrdersPage token={token} currency={currency} />;
       case 'invoices':
         return <InvoicesPage token={token} t={t} currency={currency} />;
       case 'messages':

@@ -1814,6 +1814,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [isProofreading, setIsProofreading] = useState(false);
   const [proofreadingError, setProofreadingError] = useState('');
   const [highlightedErrorIndex, setHighlightedErrorIndex] = useState(null);
+  const [highlightedPmErrorIndex, setHighlightedPmErrorIndex] = useState(null);
 
   // Rejection modal state (PM/Admin)
   const [showRejectModal, setShowRejectModal] = useState(false);
@@ -4016,11 +4017,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     let highlightedHtml = currentResult.translatedText;
 
     // Create a list of errors to highlight with their original index, sorted by length (longest first)
+    // Use traducao_errada (English text found in translation) for highlighting, not the Portuguese original
     const errorsToHighlight = proofreadingResult.erros
       .map((erro, idx) => ({
-        text: erro.found || erro.original || erro.traducao_errada || '',
+        text: erro.traducao_errada || erro.found || '',
         severity: erro.severidade || erro.gravidade || 'MÉDIO',
-        suggestion: erro.sugestao || erro.correcao || '',
+        suggestion: erro.correcao || erro.sugestao || '',
         type: erro.tipo || 'Geral',
         index: idx,
         applied: erro.applied
@@ -4076,6 +4078,64 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         setHighlightedErrorIndex(null);
       }, 3000);
     }
+  };
+
+  // Handle click on error row in table - scroll to and highlight in translation preview
+  const handleErrorRowClick = (errorIndex, foundText) => {
+    if (!foundText) return;
+
+    setHighlightedErrorIndex(errorIndex);
+
+    // Find and scroll to the highlighted mark in the translation preview iframe
+    setTimeout(() => {
+      const iframe = document.querySelector('.translation-preview-iframe');
+      if (iframe && iframe.contentDocument) {
+        const mark = iframe.contentDocument.querySelector(`mark[data-error-index="${errorIndex}"]`);
+        if (mark) {
+          mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Add a temporary pulse effect
+          mark.style.animation = 'pulse 0.5s ease-in-out 3';
+        }
+      }
+    }, 100);
+
+    // Clear the highlight after 3 seconds
+    setTimeout(() => {
+      setHighlightedErrorIndex(null);
+    }, 3000);
+  };
+
+  // Handle click on PM error row in table - scroll to and highlight in translation preview
+  const handlePmErrorRowClick = (errorIndex, foundText) => {
+    if (!foundText) return;
+
+    setHighlightedPmErrorIndex(errorIndex);
+
+    // Find and scroll to the text in the translation preview
+    setTimeout(() => {
+      const translationPreview = document.querySelector('.pm-translation-preview');
+      if (translationPreview) {
+        // Try to find and highlight the text
+        const content = translationPreview.innerHTML;
+        if (content.toLowerCase().includes(foundText.toLowerCase())) {
+          const escapedText = foundText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const regex = new RegExp(`(${escapedText})`, 'gi');
+          translationPreview.innerHTML = content.replace(
+            regex,
+            '<mark style="background-color: #fef3c7; border: 2px solid #f59e0b; padding: 2px 4px; border-radius: 3px; animation: pulse 0.5s ease-in-out 3;">$1</mark>'
+          );
+          const mark = translationPreview.querySelector('mark');
+          if (mark) {
+            mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }
+      }
+    }, 100);
+
+    // Clear the highlight after 3 seconds
+    setTimeout(() => {
+      setHighlightedPmErrorIndex(null);
+    }, 3000);
   };
 
   // Helper function to try replacing text with multiple strategies
@@ -9554,7 +9614,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       <iframe
                         srcDoc={getHighlightedTranslation()}
                         title="Translation Preview"
-                        className="w-full border-0"
+                        className="w-full border-0 translation-preview-iframe"
                         style={{flex: '1 1 0', minHeight: 0}}
                       />
                     ) : (
@@ -9683,14 +9743,16 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                   <tr
                                     key={idx}
                                     data-error-row={idx}
-                                    className={`border-t transition-all duration-300 ${
+                                    onClick={() => handleErrorRowClick(idx, foundText)}
+                                    className={`border-t transition-all duration-300 cursor-pointer hover:ring-2 hover:ring-indigo-300 ${
                                       highlightedErrorIndex === idx ? 'ring-2 ring-indigo-500 ring-inset shadow-lg scale-[1.01]' :
                                       erro.applied ? 'bg-green-50 opacity-60' :
                                       severity === 'CRÍTICO' ? 'bg-red-50' :
                                       severity === 'ALTO' ? 'bg-blue-50' :
                                       severity === 'MÉDIO' ? 'bg-yellow-50' :
                                       'bg-blue-50'
-                                    }`}>
+                                    }`}
+                                    title="Click to highlight in translation">
                                     <td className="px-2 py-2">
                                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                                         severity === 'CRÍTICO' ? 'bg-red-500 text-white' :
@@ -17813,7 +17875,13 @@ const FollowupsPage = ({ adminKey }) => {
     try {
       const response = await axios.post(`${API}/admin/quotes/process-followups?admin_key=${adminKey}`);
       const result = response.data;
-      alert(`Follow-ups processed!\n\nReminders sent: ${result.reminders_sent}\nMarked as lost: ${result.marked_lost}${result.errors?.length > 0 ? `\nErrors: ${result.errors.length}` : ''}`);
+      const errorDetails = result.errors?.length > 0
+        ? `\n\nErrors (${result.errors.length}):\n${result.errors.slice(0, 5).join('\n')}${result.errors.length > 5 ? `\n... and ${result.errors.length - 5} more` : ''}`
+        : '';
+      if (result.errors?.length > 0) {
+        console.log('Follow-up errors:', result.errors);
+      }
+      alert(`Follow-ups processed!\n\nReminders sent: ${result.reminders_sent}\nMarked as lost: ${result.marked_lost}${errorDetails}`);
       fetchFollowupStatus();
     } catch (err) {
       alert('Failed to process follow-ups. Check console for details.');
@@ -21539,7 +21607,12 @@ const FinancesPage = ({ adminKey }) => {
     try {
       const response = await axios.get(`${API}/admin/coupons?admin_key=${adminKey}`);
       // Show all active coupons that can be assigned to partners
-      const templates = (response.data || []).filter(c => c.is_active);
+      // Filter out WELCOME coupons (they are auto-generated for specific partners)
+      const templates = (response.data || []).filter(c =>
+        c.is_active &&
+        !c.code.startsWith('WELCOME-') &&
+        !c.partner_id  // Exclude coupons already assigned to a specific partner
+      );
       setCouponTemplates(templates);
     } catch (err) {
       console.error('Failed to fetch coupon templates:', err);
@@ -21767,6 +21840,17 @@ const FinancesPage = ({ adminKey }) => {
       fetchPartnerStats(); // Refresh the list
     } catch (err) {
       alert('Error deleting partner: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const setPartnerPaymentPlan = async (partnerId, plan) => {
+    try {
+      await axios.post(`${API}/admin/partners/${partnerId}/set-payment-plan?admin_key=${adminKey}&plan=${plan}&send_notification=true`);
+      const planNames = { pay_per_order: 'Pay Per Order', biweekly: 'Biweekly Invoice', monthly: 'Monthly Invoice' };
+      alert(`Payment plan set to ${planNames[plan] || plan}`);
+      fetchPartnerStats(); // Refresh the list
+    } catch (err) {
+      alert('Error setting payment plan: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -23049,6 +23133,7 @@ const FinancesPage = ({ adminKey }) => {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Orders Paid</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Orders Pending</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Payment Plan</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Received</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Pending</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
@@ -23058,7 +23143,7 @@ const FinancesPage = ({ adminKey }) => {
                 <tbody className="divide-y">
                   {partnerStats.partners?.length === 0 ? (
                     <tr>
-                      <td colSpan="8" className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan="9" className="px-4 py-8 text-center text-gray-500">
                         No partner orders found
                       </td>
                     </tr>
@@ -23103,6 +23188,25 @@ const FinancesPage = ({ adminKey }) => {
                           <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-yellow-100 text-yellow-700">
                             {partner.orders_pending}
                           </span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <select
+                            value={partner.payment_plan || 'pay_per_order'}
+                            onChange={(e) => {
+                              if (window.confirm(`Change payment plan for ${partner.company_name} to ${e.target.options[e.target.selectedIndex].text}?`)) {
+                                setPartnerPaymentPlan(partner.partner_id, e.target.value);
+                              }
+                            }}
+                            className={`text-xs px-2 py-1 rounded border ${
+                              partner.payment_plan === 'monthly' ? 'bg-purple-100 border-purple-300 text-purple-700' :
+                              partner.payment_plan === 'biweekly' ? 'bg-blue-100 border-blue-300 text-blue-700' :
+                              'bg-gray-100 border-gray-300 text-gray-700'
+                            }`}
+                          >
+                            <option value="pay_per_order">Pay Per Order</option>
+                            <option value="biweekly">Biweekly Invoice</option>
+                            <option value="monthly">Monthly Invoice</option>
+                          </select>
                         </td>
                         <td className="px-4 py-3 text-right font-medium text-green-600">
                           {formatCurrency(partner.total_received)}
@@ -23656,7 +23760,7 @@ const FinancesPage = ({ adminKey }) => {
                         <option value="">Select discount...</option>
                         {couponTemplates.map((coupon) => (
                           <option key={coupon.id} value={coupon.code}>
-                            {coupon.code} ({coupon.discount_value}% off)
+                            {coupon.code} ({coupon.discount_type === 'percentage' ? `${coupon.discount_value}% off` : coupon.discount_type === 'certified_page' ? `${coupon.discount_value} free page${coupon.discount_value > 1 ? 's' : ''}` : `$${coupon.discount_value} off`})
                           </option>
                         ))}
                       </>
@@ -26947,7 +27051,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   {translatedContent ? (
                     translatedContent.html ? (
                       <div
-                        className="border rounded p-4 bg-white"
+                        className="border rounded p-4 bg-white pm-translation-preview"
                         dangerouslySetInnerHTML={{ __html: translatedContent.html }}
                       />
                     ) : translatedContent.contentType?.includes('image') ? (
@@ -26976,7 +27080,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                       {/* Show PM uploaded HTML content */}
                       {pmTranslationHtml && (
                         <div
-                          className="border rounded p-4 bg-white mb-4"
+                          className="border rounded p-4 bg-white mb-4 pm-translation-preview"
                           dangerouslySetInnerHTML={{ __html: pmTranslationHtml }}
                         />
                       )}
@@ -27111,29 +27215,41 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                             </tr>
                           </thead>
                           <tbody>
-                            {proofreadingResult.erros.map((erro, idx) => (
-                              <tr key={idx} className={`border-t ${
-                                erro.gravidade === 'CRÍTICO' ? 'bg-red-50' :
-                                erro.gravidade === 'ALTO' ? 'bg-blue-50' :
-                                erro.gravidade === 'MÉDIO' ? 'bg-yellow-50' :
-                                'bg-blue-50'
-                              }`}>
+                            {proofreadingResult.erros.map((erro, idx) => {
+                              const severity = erro.severidade || erro.gravidade || 'MÉDIO';
+                              const foundText = erro.traducao_errada || erro.found || '';
+                              const suggestionText = erro.correcao || erro.sugestao || '';
+                              return (
+                              <tr
+                                key={idx}
+                                data-pm-error-row={idx}
+                                onClick={() => handlePmErrorRowClick(idx, foundText)}
+                                className={`border-t cursor-pointer hover:ring-2 hover:ring-indigo-300 transition-all ${
+                                  highlightedPmErrorIndex === idx ? 'ring-2 ring-indigo-500 ring-inset shadow-lg' :
+                                  severity === 'CRÍTICO' ? 'bg-red-50' :
+                                  severity === 'ALTO' ? 'bg-blue-50' :
+                                  severity === 'MÉDIO' ? 'bg-yellow-50' :
+                                  'bg-blue-50'
+                                }`}
+                                title="Click to highlight in translation"
+                              >
                                 <td className="p-2">{erro.tipo}</td>
                                 <td className="p-2 font-mono">{erro.original || '-'}</td>
-                                <td className="p-2 font-mono text-red-600">{erro.found || '-'}</td>
-                                <td className="p-2 font-mono text-green-600">{erro.sugerido || '-'}</td>
+                                <td className="p-2 font-mono text-red-600">{foundText || '-'}</td>
+                                <td className="p-2 font-mono text-green-600">{suggestionText || '-'}</td>
                                 <td className="p-2 text-center">
                                   <span className={`px-1 py-0.5 rounded text-white ${
-                                    erro.gravidade === 'CRÍTICO' ? 'bg-red-500' :
-                                    erro.gravidade === 'ALTO' ? 'bg-blue-500' :
-                                    erro.gravidade === 'MÉDIO' ? 'bg-yellow-500' :
+                                    severity === 'CRÍTICO' ? 'bg-red-500' :
+                                    severity === 'ALTO' ? 'bg-blue-500' :
+                                    severity === 'MÉDIO' ? 'bg-yellow-500' :
                                     'bg-blue-500'
                                   }`}>
-                                    {erro.gravidade}
+                                    {severity}
                                   </span>
                                 </td>
                               </tr>
-                            ))}
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
@@ -29462,8 +29578,8 @@ const SalesControlPage = ({ adminKey }) => {
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select salesperson...</option>
-                  {salespeople.filter(sp => sp.status === 'active').map(sp => (
-                    <option key={sp.id} value={sp.id}>{sp.name}</option>
+                  {salespeople.filter(sp => sp.status === 'active' || sp.status === 'pending').map(sp => (
+                    <option key={sp.id} value={sp.id}>{sp.name} {sp.status === 'pending' ? '(Pending Setup)' : ''}</option>
                   ))}
                 </select>
               </div>
@@ -29546,8 +29662,8 @@ const SalesControlPage = ({ adminKey }) => {
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select salesperson...</option>
-                  {salespeople.filter(sp => sp.status === 'active').map(sp => (
-                    <option key={sp.id} value={sp.id}>{sp.name}</option>
+                  {salespeople.filter(sp => sp.status === 'active' || sp.status === 'pending').map(sp => (
+                    <option key={sp.id} value={sp.id}>{sp.name} {sp.status === 'pending' ? '(Pending Setup)' : ''}</option>
                   ))}
                 </select>
               </div>

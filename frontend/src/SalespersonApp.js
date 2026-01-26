@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const API_URL = process.env.REACT_APP_API_URL || '';
+const API_URL = process.env.REACT_APP_API_URL || '/api';
 
 // ==================== NEW YORK TIMEZONE HELPERS ====================
 const NY_TIMEZONE = 'America/New_York';
@@ -148,7 +148,29 @@ const translations = {
 
     // Partner Referral Notice
     partnerReferralNotice: 'Partner referrals are exclusively for companies with recurring demand for certified translations, such as law firms, accounting offices, financial institutions, real estate agencies, hospitals, and other businesses that regularly require translation services.',
-    partnerReferralImportant: 'Important: Individuals (natural persons) cannot be registered as partners.'
+    partnerReferralImportant: 'Important: Individuals (natural persons) cannot be registered as partners.',
+
+    // Internal Communication
+    internalMessages: 'Internal Messages',
+    messages: 'Messages',
+    newMessage: 'New Message',
+    sendMessage: 'Send Message',
+    sending: 'Sending...',
+    messageSent: 'Message sent successfully!',
+    noMessages: 'No messages yet',
+    messagesWillAppear: 'Messages from the team will appear here',
+    typeMessage: 'Type your message...',
+    subject: 'Subject',
+    messageContent: 'Message',
+    from: 'From',
+    to: 'To',
+    admin: 'Admin',
+    reply: 'Reply',
+    markAsRead: 'Mark as read',
+    unreadMessages: 'unread messages',
+    inbox: 'Inbox',
+    sent: 'Sent',
+    compose: 'Compose'
   },
   pt: {
     // Login
@@ -275,7 +297,29 @@ const translations = {
 
     // Partner Referral Notice
     partnerReferralNotice: 'As indicações de parceiros são exclusivamente para empresas com demanda recorrente por traduções certificadas, como escritórios de advocacia, contabilidade, instituições financeiras, imobiliárias, hospitais e outras empresas que necessitam regularmente de serviços de tradução.',
-    partnerReferralImportant: 'Importante: Pessoas físicas não poderão ser cadastradas como partners.'
+    partnerReferralImportant: 'Importante: Pessoas físicas não poderão ser cadastradas como partners.',
+
+    // Internal Communication
+    internalMessages: 'Mensagens Internas',
+    messages: 'Mensagens',
+    newMessage: 'Nova Mensagem',
+    sendMessage: 'Enviar Mensagem',
+    sending: 'Enviando...',
+    messageSent: 'Mensagem enviada com sucesso!',
+    noMessages: 'Nenhuma mensagem ainda',
+    messagesWillAppear: 'Mensagens da equipe aparecerão aqui',
+    typeMessage: 'Digite sua mensagem...',
+    subject: 'Assunto',
+    messageContent: 'Mensagem',
+    from: 'De',
+    to: 'Para',
+    admin: 'Admin',
+    reply: 'Responder',
+    markAsRead: 'Marcar como lida',
+    unreadMessages: 'mensagens não lidas',
+    inbox: 'Caixa de Entrada',
+    sent: 'Enviadas',
+    compose: 'Escrever'
   },
   es: {
     // Login
@@ -402,7 +446,29 @@ const translations = {
 
     // Partner Referral Notice
     partnerReferralNotice: 'Las indicaciones de partners son exclusivamente para empresas con demanda recurrente de traducciones certificadas, como despachos de abogados, oficinas de contabilidad, instituciones financieras, inmobiliarias, hospitales y otras empresas que requieren regularmente servicios de traducción.',
-    partnerReferralImportant: 'Importante: Las personas físicas no pueden ser registradas como partners.'
+    partnerReferralImportant: 'Importante: Las personas físicas no pueden ser registradas como partners.',
+
+    // Internal Communication
+    internalMessages: 'Mensajes Internos',
+    messages: 'Mensajes',
+    newMessage: 'Nuevo Mensaje',
+    sendMessage: 'Enviar Mensaje',
+    sending: 'Enviando...',
+    messageSent: '¡Mensaje enviado exitosamente!',
+    noMessages: 'Sin mensajes aún',
+    messagesWillAppear: 'Los mensajes del equipo aparecerán aquí',
+    typeMessage: 'Escriba su mensaje...',
+    subject: 'Asunto',
+    messageContent: 'Mensaje',
+    from: 'De',
+    to: 'Para',
+    admin: 'Admin',
+    reply: 'Responder',
+    markAsRead: 'Marcar como leído',
+    unreadMessages: 'mensajes no leídos',
+    inbox: 'Bandeja de Entrada',
+    sent: 'Enviados',
+    compose: 'Redactar'
   }
 };
 
@@ -711,11 +777,21 @@ const SalespersonPortal = ({ token, salesperson, onLogout, lang, setLang }) => {
   const [registerSuccess, setRegisterSuccess] = useState(null);
   const [registerError, setRegisterError] = useState('');
 
+  // Internal Messages State
+  const [messages, setMessages] = useState([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [messageView, setMessageView] = useState('inbox'); // 'inbox', 'sent', 'compose'
+  const [newMessage, setNewMessage] = useState({ subject: '', content: '' });
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [messageSentSuccess, setMessageSentSuccess] = useState(false);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
+
   useEffect(() => {
     fetchDashboard();
     fetchCommissionInfo();
     fetchNotifications();
     fetchPaymentHistory();
+    fetchMessages();
   }, []);
 
   const fetchDashboard = async () => {
@@ -749,6 +825,55 @@ const SalespersonPortal = ({ token, salesperson, onLogout, lang, setLang }) => {
       const res = await fetch(`${API_URL}/salesperson/payment-history`, { headers: { 'salesperson-token': token } });
       if (res.ok) setPaymentHistory(await res.json());
     } catch (err) { console.error('Error:', err); }
+  };
+
+  const fetchMessages = async () => {
+    setMessagesLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/salesperson/messages`, { headers: { 'salesperson-token': token } });
+      if (res.ok) {
+        const data = await res.json();
+        setMessages(data.messages || []);
+        setUnreadMessagesCount((data.messages || []).filter(m => !m.read && m.to_salesperson).length);
+      }
+    } catch (err) { console.error('Error fetching messages:', err); }
+    setMessagesLoading(false);
+  };
+
+  const sendMessage = async (e) => {
+    e.preventDefault();
+    setSendingMessage(true);
+    setMessageSentSuccess(false);
+    try {
+      const formData = new FormData();
+      formData.append('subject', newMessage.subject);
+      formData.append('content', newMessage.content);
+
+      const res = await fetch(`${API_URL}/salesperson/messages`, {
+        method: 'POST',
+        headers: { 'salesperson-token': token },
+        body: formData
+      });
+
+      if (res.ok) {
+        setNewMessage({ subject: '', content: '' });
+        setMessageSentSuccess(true);
+        setMessageView('sent');
+        fetchMessages();
+        setTimeout(() => setMessageSentSuccess(false), 3000);
+      }
+    } catch (err) { console.error('Error sending message:', err); }
+    setSendingMessage(false);
+  };
+
+  const markMessageRead = async (messageId) => {
+    try {
+      await fetch(`${API_URL}/salesperson/messages/${messageId}/read`, {
+        method: 'PUT',
+        headers: { 'salesperson-token': token }
+      });
+      fetchMessages();
+    } catch (err) { console.error('Error marking message as read:', err); }
   };
 
   const markNotificationRead = async (id) => {
@@ -801,6 +926,7 @@ const SalespersonPortal = ({ token, salesperson, onLogout, lang, setLang }) => {
     { id: 'register', label: t.registerPartner },
     { id: 'commissions', label: t.myCommissions },
     { id: 'payments', label: t.paymentHistory },
+    { id: 'messages', label: t.messages, badge: unreadMessagesCount > 0 ? unreadMessagesCount : null },
     { id: 'howto', label: t.howItWorks }
   ];
 
@@ -883,10 +1009,13 @@ const SalespersonPortal = ({ token, salesperson, onLogout, lang, setLang }) => {
           <div className="flex gap-1 overflow-x-auto pb-px">
             {tabs.map(tab => (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                className={`px-5 py-3 font-medium transition-colors rounded-t-lg whitespace-nowrap text-sm ${
+                className={`px-5 py-3 font-medium transition-colors rounded-t-lg whitespace-nowrap text-sm relative ${
                   activeTab === tab.id ? 'bg-slate-100 text-slate-800' : 'text-slate-400 hover:text-white hover:bg-slate-700'
                 }`}>
                 {tab.label}
+                {tab.badge && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{tab.badge}</span>
+                )}
               </button>
             ))}
           </div>
@@ -1152,6 +1281,184 @@ const SalespersonPortal = ({ token, salesperson, onLogout, lang, setLang }) => {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Messages Tab */}
+        {activeTab === 'messages' && (
+          <div className="space-y-6">
+            {/* Message View Navigation */}
+            <div className="bg-white rounded-xl shadow-sm p-4">
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  onClick={() => setMessageView('inbox')}
+                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                    messageView === 'inbox'
+                      ? 'bg-slate-800 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {t.inbox} {unreadMessagesCount > 0 && <span className="ml-2 bg-red-500 text-white text-xs rounded-full px-2 py-0.5">{unreadMessagesCount}</span>}
+                </button>
+                <button
+                  onClick={() => setMessageView('sent')}
+                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                    messageView === 'sent'
+                      ? 'bg-slate-800 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {t.sent}
+                </button>
+                <button
+                  onClick={() => { setMessageView('compose'); setMessageSentSuccess(false); }}
+                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                    messageView === 'compose'
+                      ? 'bg-amber-500 text-white'
+                      : 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                  }`}
+                >
+                  + {t.compose}
+                </button>
+              </div>
+            </div>
+
+            {/* Compose New Message */}
+            {messageView === 'compose' && (
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <h2 className="text-xl font-semibold text-slate-800 mb-6">{t.newMessage}</h2>
+
+                {messageSentSuccess && (
+                  <div className="bg-teal-50 border border-teal-200 rounded-lg p-4 mb-6 text-teal-800">
+                    {t.messageSent}
+                  </div>
+                )}
+
+                <form onSubmit={sendMessage} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">{t.to}</label>
+                    <input
+                      type="text"
+                      value={t.admin}
+                      disabled
+                      className="w-full px-4 py-3 border border-slate-200 rounded-lg bg-slate-50 text-slate-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">{t.subject} *</label>
+                    <input
+                      type="text"
+                      value={newMessage.subject}
+                      onChange={(e) => setNewMessage({ ...newMessage, subject: e.target.value })}
+                      className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500"
+                      placeholder={t.subject}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">{t.messageContent} *</label>
+                    <textarea
+                      value={newMessage.content}
+                      onChange={(e) => setNewMessage({ ...newMessage, content: e.target.value })}
+                      className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500"
+                      rows={6}
+                      placeholder={t.typeMessage}
+                      required
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={sendingMessage}
+                    className="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-lg font-semibold hover:from-amber-400 hover:to-amber-500 disabled:opacity-50 shadow-lg"
+                  >
+                    {sendingMessage ? t.sending : t.sendMessage}
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* Inbox Messages */}
+            {messageView === 'inbox' && (
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <h2 className="text-xl font-semibold text-slate-800 mb-6">{t.inbox}</h2>
+                {messagesLoading ? (
+                  <div className="flex justify-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-800"></div>
+                  </div>
+                ) : messages.filter(m => m.to_salesperson).length > 0 ? (
+                  <div className="space-y-3">
+                    {messages.filter(m => m.to_salesperson).map(message => (
+                      <div
+                        key={message.id}
+                        onClick={() => !message.read && markMessageRead(message.id)}
+                        className={`p-4 rounded-lg border cursor-pointer transition-colors ${
+                          !message.read
+                            ? 'bg-amber-50 border-amber-200 hover:bg-amber-100'
+                            : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <h4 className="font-semibold text-slate-800">{message.subject}</h4>
+                          <span className="text-xs text-slate-500">
+                            {new Date(message.created_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
+                          </span>
+                        </div>
+                        <p className="text-slate-600 text-sm line-clamp-2">{message.content}</p>
+                        <p className="text-xs text-slate-400 mt-2">{t.from}: {t.admin}</p>
+                        {!message.read && (
+                          <span className="inline-block mt-2 px-2 py-1 bg-amber-500 text-white text-xs rounded">New</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-slate-400">
+                    <svg className="w-16 h-16 mx-auto mb-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    <p>{t.noMessages}</p>
+                    <p className="text-sm mt-2">{t.messagesWillAppear}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Sent Messages */}
+            {messageView === 'sent' && (
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <h2 className="text-xl font-semibold text-slate-800 mb-6">{t.sent}</h2>
+                {messagesLoading ? (
+                  <div className="flex justify-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-800"></div>
+                  </div>
+                ) : messages.filter(m => !m.to_salesperson).length > 0 ? (
+                  <div className="space-y-3">
+                    {messages.filter(m => !m.to_salesperson).map(message => (
+                      <div
+                        key={message.id}
+                        className="p-4 rounded-lg border bg-slate-50 border-slate-200"
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <h4 className="font-semibold text-slate-800">{message.subject}</h4>
+                          <span className="text-xs text-slate-500">
+                            {new Date(message.created_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
+                          </span>
+                        </div>
+                        <p className="text-slate-600 text-sm">{message.content}</p>
+                        <p className="text-xs text-slate-400 mt-2">{t.to}: {t.admin}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-slate-400">
+                    <svg className="w-16 h-16 mx-auto mb-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    </svg>
+                    <p>{t.noMessages}</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
