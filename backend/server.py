@@ -3811,218 +3811,158 @@ def extract_tables_from_textract(blocks: list) -> list:
 
 def reconstruct_layout_html_from_textract(blocks: list, page_width: int = 800, page_height: int = 1100) -> str:
     """
-    Reconstruct the original page layout from Textract blocks using HTML with CSS positioning.
-    Uses LAYOUT blocks when available for better structure preservation.
+    Reconstruct the original page layout from Textract blocks using HTML.
+    Uses LAYOUT blocks (when available) for better structure preservation.
+    Falls back to LINE/TABLE blocks for older Textract responses.
 
     Returns HTML that visually represents the document layout.
     """
     block_map = {block['Id']: block for block in blocks if 'Id' in block}
 
-    # Check if LAYOUT blocks are available (from LAYOUT feature)
-    layout_blocks = [b for b in blocks if b.get('BlockType', '').startswith('LAYOUT_')]
-    has_layout_feature = len(layout_blocks) > 0
+    # Check if we have LAYOUT blocks (newer Textract LAYOUT feature)
+    layout_blocks = [b for b in blocks if b['BlockType'].startswith('LAYOUT_')]
+    has_layout = len(layout_blocks) > 0
 
-    if has_layout_feature:
-        # Use LAYOUT blocks for better structure - these don't overlap
+    if has_layout:
+        # Use LAYOUT blocks for better structure (reading order preserved)
         return _reconstruct_from_layout_blocks(blocks, block_map, page_width, page_height)
     else:
-        # Fallback to LINE/TABLE processing for detect_document_text responses
+        # Fall back to LINE/TABLE reconstruction
         return _reconstruct_from_line_blocks(blocks, block_map, page_width, page_height)
 
 
-def _get_text_from_block(block: dict, block_map: dict) -> str:
-    """Extract text content from a block by following its CHILD relationships."""
-    if 'Text' in block:
-        return block['Text']
+def _reconstruct_from_layout_blocks(blocks: list, block_map: dict, page_width: int, page_height: int) -> str:
+    """
+    Reconstruct HTML using LAYOUT blocks which preserve reading order and semantic structure.
+    LAYOUT blocks include: LAYOUT_TITLE, LAYOUT_HEADER, LAYOUT_TEXT, LAYOUT_TABLE,
+    LAYOUT_FIGURE, LAYOUT_LIST, LAYOUT_KEY_VALUE, LAYOUT_SECTION_HEADER, LAYOUT_FOOTER
+    """
+    html_parts = []
+    html_parts.append('<div style="font-family: Arial, sans-serif; font-size: 12px; line-height: 1.5; padding: 15px; max-width: 100%;">')
 
+    # Get LAYOUT blocks sorted by reading order (Top position as fallback)
+    layout_blocks = []
+    for block in blocks:
+        if block['BlockType'].startswith('LAYOUT_'):
+            bbox = block.get('Geometry', {}).get('BoundingBox', {})
+            layout_blocks.append({
+                'block': block,
+                'type': block['BlockType'],
+                'top': bbox.get('Top', 0),
+                'left': bbox.get('Left', 0),
+                'width': bbox.get('Width', 1),
+                'height': bbox.get('Height', 0)
+            })
+
+    # Sort by top position (reading order)
+    layout_blocks.sort(key=lambda x: (x['top'], x['left']))
+
+    # Process each LAYOUT block
+    for layout in layout_blocks:
+        block = layout['block']
+        block_type = layout['type']
+
+        # Get text content from child blocks
+        content_text = _get_layout_block_text(block, block_map)
+
+        if not content_text.strip():
+            continue
+
+        # Apply styling based on block type
+        if block_type == 'LAYOUT_TITLE':
+            html_parts.append(f'<h1 style="font-size: 18px; font-weight: bold; margin: 15px 0 10px 0; color: #1a365d;">{content_text}</h1>')
+
+        elif block_type == 'LAYOUT_SECTION_HEADER':
+            html_parts.append(f'<h2 style="font-size: 14px; font-weight: bold; margin: 12px 0 8px 0; color: #2c5282;">{content_text}</h2>')
+
+        elif block_type == 'LAYOUT_HEADER':
+            html_parts.append(f'<div style="font-size: 11px; color: #666; margin-bottom: 10px; border-bottom: 1px solid #ddd; padding-bottom: 5px;">{content_text}</div>')
+
+        elif block_type == 'LAYOUT_FOOTER':
+            html_parts.append(f'<div style="font-size: 10px; color: #888; margin-top: 15px; border-top: 1px solid #ddd; padding-top: 5px;">{content_text}</div>')
+
+        elif block_type == 'LAYOUT_TABLE':
+            # For tables, find the corresponding TABLE block and render it
+            table_html = _find_and_render_table(block, blocks, block_map)
+            if table_html:
+                html_parts.append(f'<div style="margin: 10px 0; overflow-x: auto;">{table_html}</div>')
+            else:
+                # Fallback: render as pre-formatted text
+                html_parts.append(f'<pre style="font-family: monospace; font-size: 11px; background: #f5f5f5; padding: 10px; border: 1px solid #ddd; overflow-x: auto; white-space: pre-wrap;">{content_text}</pre>')
+
+        elif block_type == 'LAYOUT_LIST':
+            # Try to format as list
+            lines = content_text.split('\n')
+            html_parts.append('<ul style="margin: 8px 0; padding-left: 20px;">')
+            for line in lines:
+                if line.strip():
+                    html_parts.append(f'<li style="margin: 3px 0;">{line.strip()}</li>')
+            html_parts.append('</ul>')
+
+        elif block_type == 'LAYOUT_KEY_VALUE':
+            # Key-value pairs (forms)
+            html_parts.append(f'<div style="margin: 5px 0; padding: 5px; background: #fafafa; border-left: 3px solid #3182ce;">{content_text}</div>')
+
+        elif block_type == 'LAYOUT_FIGURE':
+            html_parts.append(f'<div style="margin: 10px 0; padding: 10px; background: #f0f0f0; border: 1px dashed #ccc; text-align: center; color: #666;">[Figure: {content_text if content_text else "Image"}]</div>')
+
+        elif block_type == 'LAYOUT_PAGE_NUMBER':
+            html_parts.append(f'<div style="font-size: 10px; color: #999; text-align: right;">{content_text}</div>')
+
+        else:  # LAYOUT_TEXT and others
+            # Regular text paragraph - preserve line breaks
+            formatted_text = content_text.replace('\n', '<br>')
+            html_parts.append(f'<p style="margin: 8px 0; text-align: justify;">{formatted_text}</p>')
+
+    html_parts.append('</div>')
+    return '\n'.join(html_parts)
+
+
+def _get_layout_block_text(block: dict, block_map: dict) -> str:
+    """Extract text content from a LAYOUT block by traversing its children."""
     text_parts = []
+
     if 'Relationships' in block:
         for rel in block['Relationships']:
             if rel['Type'] == 'CHILD':
                 for child_id in rel['Ids']:
                     child_block = block_map.get(child_id)
                     if child_block:
-                        child_type = child_block.get('BlockType', '')
-                        if child_type == 'WORD':
+                        if child_block['BlockType'] == 'LINE':
                             text_parts.append(child_block.get('Text', ''))
-                        elif child_type == 'LINE':
+                        elif child_block['BlockType'] == 'WORD':
                             text_parts.append(child_block.get('Text', ''))
-                        elif child_type in ['LAYOUT_TEXT', 'LAYOUT_TITLE', 'LAYOUT_SECTION_HEADER']:
-                            text_parts.append(_get_text_from_block(child_block, block_map))
+                        elif 'Text' in child_block:
+                            text_parts.append(child_block['Text'])
 
-    return ' '.join(text_parts)
+    return '\n'.join(text_parts) if text_parts else ''
 
 
-def _reconstruct_from_layout_blocks(blocks: list, block_map: dict, page_width: int, page_height: int) -> str:
-    """
-    Reconstruct layout using LAYOUT blocks from Textract LAYOUT feature.
-    LAYOUT blocks provide non-overlapping regions for document structure.
-    """
-    elements = []
-    processed_table_ids = set()
+def _find_and_render_table(layout_block: dict, blocks: list, block_map: dict) -> str:
+    """Find TABLE block that overlaps with LAYOUT_TABLE and render it as HTML."""
+    layout_bbox = layout_block.get('Geometry', {}).get('BoundingBox', {})
+    layout_top = layout_bbox.get('Top', 0)
+    layout_left = layout_bbox.get('Left', 0)
+    layout_bottom = layout_top + layout_bbox.get('Height', 0)
+    layout_right = layout_left + layout_bbox.get('Width', 0)
 
-    # Process LAYOUT blocks in order
+    # Find TABLE block that overlaps
     for block in blocks:
-        block_type = block.get('BlockType', '')
+        if block['BlockType'] == 'TABLE':
+            table_bbox = block.get('Geometry', {}).get('BoundingBox', {})
+            table_top = table_bbox.get('Top', 0)
+            table_left = table_bbox.get('Left', 0)
 
-        if not block_type.startswith('LAYOUT_'):
-            continue
+            # Check if table is within layout region (with tolerance)
+            if (layout_top - 0.02 <= table_top <= layout_bottom + 0.02 and
+                layout_left - 0.02 <= table_left <= layout_right + 0.02):
+                return _render_table_block(block, block_map)
 
-        bbox = block.get('Geometry', {}).get('BoundingBox', {})
-        if not bbox:
-            continue
-
-        top = bbox.get('Top', 0)
-        left = bbox.get('Left', 0)
-        width = bbox.get('Width', 0)
-        height = bbox.get('Height', 0)
-
-        if block_type == 'LAYOUT_TABLE':
-            # Find the corresponding TABLE block for this layout region
-            table_block = None
-            if 'Relationships' in block:
-                for rel in block['Relationships']:
-                    if rel['Type'] == 'CHILD':
-                        for child_id in rel['Ids']:
-                            child = block_map.get(child_id)
-                            if child and child.get('BlockType') == 'TABLE':
-                                table_block = child
-                                processed_table_ids.add(child_id)
-                                break
-
-            if table_block:
-                table_html = _build_table_html(table_block, block_map)
-                elements.append({
-                    'type': 'table',
-                    'html': table_html,
-                    'top': top,
-                    'left': left,
-                    'width': width,
-                    'height': height
-                })
-
-        elif block_type in ['LAYOUT_TEXT', 'LAYOUT_TITLE', 'LAYOUT_SECTION_HEADER',
-                           'LAYOUT_HEADER', 'LAYOUT_FOOTER', 'LAYOUT_PAGE_NUMBER']:
-            # Get text content from child LINE blocks
-            text_lines = []
-            if 'Relationships' in block:
-                for rel in block['Relationships']:
-                    if rel['Type'] == 'CHILD':
-                        for child_id in rel['Ids']:
-                            child = block_map.get(child_id)
-                            if child and child.get('BlockType') == 'LINE':
-                                text_lines.append(child.get('Text', ''))
-
-            text = '\n'.join(text_lines) if text_lines else _get_text_from_block(block, block_map)
-
-            if text.strip():
-                # Determine styling based on block type
-                font_weight = 'bold' if block_type in ['LAYOUT_TITLE', 'LAYOUT_SECTION_HEADER'] else 'normal'
-                font_size = '16px' if block_type == 'LAYOUT_TITLE' else '14px' if block_type == 'LAYOUT_SECTION_HEADER' else '12px'
-
-                elements.append({
-                    'type': 'text',
-                    'text': text,
-                    'top': top,
-                    'left': left,
-                    'width': width,
-                    'height': height,
-                    'font_weight': font_weight,
-                    'font_size': font_size,
-                    'block_type': block_type
-                })
-
-        elif block_type == 'LAYOUT_LIST':
-            # Get list items from child blocks
-            list_items = []
-            if 'Relationships' in block:
-                for rel in block['Relationships']:
-                    if rel['Type'] == 'CHILD':
-                        for child_id in rel['Ids']:
-                            child = block_map.get(child_id)
-                            if child and child.get('BlockType') == 'LINE':
-                                list_items.append(child.get('Text', ''))
-
-            if list_items:
-                elements.append({
-                    'type': 'list',
-                    'items': list_items,
-                    'top': top,
-                    'left': left,
-                    'width': width,
-                    'height': height
-                })
-
-        elif block_type == 'LAYOUT_KEY_VALUE_SET':
-            # Get key-value text
-            text = _get_text_from_block(block, block_map)
-            if text.strip():
-                elements.append({
-                    'type': 'text',
-                    'text': text,
-                    'top': top,
-                    'left': left,
-                    'width': width,
-                    'height': height,
-                    'font_weight': 'normal',
-                    'font_size': '12px',
-                    'block_type': block_type
-                })
-
-    # Process any TABLE blocks not covered by LAYOUT_TABLE
-    for block in blocks:
-        if block.get('BlockType') == 'TABLE' and block.get('Id') not in processed_table_ids:
-            bbox = block.get('Geometry', {}).get('BoundingBox', {})
-            if bbox:
-                table_html = _build_table_html(block, block_map)
-                elements.append({
-                    'type': 'table',
-                    'html': table_html,
-                    'top': bbox.get('Top', 0),
-                    'left': bbox.get('Left', 0),
-                    'width': bbox.get('Width', 1),
-                    'height': bbox.get('Height', 0)
-                })
-
-    # Sort elements by vertical position then horizontal
-    elements.sort(key=lambda x: (x['top'], x['left']))
-
-    # Build HTML with flow-based layout (not absolute) for better rendering
-    html_parts = []
-    html_parts.append('<div style="font-family: \'Courier New\', monospace; font-size: 12px; line-height: 1.6; background: white; padding: 20px;">')
-
-    for elem in elements:
-        margin_left = int(elem['left'] * 100)  # Convert to percentage for indentation
-
-        if elem['type'] == 'text':
-            font_weight = elem.get('font_weight', 'normal')
-            font_size = elem.get('font_size', '12px')
-            text_escaped = elem['text'].replace('\n', '<br>')
-            html_parts.append(
-                f'<div style="margin-left: {margin_left}px; margin-bottom: 8px; '
-                f'font-weight: {font_weight}; font-size: {font_size};">{text_escaped}</div>'
-            )
-
-        elif elem['type'] == 'table':
-            table_width_percent = int(elem['width'] * 100)
-            html_parts.append(
-                f'<div style="margin-left: {margin_left}px; margin-bottom: 12px; '
-                f'max-width: {table_width_percent}%;">{elem["html"]}</div>'
-            )
-
-        elif elem['type'] == 'list':
-            html_parts.append(f'<ul style="margin-left: {margin_left}px; margin-bottom: 8px;">')
-            for item in elem['items']:
-                html_parts.append(f'  <li>{item}</li>')
-            html_parts.append('</ul>')
-
-    html_parts.append('</div>')
-
-    return '\n'.join(html_parts)
+    return None
 
 
-def _build_table_html(table_block: dict, block_map: dict) -> str:
-    """Build HTML table from a TABLE block."""
+def _render_table_block(table_block: dict, block_map: dict) -> str:
+    """Render a TABLE block as HTML table."""
     cells = []
     if 'Relationships' in table_block:
         for rel in table_block['Relationships']:
@@ -4033,7 +3973,7 @@ def _build_table_html(table_block: dict, block_map: dict) -> str:
                         cells.append(child_block)
 
     if not cells:
-        return '<table><tr><td>(empty table)</td></tr></table>'
+        return None
 
     # Determine table dimensions
     max_row = max(cell.get('RowIndex', 1) for cell in cells)
@@ -4045,8 +3985,8 @@ def _build_table_html(table_block: dict, block_map: dict) -> str:
     for cell in cells:
         row_idx = cell.get('RowIndex', 1) - 1
         col_idx = cell.get('ColumnIndex', 1) - 1
-        rowspan = cell.get('RowSpan', 1)
-        colspan = cell.get('ColumnSpan', 1)
+        row_span = cell.get('RowSpan', 1)
+        col_span = cell.get('ColumnSpan', 1)
 
         # Get cell text
         cell_text = ''
@@ -4061,37 +4001,38 @@ def _build_table_html(table_block: dict, block_map: dict) -> str:
         if row_idx < max_row and col_idx < max_col:
             table_grid[row_idx][col_idx] = {
                 'text': cell_text.strip(),
-                'rowspan': rowspan,
-                'colspan': colspan,
+                'rowspan': row_span,
+                'colspan': col_span,
                 'skip': False
             }
 
             # Mark spanned cells to skip
-            for r in range(row_idx, min(row_idx + rowspan, max_row)):
-                for c in range(col_idx, min(col_idx + colspan, max_col)):
-                    if r != row_idx or c != col_idx:
-                        table_grid[r][c]['skip'] = True
+            for r in range(row_span):
+                for c in range(col_span):
+                    if r > 0 or c > 0:
+                        if row_idx + r < max_row and col_idx + c < max_col:
+                            table_grid[row_idx + r][col_idx + c]['skip'] = True
 
     # Build HTML table
-    table_html = '<table style="border-collapse: collapse; width: 100%; font-size: inherit;">\n'
+    table_html = '<table style="border-collapse: collapse; width: 100%; font-size: 11px;">\n'
     for row_idx, row in enumerate(table_grid):
         table_html += '  <tr>\n'
-        for col_idx, cell_info in enumerate(row):
-            if cell_info['skip']:
+        for col_idx, cell_data in enumerate(row):
+            if cell_data['skip']:
                 continue
 
             tag = 'th' if row_idx == 0 else 'td'
-            style = 'border: 1px solid #666; padding: 4px 8px; text-align: left; vertical-align: top;'
+            style = 'border: 1px solid #333; padding: 6px 8px; text-align: left; vertical-align: top;'
             if row_idx == 0:
                 style += ' background-color: #e8e8e8; font-weight: bold;'
 
-            span_attrs = ''
-            if cell_info['rowspan'] > 1:
-                span_attrs += f' rowspan="{cell_info["rowspan"]}"'
-            if cell_info['colspan'] > 1:
-                span_attrs += f' colspan="{cell_info["colspan"]}"'
+            attrs = f'style="{style}"'
+            if cell_data['rowspan'] > 1:
+                attrs += f' rowspan="{cell_data["rowspan"]}"'
+            if cell_data['colspan'] > 1:
+                attrs += f' colspan="{cell_data["colspan"]}"'
 
-            table_html += f'    <{tag} style="{style}"{span_attrs}>{cell_info["text"]}</{tag}>\n'
+            table_html += f'    <{tag} {attrs}>{cell_data["text"]}</{tag}>\n'
         table_html += '  </tr>\n'
     table_html += '</table>'
 
@@ -4100,32 +4041,30 @@ def _build_table_html(table_block: dict, block_map: dict) -> str:
 
 def _reconstruct_from_line_blocks(blocks: list, block_map: dict, page_width: int, page_height: int) -> str:
     """
-    Fallback reconstruction using LINE and TABLE blocks when LAYOUT feature not used.
-    Uses improved overlap detection to avoid duplicate text.
+    Fallback reconstruction using LINE and TABLE blocks (original method).
+    Used when LAYOUT feature is not available.
     """
     elements = []
     table_regions = []
 
-    # First, identify table regions with padding
+    # First, identify table regions
     for block in blocks:
         if block['BlockType'] == 'TABLE':
             bbox = block.get('Geometry', {}).get('BoundingBox', {})
             if bbox:
-                # Add small padding to table region to catch edge text
-                padding = 0.005
                 table_regions.append({
-                    'top': bbox.get('Top', 0) - padding,
-                    'left': bbox.get('Left', 0) - padding,
-                    'bottom': bbox.get('Top', 0) + bbox.get('Height', 0) + padding,
-                    'right': bbox.get('Left', 0) + bbox.get('Width', 0) + padding
+                    'top': bbox.get('Top', 0),
+                    'left': bbox.get('Left', 0),
+                    'width': bbox.get('Width', 0),
+                    'height': bbox.get('Height', 0),
+                    'bottom': bbox.get('Top', 0) + bbox.get('Height', 0),
+                    'right': bbox.get('Left', 0) + bbox.get('Width', 0)
                 })
 
-    def is_in_table_region(top, left, bottom, right):
-        """Check if a bounding box overlaps with any table region"""
+    def is_in_table_region(top, left):
         for tr in table_regions:
-            # Check for any overlap, not just point containment
-            if not (right < tr['left'] or left > tr['right'] or
-                    bottom < tr['top'] or top > tr['bottom']):
+            if (tr['top'] <= top <= tr['bottom'] and
+                tr['left'] <= left <= tr['right']):
                 return True
         return False
 
@@ -4135,13 +4074,8 @@ def _reconstruct_from_line_blocks(blocks: list, block_map: dict, page_width: int
             bbox = block['Geometry']['BoundingBox']
             top = bbox.get('Top', 0)
             left = bbox.get('Left', 0)
-            width = bbox.get('Width', 0)
-            height = bbox.get('Height', 0)
-            bottom = top + height
-            right = left + width
 
-            # Skip lines that overlap with table regions
-            if is_in_table_region(top, left, bottom, right):
+            if is_in_table_region(top, left):
                 continue
 
             elements.append({
@@ -4149,71 +4083,51 @@ def _reconstruct_from_line_blocks(blocks: list, block_map: dict, page_width: int
                 'text': block.get('Text', ''),
                 'top': top,
                 'left': left,
-                'width': width,
-                'height': height
+                'width': bbox.get('Width', 0),
+                'height': bbox.get('Height', 0),
+                'confidence': block.get('Confidence', 100)
             })
 
     # Process TABLE blocks
     for block in blocks:
         if block['BlockType'] == 'TABLE':
             bbox = block.get('Geometry', {}).get('BoundingBox', {})
-            table_html = _build_table_html(block, block_map)
+            table_html = _render_table_block(block, block_map)
 
-            elements.append({
-                'type': 'table',
-                'html': table_html,
-                'top': bbox.get('Top', 0),
-                'left': bbox.get('Left', 0),
-                'width': bbox.get('Width', 1),
-                'height': bbox.get('Height', 0)
-            })
+            if table_html:
+                elements.append({
+                    'type': 'table',
+                    'html': table_html,
+                    'top': bbox.get('Top', 0),
+                    'left': bbox.get('Left', 0),
+                    'width': bbox.get('Width', 1),
+                    'height': bbox.get('Height', 0)
+                })
 
     # Sort elements by vertical position then horizontal
     elements.sort(key=lambda x: (x['top'], x['left']))
 
-    # Use flow-based layout for cleaner output
+    # Build HTML output with visual positioning
     html_parts = []
-    html_parts.append('<div style="font-family: \'Courier New\', monospace; font-size: 12px; line-height: 1.6; background: white; padding: 20px;">')
-
-    # Group elements by approximate vertical position (within 2% of page height)
-    row_threshold = 0.02
-    current_row = []
-    current_row_top = -1
-    rows = []
+    html_parts.append(f'<div style="position: relative; width: 100%; min-height: {page_height}px; font-family: Arial, sans-serif; font-size: 12px; line-height: 1.4; background: white; padding: 20px; box-sizing: border-box;">')
 
     for elem in elements:
-        if current_row_top < 0 or abs(elem['top'] - current_row_top) > row_threshold:
-            if current_row:
-                rows.append(current_row)
-            current_row = [elem]
-            current_row_top = elem['top']
-        else:
-            current_row.append(elem)
+        top_px = int(elem['top'] * page_height)
+        left_px = int(elem['left'] * page_width)
 
-    if current_row:
-        rows.append(current_row)
-
-    # Render rows
-    for row in rows:
-        # Sort row elements by horizontal position
-        row.sort(key=lambda x: x['left'])
-
-        row_html = '<div style="display: flex; flex-wrap: wrap; align-items: flex-start; margin-bottom: 4px;">'
-
-        for elem in row:
-            margin_left = int(elem['left'] * page_width * 0.5)  # Scaled margin
-
-            if elem['type'] == 'text':
-                row_html += f'<span style="margin-left: {margin_left}px; white-space: pre-wrap;">{elem["text"]}</span>'
-            elif elem['type'] == 'table':
-                table_width = int(elem['width'] * 100)
-                row_html += f'<div style="margin-left: {margin_left}px; width: {table_width}%;">{elem["html"]}</div>'
-
-        row_html += '</div>'
-        html_parts.append(row_html)
+        if elem['type'] == 'text':
+            html_parts.append(
+                f'<div style="position: absolute; top: {top_px}px; left: {left_px}px; '
+                f'white-space: nowrap;">{elem["text"]}</div>'
+            )
+        elif elem['type'] == 'table':
+            table_width_px = int(elem['width'] * page_width)
+            html_parts.append(
+                f'<div style="position: absolute; top: {top_px}px; left: {left_px}px; '
+                f'width: {table_width_px}px;">{elem["html"]}</div>'
+            )
 
     html_parts.append('</div>')
-
     return '\n'.join(html_parts)
 
 
@@ -5284,15 +5198,7 @@ async def get_payment_status(session_id: str):
             
             # Handle successful payment
             if new_status == 'completed':
-                # Extract metadata and customer_details from Stripe session for email delivery
-                metadata = checkout_session.metadata or {}
-                customer_details = checkout_session.customer_details or {}
-                # Convert Stripe objects to dict if needed
-                if hasattr(metadata, 'to_dict'):
-                    metadata = metadata.to_dict()
-                if hasattr(customer_details, 'to_dict'):
-                    customer_details = customer_details.to_dict()
-                await handle_successful_payment(session_id, transaction, metadata, customer_details)
+                await handle_successful_payment(session_id, transaction)
         
         return {
             "session_id": session_id,
@@ -5376,24 +5282,11 @@ async def stripe_webhook(request: Request):
                         }}
                     )
 
-                    # Count orders that weren't already paid (to update partner stats)
-                    unpaid_order_count = await db.translation_orders.count_documents({
-                        "id": {"$in": invoice.get("order_ids", [])},
-                        "payment_status": {"$ne": "paid"}
-                    })
-
                     # Update associated orders to paid
                     await db.translation_orders.update_many(
                         {"id": {"$in": invoice.get("order_ids", [])}},
                         {"$set": {"payment_status": "paid", "payment_date": datetime.utcnow()}}
                     )
-
-                    # Increment partner's total_paid_orders counter
-                    if unpaid_order_count > 0 and invoice.get("partner_id"):
-                        await db.partners.update_one(
-                            {"id": invoice["partner_id"]},
-                            {"$inc": {"total_paid_orders": unpaid_order_count}}
-                        )
 
                     # Create admin notification for Stripe payment
                     admin_notification = {
@@ -5435,9 +5328,7 @@ async def stripe_webhook(request: Request):
                 # Get transaction and handle success
                 transaction = await db.payment_transactions.find_one({"session_id": session_id})
                 if transaction:
-                    # Extract customer_details from Stripe session (most reliable source for customer email)
-                    customer_details = session.get('customer_details', {})
-                    await handle_successful_payment(session_id, transaction, metadata, customer_details)
+                    await handle_successful_payment(session_id, transaction, metadata)
                     logger.info(f"Successfully processed payment for session: {session_id}")
         else:
             logger.info(f"Received unhandled webhook event type: {event['type']}")
@@ -5455,7 +5346,7 @@ async def stripe_webhook(request: Request):
         logger.error(f"Unexpected error handling webhook: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-async def handle_successful_payment(session_id: str, payment_transaction: dict, stripe_metadata: dict = None, stripe_customer_details: dict = None):
+async def handle_successful_payment(session_id: str, payment_transaction: dict, stripe_metadata: dict = None):
     """Handle successful payment by creating order, sending confirmation emails, and creating Protemos project"""
 
     try:
@@ -5467,28 +5358,10 @@ async def handle_successful_payment(session_id: str, payment_transaction: dict, 
             logger.error(f"Quote not found for payment session: {session_id}")
             return
 
-        # Get customer info with multiple fallbacks for reliability
-        # Priority: 1) Stripe customer_details (most reliable - email used at checkout)
-        #           2) Quote data (from when quote was created)
-        #           3) Stripe metadata (passed when checkout was created)
+        # Get customer info from quote, with Stripe metadata as fallback
         stripe_metadata = stripe_metadata or {}
-        stripe_customer_details = stripe_customer_details or {}
-
-        # Get email from Stripe customer_details first (this is the email the customer actually used at checkout)
-        customer_email = (
-            stripe_customer_details.get("email") or
-            quote.get("customer_email") or
-            stripe_metadata.get("customer_email")
-        )
-        customer_name = (
-            stripe_customer_details.get("name") or
-            quote.get("customer_name") or
-            stripe_metadata.get("customer_name") or
-            "Valued Customer"
-        )
-
-        # Log for debugging
-        logger.info(f"Payment {session_id} - Customer email sources: stripe_details={stripe_customer_details.get('email')}, quote={quote.get('customer_email')}, metadata={stripe_metadata.get('customer_email')}, final={customer_email}")
+        customer_email = quote.get("customer_email") or stripe_metadata.get("customer_email")
+        customer_name = quote.get("customer_name") or stripe_metadata.get("customer_name") or "Valued Customer"
 
         # Generate order number with P prefix (like P6377) to match admin panel format
         order_count = await db.translation_orders.count_documents({})
@@ -10553,48 +10426,23 @@ async def get_partner_statistics(admin_key: str):
     if user_role != "admin" and not user_info.get("is_master"):
         raise HTTPException(status_code=403, detail="Admin access required")
 
-    # Get all partner orders (exclude manual entries - they are not real partners)
+    # Get all partner orders
     partner_orders = await db.translation_orders.find({
-        "partner_id": {"$exists": True, "$nin": [None, "manual"]}
+        "partner_id": {"$exists": True, "$ne": None}
     }).to_list(10000)
 
     # Get all partners for contact info
     all_partners = await db.partners.find({}).to_list(500)
     partners_by_id = {p.get("id"): p for p in all_partners}
 
-    # First, add ALL registered partners to the stats (even without orders)
+    # Group by partner company
     partner_stats = {}
-    for partner in all_partners:
-        partner_id = partner.get("id")
-        company = partner.get("company_name", "Unknown")
-        if company and partner_id:
-            partner_stats[company] = {
-                "partner_id": partner_id,
-                "company_name": company,
-                "email": partner.get("email", ""),
-                "contact_name": partner.get("contact_name") or partner.get("name", ""),
-                "phone": partner.get("phone", ""),
-                "total_received": 0,
-                "total_pending": 0,
-                "orders_paid": 0,
-                "orders_pending": 0,
-                "created_at": partner.get("created_at", ""),
-                "payment_plan": partner.get("payment_plan", "pay_per_order"),
-                "payment_plan_approved": partner.get("payment_plan_approved", False),
-                "total_paid_orders": partner.get("total_paid_orders", 0)
-            }
-
-    # Then, update stats with order data
     for order in partner_orders:
         company = order.get("partner_company", "Unknown")
         partner_id = order.get("partner_id")
 
-        # Skip entries that are not real partners
-        if company in ["Unknown", "Manual Entry", ""] or partner_id == "manual":
-            continue
-
         if company not in partner_stats:
-            # Partner from order not in partners collection - add them
+            # Get partner contact info
             partner_info = partners_by_id.get(partner_id, {})
             partner_stats[company] = {
                 "partner_id": partner_id,
@@ -10606,10 +10454,7 @@ async def get_partner_statistics(admin_key: str):
                 "total_pending": 0,
                 "orders_paid": 0,
                 "orders_pending": 0,
-                "created_at": partner_info.get("created_at", ""),
-                "payment_plan": partner_info.get("payment_plan", "pay_per_order"),
-                "payment_plan_approved": partner_info.get("payment_plan_approved", False),
-                "total_paid_orders": partner_info.get("total_paid_orders", 0)
+                "created_at": partner_info.get("created_at", "")
             }
 
         total_price = order.get("total_price", 0)
@@ -10622,11 +10467,10 @@ async def get_partner_statistics(admin_key: str):
             partner_stats[company]["total_pending"] += total_price
             partner_stats[company]["orders_pending"] += 1
 
-    # Convert to list and sort by created_at (newest first) for partners without orders,
-    # then by total (received + pending) descending for those with orders
+    # Convert to list and sort by total (received + pending) descending
     result = sorted(
         partner_stats.values(),
-        key=lambda x: (x["total_received"] + x["total_pending"], x.get("created_at", "")),
+        key=lambda x: x["total_received"] + x["total_pending"],
         reverse=True
     )
 
@@ -10724,67 +10568,6 @@ async def approve_partner_payment_upgrade(partner_id: str, admin_key: str, appro
     except Exception as e:
         logger.error(f"Error processing payment upgrade: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to process upgrade request")
-
-
-@api_router.post("/admin/partners/{partner_id}/set-payment-plan")
-async def admin_set_partner_payment_plan(partner_id: str, admin_key: str, plan: str, send_notification: bool = True):
-    """Admin: Directly set a partner's payment plan (biweekly, monthly, or pay_per_order)"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
-        user = await get_current_admin_user(admin_key)
-        if not user or user.get("role") not in ["admin", "pm"]:
-            raise HTTPException(status_code=401, detail="Admin access required")
-
-    if plan not in ["pay_per_order", "biweekly", "monthly"]:
-        raise HTTPException(status_code=400, detail="Invalid payment plan. Must be 'pay_per_order', 'biweekly', or 'monthly'")
-
-    try:
-        partner = await db.partners.find_one({"id": partner_id})
-        if not partner:
-            raise HTTPException(status_code=404, detail="Partner not found")
-
-        # Update partner's payment plan
-        update_data = {
-            "payment_plan": plan,
-            "payment_plan_approved": plan != "pay_per_order",  # Approved if not pay_per_order
-            "payment_plan_upgrade_requested": False,
-            "requested_payment_plan": None
-        }
-        if plan != "pay_per_order":
-            update_data["payment_plan_approved_at"] = datetime.utcnow().isoformat()
-
-        await db.partners.update_one(
-            {"id": partner_id},
-            {"$set": update_data}
-        )
-
-        # Send notification email to partner if requested
-        if send_notification and partner.get("email") and plan != "pay_per_order":
-            try:
-                plan_name = "Biweekly Invoice" if plan == "biweekly" else "Monthly Invoice"
-                email_html = f"""
-                <h2>Payment Plan Updated!</h2>
-                <p>Dear {partner.get('contact_name', 'Partner')},</p>
-                <p>Your payment plan has been updated to <strong>{plan_name}</strong>.</p>
-                <p>You can now receive invoices for your orders instead of paying per order.</p>
-                <p>Thank you for being a valued partner!</p>
-                <p>Best regards,<br>Legacy Translations Team</p>
-                """
-                await send_email(
-                    to_email=partner.get("email"),
-                    subject="Payment Plan Updated - Legacy Translations",
-                    html_content=email_html
-                )
-            except Exception as e:
-                logger.warning(f"Failed to send payment plan update email: {e}")
-
-        plan_display = {"pay_per_order": "Pay Per Order", "biweekly": "Biweekly Invoice", "monthly": "Monthly Invoice"}
-        return {"success": True, "message": f"Partner payment plan set to {plan_display.get(plan, plan)}"}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error setting partner payment plan: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to update payment plan")
 
 
 @api_router.delete("/admin/partners/{partner_id}")
@@ -11165,12 +10948,6 @@ async def mark_invoice_paid(invoice_id: str, admin_key: str, payment_method: str
         if not invoice:
             raise HTTPException(status_code=404, detail="Invoice not found")
 
-        # Count orders that weren't already paid (to update partner stats)
-        unpaid_order_count = await db.translation_orders.count_documents({
-            "id": {"$in": invoice.get("order_ids", [])},
-            "payment_status": {"$ne": "paid"}
-        })
-
         # Update invoice
         await db.partner_invoices.update_one(
             {"id": invoice_id},
@@ -11187,13 +10964,6 @@ async def mark_invoice_paid(invoice_id: str, admin_key: str, payment_method: str
             {"id": {"$in": invoice.get("order_ids", [])}},
             {"$set": {"payment_status": "paid", "payment_date": datetime.utcnow()}}
         )
-
-        # Increment partner's total_paid_orders counter
-        if unpaid_order_count > 0 and invoice.get("partner_id"):
-            await db.partners.update_one(
-                {"id": invoice["partner_id"]},
-                {"$inc": {"total_paid_orders": unpaid_order_count}}
-            )
 
         logger.info(f"Marked invoice {invoice.get('invoice_number')} as paid")
         return {"status": "success", "message": "Invoice marked as paid"}
@@ -11436,12 +11206,6 @@ async def approve_zelle_invoice_payment(invoice_id: str, admin_key: str):
         if not invoice:
             raise HTTPException(status_code=404, detail="Invoice not found")
 
-        # Count orders that weren't already paid (to update partner stats)
-        unpaid_order_count = await db.translation_orders.count_documents({
-            "id": {"$in": invoice.get("order_ids", [])},
-            "payment_status": {"$ne": "paid"}
-        })
-
         # Update invoice to paid
         await db.partner_invoices.update_one(
             {"id": invoice_id},
@@ -11458,13 +11222,6 @@ async def approve_zelle_invoice_payment(invoice_id: str, admin_key: str):
             {"id": {"$in": invoice.get("order_ids", [])}},
             {"$set": {"payment_status": "paid", "payment_date": datetime.utcnow()}}
         )
-
-        # Increment partner's total_paid_orders counter
-        if unpaid_order_count > 0 and invoice.get("partner_id"):
-            await db.partners.update_one(
-                {"id": invoice["partner_id"]},
-                {"$inc": {"total_paid_orders": unpaid_order_count}}
-            )
 
         # Record payment in history
         payment_record = {
@@ -11967,9 +11724,6 @@ async def admin_mark_order_paid(order_id: str, admin_key: str):
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    # Check if order was already paid (to avoid double counting)
-    was_already_paid = order.get("payment_status") == "paid"
-
     # Build the update fields
     update_fields = {"payment_status": "paid", "payment_date": datetime.utcnow()}
 
@@ -11986,13 +11740,6 @@ async def admin_mark_order_paid(order_id: str, admin_key: str):
 
     if result.modified_count == 0:
         raise HTTPException(status_code=404, detail="Order not updated")
-
-    # Increment partner's total_paid_orders counter if not already paid
-    if not was_already_paid and order.get("partner_id"):
-        await db.partners.update_one(
-            {"id": order["partner_id"]},
-            {"$inc": {"total_paid_orders": 1}}
-        )
 
     return {"status": "success", "message": "Order marked as paid"}
 
@@ -12525,10 +12272,6 @@ async def review_payment_proof(
     if status == "approved" and proof.get("order_id"):
         # First get the order to check its current status
         order = await db.translation_orders.find_one({"id": proof["order_id"]})
-
-        # Check if order was already paid (to avoid double counting)
-        was_already_paid = order and order.get("payment_status") == "paid"
-
         update_fields = {
             "payment_status": "paid",
             "payment_date": datetime.utcnow(),
@@ -12544,14 +12287,6 @@ async def review_payment_proof(
             {"id": proof["order_id"]},
             {"$set": update_fields}
         )
-
-        # Increment partner's total_paid_orders counter if not already paid
-        if not was_already_paid and order and order.get("partner_id"):
-            await db.partners.update_one(
-                {"id": order["partner_id"]},
-                {"$inc": {"total_paid_orders": 1}}
-            )
-
         logger.info(f"Order {proof['order_id']} marked as paid via {proof['payment_method']}")
 
     # Send email notification to customer
@@ -19401,36 +19136,6 @@ async def process_quote_followups(admin_key: str):
                     discount_code = None
                     if discount_percent > 0:
                         discount_code = f"FOLLOWUP{discount_percent}-{quote['id'][:6].upper()}"
-
-                        # Create Stripe coupon and promotion code for checkout
-                        try:
-                            # Create a Stripe coupon
-                            stripe_coupon = stripe.Coupon.create(
-                                percent_off=discount_percent,
-                                duration="once",
-                                max_redemptions=1,
-                                redeem_by=int((now + timedelta(days=7)).timestamp()),
-                                metadata={
-                                    "source": "followup_reminder",
-                                    "quote_id": quote["id"]
-                                }
-                            )
-
-                            # Create a promotion code linked to the coupon
-                            stripe.PromotionCode.create(
-                                coupon=stripe_coupon.id,
-                                code=discount_code,
-                                max_redemptions=1,
-                                expires_at=int((now + timedelta(days=7)).timestamp()),
-                                metadata={
-                                    "source": "followup_reminder",
-                                    "quote_id": quote["id"]
-                                }
-                            )
-                            logger.info(f"Created Stripe promotion code: {discount_code}")
-                        except Exception as stripe_error:
-                            logger.error(f"Failed to create Stripe promotion code: {stripe_error}")
-
                         await db.discount_codes.insert_one({
                             "id": str(uuid.uuid4()),
                             "code": discount_code,
@@ -19514,36 +19219,6 @@ async def process_quote_followups(admin_key: str):
                     discount_code = None
                     if discount_percent > 0:
                         discount_code = f"QUOTE{discount_percent}-{order['order_number']}"
-
-                        # Create Stripe coupon and promotion code for checkout
-                        try:
-                            # Create a Stripe coupon
-                            stripe_coupon = stripe.Coupon.create(
-                                percent_off=discount_percent,
-                                duration="once",
-                                max_redemptions=1,
-                                redeem_by=int((now + timedelta(days=7)).timestamp()),
-                                metadata={
-                                    "source": "quote_order_followup",
-                                    "order_id": order["id"]
-                                }
-                            )
-
-                            # Create a promotion code linked to the coupon
-                            stripe.PromotionCode.create(
-                                coupon=stripe_coupon.id,
-                                code=discount_code,
-                                max_redemptions=1,
-                                expires_at=int((now + timedelta(days=7)).timestamp()),
-                                metadata={
-                                    "source": "quote_order_followup",
-                                    "order_id": order["id"]
-                                }
-                            )
-                            logger.info(f"Created Stripe promotion code for quote order: {discount_code}")
-                        except Exception as stripe_error:
-                            logger.error(f"Failed to create Stripe promotion code for quote order: {stripe_error}")
-
                         await db.discount_codes.insert_one({
                             "id": str(uuid.uuid4()),
                             "code": discount_code,
@@ -19619,34 +19294,33 @@ async def send_followup_email(email: str, name: str, quote: dict, reminder_numbe
 
     content = f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #fff;">
-        <div style="background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); padding: 20px; border-radius: 10px 10px 0 0;">
+        <div style="background: linear-gradient(135deg, #0d9488 0%, #0891b2 100%); padding: 20px; border-radius: 10px 10px 0 0;">
             <img src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png" alt="Legacy Translations" style="max-width: 150px;">
         </div>
-        <div style="background: linear-gradient(90deg, #c9a227 0%, #e6c547 50%, #c9a227 100%); height: 4px;"></div>
 
         <div style="padding: 30px;">
-            <h2 style="color: #1a2a4a; margin-top: 0;">Hello {name}!</h2>
+            <h2 style="color: #0d9488; margin-top: 0;">Hello {name}!</h2>
             <p>{intro}</p>
 
-            <div style="background: #f0f7ff; padding: 20px; border-radius: 10px; margin: 20px 0; border-left: 4px solid #c9a227;">
+            <div style="background: #f0fdfa; padding: 20px; border-radius: 10px; margin: 20px 0;">
                 <p><strong>Service:</strong> {quote.get('service_type', 'Translation').replace('_', ' ').title()}</p>
                 <p><strong>Languages:</strong> {quote.get('translate_from', 'Source')} → {quote.get('translate_to', 'Target')}</p>
-                <p style="font-size: 20px; color: #1a2a4a; font-weight: bold; margin: 10px 0 0 0;">Total: ${total_price:.2f}</p>
+                <p style="font-size: 20px; color: #0d9488; font-weight: bold; margin: 10px 0 0 0;">Total: ${total_price:.2f}</p>
             </div>
 
             {discount_section}
 
             <div style="text-align: center; margin: 30px 0;">
-                <a href="{frontend_url}" style="display: inline-block; padding: 15px 40px; background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">{cta_text}</a>
+                <a href="{frontend_url}" style="display: inline-block; padding: 15px 40px; background: #0d9488; color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">{cta_text}</a>
             </div>
 
-            <p style="color: #666; font-size: 14px;">If you have any questions, feel free to reply to this email or send a WhatsApp message at +1(857)316-7770.</p>
+            <p style="color: #666; font-size: 14px;">If you have any questions, feel free to reply to this email or call us at +1(857)316-7770.</p>
 
             <p>Best regards,<br>Legacy Translations Team</p>
         </div>
 
-        <div style="background: #1a2a4a; padding: 20px; text-align: center; border-radius: 0 0 10px 10px;">
-            <p style="margin: 0; color: #a0aec0; font-size: 12px;">Legacy Translations | <a href="https://www.legacytranslations.com" style="color: #c9a227; text-decoration: none;">www.legacytranslations.com</a></p>
+        <div style="background: #f3f4f6; padding: 20px; text-align: center; border-radius: 0 0 10px 10px;">
+            <p style="margin: 0; color: #666; font-size: 12px;">Legacy Translations | www.legacytranslations.com</p>
         </div>
     </div>
     """
@@ -19687,48 +19361,47 @@ async def send_quote_order_followup_email(email: str, name: str, order: dict, re
 
     content = f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #fff;">
-        <div style="background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); padding: 20px; border-radius: 10px 10px 0 0;">
+        <div style="background: linear-gradient(135deg, #0d9488 0%, #0891b2 100%); padding: 20px; border-radius: 10px 10px 0 0;">
             <img src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png" alt="Legacy Translations" style="max-width: 150px;">
         </div>
-        <div style="background: linear-gradient(90deg, #c9a227 0%, #e6c547 50%, #c9a227 100%); height: 4px;"></div>
 
         <div style="padding: 30px;">
-            <h2 style="color: #1a2a4a; margin-top: 0;">Hello {name}!</h2>
+            <h2 style="color: #0d9488; margin-top: 0;">Hello {name}!</h2>
             <p>{intro}</p>
 
-            <div style="background: #f0f7ff; padding: 20px; border-radius: 10px; margin: 20px 0; border-left: 4px solid #c9a227;">
+            <div style="background: #f0fdfa; padding: 20px; border-radius: 10px; margin: 20px 0;">
                 <p><strong>Quote #:</strong> {order_number}</p>
                 <p><strong>Service:</strong> {order.get('service_type', 'Translation').replace('_', ' ').title()}</p>
                 <p><strong>Languages:</strong> {order.get('translate_from', 'Source')} → {order.get('translate_to', 'Target')}</p>
                 <p><strong>Pages:</strong> {order.get('page_count', 1)}</p>
-                <p style="font-size: 20px; color: #1a2a4a; font-weight: bold; margin: 10px 0 0 0;">Total: ${total_price:.2f}</p>
+                <p style="font-size: 20px; color: #0d9488; font-weight: bold; margin: 10px 0 0 0;">Total: ${total_price:.2f}</p>
             </div>
 
             {discount_section}
 
             <div style="text-align: center; margin: 30px 0;">
-                <a href="{frontend_url}" style="display: inline-block; padding: 15px 40px; background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">{cta_text}</a>
+                <a href="{frontend_url}" style="display: inline-block; padding: 15px 40px; background: #0d9488; color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">{cta_text}</a>
             </div>
 
-            <h3 style="color: #1a2a4a;">Payment Options</h3>
+            <h3 style="color: #0d9488;">Payment Options</h3>
             <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-                <div style="flex: 1; min-width: 150px; background: #f0f7ff; padding: 15px; border-radius: 8px; border-left: 4px solid #c9a227;">
+                <div style="flex: 1; min-width: 150px; background: #f0fdf4; padding: 15px; border-radius: 8px;">
                     <p style="margin: 0;"><strong>Zelle</strong></p>
                     <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">857-208-1139</p>
                 </div>
-                <div style="flex: 1; min-width: 150px; background: #f0f7ff; padding: 15px; border-radius: 8px; border-left: 4px solid #c9a227;">
+                <div style="flex: 1; min-width: 150px; background: #eff6ff; padding: 15px; border-radius: 8px;">
                     <p style="margin: 0;"><strong>Venmo</strong></p>
                     <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">@legacytranslations</p>
                 </div>
             </div>
 
-            <p style="margin-top: 20px; color: #666; font-size: 14px;">Questions? Reply to this email or send a WhatsApp message at +1(857)316-7770.</p>
+            <p style="margin-top: 20px; color: #666; font-size: 14px;">Questions? Reply to this email or call +1(857)316-7770.</p>
 
             <p>Best regards,<br>Legacy Translations Team</p>
         </div>
 
-        <div style="background: #1a2a4a; padding: 20px; text-align: center; border-radius: 0 0 10px 10px;">
-            <p style="margin: 0; color: #a0aec0; font-size: 12px;">Legacy Translations | <a href="https://www.legacytranslations.com" style="color: #c9a227; text-decoration: none;">www.legacytranslations.com</a></p>
+        <div style="background: #f3f4f6; padding: 20px; text-align: center; border-radius: 0 0 10px 10px;">
+            <p style="margin: 0; color: #666; font-size: 12px;">Legacy Translations | www.legacytranslations.com</p>
         </div>
     </div>
     """
@@ -26375,7 +26048,7 @@ async def invite_salesperson(salesperson_id: str, admin_key: str = Header(None))
     return {"success": True, "message": "Invitation sent", "invite_link": invite_link}
 
 # Verify salesperson invite token (before showing set-password form)
-@api_router.get("/salesperson/verify-invite")
+@app.get("/salesperson/verify-invite")
 async def verify_salesperson_invite(token: str):
     """Verify if invite token is valid before showing the password form"""
     salesperson = await db.salespeople.find_one({"invite_token": token})
@@ -26399,7 +26072,7 @@ async def verify_salesperson_invite(token: str):
     }
 
 # Salesperson set password (from invite)
-@api_router.post("/salesperson/set-password")
+@app.post("/salesperson/set-password")
 async def salesperson_set_password(invite_token: str = Form(...), password: str = Form(...)):
     salesperson = await db.salespeople.find_one({"invite_token": invite_token})
     if not salesperson:
@@ -26430,7 +26103,7 @@ async def salesperson_set_password(invite_token: str = Form(...), password: str 
     }}
 
 # Salesperson login
-@api_router.post("/salesperson/login")
+@app.post("/salesperson/login")
 async def salesperson_login(email: str = Form(...), password: str = Form(...)):
     salesperson = await db.salespeople.find_one({"email": email.lower().strip()})
     if not salesperson:
@@ -26465,7 +26138,7 @@ async def salesperson_login(email: str = Form(...), password: str = Form(...)):
     }
 
 # Get salesperson dashboard (for salesperson portal)
-@api_router.get("/salesperson/dashboard")
+@app.get("/salesperson/dashboard")
 async def get_salesperson_dashboard(token: str = Header(None, alias="salesperson-token")):
     if not token:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -26573,7 +26246,7 @@ async def get_salesperson_dashboard(token: str = Header(None, alias="salesperson
     }
 
 # Salesperson register a new partner
-@api_router.post("/salesperson/register-partner")
+@app.post("/salesperson/register-partner")
 async def salesperson_register_partner(
     token: str = Header(None, alias="salesperson-token"),
     company_name: str = Form(...),
@@ -26730,7 +26403,7 @@ async def salesperson_register_partner(
     }
 
 # Get commission structure explanation
-@api_router.get("/salesperson/commission-info")
+@app.get("/salesperson/commission-info")
 async def get_commission_info(token: str = Header(None, alias="salesperson-token")):
     if not token:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -26752,24 +26425,24 @@ async def get_commission_info(token: str = Header(None, alias="salesperson-token
             "platinum": {"pages": "300+/month", "discount": "35%", "commission": 150}
         },
         "percentage_commission": {
-            "description": "Percentage of sales generated by the partner",
+            "description": "Percentual sobre as vendas geradas pelo parceiro",
             "rate": f"{commission_rate}%" if commission_type == "percentage" else "N/A",
-            "example": f"If the partner spends $500/month, your commission will be ${500 * commission_rate / 100:.2f}" if commission_type == "percentage" else "N/A"
+            "example": f"Se o parceiro gastar $500/mês, sua comissão será ${500 * commission_rate / 100:.2f}" if commission_type == "percentage" else "N/A"
         },
         "payment_info": {
             "method": "Zelle / ACH Transfer",
-            "schedule": "Weekly (Fridays) for new partners, Monthly (15th) for recurring",
+            "schedule": "Semanal (Sextas) para novos parceiros, Mensal (dia 15) para recorrentes",
             "minimum_payout": 50
         },
         "bonuses": {
-            "retention_bonus": "$25 extra if the partner stays 3+ months active",
-            "platinum_bonus": "$50 extra for signing Platinum partners",
-            "monthly_target_bonus": f"$100 bonus for reaching {salesperson.get('monthly_target', 10)} partners/month"
+            "retention_bonus": "$25 extra se o parceiro permanecer 3+ meses ativo",
+            "platinum_bonus": "$50 extra por assinar parceiros Platinum",
+            "monthly_target_bonus": f"$100 bônus por atingir {salesperson.get('monthly_target', 10)} parceiros/mês"
         }
     }
 
 # Salesperson notifications
-@api_router.get("/salesperson/notifications")
+@app.get("/salesperson/notifications")
 async def get_salesperson_notifications(token: str = Header(None, alias="salesperson-token")):
     if not token:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -26787,7 +26460,7 @@ async def get_salesperson_notifications(token: str = Header(None, alias="salespe
 
     return {"notifications": notifications}
 
-@api_router.put("/salesperson/notifications/{notification_id}/read")
+@app.put("/salesperson/notifications/{notification_id}/read")
 async def mark_notification_read(notification_id: str, token: str = Header(None, alias="salesperson-token")):
     if not token:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -26803,7 +26476,7 @@ async def mark_notification_read(notification_id: str, token: str = Header(None,
 
     return {"success": True}
 
-@api_router.put("/salesperson/notifications/read-all")
+@app.put("/salesperson/notifications/read-all")
 async def mark_all_notifications_read(token: str = Header(None, alias="salesperson-token")):
     if not token:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -26820,7 +26493,7 @@ async def mark_all_notifications_read(token: str = Header(None, alias="salespers
     return {"success": True}
 
 # Salesperson payment history
-@api_router.get("/salesperson/payment-history")
+@app.get("/salesperson/payment-history")
 async def get_payment_history(token: str = Header(None, alias="salesperson-token")):
     if not token:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -26850,153 +26523,6 @@ async def get_payment_history(token: str = Header(None, alias="salesperson-token
         "paid_acquisitions": paid_acquisitions,
         "total_paid": sum(p.get("total_amount", 0) for p in payments)
     }
-
-# ==================== INTERNAL MESSAGES ====================
-
-# Get salesperson messages
-@api_router.get("/salesperson/messages")
-async def get_salesperson_messages(token: str = Header(None, alias="salesperson-token")):
-    if not token:
-        raise HTTPException(status_code=401, detail="Authentication required")
-
-    salesperson = await db.salespeople.find_one({"token": token})
-    if not salesperson:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-    messages = await db.internal_messages.find({
-        "$or": [
-            {"salesperson_id": salesperson["id"]},
-            {"from_salesperson_id": salesperson["id"]}
-        ]
-    }).sort("created_at", -1).to_list(100)
-
-    for m in messages:
-        m["_id"] = str(m["_id"])
-        # Mark if message is TO this salesperson (vs FROM)
-        m["to_salesperson"] = m.get("salesperson_id") == salesperson["id"]
-
-    return {"messages": messages}
-
-# Send message from salesperson to admin
-@api_router.post("/salesperson/messages")
-async def send_salesperson_message(
-    token: str = Header(None, alias="salesperson-token"),
-    subject: str = Form(...),
-    content: str = Form(...)
-):
-    if not token:
-        raise HTTPException(status_code=401, detail="Authentication required")
-
-    salesperson = await db.salespeople.find_one({"token": token})
-    if not salesperson:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-    message = {
-        "id": str(uuid.uuid4())[:8],
-        "from_salesperson_id": salesperson["id"],
-        "from_name": salesperson["name"],
-        "to_admin": True,
-        "subject": subject,
-        "content": content,
-        "read": False,
-        "created_at": datetime.now().isoformat()
-    }
-
-    await db.internal_messages.insert_one(message)
-
-    return {"success": True, "message": message}
-
-# Mark message as read
-@api_router.put("/salesperson/messages/{message_id}/read")
-async def mark_message_read(
-    message_id: str,
-    token: str = Header(None, alias="salesperson-token")
-):
-    if not token:
-        raise HTTPException(status_code=401, detail="Authentication required")
-
-    salesperson = await db.salespeople.find_one({"token": token})
-    if not salesperson:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-    await db.internal_messages.update_one(
-        {"id": message_id, "salesperson_id": salesperson["id"]},
-        {"$set": {"read": True, "read_at": datetime.now().isoformat()}}
-    )
-
-    return {"success": True}
-
-# Admin: Get all internal messages
-@api_router.get("/admin/internal-messages")
-async def get_admin_internal_messages(admin_key: str = Header(None)):
-    if not admin_key:
-        raise HTTPException(status_code=401, detail="Admin key required")
-
-    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
-    if not is_valid:
-        user = await get_current_admin_user(admin_key)
-        if not user or user.get("role") not in ["admin", "pm", "sales"]:
-            raise HTTPException(status_code=401, detail="Invalid admin key")
-
-    messages = await db.internal_messages.find({
-        "to_admin": True
-    }).sort("created_at", -1).to_list(100)
-
-    for m in messages:
-        m["_id"] = str(m["_id"])
-
-    unread_count = len([m for m in messages if not m.get("read")])
-
-    return {"messages": messages, "unread_count": unread_count}
-
-# Admin: Send message to salesperson
-@api_router.post("/admin/internal-messages")
-async def send_admin_message(
-    admin_key: str = Header(None),
-    salesperson_id: str = Form(...),
-    subject: str = Form(...),
-    content: str = Form(...)
-):
-    if not admin_key:
-        raise HTTPException(status_code=401, detail="Admin key required")
-
-    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
-    if not is_valid:
-        user = await get_current_admin_user(admin_key)
-        if not user or user.get("role") not in ["admin", "pm", "sales"]:
-            raise HTTPException(status_code=401, detail="Invalid admin key")
-
-    salesperson = await db.salespeople.find_one({"id": salesperson_id})
-    if not salesperson:
-        raise HTTPException(status_code=404, detail="Salesperson not found")
-
-    message = {
-        "id": str(uuid.uuid4())[:8],
-        "salesperson_id": salesperson_id,
-        "to_name": salesperson["name"],
-        "from_admin": True,
-        "subject": subject,
-        "content": content,
-        "read": False,
-        "created_at": datetime.now().isoformat()
-    }
-
-    await db.internal_messages.insert_one(message)
-
-    return {"success": True, "message": message}
-
-# Admin: Mark message as read
-@api_router.put("/admin/internal-messages/{message_id}/read")
-async def admin_mark_message_read(message_id: str, admin_key: str = Header(None)):
-    if not admin_key:
-        raise HTTPException(status_code=401, detail="Admin key required")
-
-    await db.internal_messages.update_one(
-        {"id": message_id, "to_admin": True},
-        {"$set": {"read": True, "read_at": datetime.now().isoformat()}}
-    )
-
-    return {"success": True}
 
 # Admin: Approve commission
 @api_router.put("/admin/acquisitions/{acquisition_id}/approve")
