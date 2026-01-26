@@ -21788,7 +21788,12 @@ const FinancesPage = ({ adminKey }) => {
     try {
       const response = await axios.get(`${API}/admin/coupons?admin_key=${adminKey}`);
       // Show all active coupons that can be assigned to partners
-      const templates = (response.data || []).filter(c => c.is_active);
+      // Filter out WELCOME coupons (they are auto-generated for specific partners)
+      const templates = (response.data || []).filter(c =>
+        c.is_active &&
+        !c.code.startsWith('WELCOME-') &&
+        !c.partner_id  // Exclude coupons already assigned to a specific partner
+      );
       setCouponTemplates(templates);
     } catch (err) {
       console.error('Failed to fetch coupon templates:', err);
@@ -23936,7 +23941,7 @@ const FinancesPage = ({ adminKey }) => {
                         <option value="">Select discount...</option>
                         {couponTemplates.map((coupon) => (
                           <option key={coupon.id} value={coupon.code}>
-                            {coupon.code} ({coupon.discount_value}% off)
+                            {coupon.code} ({coupon.discount_type === 'percentage' ? `${coupon.discount_value}% off` : coupon.discount_type === 'certified_page' ? `${coupon.discount_value} free page${coupon.discount_value > 1 ? 's' : ''}` : `$${coupon.discount_value} off`})
                           </option>
                         ))}
                       </>
