@@ -10305,14 +10305,35 @@ async def get_partner_statistics(admin_key: str):
     all_partners = await db.partners.find({}).to_list(500)
     partners_by_id = {p.get("id"): p for p in all_partners}
 
-    # Group by partner company
+    # First, add ALL registered partners to the stats (even without orders)
     partner_stats = {}
+    for partner in all_partners:
+        partner_id = partner.get("id")
+        company = partner.get("company_name", "Unknown")
+        if company and partner_id:
+            partner_stats[company] = {
+                "partner_id": partner_id,
+                "company_name": company,
+                "email": partner.get("email", ""),
+                "contact_name": partner.get("contact_name") or partner.get("name", ""),
+                "phone": partner.get("phone", ""),
+                "total_received": 0,
+                "total_pending": 0,
+                "orders_paid": 0,
+                "orders_pending": 0,
+                "created_at": partner.get("created_at", ""),
+                "payment_plan": partner.get("payment_plan", "pay_per_order"),
+                "payment_plan_approved": partner.get("payment_plan_approved", False),
+                "total_paid_orders": partner.get("total_paid_orders", 0)
+            }
+
+    # Then, update stats with order data
     for order in partner_orders:
         company = order.get("partner_company", "Unknown")
         partner_id = order.get("partner_id")
 
         if company not in partner_stats:
-            # Get partner contact info
+            # Partner from order not in partners collection - add them
             partner_info = partners_by_id.get(partner_id, {})
             partner_stats[company] = {
                 "partner_id": partner_id,
@@ -10340,10 +10361,11 @@ async def get_partner_statistics(admin_key: str):
             partner_stats[company]["total_pending"] += total_price
             partner_stats[company]["orders_pending"] += 1
 
-    # Convert to list and sort by total (received + pending) descending
+    # Convert to list and sort by created_at (newest first) for partners without orders,
+    # then by total (received + pending) descending for those with orders
     result = sorted(
         partner_stats.values(),
-        key=lambda x: x["total_received"] + x["total_pending"],
+        key=lambda x: (x["total_received"] + x["total_pending"], x.get("created_at", "")),
         reverse=True
     )
 
