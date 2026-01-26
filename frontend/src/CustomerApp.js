@@ -258,6 +258,13 @@ const CUSTOMER_TRANSLATIONS = {
     zelleIncludeEmail: 'Include your email in the payment note',
     zelleAmount: 'Amount',
     payWithZelleBtn: 'Pay with Zelle',
+    payWithPix: 'Pay with PIX',
+    pixBrazilOnly: '(Brazil only)',
+    payWithPixBtn: 'Pay with PIX',
+    pixInstructions: 'PIX Payment Instructions',
+    pixStep1: '1. Open your bank app and select PIX',
+    pixSendTo: 'Send payment to',
+    pixIncludeEmail: 'Include your email in the description',
     couponCodeOptional: 'Coupon Code (optional)',
     enterCouponCode: 'Enter coupon code',
     invalidCoupon: 'Invalid coupon code',
@@ -469,6 +476,13 @@ const CUSTOMER_TRANSLATIONS = {
     zelleIncludeEmail: 'Incluye tu email en la nota del pago',
     zelleAmount: 'Monto',
     payWithZelleBtn: 'Pagar con Zelle',
+    payWithPix: 'Pagar con PIX',
+    pixBrazilOnly: '(Solo Brasil)',
+    payWithPixBtn: 'Pagar con PIX',
+    pixInstructions: 'Instrucciones de Pago PIX',
+    pixStep1: '1. Abre tu app bancaria y selecciona PIX',
+    pixSendTo: 'Enviar pago a',
+    pixIncludeEmail: 'Incluye tu email en la descripción',
     couponCodeOptional: 'Código de Cupón (opcional)',
     enterCouponCode: 'Ingresa código de cupón',
     invalidCoupon: 'Código de cupón inválido',
@@ -680,6 +694,13 @@ const CUSTOMER_TRANSLATIONS = {
     zelleIncludeEmail: 'Inclua seu email na nota do pagamento',
     zelleAmount: 'Valor',
     payWithZelleBtn: 'Pagar com Zelle',
+    payWithPix: 'Pagar com PIX',
+    pixBrazilOnly: '(Somente Brasil)',
+    payWithPixBtn: 'Pagar com PIX',
+    pixInstructions: 'Instruções de Pagamento PIX',
+    pixStep1: '1. Abra seu app bancário e selecione PIX',
+    pixSendTo: 'Enviar pagamento para',
+    pixIncludeEmail: 'Inclua seu email na descrição',
     couponCodeOptional: 'Código do Cupom (opcional)',
     enterCouponCode: 'Digite o código do cupom',
     invalidCoupon: 'Código do cupom inválido',
@@ -999,13 +1020,21 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
   const [formRestored, setFormRestored] = useState(false);
 
   // Payment method states
-  const [paymentMethod, setPaymentMethod] = useState('card'); // 'card' or 'zelle'
+  const [paymentMethod, setPaymentMethod] = useState('card'); // 'card' or 'zelle' or 'pix'
   const [zelleReceipt, setZelleReceipt] = useState(null);
   const [showZelleModal, setShowZelleModal] = useState(false);
   const [zelleCouponCode, setZelleCouponCode] = useState('');
   const [zelleDiscount, setZelleDiscount] = useState(null); // {type: 'percentage'|'fixed', value: number}
   const [zelleDiscountError, setZelleDiscountError] = useState('');
   const zelleReceiptInputRef = useRef(null);
+
+  // PIX payment states
+  const [pixReceipt, setPixReceipt] = useState(null);
+  const [showPixModal, setShowPixModal] = useState(false);
+  const [pixCouponCode, setPixCouponCode] = useState('');
+  const [pixDiscount, setPixDiscount] = useState(null);
+  const [pixDiscountError, setPixDiscountError] = useState('');
+  const pixReceiptInputRef = useRef(null);
 
   // Support form states
   const [supportIssueType, setSupportIssueType] = useState('');
@@ -1636,6 +1665,128 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
       return basePrice * (1 - zelleDiscount.value / 100);
     } else {
       return Math.max(0, basePrice - zelleDiscount.value);
+    }
+  };
+
+  // Handle PIX payment submission
+  const handlePixPayment = async () => {
+    if (!pixReceipt) {
+      setError(t.receiptRequired);
+      return;
+    }
+
+    setSubmitting(true);
+    setError('');
+
+    try {
+      // Step 1: Create a quote first
+      const quoteData = {
+        reference: `WEB-${Date.now()}`,
+        service_type: formData.service_type,
+        translate_from: formData.translate_from,
+        translate_to: formData.translate_to,
+        word_count: wordCount,
+        urgency: formData.urgency,
+        customer_email: guestEmail,
+        customer_name: guestName,
+        notes: formData.notes,
+        document_ids: uploadedFiles.map(f => f.documentId).filter(Boolean),
+        shipping_fee: quote?.shipping_fee || 0,
+        discount_amount: quote?.discount || 0,
+        discount_code: appliedDiscount ? discountCode : null
+      };
+
+      const quoteResponse = await axios.post(`${API}/calculate-quote`, quoteData);
+      const quoteId = quoteResponse.data.id;
+
+      // Step 2: Upload PIX receipt
+      const receiptFormData = new FormData();
+      receiptFormData.append('file', pixReceipt);
+      const uploadResponse = await axios.post(`${API}/upload-document`, receiptFormData);
+      const receiptUrl = uploadResponse.data.document_id;
+
+      // Step 3: Create PIX order with calculated discount
+      const pixTotal = getPixTotal();
+      const discountAmount = (quote?.total_price || 0) - pixTotal;
+
+      const pixOrderData = {
+        quote_id: quoteId,
+        customer_email: guestEmail,
+        customer_name: guestName,
+        payment_method: 'pix',
+        zelle_receipt_id: receiptUrl,
+        total_price: pixTotal,
+        original_price: quote?.total_price || 0,
+        discount_amount: discountAmount > 0 ? discountAmount : 0,
+        notes: pixCouponCode ? `${formData.notes}\n\nCoupon Code: ${pixCouponCode} (${pixDiscount?.type === 'percentage' ? `${pixDiscount.value}%` : `$${pixDiscount?.value}`} off)` : formData.notes,
+        coupon_code: pixCouponCode || null,
+        shipping_address: needsPhysicalCopy || formData.service_type === 'rmv' ? shippingAddress : null
+      };
+
+      await axios.post(`${API}/create-zelle-order`, pixOrderData);
+
+      // Step 4: Show success and close modal
+      setSuccess(t.zelleOrderSubmitted);
+      setShowPixModal(false);
+      setPixReceipt(null);
+      setPixCouponCode('');
+      setPixDiscount(null);
+      setPixDiscountError('');
+
+      // Clear form
+      setFormData({
+        service_type: 'certified',
+        translate_from: 'portuguese',
+        translate_to: 'english',
+        urgency: 'no',
+        reference: '',
+        notes: ''
+      });
+      setUploadedFiles([]);
+      setQuote(null);
+
+    } catch (err) {
+      setError(err.response?.data?.detail || t.failedToProcess);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Validate PIX coupon code
+  const validatePixCoupon = async () => {
+    if (!pixCouponCode.trim()) {
+      setPixDiscount(null);
+      setPixDiscountError('');
+      return;
+    }
+
+    try {
+      const response = await axios.get(`${API}/discount-codes/validate?code=${pixCouponCode}`);
+      if (response.data.valid) {
+        setPixDiscount({
+          type: response.data.type,
+          value: response.data.value
+        });
+        setPixDiscountError('');
+      } else {
+        setPixDiscount(null);
+        setPixDiscountError(t.invalidCoupon);
+      }
+    } catch (err) {
+      setPixDiscount(null);
+      setPixDiscountError(t.invalidCoupon);
+    }
+  };
+
+  // Calculate PIX total with discount
+  const getPixTotal = () => {
+    const basePrice = quote?.total_price || 0;
+    if (!pixDiscount) return basePrice;
+
+    if (pixDiscount.type === 'percentage') {
+      return basePrice * (1 - pixDiscount.value / 100);
+    } else {
+      return Math.max(0, basePrice - pixDiscount.value);
     }
   };
 
@@ -2413,6 +2564,31 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
               </div>
             </div>
 
+            {/* PIX Payment Option */}
+            <div className="mt-3">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                  </svg>
+                  <span className="font-semibold text-green-700">{t.payWithPix}</span>
+                  <span className="text-xs text-green-600 font-medium">{t.pixBrazilOnly}</span>
+                </div>
+                <div className="text-sm text-green-600 space-y-1 mb-3">
+                  <p>{t.pixSendTo}: <strong>contact@legacytranslations.com</strong></p>
+                  <p className="text-xs">{t.pixIncludeEmail}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowPixModal(true)}
+                  disabled={uploadedFiles.length === 0 || !guestName || !guestEmail}
+                  className="w-full py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 transition-colors disabled:bg-gray-400"
+                >
+                  {t.payWithPixBtn}
+                </button>
+              </div>
+            </div>
+
             <div className="text-xs text-gray-500 mt-4">
               {t.paymentRequired}
             </div>
@@ -2546,6 +2722,139 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
               onClick={handleZellePayment}
               disabled={submitting || !zelleReceipt}
               className="w-full py-3 bg-slate-600 text-white rounded-md font-semibold hover:bg-slate-700 disabled:bg-gray-400 transition-colors"
+            >
+              {submitting ? t.processingBtn : t.submitZelleOrder}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* PIX Payment Modal */}
+      {showPixModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-green-700">{t.payWithPix}</h3>
+              <button
+                onClick={() => {
+                  setShowPixModal(false);
+                  setPixCouponCode('');
+                  setPixDiscount(null);
+                  setPixDiscountError('');
+                  setPixReceipt(null);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Coupon Code */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                {t.couponCodeOptional}
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={pixCouponCode}
+                  onChange={(e) => {
+                    setPixCouponCode(e.target.value.toUpperCase());
+                    setPixDiscount(null);
+                    setPixDiscountError('');
+                  }}
+                  placeholder={t.enterCouponCode}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500 uppercase"
+                />
+                <button
+                  type="button"
+                  onClick={validatePixCoupon}
+                  className="px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 transition-colors"
+                >
+                  {t.apply}
+                </button>
+              </div>
+              {pixDiscountError && (
+                <p className="text-red-500 text-xs mt-1">{pixDiscountError}</p>
+              )}
+              {pixDiscount && (
+                <p className="text-green-600 text-xs mt-1">
+                  {pixDiscount.type === 'percentage' ? `${pixDiscount.value}%` : `R$${pixDiscount.value}`} {t.off} {t.applied}
+                </p>
+              )}
+            </div>
+
+            {/* Price Summary */}
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between text-green-600">
+                  <span>Subtotal:</span>
+                  <span>{formatLocalPrice(quote?.total_price || 0)}</span>
+                </div>
+                {pixDiscount && (
+                  <div className="flex justify-between text-green-600">
+                    <span>{t.discount} ({pixDiscount.type === 'percentage' ? `${pixDiscount.value}%` : formatLocalPrice(pixDiscount.value)}):</span>
+                    <span>-{formatLocalPrice(quote?.total_price - getPixTotal())}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-bold text-green-700 text-base border-t border-green-200 pt-2">
+                  <span>{t.zelleAmountToPay}:</span>
+                  <span>{formatLocalPrice(getPixTotal())}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* PIX Instructions */}
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+              <div className="space-y-1 text-xs text-green-700">
+                <p><strong>1.</strong> {t.pixStep1}</p>
+                <p><strong>2.</strong> {t.pixSendTo}: <strong>contact@legacytranslations.com</strong></p>
+                <p><strong>3.</strong> {t.pixIncludeEmail}</p>
+              </div>
+            </div>
+
+            {/* Upload Receipt */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                {t.uploadReceipt} *
+              </label>
+              <input
+                type="file"
+                ref={pixReceiptInputRef}
+                accept="image/*,.pdf"
+                onChange={(e) => setPixReceipt(e.target.files[0])}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => pixReceiptInputRef.current?.click()}
+                className="w-full p-3 border-2 border-dashed border-green-300 rounded-lg text-green-600 hover:border-green-400 hover:bg-green-50 transition-colors"
+              >
+                {pixReceipt ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    {pixReceipt.name}
+                  </span>
+                ) : (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                    {t.uploadReceipt}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {/* Submit Button */}
+            <button
+              onClick={handlePixPayment}
+              disabled={submitting || !pixReceipt}
+              className="w-full py-3 bg-green-600 text-white rounded-md font-semibold hover:bg-green-700 disabled:bg-gray-400 transition-colors"
             >
               {submitting ? t.processingBtn : t.submitZelleOrder}
             </button>
