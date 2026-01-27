@@ -1714,13 +1714,23 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
 
   // Payment method options - Check if partner is eligible for invoice payments
   // Invoice is available if: 1) payment_plan_approved is true, OR 2) total_paid_orders >= 10
-  const isInvoiceAllowed = partner?.payment_plan_approved || (partner?.total_paid_orders >= 10);
-  const [paymentMethod, setPaymentMethod] = useState(isInvoiceAllowed ? 'invoice' : 'zelle');
+  // Use useMemo to ensure this updates when partner data changes
+  const isInvoiceAllowed = useMemo(() => {
+    return partner?.payment_plan_approved || (partner?.total_paid_orders >= 10);
+  }, [partner?.payment_plan_approved, partner?.total_paid_orders]);
+  const [paymentMethod, setPaymentMethod] = useState('zelle');
   const [zelleReceipt, setZelleReceipt] = useState(null);
   const zelleReceiptInputRef = useRef(null);
   const ZELLE_EMAIL = 'contact@legacytranslations.com';
   const PIX_EMAIL = 'contact@legacytranslations.com';
   const ZELLE_NAME = 'Legacy Translations Inc.';
+
+  // Update payment method when invoice becomes available (e.g., after admin unlock)
+  useEffect(() => {
+    if (isInvoiceAllowed) {
+      setPaymentMethod('invoice');
+    }
+  }, [isInvoiceAllowed]);
 
   // Calculate quote when relevant fields change
   useEffect(() => {
