@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import mammoth from 'mammoth';
 import * as pdfjsLib from 'pdfjs-dist';
+import html2pdf from 'html2pdf.js';
 import { THEMES, getTheme } from './themes';
 
 // Configure PDF.js worker (pdfjs-dist 5.x uses .mjs files)
@@ -5568,43 +5569,73 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 </body>
 </html>`;
 
-    // Open in new window for printing - with proper handling for large documents
-    setQuickPackageProgress(`Opening print preview (${quickTranslationFiles.length} translations + ${quickOriginalFiles.length} originals)...`);
+    // Generate PDF using html2pdf.js for hash calculation and verification
+    setQuickPackageProgress(`Generating PDF package (${quickTranslationFiles.length} translations + ${quickOriginalFiles.length} originals)...`);
 
     try {
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        alert('Pop-up blocked! Please allow pop-ups for this site.');
-        setQuickPackageLoading(false);
-        setQuickPackageProgress('');
-        return;
-      }
+      // Create a temporary container for the HTML content
+      const container = document.createElement('div');
+      container.innerHTML = fullHTML;
+      document.body.appendChild(container);
 
-      // Write document in chunks for better browser handling
-      printWindow.document.open();
-      printWindow.document.write(fullHTML);
-      printWindow.document.close();
-
-      // Wait for all images to load before printing
-      printWindow.onload = () => {
-        setQuickPackageProgress('Package ready! Print dialog opening...');
-        setTimeout(() => {
-          printWindow.print();
-          setQuickPackageLoading(false);
-          setQuickPackageProgress('');
-        }, 500);
+      // Configure html2pdf options
+      const pdfOptions = {
+        margin: [0.5, 0.6, 0.6, 0.6],
+        filename: `${orderNumber || 'P0000'}_${documentType.replace(/\s+/g, '_')}_Certified_Translation.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+        jsPDF: { unit: 'in', format: pageFormat === 'a4' ? 'a4' : 'letter', orientation: 'portrait' },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
       };
 
-      // Fallback if onload doesn't fire (for some browsers)
-      setTimeout(() => {
-        if (quickPackageLoading) {
-          setQuickPackageLoading(false);
-          setQuickPackageProgress('');
+      setQuickPackageProgress('Converting to PDF...');
+
+      // Generate PDF as blob
+      const pdfBlob = await html2pdf().set(pdfOptions).from(container).outputPdf('blob');
+
+      // Remove temporary container
+      document.body.removeChild(container);
+
+      // Calculate SHA-256 hash of the PDF
+      setQuickPackageProgress('Calculating document hash for verification...');
+      const arrayBuffer = await pdfBlob.arrayBuffer();
+      const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const pdfHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+      // Send hash to backend if we have certification data
+      if (certData?.certification_id) {
+        try {
+          setQuickPackageProgress('Storing verification hash...');
+          await axios.post(
+            `${API}/certifications/${certData.certification_id}/update-pdf-hash?admin_key=${adminKey}&pdf_hash=${pdfHash}`
+          );
+          console.log('PDF hash stored successfully:', pdfHash.substring(0, 20) + '...');
+        } catch (hashErr) {
+          console.error('Failed to store PDF hash:', hashErr);
+          // Continue with download even if hash storage fails
         }
-      }, 10000);
+      }
+
+      // Download the PDF
+      setQuickPackageProgress('Downloading PDF...');
+      const url = URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = pdfOptions.filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setQuickPackageProgress('✅ PDF downloaded successfully!');
+      setTimeout(() => {
+        setQuickPackageLoading(false);
+        setQuickPackageProgress('');
+      }, 2000);
     } catch (err) {
       console.error('Error generating package:', err);
-      alert('Error generating package. Please try with fewer files.');
+      alert('Error generating PDF package: ' + err.message);
       setQuickPackageLoading(false);
       setQuickPackageProgress('');
     }
@@ -6154,13 +6185,54 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 </html>`;
 
     if (format === 'pdf') {
-      // Open in new window for PDF printing
-      const printWindow = window.open('', '_blank');
-      printWindow.document.write(htmlContent);
-      printWindow.document.close();
-      printWindow.onload = () => {
-        printWindow.print();
-      };
+      // Generate PDF using html2pdf.js for hash calculation and verification
+      try {
+        const container = document.createElement('div');
+        container.innerHTML = htmlContent;
+        document.body.appendChild(container);
+
+        const pdfOptions = {
+          margin: [0.5, 0.6, 0.6, 0.6],
+          filename: `${orderNumber || 'P0000'}_${documentType.replace(/\s+/g, '_')}_${translationType === 'sworn' ? 'Sworn' : 'Certified'}_Translation.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+          jsPDF: { unit: 'in', format: pageFormat === 'a4' ? 'a4' : 'letter', orientation: 'portrait' },
+          pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+        };
+
+        const pdfBlob = await html2pdf().set(pdfOptions).from(container).outputPdf('blob');
+        document.body.removeChild(container);
+
+        // Calculate SHA-256 hash and store if certification exists
+        if (certData?.certification_id) {
+          const arrayBuffer = await pdfBlob.arrayBuffer();
+          const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+          const hashArray = Array.from(new Uint8Array(hashBuffer));
+          const pdfHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+          try {
+            await axios.post(
+              `${API}/certifications/${certData.certification_id}/update-pdf-hash?admin_key=${adminKey}&pdf_hash=${pdfHash}`
+            );
+            console.log('PDF hash stored for verification:', pdfHash.substring(0, 20) + '...');
+          } catch (hashErr) {
+            console.error('Failed to store PDF hash:', hashErr);
+          }
+        }
+
+        // Download PDF
+        const url = URL.createObjectURL(pdfBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = pdfOptions.filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        console.error('Error generating PDF:', err);
+        alert('Error generating PDF: ' + err.message);
+      }
     } else {
       // Download as HTML
       const blob = new Blob([htmlContent], { type: 'text/html' });

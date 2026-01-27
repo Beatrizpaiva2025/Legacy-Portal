@@ -24932,6 +24932,50 @@ async def create_certification(data: CertificationCreate, admin_key: str):
         logger.error(f"Error creating certification: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@api_router.post("/certifications/{certification_id}/update-pdf-hash")
+async def update_certification_pdf_hash(certification_id: str, admin_key: str, pdf_hash: str):
+    """Update the PDF hash for a certification after PDF is generated in frontend"""
+    # Validate admin key or user token
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user:
+            user_role = user.get("role")
+            is_in_house = user_role == "translator" and user.get("translator_type") == "in_house"
+            if user_role in ["admin", "pm"] or is_in_house:
+                is_valid = True
+
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        # Validate hash format (should be 64 hex characters for SHA-256)
+        if not pdf_hash or len(pdf_hash) != 64 or not all(c in '0123456789abcdef' for c in pdf_hash.lower()):
+            raise HTTPException(status_code=400, detail="Invalid PDF hash format. Expected SHA-256 hash (64 hex characters)")
+
+        # Find and update certification
+        result = await db.certifications.update_one(
+            {"certification_id": certification_id},
+            {"$set": {"pdf_hash": pdf_hash.lower()}}
+        )
+
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Certification not found")
+
+        logger.info(f"Updated PDF hash for certification: {certification_id}")
+
+        return {
+            "success": True,
+            "certification_id": certification_id,
+            "pdf_hash": pdf_hash.lower()[:20] + "..."
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating PDF hash: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @api_router.get("/certifications/verify/{certification_id}")
 async def verify_certification(certification_id: str):
     """Public endpoint to verify a document certification"""
