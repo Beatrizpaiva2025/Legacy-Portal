@@ -1575,7 +1575,7 @@ const Sidebar = ({ activeTab, setActiveTab, partner, onLogout, t }) => {
 };
 
 // ==================== NEW ORDER PAGE ====================
-const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
+const NewOrderPage = ({ partner, token, onOrderCreated, t, currency, refreshPartner }) => {
   const [formData, setFormData] = useState({
     client_name: '',
     client_email: '',
@@ -1724,6 +1724,13 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
   const ZELLE_EMAIL = 'contact@legacytranslations.com';
   const PIX_EMAIL = 'contact@legacytranslations.com';
   const ZELLE_NAME = 'Legacy Translations Inc.';
+
+  // Refresh partner data when component mounts to get latest unlock status
+  useEffect(() => {
+    if (refreshPartner) {
+      refreshPartner();
+    }
+  }, [refreshPartner]);
 
   // Update payment method when invoice becomes available (e.g., after admin unlock)
   useEffect(() => {
@@ -5194,10 +5201,25 @@ function App() {
     localStorage.removeItem('token');
   };
 
+  // Refresh partner data from backend (e.g., after admin unlocks invoice)
+  const refreshPartner = useCallback(async () => {
+    if (!token) return;
+    try {
+      const response = await axios.get(`${API}/partner/verify-token?token=${token}`);
+      if (response.data.valid && response.data.partner) {
+        const partnerData = response.data.partner;
+        setPartner(partnerData);
+        localStorage.setItem('partner', JSON.stringify(partnerData));
+      }
+    } catch (err) {
+      console.error('Error refreshing partner data:', err);
+    }
+  }, [token]);
+
   const renderContent = () => {
     switch (activeTab) {
       case 'new-order':
-        return <NewOrderPage partner={partner} token={token} onOrderCreated={() => setActiveTab('orders')} t={t} currency={currency} />;
+        return <NewOrderPage partner={partner} token={token} onOrderCreated={() => setActiveTab('orders')} t={t} currency={currency} refreshPartner={refreshPartner} />;
       case 'orders':
         return <OrdersPage token={token} currency={currency} />;
       case 'invoices':
@@ -5207,7 +5229,7 @@ function App() {
       case 'payment-plan':
         return <PaymentPlanPage token={token} t={t} />;
       default:
-        return <NewOrderPage partner={partner} token={token} t={t} currency={currency} />;
+        return <NewOrderPage partner={partner} token={token} t={t} currency={currency} refreshPartner={refreshPartner} />;
     }
   };
 
