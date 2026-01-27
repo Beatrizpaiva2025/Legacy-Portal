@@ -8094,7 +8094,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           contentEditable
                           suppressContentEditableWarning
                           className="flex-1 p-3 overflow-auto focus:outline-none"
-                          style={{minHeight: '400px'}}
+                          style={{minHeight: '450px', height: '450px'}}
                           dangerouslySetInnerHTML={{ __html: translationResults[0]?.translatedText || '<p>No translation</p>' }}
                           onBlur={(e) => {
                             // Save edits back to translationResults
@@ -8108,7 +8108,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           srcDoc={translationResults[0]?.translatedText || '<p>No translation</p>'}
                           title="Translation"
                           className="w-full h-full border-0 flex-1"
-                          style={{minHeight: '450px'}}
+                          style={{minHeight: '450px', height: '450px'}}
                         />
                       )
                     ) : (
