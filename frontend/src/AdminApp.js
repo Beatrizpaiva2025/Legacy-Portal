@@ -13586,11 +13586,22 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         additional_document_ids: selectedAttachments.uploaded
       };
 
-      // Build request payload
+      // Build request payload with all PDF generation options
       const payload = {
         bcc_email: sendBccEmail || null,
         notify_pm: notifyPM && sendingOrder?.assigned_pm_id ? true : false,
-        attachments: attachmentsToSend
+        attachments: attachmentsToSend,
+        // Ensure combined PDF with verification page is generated
+        include_verification_page: true,
+        generate_combined_pdf: true,
+        include_certificate: true,
+        include_translation: true,
+        include_original: true,
+        certifier_name: selectedTranslator || 'Beatriz Paiva',
+        translator_name: selectedTranslator || 'Beatriz Paiva',
+        document_type: sendingOrder?.document_type,
+        source_language: sendingOrder?.source_language,
+        target_language: sendingOrder?.target_language
       };
 
       // Add external attachment if present (for resend)
