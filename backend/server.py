@@ -1905,6 +1905,11 @@ class PartnerResponse(BaseModel):
     token: str
     has_seen_welcome_coupon: bool = False
     welcome_coupon_code: Optional[str] = None
+    # Payment plan fields - needed for invoice unlock feature
+    payment_plan: str = "pay_per_order"
+    payment_plan_approved: bool = False
+    total_paid_orders: int = 0
+    invoice_manually_unlocked: bool = False
 
 # Admin User Models (with roles: admin, pm, translator)
 class AdminUser(BaseModel):
@@ -6112,7 +6117,11 @@ async def login_partner(login_data: PartnerLogin):
             phone=partner.get("phone"),
             token=token,
             has_seen_welcome_coupon=partner.get("has_seen_welcome_coupon", False),
-            welcome_coupon_code=partner.get("welcome_coupon_code")
+            welcome_coupon_code=partner.get("welcome_coupon_code"),
+            payment_plan=partner.get("payment_plan", "pay_per_order"),
+            payment_plan_approved=partner.get("payment_plan_approved", False),
+            total_paid_orders=partner.get("total_paid_orders", 0),
+            invoice_manually_unlocked=partner.get("invoice_manually_unlocked", False)
         )
 
     except HTTPException:
@@ -6146,7 +6155,12 @@ async def verify_partner_token(token: str):
                 "phone": partner.get("phone"),
                 "token": token,
                 "has_seen_welcome_coupon": partner.get("has_seen_welcome_coupon", False),
-                "welcome_coupon_code": partner.get("welcome_coupon_code")
+                "welcome_coupon_code": partner.get("welcome_coupon_code"),
+                # Payment plan fields - needed for invoice unlock feature
+                "payment_plan": partner.get("payment_plan", "pay_per_order"),
+                "payment_plan_approved": partner.get("payment_plan_approved", False),
+                "total_paid_orders": partner.get("total_paid_orders", 0),
+                "invoice_manually_unlocked": partner.get("invoice_manually_unlocked", False)
             }
         }
     except HTTPException:
