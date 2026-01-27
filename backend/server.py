@@ -8701,24 +8701,34 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
 
             # If Zelle payment, send Zelle-specific emails
             if order_data.payment_method == "zelle":
-                # Send Zelle pending email to client (order email)
+                # Get partner email to avoid sending to partner
+                partner_email = partner.get("email", "").lower()
+                client_email_lower = order.client_email.lower() if order.client_email else ""
+
+                # Prepare order details for Zelle emails
+                zelle_order_details = {
+                    **order_details,
+                    "customer_name": order.client_name,
+                    "customer_email": order.client_email
+                }
+
+                # Send Zelle pending email to client (order email) - NOT to partner
                 try:
-                    zelle_order_details = {
-                        **order_details,
-                        "customer_name": order.client_name,
-                        "customer_email": order.client_email
-                    }
-                    email_html = get_zelle_pending_email_template(
-                        order.client_name,
-                        zelle_order_details
-                    )
-                    await email_service.send_email(
-                        order.client_email,
-                        f"Order Received - Zelle Payment Pending Verification - {order.order_number}",
-                        email_html,
-                        "html"
-                    )
-                    logger.info(f"Zelle pending email sent to client: {order.client_email}")
+                    # Only send if client email is different from partner email
+                    if order.client_email and client_email_lower != partner_email:
+                        email_html = get_zelle_pending_email_template(
+                            order.client_name,
+                            zelle_order_details
+                        )
+                        await email_service.send_email(
+                            order.client_email,
+                            f"Order Received - Zelle Payment Pending Verification - {order.order_number}",
+                            email_html,
+                            "html"
+                        )
+                        logger.info(f"Zelle pending email sent to client: {order.client_email}")
+                    elif client_email_lower == partner_email:
+                        logger.info(f"Skipping Zelle client notification - client email matches partner email")
                 except Exception as ze:
                     logger.error(f"Failed to send Zelle pending email to client: {str(ze)}")
 
@@ -8736,14 +8746,24 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
                     logger.error(f"Failed to send Zelle admin notification: {str(ae)}")
             else:
                 # Standard order confirmation emails
-                # Notify client (order email)
-                await email_service.send_order_confirmation_email(
-                    order.client_email,
-                    order_details,
-                    is_partner=True
-                )
+                # IMPORTANT: Only send to client email, NEVER to partner email
+                # Partner should NOT receive the same order confirmation as the client
+                partner_email = partner.get("email", "").lower()
+                client_email_lower = order.client_email.lower() if order.client_email else ""
 
-                # Notify company
+                # Only send to client if it's different from partner email
+                # (Partner should not receive client's order confirmation)
+                if order.client_email and client_email_lower != partner_email:
+                    await email_service.send_order_confirmation_email(
+                        order.client_email,
+                        order_details,
+                        is_partner=False  # This is for the END CLIENT, not the partner
+                    )
+                    logger.info(f"Order confirmation sent to CLIENT: {order.client_email}")
+                elif client_email_lower == partner_email:
+                    logger.info(f"Skipping client notification - client email matches partner email: {order.client_email}")
+
+                # Notify company (internal)
                 await email_service.send_order_confirmation_email(
                     "contact@legacytranslations.com",
                     order_details,
@@ -10479,7 +10499,12 @@ async def get_partner_statistics(admin_key: str):
                 "total_pending": 0,
                 "orders_paid": 0,
                 "orders_pending": 0,
-                "created_at": partner_info.get("created_at", "")
+                "created_at": partner_info.get("created_at", ""),
+                # Payment plan fields for admin management
+                "payment_plan": partner_info.get("payment_plan", "pay_per_order"),
+                "payment_plan_approved": partner_info.get("payment_plan_approved", False),
+                "total_paid_orders": partner_info.get("total_paid_orders", 0),
+                "invoice_manually_unlocked": partner_info.get("invoice_manually_unlocked", False)
             }
 
         total_price = order.get("total_price", 0)
@@ -10593,6 +10618,116 @@ async def approve_partner_payment_upgrade(partner_id: str, admin_key: str, appro
     except Exception as e:
         logger.error(f"Error processing payment upgrade: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to process upgrade request")
+
+
+@api_router.post("/admin/partners/{partner_id}/set-payment-plan")
+async def set_partner_payment_plan(partner_id: str, admin_key: str, plan: str, send_notification: bool = True):
+    """Set a partner's payment plan directly (admin only)
+    This also automatically approves the plan if it's biweekly or monthly.
+    """
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    if plan not in ["pay_per_order", "biweekly", "monthly"]:
+        raise HTTPException(status_code=400, detail="Invalid payment plan. Must be 'pay_per_order', 'biweekly', or 'monthly'")
+
+    try:
+        partner = await db.partners.find_one({"id": partner_id})
+        if not partner:
+            raise HTTPException(status_code=404, detail="Partner not found")
+
+        # If plan is biweekly or monthly, automatically approve invoice payments
+        should_approve = plan in ["biweekly", "monthly"]
+
+        update_data = {
+            "payment_plan": plan,
+            "payment_plan_approved": should_approve,
+            "payment_plan_upgrade_requested": False,
+            "requested_payment_plan": None
+        }
+
+        if should_approve:
+            update_data["payment_plan_approved_at"] = datetime.utcnow().isoformat()
+
+        await db.partners.update_one(
+            {"id": partner_id},
+            {"$set": update_data}
+        )
+
+        plan_names = {
+            "pay_per_order": "Pay Per Order",
+            "biweekly": "Biweekly Invoice",
+            "monthly": "Monthly Invoice"
+        }
+
+        # Send notification email to partner if requested
+        if send_notification and partner.get("email"):
+            try:
+                email_html = f"""
+                <h2>Payment Plan Update</h2>
+                <p>Your payment plan has been updated to: <strong>{plan_names.get(plan, plan)}</strong></p>
+                {"<p>You can now pay by invoice for your orders.</p>" if should_approve else "<p>You will continue to pay per order.</p>"}
+                <p>Thank you for your business!</p>
+                """
+                await send_email(
+                    to_email=partner.get("email"),
+                    subject=f"Payment Plan Updated - Legacy Translations",
+                    html_content=email_html
+                )
+            except Exception as e:
+                logger.warning(f"Failed to send payment plan update email: {e}")
+
+        return {
+            "success": True,
+            "message": f"Payment plan set to {plan_names.get(plan, plan)}",
+            "plan": plan,
+            "payment_plan_approved": should_approve
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error setting payment plan: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to set payment plan")
+
+
+@api_router.post("/admin/partners/{partner_id}/toggle-invoice-unlock")
+async def toggle_partner_invoice_unlock(partner_id: str, admin_key: str, unlock: bool):
+    """Manually unlock or lock invoice payments for a partner (admin only)
+    This allows admins to override the normal qualification requirements.
+    """
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        partner = await db.partners.find_one({"id": partner_id})
+        if not partner:
+            raise HTTPException(status_code=404, detail="Partner not found")
+
+        await db.partners.update_one(
+            {"id": partner_id},
+            {"$set": {
+                "payment_plan_approved": unlock,
+                "invoice_manually_unlocked": unlock,
+                "invoice_unlocked_at": datetime.utcnow().isoformat() if unlock else None
+            }}
+        )
+
+        return {
+            "success": True,
+            "message": f"Invoice payments {'unlocked' if unlock else 'locked'} for partner",
+            "payment_plan_approved": unlock
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error toggling invoice unlock: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to toggle invoice unlock")
 
 
 @api_router.delete("/admin/partners/{partner_id}")
