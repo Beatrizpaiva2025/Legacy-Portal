@@ -13729,6 +13729,15 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                 attachment_filenames = [f"Certified_Translation_{order['order_number']}.pdf"]
                 logger.info(f"Created fallback combined PDF: Certified_Translation_{order['order_number']}.pdf")
 
+                # Compute PDF hash for integrity verification
+                if certification_data and certification_data.get("certification_id"):
+                    pdf_hash = hashlib.sha256(combined_pdf_bytes).hexdigest()
+                    await db.certifications.update_one(
+                        {"certification_id": certification_data["certification_id"]},
+                        {"$set": {"pdf_hash": pdf_hash}}
+                    )
+                    logger.info(f"Stored PDF hash for certification (fallback): {certification_data['certification_id']}")
+
             except Exception as fallback_err:
                 logger.error(f"Failed to create fallback combined PDF: {str(fallback_err)}")
                 import traceback
@@ -23891,6 +23900,14 @@ async def client_approve_translation(token: str, feedback: Optional[str] = None)
             qr_code_base64=qr_code_base64
         )
         certified_pdf_base64 = base64.b64encode(certified_pdf_bytes).decode('utf-8')
+
+        # Compute and store PDF hash for integrity verification
+        pdf_hash = hashlib.sha256(certified_pdf_bytes).hexdigest()
+        await db.certifications.update_one(
+            {"certification_id": certification_id},
+            {"$set": {"pdf_hash": pdf_hash}}
+        )
+        logger.info(f"Stored PDF hash for certification: {certification_id}")
     except Exception as pdf_error:
         logger.error(f"Error generating certified PDF: {pdf_error}")
         certified_pdf_base64 = None
