@@ -22150,6 +22150,21 @@ const FinancesPage = ({ adminKey }) => {
     }
   };
 
+  const togglePartnerInvoiceUnlock = async (partnerId, companyName, currentStatus) => {
+    const newStatus = !currentStatus;
+    const action = newStatus ? 'unlock' : 'lock';
+    if (!window.confirm(`Are you sure you want to ${action} invoice payments for "${companyName}"?\n\n${newStatus ? 'This will allow the partner to pay by invoice immediately, bypassing the normal qualification requirements.' : 'This will remove the manual unlock, and the partner will need to qualify normally.'}`)) {
+      return;
+    }
+    try {
+      await axios.post(`${API}/admin/partners/${partnerId}/toggle-invoice-unlock?admin_key=${adminKey}&unlock=${newStatus}`);
+      alert(`Invoice payments ${newStatus ? 'unlocked' : 'locked'} for ${companyName}`);
+      fetchPartnerStats(); // Refresh the list
+    } catch (err) {
+      alert('Error toggling invoice unlock: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
   const findEmailInSystem = async () => {
     if (!emailSearchQuery.trim()) {
       alert('Please enter an email to search');
@@ -23536,6 +23551,17 @@ const FinancesPage = ({ adminKey }) => {
                               title="Manage Discounts"
                             >
                               🏷️
+                            </button>
+                            <button
+                              onClick={() => togglePartnerInvoiceUnlock(partner.partner_id, partner.company_name, partner.payment_plan_approved)}
+                              className={`p-1.5 rounded transition-colors ${
+                                partner.payment_plan_approved
+                                  ? 'text-green-600 hover:bg-green-50'
+                                  : 'text-amber-600 hover:bg-amber-50'
+                              }`}
+                              title={partner.payment_plan_approved ? 'Invoice payments unlocked - Click to lock' : 'Invoice payments locked - Click to unlock'}
+                            >
+                              {partner.payment_plan_approved ? '🔓' : '🔒'}
                             </button>
                             <button
                               onClick={() => {

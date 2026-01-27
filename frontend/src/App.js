@@ -171,7 +171,7 @@ const TRANSLATIONS = {
     // Payment Plan
     paymentPlan: 'How would you like to pay?',
     payPerOrder: 'Pay Per Order',
-    payPerOrderDesc: 'Pay for each order via Zelle or card',
+    payPerOrderDesc: 'Required for the first 10 orders',
     biweeklyInvoice: 'Biweekly Invoice',
     biweeklyInvoiceDesc: 'Receive invoice every 2 weeks',
     monthlyInvoice: 'Monthly Invoice',
@@ -188,8 +188,8 @@ const TRANSLATIONS = {
     agreementTerms: 'Terms and Conditions',
     termsIntro: 'By registering as a Partner, you agree to the following terms:',
     term1: 'No fees or commitments to cancel at any time',
-    term2: 'Pay Per Order: Payment required before delivery',
-    term3: 'Invoice Plans: Payment due within 30 days of invoice',
+    term2: 'Pay Per Order: Required for the first 10 orders',
+    term3: 'Invoice Plans: Payment due within 30 days (after qualification)',
     term4: 'Late payments may result in service suspension',
     iAgreeToTerms: 'I agree to the Partner Agreement terms',
     mustAgreeToTerms: 'You must agree to the terms to register',
@@ -279,7 +279,10 @@ const TRANSLATIONS = {
     coupon: 'Coupon',
     selectCoupon: 'Select coupon...',
     apply: 'Apply',
-    paymentViaInvoice: 'Payment via invoice (Net 30)'
+    paymentViaInvoice: 'Payment via invoice (Net 30)',
+    pageInfo: '1 page = 250 words max',
+    invoiceNotAvailable: 'Invoice payment available after 10 paid orders',
+    invoiceBlocked: 'Invoice payment not yet available'
   },
   es: {
     // Login
@@ -424,7 +427,7 @@ const TRANSLATIONS = {
     // Payment Plan
     paymentPlan: '¿Cómo prefiere pagar?',
     payPerOrder: 'Pago Por Pedido',
-    payPerOrderDesc: 'Pague cada pedido vía Zelle o tarjeta',
+    payPerOrderDesc: 'Necesario para los primeros 10 pedidos',
     biweeklyInvoice: 'Factura Quincenal',
     biweeklyInvoiceDesc: 'Reciba factura cada 2 semanas',
     monthlyInvoice: 'Factura Mensual',
@@ -441,8 +444,8 @@ const TRANSLATIONS = {
     agreementTerms: 'Términos y Condiciones',
     termsIntro: 'Al registrarse como Partner, acepta los siguientes términos:',
     term1: 'Sin tarifas ni compromisos para cancelar en cualquier momento',
-    term2: 'Pago Por Pedido: Pago requerido antes de la entrega',
-    term3: 'Planes de Factura: Pago debido dentro de 30 días',
+    term2: 'Pago Por Pedido: Necesario para los primeros 10 pedidos',
+    term3: 'Planes de Factura: Pago dentro de 30 días (después de calificación)',
     term4: 'Pagos atrasados pueden resultar en suspensión del servicio',
     iAgreeToTerms: 'Acepto los términos del Acuerdo de Partner',
     mustAgreeToTerms: 'Debe aceptar los términos para registrarse',
@@ -532,7 +535,10 @@ const TRANSLATIONS = {
     coupon: 'Cupón',
     selectCoupon: 'Seleccionar cupón...',
     apply: 'Aplicar',
-    paymentViaInvoice: 'Pago via factura (Net 30)'
+    paymentViaInvoice: 'Pago via factura (Net 30)',
+    pageInfo: '1 página = 250 palabras máx.',
+    invoiceNotAvailable: 'Pago por factura disponible después de 10 pedidos pagados',
+    invoiceBlocked: 'Pago por factura aún no disponible'
   },
   pt: {
     // Login
@@ -677,7 +683,7 @@ const TRANSLATIONS = {
     // Payment Plan
     paymentPlan: 'Como prefere pagar?',
     payPerOrder: 'Pagar Por Pedido',
-    payPerOrderDesc: 'Pague cada pedido via Zelle ou cartão',
+    payPerOrderDesc: 'Necessário para os primeiros 10 pedidos',
     biweeklyInvoice: 'Fatura Quinzenal',
     biweeklyInvoiceDesc: 'Receba fatura a cada 2 semanas',
     monthlyInvoice: 'Fatura Mensal',
@@ -694,8 +700,8 @@ const TRANSLATIONS = {
     agreementTerms: 'Termos e Condições',
     termsIntro: 'Ao se cadastrar como Partner, você concorda com os seguintes termos:',
     term1: 'Sem taxas ou compromissos para cancelar a qualquer momento',
-    term2: 'Pagar Por Pedido: Pagamento necessário antes da entrega',
-    term3: 'Planos de Fatura: Pagamento em até 30 dias',
+    term2: 'Pagar Por Pedido: Necessário para os primeiros 10 pedidos',
+    term3: 'Planos de Fatura: Pagamento em até 30 dias (após qualificação)',
     term4: 'Pagamentos atrasados podem resultar em suspensão do serviço',
     iAgreeToTerms: 'Concordo com os termos do Acordo de Partner',
     mustAgreeToTerms: 'Você deve concordar com os termos para se cadastrar',
@@ -785,7 +791,10 @@ const TRANSLATIONS = {
     coupon: 'Cupom',
     selectCoupon: 'Selecionar cupom...',
     apply: 'Aplicar',
-    paymentViaInvoice: 'Pagamento via fatura (Net 30)'
+    paymentViaInvoice: 'Pagamento via fatura (Net 30)',
+    pageInfo: '1 página = 250 palavras máx.',
+    invoiceNotAvailable: 'Pagamento por fatura disponível após 10 pedidos pagos',
+    invoiceBlocked: 'Pagamento por fatura ainda não disponível'
   }
 };
 
@@ -1703,8 +1712,10 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
   });
   const USPS_PRIORITY_MAIL = 18.99;
 
-  // Payment method options
-  const [paymentMethod, setPaymentMethod] = useState('invoice'); // 'invoice' or 'zelle'
+  // Payment method options - Check if partner is eligible for invoice payments
+  // Invoice is available if: 1) payment_plan_approved is true, OR 2) total_paid_orders >= 10
+  const isInvoiceAllowed = partner?.payment_plan_approved || (partner?.total_paid_orders >= 10);
+  const [paymentMethod, setPaymentMethod] = useState(isInvoiceAllowed ? 'invoice' : 'zelle');
   const [zelleReceipt, setZelleReceipt] = useState(null);
   const zelleReceiptInputRef = useRef(null);
   const ZELLE_EMAIL = 'contact@legacytranslations.com';
@@ -2497,20 +2508,33 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
             <div className="space-y-4">
               <label className="block text-sm font-medium text-gray-700">{t.paymentMethod}</label>
               <div className="grid grid-cols-2 gap-4">
-                <label className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'invoice' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                  <input
-                    type="radio"
-                    name="paymentMethod"
-                    value="invoice"
-                    checked={paymentMethod === 'invoice'}
-                    onChange={() => setPaymentMethod('invoice')}
-                    className="sr-only"
-                  />
-                  <div>
-                    <span className="font-medium">{t.payByInvoice}</span>
-                    <p className="text-sm text-gray-500 mt-1">{t.invoiceSentToEmail}</p>
+                {/* Invoice Payment Option - Blocked if not eligible */}
+                {isInvoiceAllowed ? (
+                  <label className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'invoice' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value="invoice"
+                      checked={paymentMethod === 'invoice'}
+                      onChange={() => setPaymentMethod('invoice')}
+                      className="sr-only"
+                    />
+                    <div>
+                      <span className="font-medium">{t.payByInvoice}</span>
+                      <p className="text-sm text-gray-500 mt-1">{t.invoiceSentToEmail}</p>
+                    </div>
+                  </label>
+                ) : (
+                  <div className="flex items-center p-4 border-2 rounded-lg border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed relative" title={t.invoiceNotAvailable}>
+                    <div className="absolute -top-2 -right-2 bg-amber-100 rounded-full p-1">
+                      <svg className="w-4 h-4 text-amber-600" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/></svg>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-500">{t.payByInvoice}</span>
+                      <p className="text-xs text-amber-600 mt-1">{t.invoiceNotAvailable}</p>
+                    </div>
                   </div>
-                </label>
+                )}
                 <label className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'zelle' ? 'border-slate-400 bg-slate-50' : 'border-gray-200 hover:border-gray-300'}`}>
                   <input
                     type="radio"
@@ -2602,6 +2626,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
               <span className="text-gray-600">{t.pages}</span>
               <span className="font-medium">{quote?.pages || 0}</span>
             </div>
+            <p className="text-xs text-gray-400 text-right">{t.pageInfo}</p>
 
             <div className="border-t pt-3 mt-3">
               <div className="flex justify-between">
@@ -3738,8 +3763,8 @@ const PaymentPlanPage = ({ token, t }) => {
     try {
       // Fetch both qualification and tier info in parallel
       const [qualRes, tierRes] = await Promise.all([
-        fetch(`${API_BASE}/partner/credit-qualification?token=${token}`),
-        fetch(`${API_BASE}/partner/tier-info?token=${token}`)
+        fetch(`${API}/partner/credit-qualification?token=${token}`),
+        fetch(`${API}/partner/tier-info?token=${token}`)
       ]);
 
       if (qualRes.ok) {
@@ -3760,7 +3785,7 @@ const PaymentPlanPage = ({ token, t }) => {
 
   const fetchQualification = async () => {
     try {
-      const res = await fetch(`${API_BASE}/partner/credit-qualification?token=${token}`);
+      const res = await fetch(`${API}/partner/credit-qualification?token=${token}`);
       if (res.ok) {
         const data = await res.json();
         setQualification(data);
@@ -3795,7 +3820,7 @@ const PaymentPlanPage = ({ token, t }) => {
   const handleRequestUpgrade = async () => {
     setSubmitting(true);
     try {
-      const res = await fetch(`${API_BASE}/partner/request-payment-upgrade?token=${token}&plan=${selectedPlan}`, {
+      const res = await fetch(`${API}/partner/request-payment-upgrade?token=${token}&plan=${selectedPlan}`, {
         method: 'POST'
       });
       if (res.ok) {
