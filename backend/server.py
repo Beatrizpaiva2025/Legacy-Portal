@@ -12877,20 +12877,59 @@ async def generate_combined_delivery_pdf(
         # Check for translation HTML (workspace content)
         translation_html = order.get("translation_html")
         if translation_html and not translated_file:
-            # Create a simple text page with the translation content
-            page = doc.new_page(width=page_width, height=page_height)
+            # Render HTML content as text pages in the PDF
+            try:
+                from bs4 import BeautifulSoup
 
-            # Header
-            page.draw_rect(fitz.Rect(50, 40, page_width - 50, 43), color=blue_color, fill=blue_color)
-            page.insert_text((page_width/2 - 60, 30), "Legacy Translations", fontsize=12, fontname="helv", color=blue_color)
+                # Parse HTML and extract text content
+                soup = BeautifulSoup(translation_html, 'html.parser')
+                for script in soup(["script", "style"]):
+                    script.decompose()
+                text_content = soup.get_text(separator='\n')
+                lines = [line.strip() for line in text_content.split('\n') if line.strip()]
 
-            # Title
-            page.insert_text((80, 80), "TRANSLATED DOCUMENT", fontsize=12, fontname="helvB", color=blue_color)
-            page.insert_text((80, 100), f"Order: {order_number} | {source_lang} → {target_lang}", fontsize=9, fontname="helv", color=gray_color)
+                # Create first translation page with header
+                page = doc.new_page(width=page_width, height=page_height)
+                margin = 72
+                y_position = 100
 
-            # Content note
-            page.insert_text((80, 140), "Translation content available in HTML format.", fontsize=10, fontname="helv", color=gray_color)
-            page.insert_text((80, 160), "Please refer to the attached HTML file for full formatted content.", fontsize=10, fontname="helv", color=gray_color)
+                # Header
+                page.draw_rect(fitz.Rect(50, 40, page_width - 50, 43), color=blue_color, fill=blue_color)
+                page.insert_text((page_width/2 - 60, 30), "Legacy Translations", fontsize=12, fontname="helv", color=blue_color)
+                page.insert_text((page_width/2 - 50, 60), "TRANSLATION", fontsize=12, fontname="helvB", color=blue_color)
+                page.insert_text((page_width/2 - 100, 80), f"Order: {order_number} | {source_lang} → {target_lang}", fontsize=9, fontname="helv", color=gray_color)
+
+                # Render text content line by line with page breaks
+                for line in lines:
+                    if y_position > page_height - margin:
+                        # Create new page when current is full
+                        page = doc.new_page(width=page_width, height=page_height)
+                        y_position = margin
+
+                    # Handle long lines by wrapping
+                    max_chars = 85
+                    while len(line) > max_chars:
+                        page.insert_text((margin, y_position), line[:max_chars], fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
+                        y_position += 14
+                        line = line[max_chars:]
+                        if y_position > page_height - margin:
+                            page = doc.new_page(width=page_width, height=page_height)
+                            y_position = margin
+
+                    if line:
+                        page.insert_text((margin, y_position), line, fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
+                        y_position += 14
+
+                logger.info(f"Rendered translation_html as text pages for order {order_number}")
+            except Exception as html_err:
+                logger.error(f"Error rendering translation HTML: {str(html_err)}")
+                # Fallback: create a page indicating the issue
+                page = doc.new_page(width=page_width, height=page_height)
+                page.draw_rect(fitz.Rect(50, 40, page_width - 50, 43), color=blue_color, fill=blue_color)
+                page.insert_text((page_width/2 - 60, 30), "Legacy Translations", fontsize=12, fontname="helv", color=blue_color)
+                page.insert_text((80, 80), "TRANSLATED DOCUMENT", fontsize=12, fontname="helvB", color=blue_color)
+                page.insert_text((80, 140), "Translation content could not be rendered.", fontsize=10, fontname="helv", color=gray_color)
+                page.insert_text((80, 160), f"Error: {str(html_err)[:60]}", fontsize=9, fontname="helv", color=(0.5, 0.0, 0.0))
 
     # ==================== ORIGINAL DOCUMENT PAGES ====================
     if include_original:
