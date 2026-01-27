@@ -12043,10 +12043,23 @@ async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate,
         # Handle Translator assignment by name (from dropdown)
         if update_data.assigned_translator is not None:
             update_dict["assigned_translator_name"] = update_data.assigned_translator
-            # Try to find translator by name to get ID
+            # Try to find translator by name to get ID and apply assignment logic
             translator = await db.admin_users.find_one({"name": update_data.assigned_translator, "role": "translator"})
             if translator:
                 update_dict["assigned_translator_id"] = translator.get("id", "")
+
+                # Generate assignment token for accept/decline (same logic as ID-based assignment)
+                assignment_token = str(uuid.uuid4())
+                update_dict["translator_assignment_token"] = assignment_token
+
+                # In-house translators: auto-accept assignment
+                # Contractor translators: set to pending (must accept via email)
+                if translator.get("translator_type") == "in_house":
+                    update_dict["translator_assignment_status"] = "accepted"
+                    update_dict["translator_assignment_responded_at"] = datetime.utcnow()
+                else:
+                    update_dict["translator_assignment_status"] = "pending"
+                    update_dict["translator_assignment_responded_at"] = None
         # Handle Translator assignment by ID
         if update_data.assigned_translator_id is not None:
             update_dict["assigned_translator_id"] = update_data.assigned_translator_id
