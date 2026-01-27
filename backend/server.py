@@ -10558,8 +10558,9 @@ async def get_partner_statistics(admin_key: str):
                     partner_stats[partner_id]["total_pending"] += total_price
                     partner_stats[partner_id]["orders_pending"] += 1
 
-    # Combine real partners and special entries
-    all_entries = list(partner_stats.values()) + list(special_entries.values())
+    # Use only real partners (exclude special entries like "Manual Entry" and "Unknown")
+    # This makes the admin panel cleaner and focused on registered partners
+    all_entries = list(partner_stats.values())
 
     # Sort by total (received + pending) descending
     result = sorted(
@@ -10755,19 +10756,26 @@ async def toggle_partner_invoice_unlock(partner_id: str, admin_key: str, unlock:
         if not partner:
             raise HTTPException(status_code=404, detail="Partner not found")
 
+        update_data = {
+            "payment_plan_approved": unlock,
+            "invoice_manually_unlocked": unlock,
+            "invoice_unlocked_at": datetime.utcnow().isoformat() if unlock else None
+        }
+
+        # When unlocking, also set payment plan to biweekly if it's currently pay_per_order
+        if unlock and partner.get("payment_plan", "pay_per_order") == "pay_per_order":
+            update_data["payment_plan"] = "biweekly"
+
         await db.partners.update_one(
             {"id": partner_id},
-            {"$set": {
-                "payment_plan_approved": unlock,
-                "invoice_manually_unlocked": unlock,
-                "invoice_unlocked_at": datetime.utcnow().isoformat() if unlock else None
-            }}
+            {"$set": update_data}
         )
 
         return {
             "success": True,
             "message": f"Invoice payments {'unlocked' if unlock else 'locked'} for partner",
-            "payment_plan_approved": unlock
+            "payment_plan_approved": unlock,
+            "payment_plan": update_data.get("payment_plan", partner.get("payment_plan"))
         }
 
     except HTTPException:
