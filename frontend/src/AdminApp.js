@@ -22022,6 +22022,41 @@ const FinancesPage = ({ adminKey }) => {
     }
   };
 
+  // Invoice Reminder Functions
+  const [reminderDays, setReminderDays] = useState(3);
+  const [sendingReminder, setSendingReminder] = useState(null);
+
+  const sendInvoiceReminder = async (invoiceId, invoiceNumber) => {
+    if (!window.confirm(`Send payment reminder for invoice ${invoiceNumber}?`)) return;
+    setSendingReminder(invoiceId);
+    try {
+      const response = await axios.post(`${API}/admin/partner-invoices/${invoiceId}/send-reminder?admin_key=${adminKey}`);
+      alert(response.data.message || 'Reminder sent successfully!');
+      fetchPartnerInvoices();
+    } catch (err) {
+      alert('Error sending reminder: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setSendingReminder(null);
+    }
+  };
+
+  const sendBulkReminders = async () => {
+    const days = prompt(`Send reminders to all partners with invoices due within how many days? (Also includes overdue)`, reminderDays.toString());
+    if (!days || isNaN(parseInt(days))) return;
+
+    const daysNum = parseInt(days);
+    if (!window.confirm(`This will send reminder emails to all partners with pending invoices due within ${daysNum} days (and overdue invoices).\n\nContinue?`)) return;
+
+    try {
+      const response = await axios.post(`${API}/admin/partner-invoices/send-bulk-reminders?admin_key=${adminKey}&days_before_due=${daysNum}&include_overdue=true`);
+      const summary = response.data.summary;
+      alert(`Bulk reminders completed!\n\nSent: ${summary.sent}\nSkipped: ${summary.skipped}\nFailed: ${summary.failed}`);
+      fetchPartnerInvoices();
+    } catch (err) {
+      alert('Error sending bulk reminders: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
   const handleMarkNotificationRead = async (notifId) => {
     try {
       await axios.put(`${API}/admin/invoice-notifications/${notifId}/read?admin_key=${adminKey}`);
@@ -23460,9 +23495,16 @@ const FinancesPage = ({ adminKey }) => {
                     </tr>
                   ) : (
                     partnerStats.partners?.map((partner) => (
-                      <tr key={partner.partner_id} className="hover:bg-gray-50">
+                      <tr key={partner.partner_id} className={`hover:bg-gray-50 ${!partner.is_real_partner ? 'bg-orange-50' : ''}`}>
                         <td className="px-4 py-3">
-                          <div className="font-medium text-gray-800">{partner.company_name}</div>
+                          <div className="font-medium text-gray-800">
+                            {partner.company_name}
+                            {!partner.is_real_partner && (
+                              <span className="ml-2 px-1.5 py-0.5 text-xs bg-orange-200 text-orange-700 rounded" title="This is not a registered partner - orders created manually or from other sources">
+                                Not Registered
+                              </span>
+                            )}
+                          </div>
                           {partner.contact_name && (
                             <div className="text-xs text-gray-500">{partner.contact_name}</div>
                           )}
@@ -23501,23 +23543,27 @@ const FinancesPage = ({ adminKey }) => {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <select
-                            value={partner.payment_plan || 'pay_per_order'}
-                            onChange={(e) => {
-                              if (window.confirm(`Change payment plan for ${partner.company_name} to ${e.target.options[e.target.selectedIndex].text}?`)) {
-                                setPartnerPaymentPlan(partner.partner_id, e.target.value);
-                              }
-                            }}
-                            className={`text-xs px-2 py-1 rounded border ${
-                              partner.payment_plan === 'monthly' ? 'bg-purple-100 border-purple-300 text-purple-700' :
-                              partner.payment_plan === 'biweekly' ? 'bg-blue-100 border-blue-300 text-blue-700' :
-                              'bg-gray-100 border-gray-300 text-gray-700'
-                            }`}
-                          >
-                            <option value="pay_per_order">Pay Per Order</option>
-                            <option value="biweekly">Biweekly Invoice</option>
-                            <option value="monthly">Monthly Invoice</option>
-                          </select>
+                          {partner.is_real_partner ? (
+                            <select
+                              value={partner.payment_plan || 'pay_per_order'}
+                              onChange={(e) => {
+                                if (window.confirm(`Change payment plan for ${partner.company_name} to ${e.target.options[e.target.selectedIndex].text}?`)) {
+                                  setPartnerPaymentPlan(partner.partner_id, e.target.value);
+                                }
+                              }}
+                              className={`text-xs px-2 py-1 rounded border ${
+                                partner.payment_plan === 'monthly' ? 'bg-purple-100 border-purple-300 text-purple-700' :
+                                partner.payment_plan === 'biweekly' ? 'bg-blue-100 border-blue-300 text-blue-700' :
+                                'bg-gray-100 border-gray-300 text-gray-700'
+                              }`}
+                            >
+                              <option value="pay_per_order">Pay Per Order</option>
+                              <option value="biweekly">Biweekly Invoice</option>
+                              <option value="monthly">Monthly Invoice</option>
+                            </select>
+                          ) : (
+                            <span className="text-xs text-gray-400">N/A</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-right font-medium text-green-600">
                           {formatCurrency(partner.total_received)}
@@ -23530,50 +23576,58 @@ const FinancesPage = ({ adminKey }) => {
                         </td>
                         <td className="px-4 py-3 text-center">
                           <div className="flex items-center justify-center space-x-1">
-                            <button
-                              onClick={() => handleOpenCreateInvoice(partner)}
-                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                              title="Create Invoice"
-                              disabled={partner.orders_pending === 0}
-                            >
-                              📄
-                            </button>
-                            <button
-                              onClick={() => handleOpenInvoices(partner)}
-                              className="p-1.5 text-teal-600 hover:bg-teal-50 rounded transition-colors"
-                              title="View Invoices"
-                            >
-                              📋
-                            </button>
-                            <button
-                              onClick={() => handleOpenCouponModal(partner)}
-                              className="p-1.5 text-purple-600 hover:bg-purple-50 rounded transition-colors"
-                              title="Manage Discounts"
-                            >
-                              🏷️
-                            </button>
-                            <button
-                              onClick={() => togglePartnerInvoiceUnlock(partner.partner_id, partner.company_name, partner.payment_plan_approved)}
-                              className={`p-1.5 rounded transition-colors ${
-                                partner.payment_plan_approved
-                                  ? 'text-green-600 hover:bg-green-50'
-                                  : 'text-amber-600 hover:bg-amber-50'
-                              }`}
-                              title={partner.payment_plan_approved ? 'Invoice payments unlocked - Click to lock' : 'Invoice payments locked - Click to unlock'}
-                            >
-                              {partner.payment_plan_approved ? '🔓' : '🔒'}
-                            </button>
-                            <button
-                              onClick={() => {
-                                if (window.confirm(`Are you sure you want to delete partner "${partner.company_name}"?\n\nThis action cannot be undone.`)) {
-                                  deletePartner(partner.partner_id);
-                                }
-                              }}
-                              className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
-                              title="Delete partner"
-                            >
-                              🗑️
-                            </button>
+                            {partner.is_real_partner ? (
+                              <>
+                                <button
+                                  onClick={() => handleOpenCreateInvoice(partner)}
+                                  className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                  title="Create Invoice"
+                                  disabled={partner.orders_pending === 0}
+                                >
+                                  📄
+                                </button>
+                                <button
+                                  onClick={() => handleOpenInvoices(partner)}
+                                  className="p-1.5 text-teal-600 hover:bg-teal-50 rounded transition-colors"
+                                  title="View Invoices"
+                                >
+                                  📋
+                                </button>
+                                <button
+                                  onClick={() => handleOpenCouponModal(partner)}
+                                  className="p-1.5 text-purple-600 hover:bg-purple-50 rounded transition-colors"
+                                  title="Manage Discounts"
+                                >
+                                  🏷️
+                                </button>
+                                <button
+                                  onClick={() => togglePartnerInvoiceUnlock(partner.partner_id, partner.company_name, partner.payment_plan_approved)}
+                                  className={`p-1.5 rounded transition-colors ${
+                                    partner.payment_plan_approved
+                                      ? 'text-green-600 hover:bg-green-50'
+                                      : 'text-amber-600 hover:bg-amber-50'
+                                  }`}
+                                  title={partner.payment_plan_approved ? 'Invoice payments unlocked - Click to lock' : 'Invoice payments locked - Click to unlock'}
+                                >
+                                  {partner.payment_plan_approved ? '🔓' : '🔒'}
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    if (window.confirm(`Are you sure you want to delete partner "${partner.company_name}"?\n\nThis action cannot be undone.`)) {
+                                      deletePartner(partner.partner_id);
+                                    }
+                                  }}
+                                  className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                  title="Delete partner"
+                                >
+                                  🗑️
+                                </button>
+                              </>
+                            ) : (
+                              <span className="text-xs text-gray-400" title="Actions not available for non-registered entries">
+                                -
+                              </span>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -23587,9 +23641,18 @@ const FinancesPage = ({ adminKey }) => {
           {/* All Invoices Summary */}
           {partnerInvoices.length > 0 && (
             <div className="bg-white rounded-lg shadow">
-              <div className="p-4 border-b bg-gray-50">
-                <h2 className="text-sm font-bold text-gray-700">📋 Recent Invoices</h2>
-                <p className="text-xs text-gray-500 mt-1">All partner invoices</p>
+              <div className="p-4 border-b bg-gray-50 flex items-center justify-between">
+                <div>
+                  <h2 className="text-sm font-bold text-gray-700">📋 Recent Invoices</h2>
+                  <p className="text-xs text-gray-500 mt-1">All partner invoices</p>
+                </div>
+                <button
+                  onClick={sendBulkReminders}
+                  className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center gap-1"
+                  title="Send reminders to all partners with invoices due soon"
+                >
+                  📧 Send Bulk Reminders
+                </button>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -23601,29 +23664,60 @@ const FinancesPage = ({ adminKey }) => {
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
                       <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Due Date</th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {partnerInvoices.slice(0, 10).map((invoice) => (
-                      <tr key={invoice.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 font-mono text-xs">{invoice.invoice_number}</td>
-                        <td className="px-4 py-3">{invoice.partner_company}</td>
-                        <td className="px-4 py-3 text-center">{invoice.order_ids?.length || 0}</td>
-                        <td className="px-4 py-3 text-right font-medium">{formatCurrency(invoice.total_amount)}</td>
-                        <td className="px-4 py-3 text-center">
-                          <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
-                            invoice.status === 'paid' ? 'bg-green-100 text-green-700' :
-                            invoice.status === 'overdue' ? 'bg-red-100 text-red-700' :
-                            'bg-yellow-100 text-yellow-700'
-                          }`}>
-                            {invoice.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-xs">
-                          {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : '-'}
-                        </td>
-                      </tr>
-                    ))}
+                    {partnerInvoices.slice(0, 10).map((invoice) => {
+                      const dueDate = invoice.due_date ? new Date(invoice.due_date) : null;
+                      const now = new Date();
+                      const daysUntilDue = dueDate ? Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24)) : null;
+                      const isOverdue = daysUntilDue !== null && daysUntilDue < 0;
+                      const isDueSoon = daysUntilDue !== null && daysUntilDue >= 0 && daysUntilDue <= 3;
+
+                      return (
+                        <tr key={invoice.id} className={`hover:bg-gray-50 ${isOverdue ? 'bg-red-50' : isDueSoon && invoice.status !== 'paid' ? 'bg-yellow-50' : ''}`}>
+                          <td className="px-4 py-3 font-mono text-xs">{invoice.invoice_number}</td>
+                          <td className="px-4 py-3">{invoice.partner_company}</td>
+                          <td className="px-4 py-3 text-center">{invoice.order_ids?.length || 0}</td>
+                          <td className="px-4 py-3 text-right font-medium">{formatCurrency(invoice.total_amount)}</td>
+                          <td className="px-4 py-3 text-center">
+                            <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                              invoice.status === 'paid' ? 'bg-green-100 text-green-700' :
+                              invoice.status === 'overdue' || isOverdue ? 'bg-red-100 text-red-700' :
+                              'bg-yellow-100 text-yellow-700'
+                            }`}>
+                              {invoice.status === 'pending' && isOverdue ? 'overdue' : invoice.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-xs">
+                            <div>
+                              {dueDate ? dueDate.toLocaleDateString() : '-'}
+                              {daysUntilDue !== null && invoice.status !== 'paid' && (
+                                <div className={`text-xs ${isOverdue ? 'text-red-600 font-medium' : isDueSoon ? 'text-yellow-600' : 'text-gray-400'}`}>
+                                  {isOverdue ? `${Math.abs(daysUntilDue)} days overdue` : daysUntilDue === 0 ? 'Due today' : `${daysUntilDue} days left`}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            {invoice.status !== 'paid' && (
+                              <button
+                                onClick={() => sendInvoiceReminder(invoice.id, invoice.invoice_number)}
+                                disabled={sendingReminder === invoice.id}
+                                className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded hover:bg-blue-200 disabled:opacity-50"
+                                title={`Send reminder${invoice.reminder_sent_count ? ` (${invoice.reminder_sent_count} sent)` : ''}`}
+                              >
+                                {sendingReminder === invoice.id ? '...' : '📧'}
+                                {invoice.reminder_sent_count > 0 && (
+                                  <span className="ml-1 text-gray-500">({invoice.reminder_sent_count})</span>
+                                )}
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

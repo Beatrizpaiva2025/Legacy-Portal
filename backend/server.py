@@ -2142,6 +2142,9 @@ class PartnerInvoice(BaseModel):
     quickbooks_synced_at: Optional[datetime] = None
     quickbooks_customer_id: Optional[str] = None
     quickbooks_invoice_link: Optional[str] = None  # Payment link for partner
+    # Reminder tracking
+    reminder_sent_count: int = 0  # Number of reminders sent
+    last_reminder_at: Optional[datetime] = None  # When last reminder was sent
 
 class PartnerInvoiceCreate(BaseModel):
     partner_id: str
@@ -10471,63 +10474,107 @@ async def get_partner_statistics(admin_key: str):
     if user_role != "admin" and not user_info.get("is_master"):
         raise HTTPException(status_code=403, detail="Admin access required")
 
-    # Get all partner orders
+    # Special partner IDs that are NOT real registered partners
+    SPECIAL_PARTNER_IDS = {"manual", "direct_client", "admin_quote", "whatsapp_bot"}
+
+    # Get all partner orders (excluding special partner IDs for the main list)
     partner_orders = await db.translation_orders.find({
         "partner_id": {"$exists": True, "$ne": None}
     }).to_list(10000)
 
-    # Get all partners for contact info
+    # Get all registered partners from the partners collection
     all_partners = await db.partners.find({}).to_list(500)
     partners_by_id = {p.get("id"): p for p in all_partners}
 
-    # Group by partner company
+    # Start with all registered partners (so we include those without orders)
     partner_stats = {}
-    for order in partner_orders:
-        company = order.get("partner_company", "Unknown")
-        partner_id = order.get("partner_id")
-
-        if company not in partner_stats:
-            # Get partner contact info
-            partner_info = partners_by_id.get(partner_id, {})
-            partner_stats[company] = {
+    for partner in all_partners:
+        partner_id = partner.get("id")
+        company = partner.get("company_name", "")
+        if company and partner_id:
+            partner_stats[partner_id] = {
                 "partner_id": partner_id,
                 "company_name": company,
-                "email": partner_info.get("email", ""),
-                "contact_name": partner_info.get("contact_name") or partner_info.get("name", ""),
-                "phone": partner_info.get("phone", ""),
+                "email": partner.get("email", ""),
+                "contact_name": partner.get("contact_name") or partner.get("name", ""),
+                "phone": partner.get("phone", ""),
                 "total_received": 0,
                 "total_pending": 0,
                 "orders_paid": 0,
                 "orders_pending": 0,
-                "created_at": partner_info.get("created_at", ""),
-                # Payment plan fields for admin management
-                "payment_plan": partner_info.get("payment_plan", "pay_per_order"),
-                "payment_plan_approved": partner_info.get("payment_plan_approved", False),
-                "total_paid_orders": partner_info.get("total_paid_orders", 0),
-                "invoice_manually_unlocked": partner_info.get("invoice_manually_unlocked", False)
+                "created_at": partner.get("created_at", ""),
+                "payment_plan": partner.get("payment_plan", "pay_per_order"),
+                "payment_plan_approved": partner.get("payment_plan_approved", False),
+                "total_paid_orders": partner.get("total_paid_orders", 0),
+                "invoice_manually_unlocked": partner.get("invoice_manually_unlocked", False),
+                "is_real_partner": True  # This is a registered partner
             }
 
+    # Track special entries separately
+    special_entries = {}
+
+    # Process orders and aggregate statistics
+    for order in partner_orders:
+        partner_id = order.get("partner_id")
+        company = order.get("partner_company", "Unknown")
         total_price = order.get("total_price", 0)
         payment_status = order.get("payment_status", "pending")
 
-        if payment_status == "paid":
-            partner_stats[company]["total_received"] += total_price
-            partner_stats[company]["orders_paid"] += 1
-        else:
-            partner_stats[company]["total_pending"] += total_price
-            partner_stats[company]["orders_pending"] += 1
+        # Check if this is a special entry (not a real partner)
+        if partner_id in SPECIAL_PARTNER_IDS or partner_id not in partners_by_id:
+            # Aggregate special entries by company name
+            if company not in special_entries:
+                special_entries[company] = {
+                    "partner_id": partner_id,
+                    "company_name": company,
+                    "email": "",
+                    "contact_name": "",
+                    "phone": "",
+                    "total_received": 0,
+                    "total_pending": 0,
+                    "orders_paid": 0,
+                    "orders_pending": 0,
+                    "created_at": "",
+                    "payment_plan": "pay_per_order",
+                    "payment_plan_approved": False,
+                    "total_paid_orders": 0,
+                    "invoice_manually_unlocked": False,
+                    "is_real_partner": False  # Not a registered partner
+                }
 
-    # Convert to list and sort by total (received + pending) descending
+            if payment_status == "paid":
+                special_entries[company]["total_received"] += total_price
+                special_entries[company]["orders_paid"] += 1
+            else:
+                special_entries[company]["total_pending"] += total_price
+                special_entries[company]["orders_pending"] += 1
+        else:
+            # Real partner - aggregate by partner_id
+            if partner_id in partner_stats:
+                if payment_status == "paid":
+                    partner_stats[partner_id]["total_received"] += total_price
+                    partner_stats[partner_id]["orders_paid"] += 1
+                else:
+                    partner_stats[partner_id]["total_pending"] += total_price
+                    partner_stats[partner_id]["orders_pending"] += 1
+
+    # Combine real partners and special entries
+    all_entries = list(partner_stats.values()) + list(special_entries.values())
+
+    # Sort by total (received + pending) descending
     result = sorted(
-        partner_stats.values(),
+        all_entries,
         key=lambda x: x["total_received"] + x["total_pending"],
         reverse=True
     )
 
+    # Count only real partners for the total
+    real_partners_count = len([p for p in result if p.get("is_real_partner", False)])
+
     return {
         "partners": result,
         "summary": {
-            "total_partners": len(result),
+            "total_partners": real_partners_count,
             "total_received": sum(p["total_received"] for p in result),
             "total_pending": sum(p["total_pending"] for p in result)
         }
@@ -11509,6 +11556,340 @@ async def get_invoice_payment_history(admin_key: str, limit: int = 50):
     except Exception as e:
         logger.error(f"Error fetching payment history: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to fetch payment history")
+
+
+# ==================== INVOICE REMINDER ENDPOINTS ====================
+
+@api_router.post("/admin/partner-invoices/{invoice_id}/send-reminder")
+async def send_invoice_payment_reminder(invoice_id: str, admin_key: str):
+    """Send a payment reminder email for a pending invoice"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        invoice = await db.partner_invoices.find_one({"id": invoice_id})
+        if not invoice:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+
+        if invoice.get("status") == "paid":
+            raise HTTPException(status_code=400, detail="Invoice already paid")
+
+        partner_email = invoice.get("partner_email")
+        if not partner_email:
+            # Try to get email from partner record
+            partner = await db.partners.find_one({"id": invoice.get("partner_id")})
+            partner_email = partner.get("email") if partner else None
+
+        if not partner_email:
+            raise HTTPException(status_code=400, detail="No email address found for partner")
+
+        # Format due date
+        due_date_str = "Soon"
+        if invoice.get("due_date"):
+            due_date = invoice.get("due_date")
+            if isinstance(due_date, str):
+                due_date = datetime.fromisoformat(due_date.replace('Z', '+00:00'))
+            due_date_str = due_date.strftime("%B %d, %Y")
+            days_until_due = (due_date - datetime.utcnow()).days
+        else:
+            days_until_due = None
+
+        # Determine urgency message
+        if days_until_due is not None:
+            if days_until_due < 0:
+                urgency = f"This invoice is <strong style='color: #dc2626;'>overdue by {abs(days_until_due)} days</strong>."
+            elif days_until_due == 0:
+                urgency = "This invoice is <strong style='color: #dc2626;'>due today</strong>."
+            elif days_until_due <= 3:
+                urgency = f"This invoice is <strong style='color: #f59e0b;'>due in {days_until_due} days</strong>."
+            else:
+                urgency = f"This invoice is due in {days_until_due} days."
+        else:
+            urgency = ""
+
+        # Prepare email
+        reminder_count = invoice.get("reminder_sent_count", 0) + 1
+        subject = f"Payment Reminder: Invoice {invoice.get('invoice_number')} - Legacy Translations"
+
+        email_html = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); padding: 30px; text-align: center;">
+                <h1 style="color: white; margin: 0;">Payment Reminder</h1>
+            </div>
+            <div style="padding: 30px; background: #f9fafb;">
+                <p>Dear Partner,</p>
+                <p>This is a friendly reminder that you have an outstanding invoice with Legacy Translations.</p>
+
+                <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                    <h3 style="margin-top: 0; color: #1e40af;">Invoice Details</h3>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr>
+                            <td style="padding: 8px 0; color: #6b7280;">Invoice Number:</td>
+                            <td style="padding: 8px 0; font-weight: bold;">{invoice.get('invoice_number')}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; color: #6b7280;">Amount Due:</td>
+                            <td style="padding: 8px 0; font-weight: bold; color: #059669;">${invoice.get('total_amount', 0):.2f}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; color: #6b7280;">Due Date:</td>
+                            <td style="padding: 8px 0; font-weight: bold;">{due_date_str}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; color: #6b7280;">Orders:</td>
+                            <td style="padding: 8px 0;">{len(invoice.get('order_ids', []))} order(s)</td>
+                        </tr>
+                    </table>
+                </div>
+
+                {f'<p style="margin: 20px 0;">{urgency}</p>' if urgency else ''}
+
+                <p>Please log in to your Partner Portal to view the full invoice details and make your payment.</p>
+
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="https://portal.legacytranslations.com/#/partner"
+                       style="display: inline-block; background: #1e40af; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+                        Pay Invoice Now
+                    </a>
+                </div>
+
+                <p style="color: #6b7280; font-size: 14px;">
+                    If you have already made this payment, please disregard this reminder.
+                    For any questions, please contact us at <a href="mailto:contact@legacytranslations.com">contact@legacytranslations.com</a>.
+                </p>
+            </div>
+            <div style="background: #1f2937; padding: 20px; text-align: center;">
+                <p style="color: #9ca3af; margin: 0; font-size: 12px;">
+                    © {datetime.now().year} Legacy Translations. All rights reserved.
+                </p>
+            </div>
+        </div>
+        """
+
+        # Send email
+        await send_email(
+            to_email=partner_email,
+            subject=subject,
+            html_content=email_html
+        )
+
+        # Update invoice with reminder info
+        await db.partner_invoices.update_one(
+            {"id": invoice_id},
+            {"$set": {
+                "last_reminder_at": datetime.utcnow(),
+                "reminder_sent_count": reminder_count
+            }}
+        )
+
+        logger.info(f"Sent payment reminder #{reminder_count} for invoice {invoice.get('invoice_number')} to {partner_email}")
+        return {
+            "status": "success",
+            "message": f"Reminder email sent to {partner_email}",
+            "reminder_count": reminder_count
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error sending invoice reminder: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to send reminder")
+
+
+@api_router.get("/admin/partner-invoices/due-soon")
+async def get_invoices_due_soon(admin_key: str, days: int = 3):
+    """Get pending invoices due within the specified number of days"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        now = datetime.utcnow()
+        due_threshold = now + timedelta(days=days)
+
+        # Get pending invoices
+        invoices = await db.partner_invoices.find({
+            "status": {"$in": ["pending", "partial"]},
+            "due_date": {"$exists": True, "$ne": None}
+        }).to_list(1000)
+
+        due_soon = []
+        overdue = []
+
+        for inv in invoices:
+            if '_id' in inv:
+                del inv['_id']
+
+            due_date = inv.get("due_date")
+            if isinstance(due_date, str):
+                due_date = datetime.fromisoformat(due_date.replace('Z', '+00:00'))
+
+            days_until_due = (due_date - now).days
+
+            invoice_info = {
+                **inv,
+                "days_until_due": days_until_due,
+                "is_overdue": days_until_due < 0
+            }
+
+            if days_until_due < 0:
+                overdue.append(invoice_info)
+            elif days_until_due <= days:
+                due_soon.append(invoice_info)
+
+        # Sort by due date
+        due_soon.sort(key=lambda x: x["days_until_due"])
+        overdue.sort(key=lambda x: x["days_until_due"])
+
+        return {
+            "due_soon": due_soon,
+            "overdue": overdue,
+            "summary": {
+                "due_soon_count": len(due_soon),
+                "overdue_count": len(overdue),
+                "due_soon_total": sum(i.get("total_amount", 0) for i in due_soon),
+                "overdue_total": sum(i.get("total_amount", 0) for i in overdue)
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error fetching invoices due soon: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch invoices")
+
+
+@api_router.post("/admin/partner-invoices/send-bulk-reminders")
+async def send_bulk_invoice_reminders(admin_key: str, days_before_due: int = 3, include_overdue: bool = True):
+    """Send reminder emails to all partners with invoices due within the specified days"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        now = datetime.utcnow()
+        due_threshold = now + timedelta(days=days_before_due)
+
+        # Get pending invoices
+        invoices = await db.partner_invoices.find({
+            "status": {"$in": ["pending", "partial"]},
+            "due_date": {"$exists": True, "$ne": None}
+        }).to_list(1000)
+
+        sent_count = 0
+        failed_count = 0
+        skipped_count = 0
+        results = []
+
+        for invoice in invoices:
+            due_date = invoice.get("due_date")
+            if isinstance(due_date, str):
+                due_date = datetime.fromisoformat(due_date.replace('Z', '+00:00'))
+
+            days_until_due = (due_date - now).days
+
+            # Check if invoice qualifies for reminder
+            should_send = False
+            if days_until_due <= days_before_due and days_until_due >= 0:
+                should_send = True
+            elif include_overdue and days_until_due < 0:
+                should_send = True
+
+            if not should_send:
+                continue
+
+            # Check if we already sent a reminder recently (within 24 hours)
+            last_reminder = invoice.get("last_reminder_at")
+            if last_reminder:
+                if isinstance(last_reminder, str):
+                    last_reminder = datetime.fromisoformat(last_reminder.replace('Z', '+00:00'))
+                hours_since_last = (now - last_reminder).total_seconds() / 3600
+                if hours_since_last < 24:
+                    skipped_count += 1
+                    results.append({
+                        "invoice_number": invoice.get("invoice_number"),
+                        "status": "skipped",
+                        "reason": "Reminder sent within last 24 hours"
+                    })
+                    continue
+
+            # Try to send reminder
+            try:
+                # Make internal call to send-reminder endpoint
+                partner_email = invoice.get("partner_email")
+                if not partner_email:
+                    partner = await db.partners.find_one({"id": invoice.get("partner_id")})
+                    partner_email = partner.get("email") if partner else None
+
+                if not partner_email:
+                    skipped_count += 1
+                    results.append({
+                        "invoice_number": invoice.get("invoice_number"),
+                        "status": "skipped",
+                        "reason": "No email address"
+                    })
+                    continue
+
+                # Format and send email (simplified version)
+                due_date_str = due_date.strftime("%B %d, %Y")
+                reminder_count = invoice.get("reminder_sent_count", 0) + 1
+
+                subject = f"Payment Reminder: Invoice {invoice.get('invoice_number')} - Legacy Translations"
+                urgency = "overdue" if days_until_due < 0 else f"due in {days_until_due} days" if days_until_due > 0 else "due today"
+
+                email_html = f"""
+                <div style="font-family: Arial, sans-serif;">
+                    <h2>Payment Reminder</h2>
+                    <p>This is a reminder that your invoice <strong>{invoice.get('invoice_number')}</strong> for <strong>${invoice.get('total_amount', 0):.2f}</strong> is {urgency}.</p>
+                    <p>Due Date: {due_date_str}</p>
+                    <p><a href="https://portal.legacytranslations.com/#/partner">Click here to pay now</a></p>
+                    <p>Thank you,<br>Legacy Translations</p>
+                </div>
+                """
+
+                await send_email(
+                    to_email=partner_email,
+                    subject=subject,
+                    html_content=email_html
+                )
+
+                # Update invoice
+                await db.partner_invoices.update_one(
+                    {"id": invoice.get("id")},
+                    {"$set": {
+                        "last_reminder_at": now,
+                        "reminder_sent_count": reminder_count
+                    }}
+                )
+
+                sent_count += 1
+                results.append({
+                    "invoice_number": invoice.get("invoice_number"),
+                    "partner_email": partner_email,
+                    "status": "sent",
+                    "days_until_due": days_until_due
+                })
+            except Exception as e:
+                failed_count += 1
+                results.append({
+                    "invoice_number": invoice.get("invoice_number"),
+                    "status": "failed",
+                    "error": str(e)
+                })
+
+        logger.info(f"Bulk invoice reminders: sent={sent_count}, failed={failed_count}, skipped={skipped_count}")
+        return {
+            "status": "success",
+            "summary": {
+                "sent": sent_count,
+                "failed": failed_count,
+                "skipped": skipped_count
+            },
+            "results": results
+        }
+    except Exception as e:
+        logger.error(f"Error sending bulk reminders: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to send bulk reminders")
 
 
 @api_router.get("/admin/invoice-notifications")
