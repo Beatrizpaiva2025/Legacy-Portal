@@ -17495,14 +17495,34 @@ async def get_translation_memory(admin_key: str, sourceLang: Optional[str] = Non
     if user_role not in ["admin", "pm"] and not is_in_house_translator and not user_info.get("is_master"):
         raise HTTPException(status_code=403, detail="Only admin, PM, or in-house translators can access Translation Memory")
 
-    # Build query filter
+    # Build query filter with flexible language matching
     query = {}
+
+    # Use flexible matching for languages (case-insensitive partial match)
+    lang_conditions = []
     if sourceLang:
-        query["sourceLang"] = sourceLang
+        # Match exact OR partial (first 10 chars, case-insensitive)
+        lang_conditions.append({
+            "$or": [
+                {"sourceLang": sourceLang},
+                {"sourceLang": {"$regex": sourceLang[:10], "$options": "i"}}
+            ]
+        })
     if targetLang:
-        query["targetLang"] = targetLang
+        lang_conditions.append({
+            "$or": [
+                {"targetLang": targetLang},
+                {"targetLang": {"$regex": targetLang[:10], "$options": "i"}}
+            ]
+        })
+
+    # Field uses exact match
     if field:
         query["field"] = field
+
+    # Combine language conditions with AND
+    if lang_conditions:
+        query["$and"] = lang_conditions
 
     memories = await db.translation_memory.find(query).sort("created_at", -1).to_list(5000)
     for mem in memories:
