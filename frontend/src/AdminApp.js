@@ -9379,7 +9379,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         srcDoc={translationResults[selectedResultIndex]?.translatedText || '<p>No translation</p>'}
                         title="Translation Preview"
                         className="w-full border-0 flex-1"
-                        style={{minHeight: '380px'}}
+                        style={{minHeight: '380px', height: '380px'}}
                       />
                     ) : (
                       <div
@@ -9390,7 +9390,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         onMouseUp={saveSelection}
                         onKeyUp={saveSelection}
                         className="p-3 text-xs focus:outline-none overflow-auto flex-1"
-                        style={{minHeight: '380px', width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
+                        style={{minHeight: '380px', height: '380px', width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
                       />
                     )}
                   </div>
@@ -9635,7 +9635,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         srcDoc={getHighlightedTranslation()}
                         title="Translation Preview"
                         className="w-full border-0 translation-preview-iframe"
-                        style={{flex: '1 1 0', minHeight: 0}}
+                        style={{flex: '1 1 0', minHeight: '560px', height: '560px'}}
                       />
                     ) : (
                       <div
@@ -9646,7 +9646,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         onMouseUp={saveSelection}
                         onKeyUp={saveSelection}
                         className="p-3 text-xs focus:outline-none overflow-auto"
-                        style={{flex: '1 1 0', minHeight: 0, width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
+                        style={{flex: '1 1 0', minHeight: '520px', height: '520px', width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
                       />
                     )}
                   </div>
