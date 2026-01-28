@@ -14718,6 +14718,7 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                 logger.error(f"Failed to add external attachment: {str(e)}")
 
         # Add additional documents from selection (multiple file support)
+        # IMPORTANT: Skip translated documents if combined PDF was already generated (they're already included)
         additional_docs_sent = 0
         if attachments_selection and attachments_selection.additional_document_ids:
             logger.info(f"Processing {len(attachments_selection.additional_document_ids)} additional document(s)")
@@ -14726,15 +14727,90 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                     # Find document in order_documents collection
                     doc = await db.order_documents.find_one({"id": doc_id})
                     if doc and doc.get("file_data"):
-                        all_attachments.append({
-                            "content": doc["file_data"],  # Already base64 encoded
-                            "filename": doc.get("filename", f"document_{doc_id}.pdf"),
-                            "content_type": doc.get("content_type", "application/pdf")
-                        })
-                        attachment_filenames.append(doc.get("filename", f"document_{doc_id}.pdf"))
-                        additional_docs_sent += 1
-                        has_attachments = True
-                        logger.info(f"Added additional document: {doc.get('filename')} (id: {doc_id})")
+                        doc_source = doc.get("source", "")
+                        doc_content_type = doc.get("content_type", "application/pdf").lower()
+                        doc_filename = doc.get("filename", f"document_{doc_id}.pdf")
+
+                        # Skip translated documents if combined PDF was already generated
+                        # (the translation is already included in the combined PDF)
+                        if has_attachments and doc_source == "translated_document":
+                            logger.info(f"Skipping translated document '{doc_filename}' - already included in combined PDF")
+                            continue
+
+                        # Convert HTML files to PDF before attaching
+                        if "html" in doc_content_type or doc_filename.lower().endswith(".html"):
+                            try:
+                                import fitz
+                                from bs4 import BeautifulSoup
+
+                                html_bytes = base64.b64decode(doc["file_data"])
+                                html_content = html_bytes.decode('utf-8')
+
+                                soup = BeautifulSoup(html_content, 'html.parser')
+                                for script in soup(["script", "style"]):
+                                    script.decompose()
+                                text_content = soup.get_text(separator='\n')
+                                lines = [line.strip() for line in text_content.split('\n') if line.strip()]
+
+                                pdf_doc_extra = fitz.open()
+                                pw, ph = 612, 792
+                                bc = (0.11, 0.27, 0.53)
+
+                                def draw_hdr(pg):
+                                    pg.draw_rect(fitz.Rect(50, 40, pw - 50, 43), color=bc, fill=bc)
+                                    pg.insert_text((pw/2 - 60, 30), "Legacy Translations", fontsize=12, fontname="helv", color=bc)
+                                    pg.insert_text((pw/2 - 50, 60), "TRANSLATION", fontsize=12, fontname="helvB", color=bc)
+
+                                page = pdf_doc_extra.new_page(width=pw, height=ph)
+                                draw_hdr(page)
+                                margin = 72
+                                y_pos = 100
+
+                                for line in lines:
+                                    if y_pos > ph - margin:
+                                        page = pdf_doc_extra.new_page(width=pw, height=ph)
+                                        draw_hdr(page)
+                                        y_pos = 100
+                                    max_chars = 85
+                                    while len(line) > max_chars:
+                                        page.insert_text((margin, y_pos), line[:max_chars], fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
+                                        y_pos += 14
+                                        line = line[max_chars:]
+                                        if y_pos > ph - margin:
+                                            page = pdf_doc_extra.new_page(width=pw, height=ph)
+                                            draw_hdr(page)
+                                            y_pos = 100
+                                    if line:
+                                        page.insert_text((margin, y_pos), line, fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
+                                        y_pos += 14
+
+                                pdf_bytes = pdf_doc_extra.tobytes()
+                                pdf_doc_extra.close()
+
+                                pdf_filename = doc_filename.rsplit('.', 1)[0] + ".pdf"
+                                all_attachments.append({
+                                    "content": base64.b64encode(pdf_bytes).decode('utf-8'),
+                                    "filename": pdf_filename,
+                                    "content_type": "application/pdf"
+                                })
+                                attachment_filenames.append(pdf_filename)
+                                additional_docs_sent += 1
+                                has_attachments = True
+                                logger.info(f"Converted additional HTML to PDF: {doc_filename} -> {pdf_filename}")
+                            except Exception as html_conv_err:
+                                logger.error(f"Failed to convert additional HTML doc: {str(html_conv_err)}")
+                                # Skip HTML files that can't be converted rather than sending raw HTML
+                                continue
+                        else:
+                            all_attachments.append({
+                                "content": doc["file_data"],
+                                "filename": doc_filename,
+                                "content_type": doc.get("content_type", "application/pdf")
+                            })
+                            attachment_filenames.append(doc_filename)
+                            additional_docs_sent += 1
+                            has_attachments = True
+                            logger.info(f"Added additional document: {doc_filename} (id: {doc_id})")
                     else:
                         logger.warning(f"Additional document not found or has no data: {doc_id}")
                 except Exception as e:
