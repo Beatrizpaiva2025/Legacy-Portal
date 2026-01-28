@@ -12043,10 +12043,18 @@ async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate,
         # Handle Translator assignment by name (from dropdown)
         if update_data.assigned_translator is not None:
             update_dict["assigned_translator_name"] = update_data.assigned_translator
-            # Try to find translator by name to get ID
+            # Try to find translator by name to get ID and apply assignment logic
             translator = await db.admin_users.find_one({"name": update_data.assigned_translator, "role": "translator"})
             if translator:
                 update_dict["assigned_translator_id"] = translator.get("id", "")
+
+                # Generate assignment token for accept/decline (same logic as ID-based assignment)
+                assignment_token = str(uuid.uuid4())
+                update_dict["translator_assignment_token"] = assignment_token
+
+                # All translators must explicitly accept assignment via email
+                update_dict["translator_assignment_status"] = "pending"
+                update_dict["translator_assignment_responded_at"] = None
         # Handle Translator assignment by ID
         if update_data.assigned_translator_id is not None:
             update_dict["assigned_translator_id"] = update_data.assigned_translator_id
@@ -12060,14 +12068,9 @@ async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate,
                     assignment_token = str(uuid.uuid4())
                     update_dict["translator_assignment_token"] = assignment_token
 
-                    # In-house translators: auto-accept assignment (no email confirmation needed)
-                    # Contractor translators: set to pending (must accept via email)
-                    if translator.get("translator_type") == "in_house":
-                        update_dict["translator_assignment_status"] = "accepted"
-                        update_dict["translator_assignment_responded_at"] = datetime.utcnow()
-                    else:
-                        update_dict["translator_assignment_status"] = "pending"
-                        update_dict["translator_assignment_responded_at"] = None
+                    # All translators must explicitly accept assignment via email
+                    update_dict["translator_assignment_status"] = "pending"
+                    update_dict["translator_assignment_responded_at"] = None
 
                     # Get current order for email
                     current_order = await db.translation_orders.find_one({"id": order_id})
@@ -15448,26 +15451,15 @@ async def send_file_assignment_email(admin_key: str, request: dict = Body(...)):
     # Generate assignment token and update order
     assignment_token = str(uuid.uuid4())
     if order_id:
-        # Get translator to check if they are in-house
-        translator = await db.admin_users.find_one({"id": translator_id}) if translator_id else None
-
-        # In-house translators: auto-accept assignment (no email confirmation needed)
-        # Contractor translators: set to pending (must accept via email)
-        if translator and translator.get("translator_type") == "in_house":
-            assignment_status = "accepted"
-            responded_at = datetime.utcnow()
-        else:
-            assignment_status = "pending"
-            responded_at = None
-
+        # All translators must explicitly accept assignment via email
         await db.translation_orders.update_one(
             {"id": order_id},
             {"$set": {
                 "assigned_translator_id": translator_id,
                 "assigned_translator_name": translator_name,
                 "translator_assignment_token": assignment_token,
-                "translator_assignment_status": assignment_status,
-                "translator_assignment_responded_at": responded_at
+                "translator_assignment_status": "pending",
+                "translator_assignment_responded_at": None
             }}
         )
 
@@ -15695,24 +15687,13 @@ async def send_project_assignment_email(admin_key: str, request: dict = Body(...
     # Generate assignment token and update order
     assignment_token = str(uuid.uuid4())
 
-    # Get translator to check if they are in-house
-    translator = await db.admin_users.find_one({"id": translator_id}) if translator_id else None
-
-    # In-house translators: auto-accept assignment (no email confirmation needed)
-    # Contractor translators: set to pending (must accept via email)
-    if translator and translator.get("translator_type") == "in_house":
-        assignment_status = "accepted"
-        responded_at = datetime.utcnow()
-    else:
-        assignment_status = "pending"
-        responded_at = None
-
+    # All translators must explicitly accept assignment via email
     await db.translation_orders.update_one(
         {"id": order_id},
         {"$set": {
             "translator_assignment_token": assignment_token,
-            "translator_assignment_status": assignment_status,
-            "translator_assignment_responded_at": responded_at
+            "translator_assignment_status": "pending",
+            "translator_assignment_responded_at": None
         }}
     )
 
