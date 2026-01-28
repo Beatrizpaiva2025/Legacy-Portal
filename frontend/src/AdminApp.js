@@ -26127,9 +26127,10 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         .stamp-company { font-size: 10px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
         .stamp-ata { font-size: 8px; color: #2563eb; }
         .cover-page { page: cover; page-break-after: always; min-height: 100%; display: flex; flex-direction: column; }
-        .translation-page { page-break-after: always; }
+        .translation-page { page-break-before: always; padding-top: 15px; }
+        .cover-page + .translation-page { page-break-before: auto; }
         .translation-text-page { page-break-after: always; }
-        .original-documents-page { page-break-after: always; }
+        .original-documents-page { page-break-before: always; padding-top: 15px; }
         .translation-content { margin-top: 10px; }
         .translation-image { max-width: 100%; max-height: 700px; border: 1px solid #ddd; object-fit: contain; }
         .translation-text { font-size: 12px; line-height: 1.6; }
@@ -26143,6 +26144,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         .original-image { max-width: 100%; max-height: 650px; border: 1px solid #ddd; object-fit: contain; }
         .running-header { position: running(header); }
         .running-header-spacer { height: 80px; }
+        @page { @top-center { content: element(header); } }
         /* Verification Page Styles */
         .verification-page { page-break-before: always; padding-top: 20px; }
         .verification-box {
@@ -26167,14 +26169,18 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         .verification-footer { margin-top: 25px; text-align: center; padding-top: 20px; border-top: 1px solid #cbd5e1; }
         .verification-url { font-size: 11px; color: #1e40af; margin-bottom: 12px; }
         .verification-notice { font-size: 9px; color: #64748b; line-height: 1.5; max-width: 480px; margin: 0 auto; }
-        @page { @top-center { content: element(header); } }
         @media print {
-            body { padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            body { padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; orphans: 4; widows: 4; }
             .cover-page { page: cover; page-break-after: always; }
-            .translation-page, .translation-text-page { page-break-after: always; }
-            .original-documents-page { page-break-after: always; }
+            .translation-page { page-break-before: always; }
+            .cover-page + .translation-page { page-break-before: auto; }
+            .translation-text-page { page-break-before: always; }
+            .translation-text-page:first-child { page-break-before: auto; }
+            .original-documents-page { page-break-before: always; }
             .verification-page { page-break-before: always; }
             .verification-box { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .running-header { position: fixed; top: 0; left: 0; right: 0; background: white; padding: 20px 50px 10px; }
+            .running-header-spacer { height: 100px; }
         }
     </style>
 </head>
