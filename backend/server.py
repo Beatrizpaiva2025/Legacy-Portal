@@ -14118,9 +14118,13 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
 
                 logger.info(f"  Found {len(translated_docs)} translated document(s) in order_documents")
 
+                if not translated_docs:
+                    logger.warning(f"  NO translated documents found in order_documents for order_id={order_id}")
+
                 if translated_docs:
                     # Use the most recent translated document
-                    for trans_doc in translated_docs:
+                    logger.info(f"  Processing {len(translated_docs)} translated documents from order_documents")
+                    for idx, trans_doc in enumerate(translated_docs):
                         trans_data = trans_doc.get("file_data") or trans_doc.get("data")
                         if trans_data and len(str(trans_data)) > 100:
                             content_type = trans_doc.get("content_type", "application/pdf")
@@ -14362,11 +14366,15 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
 
                 # ==================== TRANSLATION PAGES ====================
                 if include_translation:
-                    # Check for existing translated file (PDF or HTML)
-                    translated_file = order.get("translated_file")
-                    translated_file_type = order.get("translated_file_type", "application/pdf").lower()
-                    translated_filename = order.get("translated_filename", "").lower()
+                    # IMPORTANT: Use order_with_original which has data from order_documents populated
+                    # This ensures we use the most recent translation, not just what's in the order
+                    translated_file = order_with_original.get("translated_file") or order.get("translated_file")
+                    translated_file_type = order_with_original.get("translated_file_type") or order.get("translated_file_type", "application/pdf")
+                    translated_file_type = translated_file_type.lower() if translated_file_type else "application/pdf"
+                    translated_filename = (order_with_original.get("translated_filename") or order.get("translated_filename", "")).lower()
                     translation_added = False
+
+                    logger.info(f"Fallback PDF - translated_file: {bool(translated_file)} ({len(str(translated_file or ''))} chars), type: {translated_file_type}, filename: {translated_filename}")
 
                     if translated_file:
                         # Check if it's an HTML file that needs conversion
@@ -14619,10 +14627,11 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                 import traceback
                 traceback.print_exc()
                 # If everything fails, try to send just the translated file if available
-                if has_file_attachment:
-                    file_type = order.get("translated_file_type", "application/pdf").lower()
-                    filename = order["translated_filename"]
-                    file_content = order["translated_file"]
+                # Use order_with_original first which has data from order_documents
+                if has_file_attachment or order_with_original.get("translated_file"):
+                    file_type = (order_with_original.get("translated_file_type") or order.get("translated_file_type", "application/pdf")).lower()
+                    filename = order_with_original.get("translated_filename") or order.get("translated_filename", "translation.pdf")
+                    file_content = order_with_original.get("translated_file") or order.get("translated_file")
 
                     # Convert HTML to PDF if needed
                     if "html" in file_type or filename.lower().endswith(".html"):
@@ -15103,6 +15112,12 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                 "translation": include_translation,
                 "original": include_original,
                 "verification_page": include_verification_page
+            },
+            "debug": {
+                "had_file": bool(order.get("translated_file")),
+                "had_html": bool(order.get("translation_html")),
+                "file_length": len(str(order.get("translated_file", "") or "")),
+                "html_length": len(str(order.get("translation_html", "") or ""))
             }
         }
 
