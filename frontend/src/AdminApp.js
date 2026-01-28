@@ -5421,6 +5421,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     <title>${certTitle} - ${orderNumber || 'Document'}</title>
     <style>
         @page { size: ${pageSizeCSS}; margin: 0.5in 0.6in 0.6in 0.6in; }
+        @page cover { size: ${pageSizeCSS}; margin: 0.75in; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Times New Roman', Georgia, serif;
@@ -5485,7 +5486,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         .stamp-center { text-align: center; padding: 0 12px; }
         .stamp-company { font-size: 10px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
         .stamp-ata { font-size: 8px; color: #2563eb; }
-        .cover-page { page-break-after: always; min-height: 100%; display: flex; flex-direction: column; }
+        .cover-page { page: cover; page-break-after: always; min-height: 100%; display: flex; flex-direction: column; }
         .translation-page { page-break-before: always; padding-top: 15px; }
         .cover-page + .translation-page { page-break-before: auto; }
         .translation-content { text-align: center; }
@@ -6047,6 +6048,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     <title>${orderNumber || 'P0000'}_${documentType.replace(/\s+/g, '_')}_${translationType === 'sworn' ? 'Sworn' : 'Certified'}_Translation</title>
     <style>
         @page { size: ${pageSizeCSS}; margin: 0.5in 0.6in 0.6in 0.6in; }
+        @page cover { size: ${pageSizeCSS}; margin: 0.75in; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Times New Roman', Georgia, serif;
@@ -6111,7 +6113,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         .stamp-center { text-align: center; padding: 0 12px; }
         .stamp-company { font-size: 10px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
         .stamp-ata { font-size: 8px; color: #2563eb; }
-        .cover-page { page-break-after: always; min-height: 100%; display: flex; flex-direction: column; }
+        .cover-page { page: cover; page-break-after: always; min-height: 100%; display: flex; flex-direction: column; }
         .translation-page { page-break-before: always; padding-top: 15px; }
         .cover-page + .translation-page { page-break-before: auto; }
         .page-title { font-size: 13px; font-weight: bold; text-align: center; margin: 15px 0 10px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; page-break-after: avoid; }
@@ -26060,6 +26062,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     <title>${certTitle} - ${order?.order_number || 'Document'}</title>
     <style>
         @page { size: ${pageSizeCSS}; margin: 0.5in 0.6in 0.6in 0.6in; }
+        @page cover { size: ${pageSizeCSS}; margin: 0.75in; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Times New Roman', Georgia, serif;
@@ -26123,7 +26126,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         .stamp-center { text-align: center; padding: 0 12px; }
         .stamp-company { font-size: 10px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
         .stamp-ata { font-size: 8px; color: #2563eb; }
-        .cover-page { page-break-after: always; min-height: 100%; display: flex; flex-direction: column; }
+        .cover-page { page: cover; page-break-after: always; min-height: 100%; display: flex; flex-direction: column; }
         .translation-page { page-break-after: always; }
         .translation-text-page { page-break-after: always; }
         .original-documents-page { page-break-after: always; }
@@ -26167,7 +26170,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         @page { @top-center { content: element(header); } }
         @media print {
             body { padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .cover-page { page-break-after: always; }
+            .cover-page { page: cover; page-break-after: always; }
             .translation-page, .translation-text-page { page-break-after: always; }
             .original-documents-page { page-break-after: always; }
             .verification-page { page-break-before: always; }
