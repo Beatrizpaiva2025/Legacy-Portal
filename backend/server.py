@@ -13347,7 +13347,10 @@ async def generate_combined_delivery_pdf(
         translated_filename = order.get("translated_filename", "").lower()
         translation_added = False
 
-        if translated_file:
+        # Log what we're working with
+        logger.info(f"Translation sources - translated_file: {bool(translated_file)} ({len(str(translated_file or ''))} chars), translation_html: {bool(order.get('translation_html'))} ({len(str(order.get('translation_html', '') or ''))} chars)")
+
+        if translated_file and len(str(translated_file)) > 100:  # Validate translated_file has real content
             # Check if it's an HTML file that needs conversion
             if "html" in translated_file_type or translated_filename.endswith(".html"):
                 try:
