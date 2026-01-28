@@ -17111,7 +17111,8 @@ CRITICAL INSTRUCTIONS:
 4. If you see tables in any image, create HTML tables with the same structure
 5. If you see bordered sections, use CSS borders
 6. Replicate the exact visual appearance of EACH page in HTML format
-7. DO NOT skip any pages - all pages must be translated"""
+7. DO NOT skip any pages - all pages must be translated
+8. IMPORTANT: For multi-page documents, REPEAT the document header/letterhead at the TOP of EACH page, just like in the original document"""
                     })
                 else:
                     message_content = user_message
