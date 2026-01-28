@@ -1859,7 +1859,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [availableOrders, setAvailableOrders] = useState([]);
   const [selectedOrderId, setSelectedOrderId] = useState('');
   const [sendingToProjects, setSendingToProjects] = useState(false);
-  const [sendDestination, setSendDestination] = useState('client'); // 'client' or 'admin'
+  const [sendDestination, setSendDestination] = useState('pending_admin_approval'); // 'pending_admin_approval', 'pm', or 'finalize_admin'
 
   // Resources state
   const [instructions, setInstructions] = useState([]);
@@ -10710,8 +10710,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           className="px-2 py-2 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
                           disabled={sendingToProjects}
                         >
-                          {/* Admin only can send to client */}
-                          {isAdmin && <option value="client">📧 Send to Client</option>}
+                          {/* Admin sends to PM Admin for final processing */}
+                          {isAdmin && <option value="pending_admin_approval">📤 Send to PM Admin</option>}
                           {/* PM sends to Admin for final approval */}
                           {isPM && !isAdmin && <option value="pending_admin_approval">📤 Send to Admin (Ready for Client)</option>}
                           {/* In-House Translator: Send to PM or Finalize to Admin (never to client) */}
@@ -10726,7 +10726,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           onClick={() => sendToProjects(sendDestination)}
                           disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim() || (quickTranslationFiles.length === 0 && !quickTranslationHtml)}
                           className={`flex-1 px-4 py-2 text-white text-xs rounded disabled:bg-gray-300 disabled:cursor-not-allowed ${
-                            sendDestination === 'client' ? 'bg-green-600 hover:bg-green-700' :
                             sendDestination === 'finalize_admin' ? 'bg-green-600 hover:bg-green-700' :
                             'bg-blue-600 hover:bg-blue-700'
                           }`}
@@ -10819,32 +10818,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     </div>
                   )}
 
-                  {/* Send options after package generation - Admin only */}
-                  {isAdmin && (
-                    <div className="mt-4 pt-4 border-t border-gray-200">
-                      <h4 className="text-sm font-bold text-gray-700 mb-3">📤 Deliver Translation</h4>
-                      <div className="flex gap-3 items-center">
-                        <select
-                          value={sendDestination}
-                          onChange={(e) => setSendDestination(e.target.value)}
-                          className="flex-1 px-3 py-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          disabled={sendingToProjects}
-                        >
-                          <option value="client">📧 Send to Client (Review)</option>
-                        </select>
-                        <button
-                          onClick={() => sendToProjects(sendDestination)}
-                          disabled={sendingToProjects || (quickTranslationFiles.length === 0 && !quickTranslationHtml)}
-                          className="px-6 py-3 bg-green-600 text-white text-sm font-medium rounded-lg disabled:bg-gray-300 flex items-center justify-center gap-2 hover:bg-green-700"
-                        >
-                          {sendingToProjects ? '⏳ Sending...' : '📤 Send'}
-                        </button>
-                      </div>
-                      <p className="text-[10px] text-gray-500 mt-2 text-center">
-                        Send translation to client for review
-                      </p>
-                    </div>
-                  )}
                 </>
               )}
             </>
@@ -11176,8 +11149,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       className="px-2 py-2 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
                       disabled={sendingToProjects}
                     >
-                      {/* Admin only can send to client */}
-                      {isAdmin && <option value="client">📧 Send to Client</option>}
+                      {/* Admin sends to PM Admin for final processing */}
+                      {isAdmin && <option value="pending_admin_approval">📤 Send to PM Admin</option>}
                       {/* PM sends to Admin for final approval */}
                       {isPM && !isAdmin && <option value="pending_admin_approval">📤 Send to Admin (Ready for Client)</option>}
                       {/* In-House Translator: Send to PM or Finalize to Admin (never to client) */}
@@ -11196,7 +11169,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       onClick={() => sendToProjects(sendDestination)}
                       disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim()}
                       className={`flex-1 px-4 py-2 text-white text-xs rounded disabled:bg-gray-300 disabled:cursor-not-allowed ${
-                        sendDestination === 'client' ? 'bg-green-600 hover:bg-green-700' :
                         sendDestination === 'finalize_admin' ? 'bg-green-600 hover:bg-green-700' :
                         'bg-blue-600 hover:bg-blue-700'
                       }`}
