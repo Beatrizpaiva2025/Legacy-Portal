@@ -4785,6 +4785,44 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
   };
 
+  // Extract body content and styles from full HTML document for contentEditable rendering
+  // This fixes the "shrink" issue when editing full HTML documents in a div
+  const extractBodyForEdit = (html) => {
+    if (!html) return '<p>No translation</p>';
+
+    // If it's not a full HTML document, return as-is
+    if (!html.includes('<body') && !html.includes('<html')) {
+      return html;
+    }
+
+    // Extract style content from head
+    let styles = '';
+    const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/gi);
+    if (styleMatch) {
+      styles = styleMatch.map(s => s.replace(/<\/?style[^>]*>/gi, '')).join('\n');
+    }
+
+    // Extract body content
+    let bodyContent = html;
+    const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    if (bodyMatch) {
+      bodyContent = bodyMatch[1];
+    } else {
+      // Try to extract content after </head> or after <html>
+      const headEndMatch = html.match(/<\/head>\s*([\s\S]*?)<\/html>/i);
+      if (headEndMatch) {
+        bodyContent = headEndMatch[1];
+      }
+    }
+
+    // Wrap with styles if present
+    if (styles) {
+      return `<style>${styles}</style>${bodyContent}`;
+    }
+
+    return bodyContent;
+  };
+
   // Update translation text manually
   const handleTranslationEdit = (newText) => {
     const updatedResults = [...translationResults];
@@ -8096,7 +8134,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           suppressContentEditableWarning
                           className="flex-1 p-3 overflow-auto focus:outline-none"
                           style={{minHeight: '450px', height: '450px'}}
-                          dangerouslySetInnerHTML={{ __html: translationResults[0]?.translatedText || '<p>No translation</p>' }}
+                          dangerouslySetInnerHTML={{ __html: extractBodyForEdit(translationResults[0]?.translatedText) }}
                           onBlur={(e) => {
                             // Save edits back to translationResults
                             const newResults = [...translationResults];
@@ -9386,7 +9424,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       <div
                         ref={editableRef}
                         contentEditable
-                        dangerouslySetInnerHTML={{ __html: translationResults[selectedResultIndex]?.translatedText || '' }}
+                        dangerouslySetInnerHTML={{ __html: extractBodyForEdit(translationResults[selectedResultIndex]?.translatedText) }}
                         onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
                         onMouseUp={saveSelection}
                         onKeyUp={saveSelection}
@@ -9642,7 +9680,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       <div
                         contentEditable
                         suppressContentEditableWarning
-                        dangerouslySetInnerHTML={{ __html: translationResults[selectedResultIndex]?.translatedText || '' }}
+                        dangerouslySetInnerHTML={{ __html: extractBodyForEdit(translationResults[selectedResultIndex]?.translatedText) }}
                         onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
                         onMouseUp={saveSelection}
                         onKeyUp={saveSelection}
@@ -19890,7 +19928,7 @@ const ReviewPage = ({ adminKey, user }) => {
               <div
                 contentEditable
                 className="min-h-full p-6 outline-none prose max-w-none"
-                dangerouslySetInnerHTML={{ __html: editedTranslation }}
+                dangerouslySetInnerHTML={{ __html: extractBodyForEdit(editedTranslation) }}
                 onBlur={(e) => setEditedTranslation(e.target.innerHTML)}
                 style={{ minHeight: '100%' }}
               />
