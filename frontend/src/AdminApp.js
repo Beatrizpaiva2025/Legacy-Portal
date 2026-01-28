@@ -13390,6 +13390,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       }
       if (response.data.attachment_filenames?.length > 0) {
         statusMessage += `\n📎 ${response.data.attachment_filenames.join(', ')}`;
+      } else if (response.data.attachments_sent === 0) {
+        statusMessage += `\n⚠️ Warning: No attachments were sent! Check if the order has a translation.`;
       }
       setDeliveryStatus(statusMessage);
       fetchOrders();
