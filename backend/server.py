@@ -1905,6 +1905,11 @@ class PartnerResponse(BaseModel):
     token: str
     has_seen_welcome_coupon: bool = False
     welcome_coupon_code: Optional[str] = None
+    # Payment plan fields - needed for invoice unlock feature
+    payment_plan: str = "pay_per_order"
+    payment_plan_approved: bool = False
+    total_paid_orders: int = 0
+    invoice_manually_unlocked: bool = False
 
 # Admin User Models (with roles: admin, pm, translator)
 class AdminUser(BaseModel):
@@ -6112,7 +6117,11 @@ async def login_partner(login_data: PartnerLogin):
             phone=partner.get("phone"),
             token=token,
             has_seen_welcome_coupon=partner.get("has_seen_welcome_coupon", False),
-            welcome_coupon_code=partner.get("welcome_coupon_code")
+            welcome_coupon_code=partner.get("welcome_coupon_code"),
+            payment_plan=partner.get("payment_plan", "pay_per_order"),
+            payment_plan_approved=partner.get("payment_plan_approved", False),
+            total_paid_orders=partner.get("total_paid_orders", 0),
+            invoice_manually_unlocked=partner.get("invoice_manually_unlocked", False)
         )
 
     except HTTPException:
@@ -6146,7 +6155,12 @@ async def verify_partner_token(token: str):
                 "phone": partner.get("phone"),
                 "token": token,
                 "has_seen_welcome_coupon": partner.get("has_seen_welcome_coupon", False),
-                "welcome_coupon_code": partner.get("welcome_coupon_code")
+                "welcome_coupon_code": partner.get("welcome_coupon_code"),
+                # Payment plan fields - needed for invoice unlock feature
+                "payment_plan": partner.get("payment_plan", "pay_per_order"),
+                "payment_plan_approved": partner.get("payment_plan_approved", False),
+                "total_paid_orders": partner.get("total_paid_orders", 0),
+                "invoice_manually_unlocked": partner.get("invoice_manually_unlocked", False)
             }
         }
     except HTTPException:
@@ -9101,11 +9115,11 @@ async def get_my_projects(token: str, admin_key: str):
         # Translator sees projects assigned to them
         orders = await db.translation_orders.find({"assigned_translator_id": user_id}).sort("created_at", -1).to_list(500)
 
-        # NO auto-accept: ALL translators (in-house and contractors) must explicitly accept via email link
-        # This ensures proper tracking of assignment acceptance
+        # Auto-accept for in-house translators (status set to 'accepted' at assignment time)
+        # Contractor translators must explicitly accept via email link (status 'pending')
         for order in orders:
             if order.get("translator_assignment_status") == "pending":
-                logger.info(f"Translator {user_id} accessed portal but assignment {order.get('order_number', order['id'])} requires explicit acceptance via email")
+                logger.info(f"Contractor translator {user_id} accessed portal but assignment {order.get('order_number', order['id'])} requires explicit acceptance via email")
     else:
         orders = []
 
@@ -12029,10 +12043,18 @@ async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate,
         # Handle Translator assignment by name (from dropdown)
         if update_data.assigned_translator is not None:
             update_dict["assigned_translator_name"] = update_data.assigned_translator
-            # Try to find translator by name to get ID
+            # Try to find translator by name to get ID and apply assignment logic
             translator = await db.admin_users.find_one({"name": update_data.assigned_translator, "role": "translator"})
             if translator:
                 update_dict["assigned_translator_id"] = translator.get("id", "")
+
+                # Generate assignment token for accept/decline (same logic as ID-based assignment)
+                assignment_token = str(uuid.uuid4())
+                update_dict["translator_assignment_token"] = assignment_token
+
+                # All translators must explicitly accept assignment via email
+                update_dict["translator_assignment_status"] = "pending"
+                update_dict["translator_assignment_responded_at"] = None
         # Handle Translator assignment by ID
         if update_data.assigned_translator_id is not None:
             update_dict["assigned_translator_id"] = update_data.assigned_translator_id
@@ -12045,6 +12067,8 @@ async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate,
                     # Generate assignment token for accept/decline
                     assignment_token = str(uuid.uuid4())
                     update_dict["translator_assignment_token"] = assignment_token
+
+                    # All translators must explicitly accept assignment via email
                     update_dict["translator_assignment_status"] = "pending"
                     update_dict["translator_assignment_responded_at"] = None
 
@@ -13277,23 +13301,26 @@ async def generate_combined_delivery_pdf(
                 text_content = soup.get_text(separator='\n')
                 lines = [line.strip() for line in text_content.split('\n') if line.strip()]
 
+                # Helper function to draw header on translation pages
+                def draw_translation_header(pg):
+                    pg.draw_rect(fitz.Rect(50, 40, page_width - 50, 43), color=blue_color, fill=blue_color)
+                    pg.insert_text((page_width/2 - 60, 30), "Legacy Translations", fontsize=12, fontname="helv", color=blue_color)
+                    pg.insert_text((page_width/2 - 50, 60), "TRANSLATION", fontsize=12, fontname="helvB", color=blue_color)
+                    pg.insert_text((page_width/2 - 100, 80), f"Order: {order_number} | {source_lang} → {target_lang}", fontsize=9, fontname="helv", color=gray_color)
+
                 # Create first translation page with header
                 page = doc.new_page(width=page_width, height=page_height)
                 margin = 72
                 y_position = 100
-
-                # Header
-                page.draw_rect(fitz.Rect(50, 40, page_width - 50, 43), color=blue_color, fill=blue_color)
-                page.insert_text((page_width/2 - 60, 30), "Legacy Translations", fontsize=12, fontname="helv", color=blue_color)
-                page.insert_text((page_width/2 - 50, 60), "TRANSLATION", fontsize=12, fontname="helvB", color=blue_color)
-                page.insert_text((page_width/2 - 100, 80), f"Order: {order_number} | {source_lang} → {target_lang}", fontsize=9, fontname="helv", color=gray_color)
+                draw_translation_header(page)
 
                 # Render text content line by line with page breaks
                 for line in lines:
                     if y_position > page_height - margin:
-                        # Create new page when current is full
+                        # Create new page when current is full - WITH HEADER
                         page = doc.new_page(width=page_width, height=page_height)
-                        y_position = margin
+                        draw_translation_header(page)
+                        y_position = 100  # Start after header
 
                     # Handle long lines by wrapping
                     max_chars = 85
@@ -13302,8 +13329,10 @@ async def generate_combined_delivery_pdf(
                         y_position += 14
                         line = line[max_chars:]
                         if y_position > page_height - margin:
+                            # Create new page when current is full - WITH HEADER
                             page = doc.new_page(width=page_width, height=page_height)
-                            y_position = margin
+                            draw_translation_header(page)
+                            y_position = 100  # Start after header
 
                     if line:
                         page.insert_text((margin, y_position), line, fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
@@ -15427,13 +15456,15 @@ async def send_file_assignment_email(admin_key: str, request: dict = Body(...)):
     # Generate assignment token and update order
     assignment_token = str(uuid.uuid4())
     if order_id:
+        # All translators must explicitly accept assignment via email
         await db.translation_orders.update_one(
             {"id": order_id},
             {"$set": {
                 "assigned_translator_id": translator_id,
                 "assigned_translator_name": translator_name,
                 "translator_assignment_token": assignment_token,
-                "translator_assignment_status": "pending"
+                "translator_assignment_status": "pending",
+                "translator_assignment_responded_at": None
             }}
         )
 
@@ -15660,6 +15691,8 @@ async def send_project_assignment_email(admin_key: str, request: dict = Body(...
 
     # Generate assignment token and update order
     assignment_token = str(uuid.uuid4())
+
+    # All translators must explicitly accept assignment via email
     await db.translation_orders.update_one(
         {"id": order_id},
         {"$set": {
@@ -17083,7 +17116,8 @@ CRITICAL INSTRUCTIONS:
 4. If you see tables in any image, create HTML tables with the same structure
 5. If you see bordered sections, use CSS borders
 6. Replicate the exact visual appearance of EACH page in HTML format
-7. DO NOT skip any pages - all pages must be translated"""
+7. DO NOT skip any pages - all pages must be translated
+8. IMPORTANT: For multi-page documents, REPEAT the document header/letterhead at the TOP of EACH page, just like in the original document"""
                     })
                 else:
                     message_content = user_message
@@ -17118,9 +17152,19 @@ CRITICAL INSTRUCTIONS:
             if not translation:
                 raise HTTPException(status_code=500, detail="No translation returned from Claude")
 
+            # Clean up markdown code blocks if present (Claude sometimes wraps HTML in ```html ... ```)
+            clean_translation = translation.strip()
+            if clean_translation.startswith("```html"):
+                clean_translation = clean_translation[7:]
+            elif clean_translation.startswith("```"):
+                clean_translation = clean_translation[3:]
+            if clean_translation.endswith("```"):
+                clean_translation = clean_translation[:-3]
+            clean_translation = clean_translation.strip()
+
             return {
                 "status": "success",
-                "translation": translation,
+                "translation": clean_translation,
                 "action": request.action,
                 "model": "claude-sonnet-4-5-20250929"
             }
@@ -17720,25 +17764,37 @@ Analise minuciosamente e retorne o JSON com todos os erros encontrados."""
                     parsed_result["erros"] = filtered_errors
                     filtered_count = original_count - len(filtered_errors)
 
-                    # Recalculate summary counts after filtering
-                    if filtered_count > 0 and parsed_result.get("resumo"):
-                        resumo = parsed_result["resumo"]
-                        resumo["total_erros"] = len(filtered_errors)
-                        # Recalculate severity counts from filtered errors
-                        resumo["criticos"] = sum(1 for e in filtered_errors if e.get("gravidade") == "CRÍTICO")
-                        resumo["altos"] = sum(1 for e in filtered_errors if e.get("gravidade") == "ALTO")
-                        resumo["medios"] = sum(1 for e in filtered_errors if e.get("gravidade") == "MÉDIO")
-                        resumo["baixos"] = sum(1 for e in filtered_errors if e.get("gravidade") == "BAIXO")
-
-                        # Update quality classification based on new counts
-                        if resumo["criticos"] > 0 or resumo["altos"] > 2:
-                            resumo["qualidade"] = "REPROVADO"
-                        elif resumo["altos"] > 0 or resumo["medios"] > 3:
-                            resumo["qualidade"] = "APROVADO_COM_OBSERVACOES"
-                        else:
-                            resumo["qualidade"] = "APROVADO"
-
+                    if filtered_count > 0:
                         logger.info(f"Proofreading: Filtered {filtered_count} duplicate errors, {len(filtered_errors)} remaining")
+
+                # Always recalculate summary and classification based on actual errors
+                # This ensures consistency regardless of what AI returned
+                erros = parsed_result.get("erros", [])
+                if not parsed_result.get("resumo"):
+                    parsed_result["resumo"] = {}
+
+                resumo = parsed_result["resumo"]
+                resumo["total_erros"] = len(erros)
+                resumo["criticos"] = sum(1 for e in erros if e.get("gravidade") == "CRÍTICO")
+                resumo["altos"] = sum(1 for e in erros if e.get("gravidade") == "ALTO")
+                resumo["medios"] = sum(1 for e in erros if e.get("gravidade") == "MÉDIO")
+                resumo["baixos"] = sum(1 for e in erros if e.get("gravidade") == "BAIXO")
+
+                # Determine quality classification based on error counts
+                # REPROVADO: critical errors OR more than 2 high errors
+                # APROVADO_COM_OBSERVACOES: any high errors OR more than 3 medium errors
+                # APROVADO: only low/medium errors within acceptable limits
+                if resumo["criticos"] > 0 or resumo["altos"] > 2:
+                    resumo["qualidade"] = "REPROVADO"
+                elif resumo["altos"] > 0 or resumo["medios"] > 3:
+                    resumo["qualidade"] = "APROVADO_COM_OBSERVACOES"
+                else:
+                    resumo["qualidade"] = "APROVADO"
+
+                # Sync classificacao field for frontend compatibility
+                parsed_result["classificacao"] = resumo["qualidade"]
+
+                logger.info(f"Proofreading result: {resumo['total_erros']} errors (C:{resumo['criticos']} A:{resumo['altos']} M:{resumo['medios']} B:{resumo['baixos']}) -> {resumo['qualidade']}")
 
                 return {
                     "status": "success",

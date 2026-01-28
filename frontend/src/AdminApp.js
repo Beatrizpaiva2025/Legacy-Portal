@@ -2515,6 +2515,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               translate_to: order.translate_to,
               document_type: order.document_type,
               deadline: order.deadline,
+              translator_deadline: order.translator_deadline,
               internal_notes: order.internal_notes,
               project_translation_status: order.translation_status,
               // Use document-level status if available, otherwise inherit from project
@@ -4784,6 +4785,44 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
   };
 
+  // Extract body content and styles from full HTML document for contentEditable rendering
+  // This fixes the "shrink" issue when editing full HTML documents in a div
+  const extractBodyForEdit = (html) => {
+    if (!html) return '<p>No translation</p>';
+
+    // If it's not a full HTML document, return as-is
+    if (!html.includes('<body') && !html.includes('<html')) {
+      return html;
+    }
+
+    // Extract style content from head
+    let styles = '';
+    const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/gi);
+    if (styleMatch) {
+      styles = styleMatch.map(s => s.replace(/<\/?style[^>]*>/gi, '')).join('\n');
+    }
+
+    // Extract body content
+    let bodyContent = html;
+    const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    if (bodyMatch) {
+      bodyContent = bodyMatch[1];
+    } else {
+      // Try to extract content after </head> or after <html>
+      const headEndMatch = html.match(/<\/head>\s*([\s\S]*?)<\/html>/i);
+      if (headEndMatch) {
+        bodyContent = headEndMatch[1];
+      }
+    }
+
+    // Wrap with styles if present
+    if (styles) {
+      return `<style>${styles}</style>${bodyContent}`;
+    }
+
+    return bodyContent;
+  };
+
   // Update translation text manually
   const handleTranslationEdit = (newText) => {
     const updatedResults = [...translationResults];
@@ -5382,6 +5421,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     <title>${certTitle} - ${orderNumber || 'Document'}</title>
     <style>
         @page { size: ${pageSizeCSS}; margin: 0.5in 0.6in 0.6in 0.6in; }
+        @page cover { size: ${pageSizeCSS}; margin: 0.75in; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Times New Roman', Georgia, serif;
@@ -5446,7 +5486,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         .stamp-center { text-align: center; padding: 0 12px; }
         .stamp-company { font-size: 10px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
         .stamp-ata { font-size: 8px; color: #2563eb; }
-        .cover-page { page-break-after: always; min-height: 100%; display: flex; flex-direction: column; }
+        .cover-page { page: cover; page-break-after: always; min-height: 100%; display: flex; flex-direction: column; }
         .translation-page { page-break-before: always; padding-top: 15px; }
         .cover-page + .translation-page { page-break-before: auto; }
         .translation-content { text-align: center; }
@@ -6008,6 +6048,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     <title>${orderNumber || 'P0000'}_${documentType.replace(/\s+/g, '_')}_${translationType === 'sworn' ? 'Sworn' : 'Certified'}_Translation</title>
     <style>
         @page { size: ${pageSizeCSS}; margin: 0.5in 0.6in 0.6in 0.6in; }
+        @page cover { size: ${pageSizeCSS}; margin: 0.75in; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Times New Roman', Georgia, serif;
@@ -6072,7 +6113,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         .stamp-center { text-align: center; padding: 0 12px; }
         .stamp-company { font-size: 10px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
         .stamp-ata { font-size: 8px; color: #2563eb; }
-        .cover-page { page-break-after: always; min-height: 100%; display: flex; flex-direction: column; }
+        .cover-page { page: cover; page-break-after: always; min-height: 100%; display: flex; flex-direction: column; }
         .translation-page { page-break-before: always; padding-top: 15px; }
         .cover-page + .translation-page { page-break-before: auto; }
         .page-title { font-size: 13px; font-weight: bold; text-align: center; margin: 15px 0 10px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; page-break-after: avoid; }
@@ -6733,9 +6774,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         <div className="text-xs text-gray-600">
                           {file.translate_from} → {file.translate_to}
                         </div>
-                        {file.deadline && (
+                        {(file.translator_deadline || file.deadline) && (
                           <div className="text-[10px] text-blue-600 mt-1">
-                            ⏰ Due: {new Date(file.deadline).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
+                            ⏰ Due: {new Date(file.translator_deadline || file.deadline).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
                           </div>
                         )}
                         {file.internal_notes && (
@@ -6862,9 +6903,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           <div className="text-xs text-gray-500">
                             {order.document_type || 'Document'} • {order.page_count || 1} page(s)
                           </div>
-                          {order.deadline && (
+                          {(order.translator_deadline || order.deadline) && (
                             <div className="text-[10px] text-blue-600 mt-1">
-                              ⏰ Due: {new Date(order.deadline).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
+                              ⏰ Due: {new Date(order.translator_deadline || order.deadline).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
                             </div>
                           )}
                           {order.internal_notes && (
@@ -8094,7 +8135,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           suppressContentEditableWarning
                           className="p-3 overflow-auto focus:outline-none h-full"
                           style={{width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
-                          dangerouslySetInnerHTML={{ __html: translationResults[0]?.translatedText || '<p>No translation</p>' }}
+                          dangerouslySetInnerHTML={{ __html: extractBodyForEdit(translationResults[0]?.translatedText) }}
                           onBlur={(e) => {
                             // Save edits back to translationResults
                             const newResults = [...translationResults];
@@ -9382,7 +9423,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       <div
                         ref={editableRef}
                         contentEditable
-                        dangerouslySetInnerHTML={{ __html: translationResults[selectedResultIndex]?.translatedText || '' }}
+                        dangerouslySetInnerHTML={{ __html: extractBodyForEdit(translationResults[selectedResultIndex]?.translatedText) }}
                         onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
                         onMouseUp={saveSelection}
                         onKeyUp={saveSelection}
@@ -9638,7 +9679,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       <div
                         contentEditable
                         suppressContentEditableWarning
-                        dangerouslySetInnerHTML={{ __html: translationResults[selectedResultIndex]?.translatedText || '' }}
+                        dangerouslySetInnerHTML={{ __html: extractBodyForEdit(translationResults[selectedResultIndex]?.translatedText) }}
                         onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
                         onMouseUp={saveSelection}
                         onKeyUp={saveSelection}
@@ -19886,7 +19927,7 @@ const ReviewPage = ({ adminKey, user }) => {
               <div
                 contentEditable
                 className="min-h-full p-6 outline-none prose max-w-none"
-                dangerouslySetInnerHTML={{ __html: editedTranslation }}
+                dangerouslySetInnerHTML={{ __html: extractBodyForEdit(editedTranslation) }}
                 onBlur={(e) => setEditedTranslation(e.target.innerHTML)}
                 style={{ minHeight: '100%' }}
               />
@@ -26018,6 +26059,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     <title>${certTitle} - ${order?.order_number || 'Document'}</title>
     <style>
         @page { size: ${pageSizeCSS}; margin: 0.5in 0.6in 0.6in 0.6in; }
+        @page cover { size: ${pageSizeCSS}; margin: 0.75in; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Times New Roman', Georgia, serif;
@@ -26081,10 +26123,11 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         .stamp-center { text-align: center; padding: 0 12px; }
         .stamp-company { font-size: 10px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
         .stamp-ata { font-size: 8px; color: #2563eb; }
-        .cover-page { page-break-after: always; min-height: 100%; display: flex; flex-direction: column; }
-        .translation-page { page-break-after: always; }
+        .cover-page { page: cover; page-break-after: always; min-height: 100%; display: flex; flex-direction: column; }
+        .translation-page { page-break-before: always; padding-top: 15px; }
+        .cover-page + .translation-page { page-break-before: auto; }
         .translation-text-page { page-break-after: always; }
-        .original-documents-page { page-break-after: always; }
+        .original-documents-page { page-break-before: always; padding-top: 15px; }
         .translation-content { margin-top: 10px; }
         .translation-image { max-width: 100%; max-height: 700px; border: 1px solid #ddd; object-fit: contain; }
         .translation-text { font-size: 12px; line-height: 1.6; }
@@ -26098,6 +26141,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         .original-image { max-width: 100%; max-height: 650px; border: 1px solid #ddd; object-fit: contain; }
         .running-header { position: running(header); }
         .running-header-spacer { height: 80px; }
+        @page { @top-center { content: element(header); } }
         /* Verification Page Styles */
         .verification-page { page-break-before: always; padding-top: 20px; }
         .verification-box {
@@ -26122,14 +26166,18 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         .verification-footer { margin-top: 25px; text-align: center; padding-top: 20px; border-top: 1px solid #cbd5e1; }
         .verification-url { font-size: 11px; color: #1e40af; margin-bottom: 12px; }
         .verification-notice { font-size: 9px; color: #64748b; line-height: 1.5; max-width: 480px; margin: 0 auto; }
-        @page { @top-center { content: element(header); } }
         @media print {
-            body { padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .cover-page { page-break-after: always; }
-            .translation-page, .translation-text-page { page-break-after: always; }
-            .original-documents-page { page-break-after: always; }
+            body { padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; orphans: 4; widows: 4; }
+            .cover-page { page: cover; page-break-after: always; }
+            .translation-page { page-break-before: always; }
+            .cover-page + .translation-page { page-break-before: auto; }
+            .translation-text-page { page-break-before: always; }
+            .translation-text-page:first-child { page-break-before: auto; }
+            .original-documents-page { page-break-before: always; }
             .verification-page { page-break-before: always; }
             .verification-box { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .running-header { position: fixed; top: 0; left: 0; right: 0; background: white; padding: 20px 50px 10px; }
+            .running-header-spacer { height: 100px; }
         }
     </style>
 </head>
