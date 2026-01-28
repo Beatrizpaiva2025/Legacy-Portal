@@ -14094,140 +14094,134 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                 logger.info(f"  translated_filename: {order.get('translated_filename', 'N/A')}")
                 logger.info(f"  translated_file_type: {order.get('translated_file_type', 'N/A')}")
 
-                # Fetch translated documents from order_documents collection if not already on order
-                # Check if translated_file exists AND has valid content (not empty or corrupted)
-                existing_translated_file = order_with_original.get("translated_file")
-                has_valid_translated_file = existing_translated_file and len(str(existing_translated_file)) > 100  # Valid base64 should be > 100 chars
+                # ALWAYS check order_documents FIRST as the primary source
+                # This ensures we use the most recently uploaded document
+                translated_docs = await db.order_documents.find({
+                    "order_id": order_id,
+                    "source": "translated_document"
+                }).sort("uploaded_at", -1).to_list(10)  # Sort by newest first
 
-                if not has_valid_translated_file:
-                    logger.info(f"No valid translated_file on order, checking order_documents collection")
-                    translated_docs = await db.order_documents.find({
-                        "order_id": order_id,
-                        "source": "translated_document"
-                    }).to_list(10)
+                logger.info(f"  Found {len(translated_docs)} translated document(s) in order_documents")
 
-                    if translated_docs:
-                        # Get the first translated document (usually a PDF)
-                        for trans_doc in translated_docs:
-                            trans_data = trans_doc.get("file_data") or trans_doc.get("data")
-                            if trans_data:
-                                content_type = trans_doc.get("content_type", "application/pdf")
-                                # If it's a PDF, use it directly
-                                if "pdf" in content_type.lower():
-                                    order_with_original["translated_file"] = trans_data
-                                    order_with_original["translated_filename"] = trans_doc.get("filename", "translation.pdf")
-                                    order_with_original["translated_file_type"] = "application/pdf"  # IMPORTANT: Set correct type
-                                    logger.info(f"Found translated PDF from order_documents: {trans_doc.get('filename')}")
+                if translated_docs:
+                    # Use the most recent translated document
+                    for trans_doc in translated_docs:
+                        trans_data = trans_doc.get("file_data") or trans_doc.get("data")
+                        if trans_data and len(str(trans_data)) > 100:
+                            content_type = trans_doc.get("content_type", "application/pdf")
+                            logger.info(f"  Using document from order_documents: {trans_doc.get('filename')} ({content_type})")
+
+                            # If it's a PDF, use it directly
+                            if "pdf" in content_type.lower():
+                                order_with_original["translated_file"] = trans_data
+                                order_with_original["translated_filename"] = trans_doc.get("filename", "translation.pdf")
+                                order_with_original["translated_file_type"] = "application/pdf"
+                                logger.info(f"  Set translated_file from order_documents PDF: {trans_doc.get('filename')}")
+                                break
+                            # If it's an image, convert to PDF
+                            elif "image" in content_type.lower():
+                                try:
+                                    import fitz
+                                    from PIL import Image
+                                    import io
+
+                                    img_bytes = base64.b64decode(trans_data)
+                                    pil_img = Image.open(io.BytesIO(img_bytes))
+                                    img_width, img_height = pil_img.size
+
+                                    pdf_doc = fitz.open()
+                                    pdf_page = pdf_doc.new_page(width=612, height=792)
+
+                                    margin = 36
+                                    max_width = 612 - 2 * margin
+                                    max_height = 792 - 2 * margin
+                                    scale = min(max_width / img_width, max_height / img_height)
+
+                                    new_width = img_width * scale
+                                    new_height = img_height * scale
+                                    x_offset = (612 - new_width) / 2
+                                    y_offset = (792 - new_height) / 2
+                                    insert_rect = fitz.Rect(x_offset, y_offset, x_offset + new_width, y_offset + new_height)
+
+                                    pdf_page.insert_image(insert_rect, stream=img_bytes)
+
+                                    pdf_bytes = pdf_doc.tobytes()
+                                    order_with_original["translated_file"] = base64.b64encode(pdf_bytes).decode('utf-8')
+                                    order_with_original["translated_filename"] = trans_doc.get("filename", "translation.pdf").rsplit('.', 1)[0] + ".pdf"
+                                    order_with_original["translated_file_type"] = "application/pdf"
+                                    logger.info(f"  Converted image to PDF: {trans_doc.get('filename')}")
+                                    pdf_doc.close()
+                                    pil_img.close()
                                     break
-                                # If it's an image (JPG, PNG), convert to PDF with full page size
-                                elif "image" in content_type.lower():
-                                    try:
-                                        import fitz
-                                        from PIL import Image
-                                        import io
+                                except Exception as img_err:
+                                    logger.error(f"  Error converting image to PDF: {str(img_err)}")
+                                    continue
+                            # If it's HTML, convert to PDF
+                            elif "html" in content_type.lower() or trans_doc.get("filename", "").lower().endswith(".html"):
+                                try:
+                                    import fitz
+                                    from bs4 import BeautifulSoup
 
-                                        img_bytes = base64.b64decode(trans_data)
-                                        # Get image dimensions using PIL
-                                        pil_img = Image.open(io.BytesIO(img_bytes))
-                                        img_width, img_height = pil_img.size
+                                    html_bytes = base64.b64decode(trans_data)
+                                    html_content = html_bytes.decode('utf-8')
 
-                                        # Create PDF with letter size
-                                        pdf_doc = fitz.open()
-                                        pdf_page = pdf_doc.new_page(width=612, height=792)
+                                    soup = BeautifulSoup(html_content, 'html.parser')
+                                    for script in soup(["script", "style"]):
+                                        script.decompose()
+                                    text_content = soup.get_text(separator='\n')
+                                    lines = [line.strip() for line in text_content.split('\n') if line.strip()]
 
-                                        # Calculate scale to fit page with small margins
-                                        margin = 36  # 0.5 inch margins
-                                        max_width = 612 - 2 * margin
-                                        max_height = 792 - 2 * margin
-                                        scale = min(max_width / img_width, max_height / img_height)
+                                    pdf_doc = fitz.open()
+                                    page_width, page_height = 612, 792
+                                    blue_color = (0.11, 0.27, 0.53)
 
-                                        # Center the image
-                                        new_width = img_width * scale
-                                        new_height = img_height * scale
-                                        x_offset = (612 - new_width) / 2
-                                        y_offset = (792 - new_height) / 2
-                                        insert_rect = fitz.Rect(x_offset, y_offset, x_offset + new_width, y_offset + new_height)
+                                    def draw_header(pg):
+                                        pg.draw_rect(fitz.Rect(50, 40, page_width - 50, 43), color=blue_color, fill=blue_color)
+                                        pg.insert_text((page_width/2 - 60, 30), "Legacy Translations", fontsize=12, fontname="helv", color=blue_color)
+                                        pg.insert_text((page_width/2 - 50, 60), "TRANSLATION", fontsize=12, fontname="helvB", color=blue_color)
 
-                                        pdf_page.insert_image(insert_rect, stream=img_bytes)
+                                    page = pdf_doc.new_page(width=page_width, height=page_height)
+                                    draw_header(page)
+                                    margin = 72
+                                    y_pos = 100
 
-                                        # Convert to base64
-                                        pdf_bytes = pdf_doc.tobytes()
-                                        order_with_original["translated_file"] = base64.b64encode(pdf_bytes).decode('utf-8')
-                                        order_with_original["translated_filename"] = trans_doc.get("filename", "translation.pdf").rsplit('.', 1)[0] + ".pdf"
-                                        order_with_original["translated_file_type"] = "application/pdf"  # IMPORTANT: Set correct type
-                                        logger.info(f"Converted translated image to PDF (full size): {trans_doc.get('filename')}")
-                                        pdf_doc.close()
-                                        pil_img.close()
-                                        break
-                                    except Exception as img_err:
-                                        logger.error(f"Error converting image to PDF: {str(img_err)}")
-                                        continue
-                                # If it's an HTML file, convert to PDF
-                                elif "html" in content_type.lower() or trans_doc.get("filename", "").lower().endswith(".html"):
-                                    try:
-                                        import fitz
-                                        from bs4 import BeautifulSoup
-
-                                        html_bytes = base64.b64decode(trans_data)
-                                        html_content = html_bytes.decode('utf-8')
-
-                                        # Parse HTML and extract text
-                                        soup = BeautifulSoup(html_content, 'html.parser')
-                                        for script in soup(["script", "style"]):
-                                            script.decompose()
-                                        text_content = soup.get_text(separator='\n')
-                                        lines = [line.strip() for line in text_content.split('\n') if line.strip()]
-
-                                        # Create PDF with letter size
-                                        pdf_doc = fitz.open()
-                                        page_width, page_height = 612, 792
-                                        blue_color = (0.11, 0.27, 0.53)
-                                        gray_color = (0.4, 0.4, 0.4)
-
-                                        # Helper to draw header
-                                        def draw_header(pg):
-                                            pg.draw_rect(fitz.Rect(50, 40, page_width - 50, 43), color=blue_color, fill=blue_color)
-                                            pg.insert_text((page_width/2 - 60, 30), "Legacy Translations", fontsize=12, fontname="helv", color=blue_color)
-                                            pg.insert_text((page_width/2 - 50, 60), "TRANSLATION", fontsize=12, fontname="helvB", color=blue_color)
-
-                                        # Create first page
-                                        page = pdf_doc.new_page(width=page_width, height=page_height)
-                                        draw_header(page)
-                                        margin = 72
-                                        y_pos = 100
-
-                                        # Render text
-                                        for line in lines:
+                                    for line in lines:
+                                        if y_pos > page_height - margin:
+                                            page = pdf_doc.new_page(width=page_width, height=page_height)
+                                            draw_header(page)
+                                            y_pos = 100
+                                        max_chars = 85
+                                        while len(line) > max_chars:
+                                            page.insert_text((margin, y_pos), line[:max_chars], fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
+                                            y_pos += 14
+                                            line = line[max_chars:]
                                             if y_pos > page_height - margin:
                                                 page = pdf_doc.new_page(width=page_width, height=page_height)
                                                 draw_header(page)
                                                 y_pos = 100
+                                        if line:
+                                            page.insert_text((margin, y_pos), line, fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
+                                            y_pos += 14
 
-                                            max_chars = 85
-                                            while len(line) > max_chars:
-                                                page.insert_text((margin, y_pos), line[:max_chars], fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
-                                                y_pos += 14
-                                                line = line[max_chars:]
-                                                if y_pos > page_height - margin:
-                                                    page = pdf_doc.new_page(width=page_width, height=page_height)
-                                                    draw_header(page)
-                                                    y_pos = 100
+                                    pdf_bytes = pdf_doc.tobytes()
+                                    order_with_original["translated_file"] = base64.b64encode(pdf_bytes).decode('utf-8')
+                                    order_with_original["translated_filename"] = trans_doc.get("filename", "translation.html").rsplit('.', 1)[0] + ".pdf"
+                                    order_with_original["translated_file_type"] = "application/pdf"
+                                    logger.info(f"  Converted HTML to PDF: {trans_doc.get('filename')}")
+                                    pdf_doc.close()
+                                    break
+                                except Exception as html_err:
+                                    logger.error(f"  Error converting HTML to PDF: {str(html_err)}")
+                                    continue
 
-                                            if line:
-                                                page.insert_text((margin, y_pos), line, fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
-                                                y_pos += 14
-
-                                        # Convert to base64
-                                        pdf_bytes = pdf_doc.tobytes()
-                                        order_with_original["translated_file"] = base64.b64encode(pdf_bytes).decode('utf-8')
-                                        order_with_original["translated_filename"] = trans_doc.get("filename", "translation.html").rsplit('.', 1)[0] + ".pdf"
-                                        order_with_original["translated_file_type"] = "application/pdf"  # IMPORTANT: Set correct type
-                                        logger.info(f"Converted HTML translation to PDF: {trans_doc.get('filename')}")
-                                        pdf_doc.close()
-                                        break
-                                    except Exception as html_err:
-                                        logger.error(f"Error converting HTML to PDF: {str(html_err)}")
-                                        continue
+                # Fallback: use translated_file from order if order_documents didn't provide anything
+                if not order_with_original.get("translated_file") or len(str(order_with_original.get("translated_file", ""))) < 100:
+                    existing_translated_file = order.get("translated_file")
+                    if existing_translated_file and len(str(existing_translated_file)) > 100:
+                        order_with_original["translated_file"] = existing_translated_file
+                        order_with_original["translated_filename"] = order.get("translated_filename", "translation.pdf")
+                        order_with_original["translated_file_type"] = order.get("translated_file_type", "application/pdf")
+                        logger.info(f"  Using translated_file from order: {order.get('translated_filename')}")
 
                 # Log what we will use for combined PDF generation
                 logger.info(f"=== GENERATING COMBINED PDF ===")
