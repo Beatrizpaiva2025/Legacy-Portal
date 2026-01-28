@@ -27551,7 +27551,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   {reviewQueue.map(order => (
                     <div
                       key={order.id}
-                      onClick={() => onNavigateToTranslation(order)}
+                      onClick={() => loadReviewContent(order)}
                       className="p-3 border rounded-lg hover:bg-blue-50 cursor-pointer transition-colors flex justify-between items-center"
                     >
                       <div>
