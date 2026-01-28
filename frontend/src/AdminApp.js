@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import mammoth from 'mammoth';
 import * as pdfjsLib from 'pdfjs-dist';
+import html2pdf from 'html2pdf.js';
 import { THEMES, getTheme } from './themes';
 
 // Configure PDF.js worker (pdfjs-dist 5.x uses .mjs files)
@@ -57,6 +58,76 @@ const getNYDateISO = () => {
   const month = parts.find(p => p.type === 'month').value;
   const day = parts.find(p => p.type === 'day').value;
   return `${year}-${month}-${day}`;
+};
+
+// ==================== PDF HASH UTILITIES ====================
+// Calculate SHA-256 hash of an ArrayBuffer using Web Crypto API
+const calculateSHA256 = async (arrayBuffer) => {
+  const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+};
+
+// Generate PDF from HTML content and return both blob and hash
+const generatePdfWithHash = async (htmlContent, filename, options = {}) => {
+  const defaultOptions = {
+    margin: [10, 10, 10, 10],
+    filename: filename || 'document.pdf',
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      letterRendering: true
+    },
+    jsPDF: {
+      unit: 'mm',
+      format: 'letter',
+      orientation: 'portrait'
+    },
+    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+  };
+
+  const mergedOptions = { ...defaultOptions, ...options };
+
+  // Create a temporary container for the HTML
+  const container = document.createElement('div');
+  container.innerHTML = htmlContent;
+  container.style.position = 'absolute';
+  container.style.left = '-9999px';
+  container.style.top = '0';
+  document.body.appendChild(container);
+
+  try {
+    // Generate PDF as blob
+    const pdfBlob = await html2pdf()
+      .set(mergedOptions)
+      .from(container)
+      .outputPdf('blob');
+
+    // Calculate hash from blob
+    const arrayBuffer = await pdfBlob.arrayBuffer();
+    const pdfHash = await calculateSHA256(arrayBuffer);
+
+    return { blob: pdfBlob, hash: pdfHash };
+  } finally {
+    // Clean up
+    document.body.removeChild(container);
+  }
+};
+
+// Update PDF hash in backend after PDF generation
+const updatePdfHashInBackend = async (certificationId, pdfHash, adminKey) => {
+  try {
+    const response = await axios.post(
+      `${API}/certifications/${certificationId}/update-pdf-hash?admin_key=${adminKey}&pdf_hash=${pdfHash}`
+    );
+    console.log('PDF hash updated successfully:', response.data);
+    return response.data;
+  } catch (err) {
+    console.error('Failed to update PDF hash:', err);
+    return null;
+  }
 };
 
 // ==================== CONSTANTS ====================
@@ -5566,43 +5637,42 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 </body>
 </html>`;
 
-    // Open in new window for printing - with proper handling for large documents
-    setQuickPackageProgress(`Opening print preview (${quickTranslationFiles.length} translations + ${quickOriginalFiles.length} originals)...`);
+    // Generate PDF using html2pdf for proper hash tracking
+    setQuickPackageProgress(`Generating PDF (${quickTranslationFiles.length} translations + ${quickOriginalFiles.length} originals)...`);
 
     try {
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        alert('Pop-up blocked! Please allow pop-ups for this site.');
-        setQuickPackageLoading(false);
-        setQuickPackageProgress('');
-        return;
+      const filename = `${orderNumber || 'LT'}_Certified_Translation.pdf`;
+
+      // Generate PDF with hash
+      const { blob: pdfBlob, hash: pdfHash } = await generatePdfWithHash(fullHTML, filename, {
+        margin: [5, 5, 5, 5],
+        image: { type: 'jpeg', quality: 0.95 },
+        html2canvas: { scale: 2, useCORS: true, allowTaint: true },
+        jsPDF: { unit: 'mm', format: pageFormat === 'a4' ? 'a4' : 'letter', orientation: 'portrait' }
+      });
+
+      // Update PDF hash in backend if we have a certification
+      if (certData?.certification_id) {
+        setQuickPackageProgress('Registering document hash for verification...');
+        await updatePdfHashInBackend(certData.certification_id, pdfHash, adminKey);
       }
 
-      // Write document in chunks for better browser handling
-      printWindow.document.open();
-      printWindow.document.write(fullHTML);
-      printWindow.document.close();
+      // Download the PDF
+      setQuickPackageProgress('Package ready! Starting download...');
+      const downloadUrl = URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(downloadUrl);
 
-      // Wait for all images to load before printing
-      printWindow.onload = () => {
-        setQuickPackageProgress('Package ready! Print dialog opening...');
-        setTimeout(() => {
-          printWindow.print();
-          setQuickPackageLoading(false);
-          setQuickPackageProgress('');
-        }, 500);
-      };
-
-      // Fallback if onload doesn't fire (for some browsers)
-      setTimeout(() => {
-        if (quickPackageLoading) {
-          setQuickPackageLoading(false);
-          setQuickPackageProgress('');
-        }
-      }, 10000);
+      setQuickPackageLoading(false);
+      setQuickPackageProgress('');
     } catch (err) {
       console.error('Error generating package:', err);
-      alert('Error generating package. Please try with fewer files.');
+      alert('Error generating PDF package. Please try again.');
       setQuickPackageLoading(false);
       setQuickPackageProgress('');
     }
@@ -6153,13 +6223,35 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 </html>`;
 
     if (format === 'pdf') {
-      // Open in new window for PDF printing
-      const printWindow = window.open('', '_blank');
-      printWindow.document.write(htmlContent);
-      printWindow.document.close();
-      printWindow.onload = () => {
-        printWindow.print();
-      };
+      // Generate PDF with hash tracking for verification
+      try {
+        const filename = `${orderNumber || 'P0000'}_${documentType.replace(/\s+/g, '_')}_${translationType === 'sworn' ? 'Sworn' : 'Certified'}_Translation.pdf`;
+
+        const { blob: pdfBlob, hash: pdfHash } = await generatePdfWithHash(htmlContent, filename, {
+          margin: [5, 5, 5, 5],
+          image: { type: 'jpeg', quality: 0.95 },
+          html2canvas: { scale: 2, useCORS: true, allowTaint: true },
+          jsPDF: { unit: 'mm', format: pageFormat === 'a4' ? 'a4' : 'letter', orientation: 'portrait' }
+        });
+
+        // Update PDF hash in backend if we have a certification
+        if (certData?.certification_id) {
+          await updatePdfHashInBackend(certData.certification_id, pdfHash, adminKey);
+        }
+
+        // Download the PDF
+        const downloadUrl = URL.createObjectURL(pdfBlob);
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(downloadUrl);
+      } catch (err) {
+        console.error('Error generating PDF:', err);
+        alert('Error generating PDF. Please try again.');
+      }
     } else {
       // Download as HTML
       const blob = new Blob([htmlContent], { type: 'text/html' });
@@ -13417,17 +13509,38 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 </body>
 </html>`;
 
-      // Open print window
-      const printWindow = window.open('', '_blank');
-      if (printWindow) {
-        printWindow.document.write(fullHTML);
-        printWindow.document.close();
-        printWindow.focus();
-        setTimeout(() => {
-          printWindow.print();
-        }, 500);
-      } else {
-        alert('Please allow popups to download the translation package.');
+      // Generate PDF with hash tracking
+      const filename = `${order.order_number || 'Order'}_Certified_Translation.pdf`;
+
+      try {
+        const { blob: pdfBlob, hash: pdfHash } = await generatePdfWithHash(fullHTML, filename, {
+          margin: [5, 5, 5, 5],
+          image: { type: 'jpeg', quality: 0.95 },
+          html2canvas: { scale: 2, useCORS: true, allowTaint: true },
+          jsPDF: { unit: 'mm', format: 'letter', orientation: 'portrait' }
+        });
+
+        // Download the PDF
+        const downloadUrl = URL.createObjectURL(pdfBlob);
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(downloadUrl);
+      } catch (pdfErr) {
+        console.error('PDF generation failed, falling back to print:', pdfErr);
+        // Fallback to print window if PDF generation fails
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+          printWindow.document.write(fullHTML);
+          printWindow.document.close();
+          printWindow.focus();
+          setTimeout(() => { printWindow.print(); }, 500);
+        } else {
+          alert('Please allow popups to download the translation package.');
+        }
       }
     } catch (err) {
       console.error('Failed to download package:', err);
@@ -25567,17 +25680,38 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 </body>
 </html>`;
 
-      // Open print window
-      const printWindow = window.open('', '_blank');
-      if (printWindow) {
-        printWindow.document.write(fullHTML);
-        printWindow.document.close();
-        printWindow.focus();
-        setTimeout(() => {
-          printWindow.print();
-        }, 500);
-      } else {
-        alert('Please allow popups to download the translation package.');
+      // Generate PDF with hash tracking
+      const filename = `${orderData.order_number || 'Order'}_Certified_Translation.pdf`;
+
+      try {
+        const { blob: pdfBlob, hash: pdfHash } = await generatePdfWithHash(fullHTML, filename, {
+          margin: [5, 5, 5, 5],
+          image: { type: 'jpeg', quality: 0.95 },
+          html2canvas: { scale: 2, useCORS: true, allowTaint: true },
+          jsPDF: { unit: 'mm', format: 'letter', orientation: 'portrait' }
+        });
+
+        // Download the PDF
+        const downloadUrl = URL.createObjectURL(pdfBlob);
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(downloadUrl);
+      } catch (pdfErr) {
+        console.error('PDF generation failed, falling back to print:', pdfErr);
+        // Fallback to print window if PDF generation fails
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+          printWindow.document.write(fullHTML);
+          printWindow.document.close();
+          printWindow.focus();
+          setTimeout(() => { printWindow.print(); }, 500);
+        } else {
+          alert('Please allow popups to download the translation package.');
+        }
       }
     } catch (err) {
       console.error('Failed to download package:', err);
@@ -26206,6 +26340,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
     // Verification page HTML (with QR code) - Create certification in backend
     let verificationPageHTML = '';
+    let pmCertificationId = null; // Store certification ID for hash update
     if (includeVerificationPage) {
       try {
         setProcessingStatus('Creating document certification...');
@@ -26236,6 +26371,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         if (certResponse.data.success) {
           const certData = certResponse.data;
           const verificationId = certData.certification_id;
+          pmCertificationId = verificationId; // Store for PDF hash update
           const verificationUrl = certData.verification_url;
           const qrCodeData = certData.qr_code_data;
 
@@ -26512,16 +26648,43 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 </body>
 </html>`;
 
-    // Open print dialog
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(fullHTML);
-      printWindow.document.close();
-      printWindow.onload = () => {
-        setTimeout(() => {
-          printWindow.print();
-        }, 500);
-      };
+    // Generate PDF with hash tracking for verification
+    setProcessingStatus('Generating PDF...');
+    const filename = `${order?.order_number || orderNumber || 'PM'}_Certified_Translation.pdf`;
+
+    try {
+      const { blob: pdfBlob, hash: pdfHash } = await generatePdfWithHash(fullHTML, filename, {
+        margin: [5, 5, 5, 5],
+        image: { type: 'jpeg', quality: 0.95 },
+        html2canvas: { scale: 2, useCORS: true, allowTaint: true },
+        jsPDF: { unit: 'mm', format: pageFormat === 'a4' ? 'a4' : 'letter', orientation: 'portrait' }
+      });
+
+      // Update PDF hash in backend if we have a certification
+      if (pmCertificationId) {
+        setProcessingStatus('Registering document hash for verification...');
+        await updatePdfHashInBackend(pmCertificationId, pdfHash, adminKey);
+      }
+
+      // Download the PDF
+      setProcessingStatus('Package ready! Starting download...');
+      const downloadUrl = URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(downloadUrl);
+    } catch (pdfErr) {
+      console.error('PDF generation failed, falling back to print:', pdfErr);
+      // Fallback to print window if PDF generation fails
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(fullHTML);
+        printWindow.document.close();
+        printWindow.onload = () => { setTimeout(() => { printWindow.print(); }, 500); };
+      }
     }
 
     setPmPackageGenerating(false);
