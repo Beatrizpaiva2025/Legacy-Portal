@@ -1829,6 +1829,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [selectedTranslatorForReject, setSelectedTranslatorForReject] = useState('');
   const [rejectReason, setRejectReason] = useState('');
 
+  // Restore session modal state
+  const [showRestoreModal, setShowRestoreModal] = useState(false);
+  const [restoreSessionData, setRestoreSessionData] = useState(null);
+  const [restorePromptsDisabled, setRestorePromptsDisabled] = useState(() =>
+    localStorage.getItem('translation_restore_disabled') === 'true'
+  );
+
   // Config state - initialize from selectedOrder if available
   const [sourceLanguage, setSourceLanguage] = useState('Portuguese (Brazil)');
   const [targetLanguage, setTargetLanguage] = useState('English');
@@ -2117,6 +2124,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
   // Restore from localStorage on mount
   useEffect(() => {
+    // Check if user disabled restore prompts
+    if (restorePromptsDisabled) {
+      // Clear any old autosave data silently
+      localStorage.removeItem('translation_workflow_autosave');
+      return;
+    }
+
     const savedData = localStorage.getItem('translation_workflow_autosave');
     if (savedData) {
       try {
@@ -2126,33 +2140,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         // Check for restorable data (translation text, settings, etc. - not images since we don't save them)
         const hasRestorableData = data.translationResults?.length > 0 || data.orderNumber || data.originalImagesCount > 0;
         if (isRecent && hasRestorableData) {
-          // Build info message
-          const docCount = (data.originalImagesCount || 0) + (data.translationResults?.length || 0);
-          const shouldRestore = window.confirm(
-            `Found unsaved work from ${new Date(data.timestamp).toLocaleString()}.\n\n` +
-            `Order: ${data.orderNumber || 'Not set'}\n` +
-            `Document Type: ${data.documentType || 'Not set'}\n` +
-            `Translation texts: ${data.translationResults?.length || 0}\n` +
-            (data.originalImagesCount > 0 ? `\n⚠️ Note: ${data.originalImagesCount} original document(s) need to be re-uploaded.\n` : '') +
-            `\nDo you want to restore this session?`
-          );
-          if (shouldRestore) {
-            // Restore translation results (text only)
-            if (data.translationResults?.length > 0) setTranslationResults(data.translationResults);
-            if (data.orderNumber) setOrderNumber(data.orderNumber);
-            if (data.documentType) setDocumentType(data.documentType);
-            if (data.sourceLanguage) setSourceLanguage(data.sourceLanguage);
-            if (data.targetLanguage) setTargetLanguage(data.targetLanguage);
-            if (data.workflowMode) setWorkflowMode(data.workflowMode);
-            if (data.externalTranslationText) setExternalTranslationText(data.externalTranslationText);
-            // Note: originalImages and externalOriginalImages are NOT restored (too large for localStorage)
-            setProcessingStatus(data.originalImagesCount > 0
-              ? '✅ Session restored! Please re-upload original documents.'
-              : '✅ Previous session restored successfully!');
-          } else {
-            // Clear old data if user declines
-            localStorage.removeItem('translation_workflow_autosave');
-          }
+          // Show modal instead of window.confirm
+          setRestoreSessionData(data);
+          setShowRestoreModal(true);
         }
       } catch (e) {
         console.error('Failed to restore autosave:', e);
@@ -2160,6 +2150,34 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       }
     }
   }, []); // Run only on mount
+
+  // Handle restore session actions
+  const handleRestoreSession = (action) => {
+    if (action === 'restore' && restoreSessionData) {
+      // Restore translation results (text only)
+      if (restoreSessionData.translationResults?.length > 0) setTranslationResults(restoreSessionData.translationResults);
+      if (restoreSessionData.orderNumber) setOrderNumber(restoreSessionData.orderNumber);
+      if (restoreSessionData.documentType) setDocumentType(restoreSessionData.documentType);
+      if (restoreSessionData.sourceLanguage) setSourceLanguage(restoreSessionData.sourceLanguage);
+      if (restoreSessionData.targetLanguage) setTargetLanguage(restoreSessionData.targetLanguage);
+      if (restoreSessionData.workflowMode) setWorkflowMode(restoreSessionData.workflowMode);
+      if (restoreSessionData.externalTranslationText) setExternalTranslationText(restoreSessionData.externalTranslationText);
+      // Note: originalImages and externalOriginalImages are NOT restored (too large for localStorage)
+      setProcessingStatus(restoreSessionData.originalImagesCount > 0
+        ? '✅ Session restored! Please re-upload original documents.'
+        : '✅ Previous session restored successfully!');
+    } else if (action === 'discard') {
+      // Clear old data
+      localStorage.removeItem('translation_workflow_autosave');
+    } else if (action === 'never') {
+      // Disable restore prompts and clear data
+      localStorage.setItem('translation_restore_disabled', 'true');
+      localStorage.removeItem('translation_workflow_autosave');
+      setRestorePromptsDisabled(true);
+    }
+    setShowRestoreModal(false);
+    setRestoreSessionData(null);
+  };
 
   // Clear autosave when workflow is complete (sent to PM/Admin/Client)
   const clearAutosave = () => {
@@ -7628,6 +7646,26 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             </div>
           </div>
 
+          {/* Session Restore Preferences */}
+          {restorePromptsDisabled && (
+            <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-gray-600">
+                  Session restore prompts are disabled
+                </div>
+                <button
+                  onClick={() => {
+                    localStorage.removeItem('translation_restore_disabled');
+                    setRestorePromptsDisabled(false);
+                  }}
+                  className="text-xs text-blue-600 hover:text-blue-800 underline"
+                >
+                  Enable restore prompts
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Navigation */}
           <div className="mt-4 flex justify-end">
             <button
@@ -12610,6 +12648,64 @@ translation juramentada | certified translation`}
               >
                 Save Changes
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Restore Session Modal */}
+      {showRestoreModal && restoreSessionData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="p-4 border-b bg-blue-50">
+              <h3 className="font-bold text-blue-700">Found unsaved work</h3>
+              <p className="text-xs text-blue-600 mt-1">
+                From {new Date(restoreSessionData.timestamp).toLocaleString()}
+              </p>
+            </div>
+
+            <div className="p-4 space-y-3">
+              <div className="text-sm space-y-2">
+                <p><strong>Order:</strong> {restoreSessionData.orderNumber || 'Not set'}</p>
+                <p><strong>Document Type:</strong> {restoreSessionData.documentType || 'Not set'}</p>
+                <p><strong>Translation texts:</strong> {restoreSessionData.translationResults?.length || 0}</p>
+              </div>
+
+              {restoreSessionData.originalImagesCount > 0 && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                  <p className="text-sm text-yellow-700">
+                    <span className="font-medium">Note:</span> {restoreSessionData.originalImagesCount} original document(s) need to be re-uploaded.
+                  </p>
+                </div>
+              )}
+
+              <p className="text-sm text-gray-600 pt-2">Do you want to restore this session?</p>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="p-4 border-t bg-gray-50 flex flex-col gap-2">
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => handleRestoreSession('discard')}
+                  className="px-4 py-2 text-sm border rounded-lg hover:bg-gray-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleRestoreSession('restore')}
+                  className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  Restore
+                </button>
+              </div>
+              <div className="flex justify-center pt-2 border-t mt-2">
+                <button
+                  onClick={() => handleRestoreSession('never')}
+                  className="text-xs text-gray-500 hover:text-gray-700 underline"
+                >
+                  Don't ask again (disable restore prompts)
+                </button>
+              </div>
             </div>
           </div>
         </div>
