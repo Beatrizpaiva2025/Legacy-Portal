@@ -13363,16 +13363,22 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     setDeliverySending(true);
     setDeliveryStatus('📄 Generating certified PDF package...');
 
+    // Get translator name from order data
+    const translatorName = deliveryModalOrder.translation_translator_name ||
+                          deliveryModalOrder.assigned_translator_name ||
+                          deliveryModalOrder.assigned_translator ||
+                          'Beatriz Paiva';
+
     try {
       const response = await axios.post(`${API}/admin/orders/${deliveryModalOrder.id}/deliver?admin_key=${adminKey}`, {
         include_verification_page: deliveryIncludeVerification,
-        certifier_name: selectedTranslator || 'Beatriz Paiva',
+        certifier_name: translatorName,
         // Combined PDF options
         generate_combined_pdf: true,
         include_certificate: true,
         include_translation: true,
         include_original: true,
-        translator_name: selectedTranslator || 'Beatriz Paiva',
+        translator_name: translatorName,
         document_type: deliveryModalOrder.document_type,
         source_language: deliveryModalOrder.source_language,
         target_language: deliveryModalOrder.target_language
@@ -15982,7 +15988,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           )}
 
                           {/* Admin only: Preview & Send Translation */}
-                          {isAdmin && ['ready', 'pending_admin_approval', 'pending_admin_review', 'finalized_pending_admin', 'review', 'pending_pm_review'].includes(order.translation_status) && order.translation_html && (
+                          {isAdmin && ['ready', 'pending_admin_approval', 'pending_admin_review', 'finalized_pending_admin', 'review', 'pending_pm_review'].includes(order.translation_status) && (
                             <button
                               onClick={() => { openDeliveryModal(order); setOpenActionsDropdown(null); }}
                               className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50 flex items-center gap-2"
