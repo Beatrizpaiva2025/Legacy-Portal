@@ -1865,7 +1865,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [availableOrders, setAvailableOrders] = useState([]);
   const [selectedOrderId, setSelectedOrderId] = useState('');
   const [sendingToProjects, setSendingToProjects] = useState(false);
-  const [sendDestination, setSendDestination] = useState('client'); // 'client' or 'admin'
+  const [sendDestination, setSendDestination] = useState('pending_admin_approval'); // 'pending_admin_approval', 'pm', or 'finalize_admin'
 
   // Resources state
   const [instructions, setInstructions] = useState([]);
@@ -2826,7 +2826,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               setProcessingStatus(`Converting PDF: page ${pageNum} of ${pdf.numPages}...`);
 
               const page = await pdf.getPage(pageNum);
-              const scale = 2; // Higher scale = better quality
+              const scale = 3; // Higher scale = better quality (3x for sharp PDF rendering)
               const viewport = page.getViewport({ scale });
               const canvas = document.createElement('canvas');
               const context = canvas.getContext('2d');
@@ -4430,7 +4430,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             if (onProgress) onProgress(pageNum, pdf.numPages);
 
             const page = await pdf.getPage(pageNum);
-            const scale = 2; // Higher scale = better quality
+            const scale = 3; // Higher scale = better quality (3x for sharp PDF rendering)
             const viewport = page.getViewport({ scale });
 
             const canvas = document.createElement('canvas');
@@ -5456,12 +5456,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             page-break-after: avoid;
         }
         .translation-content.translation-text ul, .translation-content.translation-text ol { margin: 8px 0 8px 20px; }
-        .translation-image { max-width: 100%; max-height: 680px; border: 1px solid #ddd; object-fit: contain; display: block; margin: 0 auto; }
+        .translation-image { width: 100%; height: auto; max-height: none; border: none; object-fit: contain; display: block; margin: 0 auto; }
         .page-title { font-size: 13px; font-weight: bold; text-align: center; margin: 10px 0 8px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; page-break-after: avoid; }
         .original-documents-page { page-break-after: always; page-break-inside: avoid; padding-top: 15px; }
         .original-documents-page:last-of-type { page-break-after: auto; }
         .original-image-container { text-align: center; margin-bottom: 5px; }
-        .original-image { max-width: 100%; max-height: 630px; border: 1px solid #ddd; object-fit: contain; display: block; margin: 0 auto; }
+        .original-image { width: 100%; height: auto; max-height: none; border: none; object-fit: contain; display: block; margin: 0 auto; }
 
         /* Bank statement / Financial document optimization */
         .financial-doc .translation-content.translation-text {
@@ -10716,8 +10716,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           className="px-2 py-2 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
                           disabled={sendingToProjects}
                         >
-                          {/* Admin only can send to client */}
-                          {isAdmin && <option value="client">📧 Send to Client</option>}
+                          {/* Admin sends to PM Admin for final processing */}
+                          {isAdmin && <option value="pending_admin_approval">📤 Send to PM Admin</option>}
                           {/* PM sends to Admin for final approval */}
                           {isPM && !isAdmin && <option value="pending_admin_approval">📤 Send to Admin (Ready for Client)</option>}
                           {/* In-House Translator: Send to PM or Finalize to Admin (never to client) */}
@@ -10732,7 +10732,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           onClick={() => sendToProjects(sendDestination)}
                           disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim() || (quickTranslationFiles.length === 0 && !quickTranslationHtml)}
                           className={`flex-1 px-4 py-2 text-white text-xs rounded disabled:bg-gray-300 disabled:cursor-not-allowed ${
-                            sendDestination === 'client' ? 'bg-green-600 hover:bg-green-700' :
                             sendDestination === 'finalize_admin' ? 'bg-green-600 hover:bg-green-700' :
                             'bg-blue-600 hover:bg-blue-700'
                           }`}
@@ -10825,32 +10824,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     </div>
                   )}
 
-                  {/* Send options after package generation - Admin only */}
-                  {isAdmin && (
-                    <div className="mt-4 pt-4 border-t border-gray-200">
-                      <h4 className="text-sm font-bold text-gray-700 mb-3">📤 Deliver Translation</h4>
-                      <div className="flex gap-3 items-center">
-                        <select
-                          value={sendDestination}
-                          onChange={(e) => setSendDestination(e.target.value)}
-                          className="flex-1 px-3 py-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          disabled={sendingToProjects}
-                        >
-                          <option value="client">📧 Send to Client (Review)</option>
-                        </select>
-                        <button
-                          onClick={() => sendToProjects(sendDestination)}
-                          disabled={sendingToProjects || (quickTranslationFiles.length === 0 && !quickTranslationHtml)}
-                          className="px-6 py-3 bg-green-600 text-white text-sm font-medium rounded-lg disabled:bg-gray-300 flex items-center justify-center gap-2 hover:bg-green-700"
-                        >
-                          {sendingToProjects ? '⏳ Sending...' : '📤 Send'}
-                        </button>
-                      </div>
-                      <p className="text-[10px] text-gray-500 mt-2 text-center">
-                        Send translation to client for review
-                      </p>
-                    </div>
-                  )}
                 </>
               )}
             </>
@@ -11182,8 +11155,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       className="px-2 py-2 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
                       disabled={sendingToProjects}
                     >
-                      {/* Admin only can send to client */}
-                      {isAdmin && <option value="client">📧 Send to Client</option>}
+                      {/* Admin sends to PM Admin for final processing */}
+                      {isAdmin && <option value="pending_admin_approval">📤 Send to PM Admin</option>}
                       {/* PM sends to Admin for final approval */}
                       {isPM && !isAdmin && <option value="pending_admin_approval">📤 Send to Admin (Ready for Client)</option>}
                       {/* In-House Translator: Send to PM or Finalize to Admin (never to client) */}
@@ -11202,7 +11175,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       onClick={() => sendToProjects(sendDestination)}
                       disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim()}
                       className={`flex-1 px-4 py-2 text-white text-xs rounded disabled:bg-gray-300 disabled:cursor-not-allowed ${
-                        sendDestination === 'client' ? 'bg-green-600 hover:bg-green-700' :
                         sendDestination === 'finalize_admin' ? 'bg-green-600 hover:bg-green-700' :
                         'bg-blue-600 hover:bg-blue-700'
                       }`}
@@ -26384,7 +26356,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         .translation-text-page { page-break-after: always; }
         .original-documents-page { page-break-before: always; padding-top: 15px; }
         .translation-content { margin-top: 10px; }
-        .translation-image { max-width: 100%; max-height: 700px; border: 1px solid #ddd; object-fit: contain; }
+        .translation-image { width: 100%; height: auto; max-height: none; border: none; object-fit: contain; }
         .translation-text { font-size: 12px; line-height: 1.6; }
         .translation-text p { margin-bottom: 12px; text-align: justify; orphans: 4; widows: 4; }
         .translation-text table { width: 100%; max-width: 100%; border-collapse: collapse; margin: 15px 0; table-layout: fixed; page-break-inside: auto; }
@@ -26393,7 +26365,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         .translation-text thead { display: table-header-group; }
         .page-title { font-size: 13px; font-weight: bold; text-align: center; margin: 15px 0 10px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; page-break-after: avoid; }
         .original-image-container { text-align: center; margin-bottom: 10px; }
-        .original-image { max-width: 100%; max-height: 650px; border: 1px solid #ddd; object-fit: contain; }
+        .original-image { width: 100%; height: auto; max-height: none; border: none; object-fit: contain; }
         .running-header { position: running(header); }
         .running-header-spacer { height: 80px; }
         @page { @top-center { content: element(header); } }
