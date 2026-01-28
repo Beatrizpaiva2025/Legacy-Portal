@@ -17748,25 +17748,37 @@ Analise minuciosamente e retorne o JSON com todos os erros encontrados."""
                     parsed_result["erros"] = filtered_errors
                     filtered_count = original_count - len(filtered_errors)
 
-                    # Recalculate summary counts after filtering
-                    if filtered_count > 0 and parsed_result.get("resumo"):
-                        resumo = parsed_result["resumo"]
-                        resumo["total_erros"] = len(filtered_errors)
-                        # Recalculate severity counts from filtered errors
-                        resumo["criticos"] = sum(1 for e in filtered_errors if e.get("gravidade") == "CRÍTICO")
-                        resumo["altos"] = sum(1 for e in filtered_errors if e.get("gravidade") == "ALTO")
-                        resumo["medios"] = sum(1 for e in filtered_errors if e.get("gravidade") == "MÉDIO")
-                        resumo["baixos"] = sum(1 for e in filtered_errors if e.get("gravidade") == "BAIXO")
-
-                        # Update quality classification based on new counts
-                        if resumo["criticos"] > 0 or resumo["altos"] > 2:
-                            resumo["qualidade"] = "REPROVADO"
-                        elif resumo["altos"] > 0 or resumo["medios"] > 3:
-                            resumo["qualidade"] = "APROVADO_COM_OBSERVACOES"
-                        else:
-                            resumo["qualidade"] = "APROVADO"
-
+                    if filtered_count > 0:
                         logger.info(f"Proofreading: Filtered {filtered_count} duplicate errors, {len(filtered_errors)} remaining")
+
+                # Always recalculate summary and classification based on actual errors
+                # This ensures consistency regardless of what AI returned
+                erros = parsed_result.get("erros", [])
+                if not parsed_result.get("resumo"):
+                    parsed_result["resumo"] = {}
+
+                resumo = parsed_result["resumo"]
+                resumo["total_erros"] = len(erros)
+                resumo["criticos"] = sum(1 for e in erros if e.get("gravidade") == "CRÍTICO")
+                resumo["altos"] = sum(1 for e in erros if e.get("gravidade") == "ALTO")
+                resumo["medios"] = sum(1 for e in erros if e.get("gravidade") == "MÉDIO")
+                resumo["baixos"] = sum(1 for e in erros if e.get("gravidade") == "BAIXO")
+
+                # Determine quality classification based on error counts
+                # REPROVADO: critical errors OR more than 2 high errors
+                # APROVADO_COM_OBSERVACOES: any high errors OR more than 3 medium errors
+                # APROVADO: only low/medium errors within acceptable limits
+                if resumo["criticos"] > 0 or resumo["altos"] > 2:
+                    resumo["qualidade"] = "REPROVADO"
+                elif resumo["altos"] > 0 or resumo["medios"] > 3:
+                    resumo["qualidade"] = "APROVADO_COM_OBSERVACOES"
+                else:
+                    resumo["qualidade"] = "APROVADO"
+
+                # Sync classificacao field for frontend compatibility
+                parsed_result["classificacao"] = resumo["qualidade"]
+
+                logger.info(f"Proofreading result: {resumo['total_erros']} errors (C:{resumo['criticos']} A:{resumo['altos']} M:{resumo['medios']} B:{resumo['baixos']}) -> {resumo['qualidade']}")
 
                 return {
                     "status": "success",

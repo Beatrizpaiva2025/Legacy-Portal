@@ -2515,6 +2515,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               translate_to: order.translate_to,
               document_type: order.document_type,
               deadline: order.deadline,
+              translator_deadline: order.translator_deadline,
               internal_notes: order.internal_notes,
               project_translation_status: order.translation_status,
               // Use document-level status if available, otherwise inherit from project
@@ -6733,9 +6734,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         <div className="text-xs text-gray-600">
                           {file.translate_from} → {file.translate_to}
                         </div>
-                        {file.deadline && (
+                        {(file.translator_deadline || file.deadline) && (
                           <div className="text-[10px] text-blue-600 mt-1">
-                            ⏰ Due: {new Date(file.deadline).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
+                            ⏰ Due: {new Date(file.translator_deadline || file.deadline).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
                           </div>
                         )}
                         {file.internal_notes && (
@@ -6862,9 +6863,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           <div className="text-xs text-gray-500">
                             {order.document_type || 'Document'} • {order.page_count || 1} page(s)
                           </div>
-                          {order.deadline && (
+                          {(order.translator_deadline || order.deadline) && (
                             <div className="text-[10px] text-blue-600 mt-1">
-                              ⏰ Due: {new Date(order.deadline).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
+                              ⏰ Due: {new Date(order.translator_deadline || order.deadline).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
                             </div>
                           )}
                           {order.internal_notes && (
