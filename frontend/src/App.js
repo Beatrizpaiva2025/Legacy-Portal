@@ -3747,7 +3747,7 @@ const InvoicesPage = ({ token, t, currency, lang }) => {
 };
 
 // ==================== PAYMENT PLAN PAGE ====================
-const PaymentPlanPage = ({ token, t }) => {
+const PaymentPlanPage = ({ token, t, currency }) => {
   const [qualification, setQualification] = useState(null);
   const [tierInfo, setTierInfo] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -5195,7 +5195,7 @@ function App() {
       case 'messages':
         return <MessagesPage token={token} />;
       case 'payment-plan':
-        return <PaymentPlanPage token={token} t={t} />;
+        return <PaymentPlanPage token={token} t={t} currency={currency} />;
       default:
         return <NewOrderPage partner={partner} token={token} t={t} currency={currency} />;
     }
