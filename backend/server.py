@@ -3722,16 +3722,24 @@ def calculate_price_with_tier(word_count: int, service_type: str, urgency: str, 
     # Convert words to pages (250 words = 1 page) - round up to next page
     pages = max(1, math.ceil(word_count / 250))
 
-    # Get tier-specific price per page for certified translations
+    # Pricing based on service type
+    # Tier discounts ONLY apply to certified/rmv translations
     if service_type == "standard":
-        price_per_page = get_tier_price_per_page(tier)
+        # Standard translation - $19.99/page, no tier discount
+        price_per_page = 19.99
         base_price = pages * price_per_page
-        discount_amount = pages * (24.99 - price_per_page)  # Savings from standard price
+        discount_amount = 0
+    elif service_type == "sworn":
+        # Sworn translation - $55.00/page, no tier discount
+        price_per_page = 55.00
+        base_price = pages * price_per_page
+        discount_amount = 0
     elif service_type == "professional":
-        # Professional translation doesn't have tier discounts
+        # Professional translation - per word pricing, no tier discounts
         base_price = word_count * 0.075
         discount_amount = 0
     else:
+        # Certified and RMV - tier discounts apply ($24.99 base)
         price_per_page = get_tier_price_per_page(tier)
         base_price = pages * price_per_page
         discount_amount = pages * (24.99 - price_per_page)
@@ -8662,7 +8670,14 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
         order_dict["partner_tier"] = effective_tier
         order_dict["tier_discount_percent"] = int(tier_discount * 100)
         order_dict["discount_amount"] = round(discount_amount, 2)
-        order_dict["original_price"] = round(page_count * 24.99 + urgency_fee, 2)  # Price without discount
+        # Calculate original price based on service type (price without tier discount)
+        if order_data.service_type == "standard":
+            original_price_per_page = 19.99
+        elif order_data.service_type == "sworn":
+            original_price_per_page = 55.00
+        else:  # certified, rmv
+            original_price_per_page = 24.99
+        order_dict["original_price"] = round(page_count * original_price_per_page + urgency_fee, 2)
         order_dict["loyalty_lock_active"] = tier_result.get("loyalty_lock_active", False)
 
         await db.translation_orders.insert_one(order_dict)
