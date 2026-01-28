@@ -14037,7 +14037,12 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
         if generate_combined_pdf:
             # Generate a single combined PDF with all parts
             try:
+                # Diagnostic logging for debugging attachment issues
                 logger.info(f"Generating combined PDF for order {order.get('order_number')}")
+                logger.info(f"  - translated_file exists: {bool(order.get('translated_file'))}, length: {len(str(order.get('translated_file', '')))}")
+                logger.info(f"  - translation_html exists: {bool(order.get('translation_html'))}, length: {len(str(order.get('translation_html', '')))}")
+                logger.info(f"  - translated_filename: {order.get('translated_filename', 'N/A')}")
+                logger.info(f"  - translated_file_type: {order.get('translated_file_type', 'N/A')}")
 
                 # Fetch original documents for the combined PDF
                 # First try to find explicitly marked originals
@@ -14080,7 +14085,12 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                     order_with_original["original_file_list"] = original_file_list
 
                 # Fetch translated documents from order_documents collection if not already on order
-                if not order_with_original.get("translated_file"):
+                # Check if translated_file exists AND has valid content (not empty or corrupted)
+                existing_translated_file = order_with_original.get("translated_file")
+                has_valid_translated_file = existing_translated_file and len(str(existing_translated_file)) > 100  # Valid base64 should be > 100 chars
+
+                if not has_valid_translated_file:
+                    logger.info(f"No valid translated_file on order, checking order_documents collection")
                     translated_docs = await db.order_documents.find({
                         "order_id": order_id,
                         "source": "translated_document"
@@ -14096,6 +14106,7 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                                 if "pdf" in content_type.lower():
                                     order_with_original["translated_file"] = trans_data
                                     order_with_original["translated_filename"] = trans_doc.get("filename", "translation.pdf")
+                                    order_with_original["translated_file_type"] = "application/pdf"  # IMPORTANT: Set correct type
                                     logger.info(f"Found translated PDF from order_documents: {trans_doc.get('filename')}")
                                     break
                                 # If it's an image (JPG, PNG), convert to PDF with full page size
@@ -14133,6 +14144,7 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                                         pdf_bytes = pdf_doc.tobytes()
                                         order_with_original["translated_file"] = base64.b64encode(pdf_bytes).decode('utf-8')
                                         order_with_original["translated_filename"] = trans_doc.get("filename", "translation.pdf").rsplit('.', 1)[0] + ".pdf"
+                                        order_with_original["translated_file_type"] = "application/pdf"  # IMPORTANT: Set correct type
                                         logger.info(f"Converted translated image to PDF (full size): {trans_doc.get('filename')}")
                                         pdf_doc.close()
                                         pil_img.close()
@@ -14199,6 +14211,7 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                                         pdf_bytes = pdf_doc.tobytes()
                                         order_with_original["translated_file"] = base64.b64encode(pdf_bytes).decode('utf-8')
                                         order_with_original["translated_filename"] = trans_doc.get("filename", "translation.html").rsplit('.', 1)[0] + ".pdf"
+                                        order_with_original["translated_file_type"] = "application/pdf"  # IMPORTANT: Set correct type
                                         logger.info(f"Converted HTML translation to PDF: {trans_doc.get('filename')}")
                                         pdf_doc.close()
                                         break
@@ -14759,6 +14772,66 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                                 })
                                 attachment_filenames.append(filename)
                             logger.info(f"Added fallback document from order_documents: {filename}")
+
+                # ULTIMATE FALLBACK: If still no attachments, try translation_html from order
+                if len(all_attachments) == 0 and order.get("translation_html"):
+                    logger.warning(f"Trying ultimate fallback: converting translation_html to PDF for order {order_id}")
+                    try:
+                        import fitz
+                        from bs4 import BeautifulSoup
+
+                        html_content = order.get("translation_html", "")
+                        soup = BeautifulSoup(html_content, 'html.parser')
+                        for script in soup(["script", "style"]):
+                            script.decompose()
+                        text_content = soup.get_text(separator='\n')
+                        lines = [line.strip() for line in text_content.split('\n') if line.strip()]
+
+                        if lines:  # Only create PDF if there's actual content
+                            pdf_doc = fitz.open()
+                            page_width, page_height = 612, 792
+                            blue_color = (0.11, 0.27, 0.53)
+
+                            def draw_header_ultimate(pg):
+                                pg.draw_rect(fitz.Rect(50, 40, page_width - 50, 43), color=blue_color, fill=blue_color)
+                                pg.insert_text((page_width/2 - 60, 30), "Legacy Translations", fontsize=12, fontname="helv", color=blue_color)
+                                pg.insert_text((page_width/2 - 50, 60), "TRANSLATION", fontsize=12, fontname="helvB", color=blue_color)
+
+                            page = pdf_doc.new_page(width=page_width, height=page_height)
+                            draw_header_ultimate(page)
+                            margin = 72
+                            y_pos = 100
+
+                            for line in lines:
+                                if y_pos > page_height - margin:
+                                    page = pdf_doc.new_page(width=page_width, height=page_height)
+                                    draw_header_ultimate(page)
+                                    y_pos = 100
+                                max_chars = 85
+                                while len(line) > max_chars:
+                                    page.insert_text((margin, y_pos), line[:max_chars], fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
+                                    y_pos += 14
+                                    line = line[max_chars:]
+                                    if y_pos > page_height - margin:
+                                        page = pdf_doc.new_page(width=page_width, height=page_height)
+                                        draw_header_ultimate(page)
+                                        y_pos = 100
+                                if line:
+                                    page.insert_text((margin, y_pos), line, fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
+                                    y_pos += 14
+
+                            pdf_bytes = pdf_doc.tobytes()
+                            pdf_doc.close()
+
+                            all_attachments.append({
+                                "content": base64.b64encode(pdf_bytes).decode('utf-8'),
+                                "filename": f"Translation_{order.get('order_number', 'document')}.pdf",
+                                "content_type": "application/pdf"
+                            })
+                            attachment_filenames.append(f"Translation_{order.get('order_number', 'document')}.pdf")
+                            logger.info(f"Created ultimate fallback PDF from translation_html for order {order_id}")
+                    except Exception as ultimate_err:
+                        logger.error(f"Ultimate fallback (translation_html) failed: {str(ultimate_err)}")
 
                 if len(all_attachments) == 0:
                     logger.error(f"NO ATTACHMENTS FOUND for order {order_id}! Order data: translated_file={bool(order.get('translated_file'))}, translation_html={bool(order.get('translation_html'))}")
