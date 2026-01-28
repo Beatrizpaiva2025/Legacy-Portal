@@ -13271,25 +13271,83 @@ async def generate_combined_delivery_pdf(
 
     # ==================== TRANSLATION PAGES ====================
     if include_translation:
-        # Check for existing translated file (PDF)
+        # Check for existing translated file (PDF or HTML)
         translated_file = order.get("translated_file")
+        translated_file_type = order.get("translated_file_type", "application/pdf").lower()
+        translated_filename = order.get("translated_filename", "").lower()
+        translation_added = False
+
         if translated_file:
-            try:
-                # Decode base64 PDF
-                pdf_bytes = base64.b64decode(translated_file)
-                trans_doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+            # Check if it's an HTML file that needs conversion
+            if "html" in translated_file_type or translated_filename.endswith(".html"):
+                try:
+                    from bs4 import BeautifulSoup
 
-                for page_num in range(len(trans_doc)):
-                    # Insert each page from the translated PDF
-                    doc.insert_pdf(trans_doc, from_page=page_num, to_page=page_num)
+                    html_bytes = base64.b64decode(translated_file)
+                    html_content = html_bytes.decode('utf-8')
 
-                trans_doc.close()
-            except Exception as e:
-                logger.error(f"Error adding translated PDF: {str(e)}")
+                    # Parse HTML and extract text
+                    soup = BeautifulSoup(html_content, 'html.parser')
+                    for script in soup(["script", "style"]):
+                        script.decompose()
+                    text_content = soup.get_text(separator='\n')
+                    lines = [line.strip() for line in text_content.split('\n') if line.strip()]
 
-        # Check for translation HTML (workspace content)
+                    # Helper function to draw header on translation pages
+                    def draw_html_translation_header(pg):
+                        pg.draw_rect(fitz.Rect(50, 40, page_width - 50, 43), color=blue_color, fill=blue_color)
+                        pg.insert_text((page_width/2 - 60, 30), "Legacy Translations", fontsize=12, fontname="helv", color=blue_color)
+                        pg.insert_text((page_width/2 - 50, 60), "TRANSLATION", fontsize=12, fontname="helvB", color=blue_color)
+                        pg.insert_text((page_width/2 - 100, 80), f"Order: {order_number} | {source_lang} → {target_lang}", fontsize=9, fontname="helv", color=gray_color)
+
+                    # Create first translation page with header
+                    page = doc.new_page(width=page_width, height=page_height)
+                    margin = 72
+                    y_position = 100
+                    draw_html_translation_header(page)
+
+                    # Render text content
+                    for line in lines:
+                        if y_position > page_height - margin:
+                            page = doc.new_page(width=page_width, height=page_height)
+                            draw_html_translation_header(page)
+                            y_position = 100
+
+                        max_chars = 85
+                        while len(line) > max_chars:
+                            page.insert_text((margin, y_position), line[:max_chars], fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
+                            y_position += 14
+                            line = line[max_chars:]
+                            if y_position > page_height - margin:
+                                page = doc.new_page(width=page_width, height=page_height)
+                                draw_html_translation_header(page)
+                                y_position = 100
+
+                        if line:
+                            page.insert_text((margin, y_position), line, fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
+                            y_position += 14
+
+                    logger.info(f"Rendered HTML translated file as text pages for order {order_number}")
+                    translation_added = True
+                except Exception as html_err:
+                    logger.error(f"Error rendering HTML translated file: {str(html_err)}")
+            else:
+                # Try to open as PDF
+                try:
+                    pdf_bytes = base64.b64decode(translated_file)
+                    trans_doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+
+                    for page_num in range(len(trans_doc)):
+                        doc.insert_pdf(trans_doc, from_page=page_num, to_page=page_num)
+
+                    trans_doc.close()
+                    translation_added = True
+                except Exception as e:
+                    logger.error(f"Error adding translated PDF: {str(e)}")
+
+        # Check for translation HTML (workspace content) if no translated file was added
         translation_html = order.get("translation_html")
-        if translation_html and not translated_file:
+        if translation_html and not translation_added:
             # Render HTML content as text pages in the PDF
             try:
                 from bs4 import BeautifulSoup
@@ -14197,21 +14255,75 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
 
                 # ==================== TRANSLATION PAGES ====================
                 if include_translation:
-                    # Check for existing translated file (PDF)
+                    # Check for existing translated file (PDF or HTML)
                     translated_file = order.get("translated_file")
-                    if translated_file:
-                        try:
-                            trans_bytes = base64.b64decode(translated_file)
-                            trans_doc = fitz.open(stream=trans_bytes, filetype="pdf")
-                            for page_num in range(len(trans_doc)):
-                                pdf_doc.insert_pdf(trans_doc, from_page=page_num, to_page=page_num)
-                            trans_doc.close()
-                            logger.info("Added translated PDF pages to combined document")
-                        except Exception as trans_err:
-                            logger.error(f"Error adding translated PDF: {str(trans_err)}")
+                    translated_file_type = order.get("translated_file_type", "application/pdf").lower()
+                    translated_filename = order.get("translated_filename", "").lower()
+                    translation_added = False
 
-                    # If no PDF but has HTML translation
-                    elif has_html_translation:
+                    if translated_file:
+                        # Check if it's an HTML file that needs conversion
+                        if "html" in translated_file_type or translated_filename.endswith(".html"):
+                            try:
+                                html_bytes = base64.b64decode(translated_file)
+                                html_content = html_bytes.decode('utf-8')
+                                soup = BeautifulSoup(html_content, 'html.parser')
+                                for script in soup(["script", "style"]):
+                                    script.decompose()
+                                text_content = soup.get_text(separator='\n')
+                                lines = [line.strip() for line in text_content.split('\n') if line.strip()]
+
+                                # Create translation page with header
+                                trans_page = pdf_doc.new_page(width=page_width, height=page_height)
+                                trans_page.draw_rect(fitz.Rect(50, 40, page_width - 50, 43), color=blue_color, fill=blue_color)
+                                trans_page.insert_text((page_width/2 - 60, 30), "Legacy Translations", fontsize=12, fontname="helv", color=blue_color)
+                                trans_page.insert_text((page_width/2 - 50, 60), "TRANSLATION", fontsize=12, fontname="helvB", color=blue_color)
+
+                                margin = 72
+                                y_position = 100
+                                for line in lines:
+                                    if y_position > page_height - margin:
+                                        trans_page = pdf_doc.new_page(width=page_width, height=page_height)
+                                        trans_page.draw_rect(fitz.Rect(50, 40, page_width - 50, 43), color=blue_color, fill=blue_color)
+                                        trans_page.insert_text((page_width/2 - 60, 30), "Legacy Translations", fontsize=12, fontname="helv", color=blue_color)
+                                        trans_page.insert_text((page_width/2 - 50, 60), "TRANSLATION", fontsize=12, fontname="helvB", color=blue_color)
+                                        y_position = 100
+
+                                    max_chars = 80
+                                    while len(line) > max_chars:
+                                        trans_page.insert_text((margin, y_position), line[:max_chars], fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
+                                        y_position += 14
+                                        line = line[max_chars:]
+                                        if y_position > page_height - margin:
+                                            trans_page = pdf_doc.new_page(width=page_width, height=page_height)
+                                            trans_page.draw_rect(fitz.Rect(50, 40, page_width - 50, 43), color=blue_color, fill=blue_color)
+                                            trans_page.insert_text((page_width/2 - 60, 30), "Legacy Translations", fontsize=12, fontname="helv", color=blue_color)
+                                            trans_page.insert_text((page_width/2 - 50, 60), "TRANSLATION", fontsize=12, fontname="helvB", color=blue_color)
+                                            y_position = 100
+
+                                    if line:
+                                        trans_page.insert_text((margin, y_position), line, fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
+                                        y_position += 14
+
+                                logger.info("Added HTML translated file as text pages to combined document")
+                                translation_added = True
+                            except Exception as html_err:
+                                logger.error(f"Error converting HTML translated file: {str(html_err)}")
+                        else:
+                            # Try to add as PDF
+                            try:
+                                trans_bytes = base64.b64decode(translated_file)
+                                trans_doc = fitz.open(stream=trans_bytes, filetype="pdf")
+                                for page_num in range(len(trans_doc)):
+                                    pdf_doc.insert_pdf(trans_doc, from_page=page_num, to_page=page_num)
+                                trans_doc.close()
+                                logger.info("Added translated PDF pages to combined document")
+                                translation_added = True
+                            except Exception as trans_err:
+                                logger.error(f"Error adding translated PDF: {str(trans_err)}")
+
+                    # If no translated file added but has HTML translation from workspace
+                    if not translation_added and has_html_translation:
                         try:
                             translation_html_content = generate_translation_html_for_email(order)
                             soup = BeautifulSoup(translation_html_content, 'html.parser')
