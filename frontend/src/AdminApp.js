@@ -13363,16 +13363,22 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     setDeliverySending(true);
     setDeliveryStatus('📄 Generating certified PDF package...');
 
+    // Get translator name from order data
+    const translatorName = deliveryModalOrder.translation_translator_name ||
+                          deliveryModalOrder.assigned_translator_name ||
+                          deliveryModalOrder.assigned_translator ||
+                          'Beatriz Paiva';
+
     try {
       const response = await axios.post(`${API}/admin/orders/${deliveryModalOrder.id}/deliver?admin_key=${adminKey}`, {
         include_verification_page: deliveryIncludeVerification,
-        certifier_name: selectedTranslator || 'Beatriz Paiva',
+        certifier_name: translatorName,
         // Combined PDF options
         generate_combined_pdf: true,
         include_certificate: true,
         include_translation: true,
         include_original: true,
-        translator_name: selectedTranslator || 'Beatriz Paiva',
+        translator_name: translatorName,
         document_type: deliveryModalOrder.document_type,
         source_language: deliveryModalOrder.source_language,
         target_language: deliveryModalOrder.target_language
