@@ -5403,8 +5403,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         .stamp-company { font-size: 10px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
         .stamp-ata { font-size: 8px; color: #2563eb; }
         .cover-page { page: cover; page-break-after: always; min-height: 100%; display: flex; flex-direction: column; }
-        .translation-page { page-break-before: always; padding-top: 15px; }
-        .cover-page + .translation-page { page-break-before: auto; }
+        .translation-page { page-break-after: always; page-break-inside: avoid; padding-top: 15px; }
+        .translation-page:first-of-type { page-break-before: auto; }
+        .translation-page:last-of-type { page-break-after: auto; }
         .translation-content { text-align: center; }
         .translation-content.translation-text {
             text-align: left;
@@ -5449,11 +5450,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             page-break-after: avoid;
         }
         .translation-content.translation-text ul, .translation-content.translation-text ol { margin: 8px 0 8px 20px; }
-        .translation-image { max-width: 100%; max-height: 700px; border: 1px solid #ddd; object-fit: contain; }
-        .page-title { font-size: 13px; font-weight: bold; text-align: center; margin: 15px 0 10px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; page-break-after: avoid; }
-        .original-documents-page { page-break-before: always; padding-top: 15px; }
-        .original-image-container { text-align: center; margin-bottom: 10px; }
-        .original-image { max-width: 100%; max-height: 650px; border: 1px solid #ddd; object-fit: contain; }
+        .translation-image { max-width: 100%; max-height: 680px; border: 1px solid #ddd; object-fit: contain; display: block; margin: 0 auto; }
+        .page-title { font-size: 13px; font-weight: bold; text-align: center; margin: 10px 0 8px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; page-break-after: avoid; }
+        .original-documents-page { page-break-after: always; page-break-inside: avoid; padding-top: 15px; }
+        .original-documents-page:last-of-type { page-break-after: auto; }
+        .original-image-container { text-align: center; margin-bottom: 5px; }
+        .original-image { max-width: 100%; max-height: 630px; border: 1px solid #ddd; object-fit: contain; display: block; margin: 0 auto; }
 
         /* Bank statement / Financial document optimization */
         .financial-doc .translation-content.translation-text {
@@ -5469,6 +5471,22 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 print-color-adjust: exact;
                 orphans: 4;
                 widows: 4;
+            }
+
+            /* Ensure each image page stays on its own page */
+            .translation-page {
+                page-break-after: always;
+                page-break-inside: avoid;
+            }
+            .translation-page:last-of-type {
+                page-break-after: auto;
+            }
+            .original-documents-page {
+                page-break-after: always;
+                page-break-inside: avoid;
+            }
+            .original-documents-page:last-of-type {
+                page-break-after: auto;
             }
 
             /* Running header for HTML content pages */
