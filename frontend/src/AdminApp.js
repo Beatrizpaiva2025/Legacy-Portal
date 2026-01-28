@@ -13643,8 +13643,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         include_certificate: true,
         include_translation: true,
         include_original: true,
-        certifier_name: selectedTranslator || 'Beatriz Paiva',
-        translator_name: selectedTranslator || 'Beatriz Paiva',
+        certifier_name: sendingOrder?.assigned_translator_name || sendingOrder?.assigned_translator || 'Beatriz Paiva',
+        translator_name: sendingOrder?.assigned_translator_name || sendingOrder?.assigned_translator || 'Beatriz Paiva',
         document_type: sendingOrder?.document_type,
         source_language: sendingOrder?.source_language,
         target_language: sendingOrder?.target_language
