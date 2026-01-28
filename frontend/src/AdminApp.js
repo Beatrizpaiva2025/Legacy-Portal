@@ -263,6 +263,12 @@ const WriteIcon = ({ className = "w-3 h-3" }) => (
   </svg>
 );
 
+const DownloadIcon = ({ className = "w-3 h-3" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+  </svg>
+);
+
 // ==================== ADMIN LOGIN ====================
 const AdminLogin = ({ onLogin }) => {
   const [email, setEmail] = useState('');
@@ -12909,6 +12915,9 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewCurrentPage, setReviewCurrentPage] = useState(0);
 
+  // Download package state
+  const [downloadingPackage, setDownloadingPackage] = useState(null); // Order ID being downloaded
+
   const [newProject, setNewProject] = useState({
     client_name: '',
     client_email: '',
@@ -13158,6 +13167,205 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     } catch (err) {
       console.error('Failed to reopen order:', err);
       alert('Error reopening order');
+    }
+  };
+
+  // Download complete translation package (PDF/Print)
+  const downloadOrderPackage = async (order) => {
+    setDownloadingPackage(order.id);
+    try {
+      // Fetch complete order data with translation
+      const orderResponse = await axios.get(`${API}/admin/orders/${order.id}?admin_key=${adminKey}`);
+      const orderData = orderResponse.data.order || orderResponse.data;
+
+      if (!orderData.translation_html && !orderData.translation_ready) {
+        alert('This order does not have a completed translation yet.');
+        setDownloadingPackage(null);
+        return;
+      }
+
+      // Fetch order documents for originals
+      let originalDocuments = [];
+      try {
+        const docsResponse = await axios.get(`${API}/admin/order-documents?order_id=${order.id}&admin_key=${adminKey}`);
+        const docs = docsResponse.data.documents || docsResponse.data || [];
+
+        // Load original documents (not translations)
+        for (const doc of docs.filter(d => d.document_type !== 'translation')) {
+          try {
+            const docData = await axios.get(`${API}/admin/order-documents/${doc.id}/download?admin_key=${adminKey}`);
+            if (docData.data.file_data) {
+              originalDocuments.push({
+                filename: doc.filename,
+                data: docData.data.file_data,
+                type: docData.data.content_type || 'image/png'
+              });
+            }
+          } catch (docErr) {
+            console.warn('Failed to load document:', doc.id);
+          }
+        }
+      } catch (docsErr) {
+        console.warn('Failed to fetch documents:', docsErr);
+      }
+
+      // Build package HTML
+      const translatorName = orderData.translation_translator_name || orderData.assigned_translator_name || orderData.assigned_translator || 'Beatriz Paiva';
+      const documentType = DOCUMENT_TYPES.find(d => d.value === orderData.document_type)?.label || orderData.document_type || 'Document';
+      const sourceLanguage = orderData.translate_from || orderData.source_language || 'Portuguese';
+      const targetLanguage = orderData.translate_to || orderData.target_language || 'English';
+      const translationDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+      // Letterhead HTML
+      const letterheadHTML = `
+        <div class="header">
+          <div class="logo-left">
+            <div class="logo-placeholder"><span style="text-align:center;">LEGACY<br/>TRANSLATIONS</span></div>
+          </div>
+          <div class="header-center">
+            <div class="company-name">Legacy Translations</div>
+            <div class="company-address">
+              867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116<br>
+              (857) 316-7770 · contact@legacytranslations.com
+            </div>
+          </div>
+          <div class="logo-right">
+            <div class="logo-placeholder-right"><span>ata<br/>Member #275993</span></div>
+          </div>
+        </div>
+        <div class="header-line"></div>`;
+
+      // Cover Letter
+      const coverLetterHTML = `
+      <div class="cover-page">
+        ${letterheadHTML}
+        ${orderData.order_number ? `<div class="order-number">Order # <strong>${orderData.order_number}</strong></div>` : ''}
+        <h1 class="main-title">Certification of Translation Accuracy</h1>
+        <div class="subtitle">
+          Translation of a <strong>${documentType}</strong> from <strong>${sourceLanguage}</strong> to<br>
+          <strong>${targetLanguage}</strong>
+        </div>
+        <p class="body-text">I, the undersigned, hereby certify that the attached document is, to the best of my knowledge and belief, a true and accurate translation of the original document from ${sourceLanguage} to ${targetLanguage}.</p>
+        <p class="body-text">I am competent to translate from ${sourceLanguage} to ${targetLanguage}, and this translation is complete and accurate.</p>
+        <p class="body-text">This certification is valid for official use, including immigration, legal, and academic purposes.</p>
+        <div class="footer-section">
+          <div class="signature-block">
+            <div style="font-family: 'Times New Roman', serif; font-size: 18px; font-style: italic; color: #1a365d; margin-bottom: 2px;">${translatorName}</div>
+            <div class="signature-name">Authorized Representative</div>
+            <div class="signature-title">Legacy Translations Inc.</div>
+            <div class="signature-date">Dated: ${translationDate}</div>
+          </div>
+          <div class="stamp-container">
+            <div class="stamp">
+              <div class="stamp-text-top">CERTIFIED TRANSLATOR</div>
+              <div class="stamp-center">
+                <div class="stamp-company">LEGACY TRANSLATIONS</div>
+                <div class="stamp-ata">ATA # 275993</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+
+      // Translation pages HTML
+      let translationPagesHTML = '';
+      if (orderData.translation_html) {
+        translationPagesHTML = `
+        <div class="translation-text-page">
+          <div class="running-header">${letterheadHTML}</div>
+          <div class="running-header-spacer"></div>
+          <div class="translation-content translation-text">${orderData.translation_html}</div>
+        </div>`;
+      }
+
+      // Original documents pages
+      const originalPagesHTML = originalDocuments.length > 0 ? originalDocuments.map((file, idx) => `
+      <div class="original-documents-page">
+        ${letterheadHTML}
+        ${idx === 0 ? '<div class="page-title">Original Document</div>' : ''}
+        <div class="original-image-container">
+          <img src="data:${file.type};base64,${file.data}" alt="Original page ${idx + 1}" class="original-image" />
+        </div>
+      </div>`).join('') : '';
+
+      // Complete HTML document
+      const fullHTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Certified Translation - ${orderData.order_number || 'Document'}</title>
+  <style>
+    @page { size: Letter; margin: 0.5in 0.6in 0.6in 0.6in; }
+    @page cover { size: Letter; margin: 0.75in; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Times New Roman', Georgia, serif; font-size: 13px; line-height: 1.5; color: #333; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; }
+    .header-line { height: 3px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 12px; }
+    .logo-left { width: 130px; height: 55px; display: flex; align-items: center; }
+    .logo-placeholder { width: 130px; height: 55px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #999; background: #fafafa; }
+    .header-center { text-align: center; flex: 1; padding: 0 15px; }
+    .company-name { font-size: 15px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
+    .company-address { font-size: 9px; line-height: 1.3; color: #333; }
+    .logo-right { width: 85px; height: 55px; display: flex; align-items: center; justify-content: flex-end; }
+    .logo-placeholder-right { width: 85px; height: 55px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #1a365d; background: #fafafa; text-align: center; font-style: italic; }
+    .order-number { text-align: right; margin-bottom: 20px; font-size: 12px; margin-top: 5px; }
+    .main-title { text-align: center; font-size: 26px; font-weight: normal; margin-bottom: 20px; color: #1a365d; line-height: 1.2; }
+    .subtitle { text-align: center; font-size: 13px; margin-bottom: 25px; line-height: 1.5; }
+    .body-text { text-align: justify; margin-bottom: 14px; line-height: 1.6; font-size: 12px; }
+    .footer-section { display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; padding-top: 20px; }
+    .signature-block { line-height: 1.3; }
+    .signature-name { font-weight: bold; font-size: 13px; }
+    .signature-title { font-weight: bold; font-size: 12px; }
+    .signature-date { font-size: 12px; }
+    .stamp-container { width: 130px; height: 130px; }
+    .stamp { width: 130px; height: 130px; border: 3px solid #2563eb; border-radius: 50%; position: relative; display: flex; align-items: center; justify-content: center; background: white; }
+    .stamp::before { content: ''; position: absolute; top: 7px; left: 7px; right: 7px; bottom: 7px; border: 1px solid #2563eb; border-radius: 50%; }
+    .stamp-text-top { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); font-size: 8px; font-weight: bold; color: #2563eb; letter-spacing: 1.5px; }
+    .stamp-center { text-align: center; padding: 0 12px; }
+    .stamp-company { font-size: 10px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
+    .stamp-ata { font-size: 8px; color: #2563eb; }
+    .cover-page { page: cover; page-break-after: always; min-height: 100%; display: flex; flex-direction: column; }
+    .translation-text-page { page-break-before: always; }
+    .translation-content.translation-text { text-align: left; font-family: 'Times New Roman', Georgia, serif; font-size: 11pt; line-height: 1.5; color: #333; }
+    .translation-content.translation-text p { margin-bottom: 10px; text-align: justify; }
+    .translation-content.translation-text table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+    .translation-content.translation-text td, .translation-content.translation-text th { border: 1px solid #333; padding: 6px; font-size: 10pt; }
+    .page-title { font-size: 13px; font-weight: bold; text-align: center; margin: 10px 0 8px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
+    .original-documents-page { page-break-after: always; page-break-inside: avoid; padding-top: 15px; }
+    .original-documents-page:last-of-type { page-break-after: auto; }
+    .original-image-container { text-align: center; margin-bottom: 5px; }
+    .original-image { max-width: 100%; max-height: 630px; border: 1px solid #ddd; object-fit: contain; display: block; margin: 0 auto; }
+    @media print {
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .running-header { position: fixed; top: 0; left: 0; right: 0; background: white; padding: 20px 50px 10px; }
+      .running-header-spacer { height: 100px; }
+    }
+  </style>
+</head>
+<body>
+  ${coverLetterHTML}
+  ${translationPagesHTML}
+  ${originalPagesHTML}
+</body>
+</html>`;
+
+      // Open print window
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(fullHTML);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => {
+          printWindow.print();
+        }, 500);
+      } else {
+        alert('Please allow popups to download the translation package.');
+      }
+    } catch (err) {
+      console.error('Failed to download package:', err);
+      alert('Error generating translation package: ' + (err.message || 'Unknown error'));
+    } finally {
+      setDownloadingPackage(null);
     }
   };
 
@@ -15714,6 +15922,18 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             >
                               <SearchIcon className="w-4 h-4 text-emerald-500" />
                               Review Side-by-Side
+                            </button>
+                          )}
+
+                          {/* Download Translation Package */}
+                          {(isAdmin || isPM) && (order.translation_ready || ['ready', 'delivered', 'final', 'pending_admin_approval', 'pending_admin_review', 'finalized_pending_admin', 'review', 'pending_pm_review'].includes(order.translation_status)) && (
+                            <button
+                              onClick={() => { downloadOrderPackage(order); setOpenActionsDropdown(null); }}
+                              disabled={downloadingPackage === order.id}
+                              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-purple-50 flex items-center gap-2 disabled:opacity-50"
+                            >
+                              <DownloadIcon className="w-4 h-4 text-purple-500" />
+                              {downloadingPackage === order.id ? 'Generating...' : 'Download Package (PDF)'}
                             </button>
                           )}
 
@@ -24821,6 +25041,9 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   const [tempTrDeadline, setTempTrDeadline] = useState({ date: '', time: '17:00' });
   const [savingTrDeadline, setSavingTrDeadline] = useState(false);
 
+  // Download package state
+  const [downloadingPackagePM, setDownloadingPackagePM] = useState(null); // Order ID being downloaded
+
   const [stats, setStats] = useState({
     totalProjects: 0,
     inProgress: 0,
@@ -25095,6 +25318,205 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     setMessages(updatedMessages);
     localStorage.setItem(`pm_messages_${user?.id}`, JSON.stringify(updatedMessages));
     setNewMessage('');
+  };
+
+  // Download complete translation package (PDF/Print) for PM Dashboard
+  const downloadOrderPackagePM = async (order) => {
+    setDownloadingPackagePM(order.id);
+    try {
+      // Fetch complete order data with translation
+      const orderResponse = await axios.get(`${API}/admin/orders/${order.id}?admin_key=${adminKey}`);
+      const orderData = orderResponse.data.order || orderResponse.data;
+
+      if (!orderData.translation_html && !orderData.translation_ready) {
+        alert('This order does not have a completed translation yet.');
+        setDownloadingPackagePM(null);
+        return;
+      }
+
+      // Fetch order documents for originals
+      let originalDocuments = [];
+      try {
+        const docsResponse = await axios.get(`${API}/admin/order-documents?order_id=${order.id}&admin_key=${adminKey}`);
+        const docs = docsResponse.data.documents || docsResponse.data || [];
+
+        // Load original documents (not translations)
+        for (const doc of docs.filter(d => d.document_type !== 'translation')) {
+          try {
+            const docData = await axios.get(`${API}/admin/order-documents/${doc.id}/download?admin_key=${adminKey}`);
+            if (docData.data.file_data) {
+              originalDocuments.push({
+                filename: doc.filename,
+                data: docData.data.file_data,
+                type: docData.data.content_type || 'image/png'
+              });
+            }
+          } catch (docErr) {
+            console.warn('Failed to load document:', doc.id);
+          }
+        }
+      } catch (docsErr) {
+        console.warn('Failed to fetch documents:', docsErr);
+      }
+
+      // Build package HTML
+      const translatorName = orderData.translation_translator_name || orderData.assigned_translator_name || orderData.assigned_translator || 'Beatriz Paiva';
+      const documentType = DOCUMENT_TYPES.find(d => d.value === orderData.document_type)?.label || orderData.document_type || 'Document';
+      const sourceLanguage = orderData.translate_from || orderData.source_language || 'Portuguese';
+      const targetLanguage = orderData.translate_to || orderData.target_language || 'English';
+      const translationDateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+      // Letterhead HTML
+      const letterheadHTML = `
+        <div class="header">
+          <div class="logo-left">
+            <div class="logo-placeholder"><span style="text-align:center;">LEGACY<br/>TRANSLATIONS</span></div>
+          </div>
+          <div class="header-center">
+            <div class="company-name">Legacy Translations</div>
+            <div class="company-address">
+              867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116<br>
+              (857) 316-7770 · contact@legacytranslations.com
+            </div>
+          </div>
+          <div class="logo-right">
+            <div class="logo-placeholder-right"><span>ata<br/>Member #275993</span></div>
+          </div>
+        </div>
+        <div class="header-line"></div>`;
+
+      // Cover Letter
+      const coverLetterHTML = `
+      <div class="cover-page">
+        ${letterheadHTML}
+        ${orderData.order_number ? `<div class="order-number">Order # <strong>${orderData.order_number}</strong></div>` : ''}
+        <h1 class="main-title">Certification of Translation Accuracy</h1>
+        <div class="subtitle">
+          Translation of a <strong>${documentType}</strong> from <strong>${sourceLanguage}</strong> to<br>
+          <strong>${targetLanguage}</strong>
+        </div>
+        <p class="body-text">I, the undersigned, hereby certify that the attached document is, to the best of my knowledge and belief, a true and accurate translation of the original document from ${sourceLanguage} to ${targetLanguage}.</p>
+        <p class="body-text">I am competent to translate from ${sourceLanguage} to ${targetLanguage}, and this translation is complete and accurate.</p>
+        <p class="body-text">This certification is valid for official use, including immigration, legal, and academic purposes.</p>
+        <div class="footer-section">
+          <div class="signature-block">
+            <div style="font-family: 'Times New Roman', serif; font-size: 18px; font-style: italic; color: #1a365d; margin-bottom: 2px;">${translatorName}</div>
+            <div class="signature-name">Authorized Representative</div>
+            <div class="signature-title">Legacy Translations Inc.</div>
+            <div class="signature-date">Dated: ${translationDateStr}</div>
+          </div>
+          <div class="stamp-container">
+            <div class="stamp">
+              <div class="stamp-text-top">CERTIFIED TRANSLATOR</div>
+              <div class="stamp-center">
+                <div class="stamp-company">LEGACY TRANSLATIONS</div>
+                <div class="stamp-ata">ATA # 275993</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+
+      // Translation pages HTML
+      let translationPagesHTML = '';
+      if (orderData.translation_html) {
+        translationPagesHTML = `
+        <div class="translation-text-page">
+          <div class="running-header">${letterheadHTML}</div>
+          <div class="running-header-spacer"></div>
+          <div class="translation-content translation-text">${orderData.translation_html}</div>
+        </div>`;
+      }
+
+      // Original documents pages
+      const originalPagesHTML = originalDocuments.length > 0 ? originalDocuments.map((file, idx) => `
+      <div class="original-documents-page">
+        ${letterheadHTML}
+        ${idx === 0 ? '<div class="page-title">Original Document</div>' : ''}
+        <div class="original-image-container">
+          <img src="data:${file.type};base64,${file.data}" alt="Original page ${idx + 1}" class="original-image" />
+        </div>
+      </div>`).join('') : '';
+
+      // Complete HTML document
+      const fullHTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Certified Translation - ${orderData.order_number || 'Document'}</title>
+  <style>
+    @page { size: Letter; margin: 0.5in 0.6in 0.6in 0.6in; }
+    @page cover { size: Letter; margin: 0.75in; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Times New Roman', Georgia, serif; font-size: 13px; line-height: 1.5; color: #333; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; }
+    .header-line { height: 3px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 12px; }
+    .logo-left { width: 130px; height: 55px; display: flex; align-items: center; }
+    .logo-placeholder { width: 130px; height: 55px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #999; background: #fafafa; }
+    .header-center { text-align: center; flex: 1; padding: 0 15px; }
+    .company-name { font-size: 15px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
+    .company-address { font-size: 9px; line-height: 1.3; color: #333; }
+    .logo-right { width: 85px; height: 55px; display: flex; align-items: center; justify-content: flex-end; }
+    .logo-placeholder-right { width: 85px; height: 55px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #1a365d; background: #fafafa; text-align: center; font-style: italic; }
+    .order-number { text-align: right; margin-bottom: 20px; font-size: 12px; margin-top: 5px; }
+    .main-title { text-align: center; font-size: 26px; font-weight: normal; margin-bottom: 20px; color: #1a365d; line-height: 1.2; }
+    .subtitle { text-align: center; font-size: 13px; margin-bottom: 25px; line-height: 1.5; }
+    .body-text { text-align: justify; margin-bottom: 14px; line-height: 1.6; font-size: 12px; }
+    .footer-section { display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; padding-top: 20px; }
+    .signature-block { line-height: 1.3; }
+    .signature-name { font-weight: bold; font-size: 13px; }
+    .signature-title { font-weight: bold; font-size: 12px; }
+    .signature-date { font-size: 12px; }
+    .stamp-container { width: 130px; height: 130px; }
+    .stamp { width: 130px; height: 130px; border: 3px solid #2563eb; border-radius: 50%; position: relative; display: flex; align-items: center; justify-content: center; background: white; }
+    .stamp::before { content: ''; position: absolute; top: 7px; left: 7px; right: 7px; bottom: 7px; border: 1px solid #2563eb; border-radius: 50%; }
+    .stamp-text-top { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); font-size: 8px; font-weight: bold; color: #2563eb; letter-spacing: 1.5px; }
+    .stamp-center { text-align: center; padding: 0 12px; }
+    .stamp-company { font-size: 10px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
+    .stamp-ata { font-size: 8px; color: #2563eb; }
+    .cover-page { page: cover; page-break-after: always; min-height: 100%; display: flex; flex-direction: column; }
+    .translation-text-page { page-break-before: always; }
+    .translation-content.translation-text { text-align: left; font-family: 'Times New Roman', Georgia, serif; font-size: 11pt; line-height: 1.5; color: #333; }
+    .translation-content.translation-text p { margin-bottom: 10px; text-align: justify; }
+    .translation-content.translation-text table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+    .translation-content.translation-text td, .translation-content.translation-text th { border: 1px solid #333; padding: 6px; font-size: 10pt; }
+    .page-title { font-size: 13px; font-weight: bold; text-align: center; margin: 10px 0 8px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
+    .original-documents-page { page-break-after: always; page-break-inside: avoid; padding-top: 15px; }
+    .original-documents-page:last-of-type { page-break-after: auto; }
+    .original-image-container { text-align: center; margin-bottom: 5px; }
+    .original-image { max-width: 100%; max-height: 630px; border: 1px solid #ddd; object-fit: contain; display: block; margin: 0 auto; }
+    @media print {
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .running-header { position: fixed; top: 0; left: 0; right: 0; background: white; padding: 20px 50px 10px; }
+      .running-header-spacer { height: 100px; }
+    }
+  </style>
+</head>
+<body>
+  ${coverLetterHTML}
+  ${translationPagesHTML}
+  ${originalPagesHTML}
+</body>
+</html>`;
+
+      // Open print window
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(fullHTML);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => {
+          printWindow.print();
+        }, 500);
+      } else {
+        alert('Please allow popups to download the translation package.');
+      }
+    } catch (err) {
+      console.error('Failed to download package:', err);
+      alert('Error generating translation package: ' + (err.message || 'Unknown error'));
+    } finally {
+      setDownloadingPackagePM(null);
+    }
   };
 
   // View project files and assign translators
@@ -26581,6 +27003,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     <th className="text-left py-2 px-2">Translator</th>
                     <th className="text-left py-2 px-2">Status</th>
                     <th className="text-left py-2 px-2">Deadline</th>
+                    <th className="text-center py-2 px-2">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -26662,6 +27085,18 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                       </td>
                       <td className="py-2 px-2">
                         {order.deadline ? formatDateLocal(order.deadline) : '-'}
+                      </td>
+                      <td className="py-2 px-2 text-center">
+                        {(order.translation_ready || ['ready', 'delivered', 'final', 'pending_admin_approval', 'pending_admin_review', 'finalized_pending_admin', 'review', 'pending_pm_review'].includes(order.translation_status)) && (
+                          <button
+                            onClick={() => downloadOrderPackagePM(order)}
+                            disabled={downloadingPackagePM === order.id}
+                            className="px-2 py-1 bg-purple-500 text-white rounded text-[10px] hover:bg-purple-600 disabled:bg-gray-400 flex items-center gap-1 mx-auto"
+                            title="Download complete translation package"
+                          >
+                            {downloadingPackagePM === order.id ? '...' : '📥 Package'}
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
