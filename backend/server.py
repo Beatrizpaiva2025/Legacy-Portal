@@ -13301,23 +13301,26 @@ async def generate_combined_delivery_pdf(
                 text_content = soup.get_text(separator='\n')
                 lines = [line.strip() for line in text_content.split('\n') if line.strip()]
 
+                # Helper function to draw header on translation pages
+                def draw_translation_header(pg):
+                    pg.draw_rect(fitz.Rect(50, 40, page_width - 50, 43), color=blue_color, fill=blue_color)
+                    pg.insert_text((page_width/2 - 60, 30), "Legacy Translations", fontsize=12, fontname="helv", color=blue_color)
+                    pg.insert_text((page_width/2 - 50, 60), "TRANSLATION", fontsize=12, fontname="helvB", color=blue_color)
+                    pg.insert_text((page_width/2 - 100, 80), f"Order: {order_number} | {source_lang} → {target_lang}", fontsize=9, fontname="helv", color=gray_color)
+
                 # Create first translation page with header
                 page = doc.new_page(width=page_width, height=page_height)
                 margin = 72
                 y_position = 100
-
-                # Header
-                page.draw_rect(fitz.Rect(50, 40, page_width - 50, 43), color=blue_color, fill=blue_color)
-                page.insert_text((page_width/2 - 60, 30), "Legacy Translations", fontsize=12, fontname="helv", color=blue_color)
-                page.insert_text((page_width/2 - 50, 60), "TRANSLATION", fontsize=12, fontname="helvB", color=blue_color)
-                page.insert_text((page_width/2 - 100, 80), f"Order: {order_number} | {source_lang} → {target_lang}", fontsize=9, fontname="helv", color=gray_color)
+                draw_translation_header(page)
 
                 # Render text content line by line with page breaks
                 for line in lines:
                     if y_position > page_height - margin:
-                        # Create new page when current is full
+                        # Create new page when current is full - WITH HEADER
                         page = doc.new_page(width=page_width, height=page_height)
-                        y_position = margin
+                        draw_translation_header(page)
+                        y_position = 100  # Start after header
 
                     # Handle long lines by wrapping
                     max_chars = 85
@@ -13326,8 +13329,10 @@ async def generate_combined_delivery_pdf(
                         y_position += 14
                         line = line[max_chars:]
                         if y_position > page_height - margin:
+                            # Create new page when current is full - WITH HEADER
                             page = doc.new_page(width=page_width, height=page_height)
-                            y_position = margin
+                            draw_translation_header(page)
+                            y_position = 100  # Start after header
 
                     if line:
                         page.insert_text((margin, y_position), line, fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
