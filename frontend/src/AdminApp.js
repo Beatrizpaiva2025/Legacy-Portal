@@ -8031,7 +8031,38 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     <span className="text-xs font-bold text-gray-700">🌐 Translation ({targetLanguage})</span>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-0" style={{height: '450px'}}>
+                {/* Edit Mode Toggle and Toolbar - Outside the grid for consistent height */}
+                {isInHouseTranslator && translationResults.length > 0 && (
+                  <div className="flex items-center justify-between px-2 py-1 bg-gray-100 border-b">
+                    <span className="text-[10px] text-gray-600">Mode:</span>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => setTranslationEditMode && setTranslationEditMode(false)}
+                        className={`px-2 py-0.5 text-[10px] rounded ${!translationEditMode ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border'}`}
+                      >
+                        Preview
+                      </button>
+                      <button
+                        onClick={() => setTranslationEditMode && setTranslationEditMode(true)}
+                        className={`px-2 py-0.5 text-[10px] rounded ${translationEditMode ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border'}`}
+                      >
+                        ✏️ Edit
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {isInHouseTranslator && translationEditMode && translationResults.length > 0 && (
+                  <div className="flex gap-1 px-2 py-1 bg-gray-50 border-b flex-wrap">
+                    <button onClick={() => document.execCommand('bold')} className="px-2 py-0.5 text-xs border rounded hover:bg-gray-100 font-bold" title="Bold">B</button>
+                    <button onClick={() => document.execCommand('italic')} className="px-2 py-0.5 text-xs border rounded hover:bg-gray-100 italic" title="Italic">I</button>
+                    <button onClick={() => document.execCommand('underline')} className="px-2 py-0.5 text-xs border rounded hover:bg-gray-100 underline" title="Underline">U</button>
+                    <span className="border-l mx-1"></span>
+                    <button onClick={() => document.execCommand('fontSize', false, '2')} className="px-2 py-0.5 text-[10px] border rounded hover:bg-gray-100" title="Small">A-</button>
+                    <button onClick={() => document.execCommand('fontSize', false, '4')} className="px-2 py-0.5 text-xs border rounded hover:bg-gray-100" title="Normal">A</button>
+                    <button onClick={() => document.execCommand('fontSize', false, '6')} className="px-2 py-0.5 text-sm border rounded hover:bg-gray-100" title="Large">A+</button>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-0 h-[500px] overflow-hidden">
                   {/* Left: Original Document */}
                   <div className="border-r overflow-auto bg-gray-50 p-2">
                     {originalImages.map((img, idx) => (
@@ -8041,7 +8072,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             src={getImageSrc(img)}
                             type="application/pdf"
                             className="w-full border shadow-sm"
-                            style={{height: '430px'}}
+                            style={{height: '480px'}}
                           />
                         ) : (
                           <img
@@ -8055,46 +8086,14 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   </div>
 
                   {/* Right: Translation Result - With Edit Mode for In-House Translators */}
-                  <div className="overflow-auto bg-white flex flex-col">
-                    {/* Edit Mode Toggle - Only for In-House Translators */}
-                    {isInHouseTranslator && translationResults.length > 0 && (
-                      <div className="flex items-center justify-between px-2 py-1 bg-gray-100 border-b">
-                        <span className="text-[10px] text-gray-600">Mode:</span>
-                        <div className="flex gap-1">
-                          <button
-                            onClick={() => setTranslationEditMode && setTranslationEditMode(false)}
-                            className={`px-2 py-0.5 text-[10px] rounded ${!translationEditMode ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border'}`}
-                          >
-                            Preview
-                          </button>
-                          <button
-                            onClick={() => setTranslationEditMode && setTranslationEditMode(true)}
-                            className={`px-2 py-0.5 text-[10px] rounded ${translationEditMode ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border'}`}
-                          >
-                            ✏️ Edit
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                    {/* Edit Toolbar - Only when in Edit Mode for In-House */}
-                    {isInHouseTranslator && translationEditMode && translationResults.length > 0 && (
-                      <div className="flex gap-1 px-2 py-1 bg-gray-50 border-b flex-wrap">
-                        <button onClick={() => document.execCommand('bold')} className="px-2 py-0.5 text-xs border rounded hover:bg-gray-100 font-bold" title="Bold">B</button>
-                        <button onClick={() => document.execCommand('italic')} className="px-2 py-0.5 text-xs border rounded hover:bg-gray-100 italic" title="Italic">I</button>
-                        <button onClick={() => document.execCommand('underline')} className="px-2 py-0.5 text-xs border rounded hover:bg-gray-100 underline" title="Underline">U</button>
-                        <span className="border-l mx-1"></span>
-                        <button onClick={() => document.execCommand('fontSize', false, '2')} className="px-2 py-0.5 text-[10px] border rounded hover:bg-gray-100" title="Small">A-</button>
-                        <button onClick={() => document.execCommand('fontSize', false, '4')} className="px-2 py-0.5 text-xs border rounded hover:bg-gray-100" title="Normal">A</button>
-                        <button onClick={() => document.execCommand('fontSize', false, '6')} className="px-2 py-0.5 text-sm border rounded hover:bg-gray-100" title="Large">A+</button>
-                      </div>
-                    )}
+                  <div className="overflow-auto bg-white flex flex-col h-full">
                     {translationResults.length > 0 ? (
                       isInHouseTranslator && translationEditMode ? (
                         <div
                           contentEditable
                           suppressContentEditableWarning
-                          className="flex-1 p-3 overflow-auto focus:outline-none"
-                          style={{minHeight: '450px', height: '450px'}}
+                          className="p-3 overflow-auto focus:outline-none h-full"
+                          style={{width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
                           dangerouslySetInnerHTML={{ __html: translationResults[0]?.translatedText || '<p>No translation</p>' }}
                           onBlur={(e) => {
                             // Save edits back to translationResults
@@ -8107,12 +8106,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         <iframe
                           srcDoc={translationResults[0]?.translatedText || '<p>No translation</p>'}
                           title="Translation"
-                          className="w-full h-full border-0 flex-1"
-                          style={{minHeight: '450px', height: '450px'}}
+                          className="w-full h-full border-0"
                         />
                       )
                     ) : (
-                      <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4 flex-1">
+                      <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
                         <div className="text-center">
                           <div className="text-3xl mb-2">🌐</div>
                           <p>Click "Translate" to start</p>
@@ -9378,8 +9376,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       <iframe
                         srcDoc={translationResults[selectedResultIndex]?.translatedText || '<p>No translation</p>'}
                         title="Translation Preview"
-                        className="w-full border-0 flex-1"
-                        style={{minHeight: '380px', height: '380px'}}
+                        className="w-full h-full border-0"
                       />
                     ) : (
                       <div
@@ -9389,8 +9386,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
                         onMouseUp={saveSelection}
                         onKeyUp={saveSelection}
-                        className="p-3 text-xs focus:outline-none overflow-auto flex-1"
-                        style={{minHeight: '380px', height: '380px', width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
+                        className="p-3 text-xs focus:outline-none overflow-auto h-full"
+                        style={{width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
                       />
                     )}
                   </div>
@@ -9589,6 +9586,21 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     </div>
                   </div>
                 </div>
+                {/* Toolbar outside the height-constrained grid */}
+                {proofreadingViewMode === 'edit' && (
+                  <div className="flex items-center space-x-1 bg-gray-100 px-2 py-1 border-b">
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('bold'); }} className="px-2 py-1 text-xs font-bold bg-white border rounded hover:bg-gray-200">B</button>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('italic'); }} className="px-2 py-1 text-xs italic bg-white border rounded hover:bg-gray-200">I</button>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('underline'); }} className="px-2 py-1 text-xs underline bg-white border rounded hover:bg-gray-200">U</button>
+                    <div className="w-px h-5 bg-gray-300 mx-1"></div>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('decreaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200">A-</button>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('increaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200">A+</button>
+                    <div className="w-px h-5 bg-gray-300 mx-1"></div>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyLeft'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Left">⬅</button>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyCenter'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Center">⬌</button>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyRight'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Right">➡</button>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-0 h-[600px] overflow-hidden">
                   {/* Left: Original Document */}
                   <div className="border-r overflow-auto bg-gray-50 p-2">
@@ -9616,26 +9628,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   </div>
                   {/* Right: Translation */}
                   <div className="overflow-hidden bg-white flex flex-col h-full">
-                    {proofreadingViewMode === 'edit' && (
-                      <div className="flex items-center space-x-1 bg-gray-100 px-2 py-1 border-b flex-shrink-0">
-                        <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('bold'); }} className="px-2 py-1 text-xs font-bold bg-white border rounded hover:bg-gray-200">B</button>
-                        <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('italic'); }} className="px-2 py-1 text-xs italic bg-white border rounded hover:bg-gray-200">I</button>
-                        <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('underline'); }} className="px-2 py-1 text-xs underline bg-white border rounded hover:bg-gray-200">U</button>
-                        <div className="w-px h-5 bg-gray-300 mx-1"></div>
-                        <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('decreaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200">A-</button>
-                        <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('increaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200">A+</button>
-                        <div className="w-px h-5 bg-gray-300 mx-1"></div>
-                        <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyLeft'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Left">⬅</button>
-                        <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyCenter'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Center">⬌</button>
-                        <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyRight'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Right">➡</button>
-                      </div>
-                    )}
                     {proofreadingViewMode === 'preview' ? (
                       <iframe
                         srcDoc={getHighlightedTranslation()}
                         title="Translation Preview"
-                        className="w-full border-0 translation-preview-iframe"
-                        style={{flex: '1 1 0', minHeight: '560px', height: '560px'}}
+                        className="w-full h-full border-0 translation-preview-iframe"
                       />
                     ) : (
                       <div
@@ -9645,8 +9642,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
                         onMouseUp={saveSelection}
                         onKeyUp={saveSelection}
-                        className="p-3 text-xs focus:outline-none overflow-auto"
-                        style={{flex: '1 1 0', minHeight: '520px', height: '520px', width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
+                        className="p-3 text-xs focus:outline-none overflow-auto h-full"
+                        style={{width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
                       />
                     )}
                   </div>
