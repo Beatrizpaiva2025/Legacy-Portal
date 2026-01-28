@@ -17146,9 +17146,19 @@ CRITICAL INSTRUCTIONS:
             if not translation:
                 raise HTTPException(status_code=500, detail="No translation returned from Claude")
 
+            # Clean up markdown code blocks if present (Claude sometimes wraps HTML in ```html ... ```)
+            clean_translation = translation.strip()
+            if clean_translation.startswith("```html"):
+                clean_translation = clean_translation[7:]
+            elif clean_translation.startswith("```"):
+                clean_translation = clean_translation[3:]
+            if clean_translation.endswith("```"):
+                clean_translation = clean_translation[:-3]
+            clean_translation = clean_translation.strip()
+
             return {
                 "status": "success",
-                "translation": translation,
+                "translation": clean_translation,
                 "action": request.action,
                 "model": "claude-sonnet-4-5-20250929"
             }
