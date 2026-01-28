@@ -12347,6 +12347,76 @@ async def admin_upload_translation(order_id: str, admin_key: str, file: UploadFi
         'html': 'text/html'
     }
     file_type = file_types.get(file_extension, 'application/octet-stream')
+    final_filename = file.filename
+
+    # AUTO-CONVERT HTML FILES TO PDF at upload time
+    # This ensures all downstream code (combined PDF generation, email attachments) works with PDF
+    if file_extension == 'html' or 'html' in file_type.lower():
+        try:
+            import fitz
+            from bs4 import BeautifulSoup
+
+            logger.info(f"Auto-converting HTML upload to PDF: {file.filename}")
+
+            html_content = file_content.decode('utf-8')
+
+            # Parse HTML and extract text
+            soup = BeautifulSoup(html_content, 'html.parser')
+            for script in soup(["script", "style"]):
+                script.decompose()
+            text_content = soup.get_text(separator='\n')
+            lines = [line.strip() for line in text_content.split('\n') if line.strip()]
+
+            # Create PDF with letter size
+            pdf_doc = fitz.open()
+            page_width, page_height = 612, 792
+            blue_color = (0.11, 0.27, 0.53)
+            gray_color = (0.4, 0.4, 0.4)
+
+            def draw_translation_header(pg):
+                pg.draw_rect(fitz.Rect(50, 40, page_width - 50, 43), color=blue_color, fill=blue_color)
+                pg.insert_text((page_width/2 - 60, 30), "Legacy Translations", fontsize=12, fontname="helv", color=blue_color)
+                pg.insert_text((page_width/2 - 50, 60), "TRANSLATION", fontsize=12, fontname="helvB", color=blue_color)
+
+            page = pdf_doc.new_page(width=page_width, height=page_height)
+            draw_translation_header(page)
+            margin = 72
+            y_pos = 100
+
+            for line in lines:
+                if y_pos > page_height - margin:
+                    page = pdf_doc.new_page(width=page_width, height=page_height)
+                    draw_translation_header(page)
+                    y_pos = 100
+
+                max_chars = 85
+                while len(line) > max_chars:
+                    page.insert_text((margin, y_pos), line[:max_chars], fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
+                    y_pos += 14
+                    line = line[max_chars:]
+                    if y_pos > page_height - margin:
+                        page = pdf_doc.new_page(width=page_width, height=page_height)
+                        draw_translation_header(page)
+                        y_pos = 100
+
+                if line:
+                    page.insert_text((margin, y_pos), line, fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
+                    y_pos += 14
+
+            pdf_bytes = pdf_doc.tobytes()
+            pdf_doc.close()
+
+            # Replace file data with PDF
+            file_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
+            file_type = 'application/pdf'
+            final_filename = file.filename.rsplit('.', 1)[0] + '.pdf'
+            logger.info(f"HTML converted to PDF: {file.filename} -> {final_filename} ({len(pdf_bytes)} bytes)")
+
+        except Exception as html_conv_err:
+            logger.error(f"Failed to auto-convert HTML to PDF: {str(html_conv_err)}")
+            import traceback
+            traceback.print_exc()
+            # Keep original HTML if conversion fails
 
     # Generate unique document ID
     document_id = str(uuid.uuid4())
@@ -12355,7 +12425,7 @@ async def admin_upload_translation(order_id: str, admin_key: str, file: UploadFi
     document_record = {
         "id": document_id,
         "order_id": order_id,
-        "filename": file.filename,
+        "filename": final_filename,
         "file_data": file_base64,
         "content_type": file_type,
         "source": "translated_document",
@@ -12370,18 +12440,18 @@ async def admin_upload_translation(order_id: str, admin_key: str, file: UploadFi
         {"id": order_id},
         {"$set": {
             "translated_file": file_base64,
-            "translated_filename": file.filename,
+            "translated_filename": final_filename,
             "translated_file_type": file_type
         }}
     )
 
-    logger.info(f"Translation file uploaded: {file.filename} (doc_id: {document_id}) for order {order_id}")
+    logger.info(f"Translation file uploaded: {final_filename} (doc_id: {document_id}) for order {order_id}")
 
     return {
         "status": "success",
-        "message": f"Translation file '{file.filename}' uploaded successfully",
+        "message": f"Translation file '{final_filename}' uploaded successfully",
         "document_id": document_id,
-        "filename": file.filename
+        "filename": final_filename
     }
 
 
@@ -16485,21 +16555,107 @@ async def admin_upload_order_document(order_id: str, doc_data: OrderDocumentUplo
         raise HTTPException(status_code=404, detail="Order not found")
 
     try:
+        final_filename = doc_data.filename
+        final_data = doc_data.file_data
+        final_content_type = doc_data.content_type
+
+        # AUTO-CONVERT HTML translated documents to PDF at upload time
+        # This ensures all downstream code (combined PDF, email) works with PDF
+        if doc_data.source == "translated_document" and (
+            "html" in (doc_data.content_type or "").lower() or
+            doc_data.filename.lower().endswith(".html")
+        ):
+            try:
+                import fitz
+                from bs4 import BeautifulSoup
+
+                logger.info(f"Auto-converting HTML document to PDF: {doc_data.filename}")
+
+                html_bytes = base64.b64decode(doc_data.file_data)
+                html_content = html_bytes.decode('utf-8')
+
+                # Parse HTML and extract text
+                soup = BeautifulSoup(html_content, 'html.parser')
+                for script in soup(["script", "style"]):
+                    script.decompose()
+                text_content = soup.get_text(separator='\n')
+                lines = [line.strip() for line in text_content.split('\n') if line.strip()]
+
+                # Create PDF with letter size
+                pdf_doc = fitz.open()
+                page_width, page_height = 612, 792
+                blue_color = (0.11, 0.27, 0.53)
+
+                def draw_hdr(pg):
+                    pg.draw_rect(fitz.Rect(50, 40, page_width - 50, 43), color=blue_color, fill=blue_color)
+                    pg.insert_text((page_width/2 - 60, 30), "Legacy Translations", fontsize=12, fontname="helv", color=blue_color)
+                    pg.insert_text((page_width/2 - 50, 60), "TRANSLATION", fontsize=12, fontname="helvB", color=blue_color)
+
+                page = pdf_doc.new_page(width=page_width, height=page_height)
+                draw_hdr(page)
+                margin = 72
+                y_pos = 100
+
+                for line in lines:
+                    if y_pos > page_height - margin:
+                        page = pdf_doc.new_page(width=page_width, height=page_height)
+                        draw_hdr(page)
+                        y_pos = 100
+
+                    max_chars = 85
+                    while len(line) > max_chars:
+                        page.insert_text((margin, y_pos), line[:max_chars], fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
+                        y_pos += 14
+                        line = line[max_chars:]
+                        if y_pos > page_height - margin:
+                            page = pdf_doc.new_page(width=page_width, height=page_height)
+                            draw_hdr(page)
+                            y_pos = 100
+
+                    if line:
+                        page.insert_text((margin, y_pos), line, fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
+                        y_pos += 14
+
+                pdf_bytes = pdf_doc.tobytes()
+                pdf_doc.close()
+
+                final_data = base64.b64encode(pdf_bytes).decode('utf-8')
+                final_content_type = "application/pdf"
+                final_filename = doc_data.filename.rsplit('.', 1)[0] + '.pdf'
+                logger.info(f"HTML converted to PDF: {doc_data.filename} -> {final_filename} ({len(pdf_bytes)} bytes)")
+
+            except Exception as html_conv_err:
+                logger.error(f"Failed to auto-convert HTML doc to PDF: {str(html_conv_err)}")
+                import traceback
+                traceback.print_exc()
+
         doc_record = {
             "id": str(uuid.uuid4()),
             "order_id": order_id,
-            "filename": doc_data.filename,
-            "data": doc_data.file_data,
-            "content_type": doc_data.content_type,
+            "filename": final_filename,
+            "data": final_data,
+            "file_data": final_data,
+            "content_type": final_content_type,
             "source": doc_data.source,
             "uploaded_at": datetime.utcnow()
         }
         await db.order_documents.insert_one(doc_record)
-        logger.info(f"Document '{doc_data.filename}' uploaded to order {order_id}")
+        logger.info(f"Document '{final_filename}' uploaded to order {order_id}")
+
+        # Also update order with translated file for backwards compatibility
+        if doc_data.source == "translated_document":
+            await db.translation_orders.update_one(
+                {"id": order_id},
+                {"$set": {
+                    "translated_file": final_data,
+                    "translated_filename": final_filename,
+                    "translated_file_type": final_content_type
+                }}
+            )
 
         return {
             "status": "success",
-            "message": f"Document '{doc_data.filename}' uploaded successfully",
+            "message": f"Document '{final_filename}' uploaded successfully",
             "document_id": doc_record["id"]
         }
     except Exception as e:
