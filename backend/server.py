@@ -14087,6 +14087,13 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                 if original_file_list:
                     order_with_original["original_file_list"] = original_file_list
 
+                # DIAGNOSTIC: Log all translation sources at start
+                logger.info(f"=== TRANSLATION SOURCES FOR ORDER {order.get('order_number')} ===")
+                logger.info(f"  translated_file: {bool(order.get('translated_file'))} ({len(str(order.get('translated_file', '') or ''))} chars)")
+                logger.info(f"  translation_html: {bool(order.get('translation_html'))} ({len(str(order.get('translation_html', '') or ''))} chars)")
+                logger.info(f"  translated_filename: {order.get('translated_filename', 'N/A')}")
+                logger.info(f"  translated_file_type: {order.get('translated_file_type', 'N/A')}")
+
                 # Fetch translated documents from order_documents collection if not already on order
                 # Check if translated_file exists AND has valid content (not empty or corrupted)
                 existing_translated_file = order_with_original.get("translated_file")
@@ -14221,6 +14228,11 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                                     except Exception as html_err:
                                         logger.error(f"Error converting HTML to PDF: {str(html_err)}")
                                         continue
+
+                # Log what we will use for combined PDF generation
+                logger.info(f"=== GENERATING COMBINED PDF ===")
+                logger.info(f"  order_with_original translated_file: {bool(order_with_original.get('translated_file'))} ({len(str(order_with_original.get('translated_file', '') or ''))} chars)")
+                logger.info(f"  order_with_original translation_html: {bool(order_with_original.get('translation_html'))} ({len(str(order_with_original.get('translation_html', '') or ''))} chars)")
 
                 # Generate the combined PDF
                 combined_pdf_bytes = await generate_combined_delivery_pdf(
