@@ -297,36 +297,40 @@ const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
 
     /* ============ HEADER/LETTERHEAD - NO BLACK LINES ============ */
     .header {
-        display: flex;
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
         justify-content: space-between;
         align-items: center;
         width: 100%;
-        height: 55px;
-        margin-bottom: 5px;
+        height: 60px;
+        margin-bottom: 8px;
         padding: 0;
         border: none !important;
     }
     .header-line {
         width: 100%;
-        height: 3px;
+        height: 2px;
         background: linear-gradient(to right, #3B82F6, #60A5FA);
-        margin-bottom: 15px;
+        margin-bottom: 20px;
         border: none !important;
     }
     .logo-left {
-        width: 130px;
-        min-width: 130px;
-        height: 50px;
+        width: 120px;
+        min-width: 120px;
+        max-width: 120px;
+        height: 55px;
         display: flex;
         align-items: center;
+        flex-shrink: 0;
     }
     .logo-left img {
-        max-width: 120px;
-        max-height: 50px;
+        max-width: 110px;
+        max-height: 55px;
         object-fit: contain;
     }
     .logo-placeholder {
-        width: 120px;
+        width: 110px;
         height: 50px;
         border: 1px dashed #ccc;
         display: flex;
@@ -340,44 +344,43 @@ const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
     .header-center {
         text-align: center;
         flex: 1;
-        padding: 0 15px;
+        padding: 0 20px;
     }
     .company-name {
-        font-size: 16px;
+        font-size: 15px;
         font-weight: bold;
         color: #2563eb;
-        margin-bottom: 2px;
+        margin-bottom: 3px;
     }
     .company-address {
         font-size: 9px;
-        line-height: 1.4;
+        line-height: 1.3;
         color: #333;
     }
     .logo-right {
-        width: 85px;
-        min-width: 85px;
-        height: 50px;
+        width: 80px;
+        min-width: 80px;
+        max-width: 80px;
+        height: 55px;
         display: flex;
         align-items: center;
         justify-content: flex-end;
+        flex-shrink: 0;
     }
     .logo-right img {
-        max-width: 80px;
-        max-height: 50px;
+        max-width: 75px;
+        max-height: 55px;
         object-fit: contain;
     }
     .logo-placeholder-right {
-        width: 80px;
+        width: 70px;
         height: 50px;
-        border: 1px dashed #ccc;
         display: flex;
         align-items: center;
         justify-content: center;
         font-size: 9px;
         color: #1a365d;
-        background: #fafafa;
         text-align: center;
-        font-style: italic;
     }
 
     /* ============ COVER PAGE ============ */
