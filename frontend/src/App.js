@@ -1774,7 +1774,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency, refreshPart
         basePrice = pages * 19.99;
         break;
       case 'sworn':
-        basePrice = pages * 55.00;
+        basePrice = pages * 35.00;
         break;
       case 'rmv':
         basePrice = pages * 24.99;
@@ -2215,7 +2215,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency, refreshPart
                     </div>
                     <div className="text-sm text-gray-500">{t.swornDesc}</div>
                   </div>
-                  <div className="font-semibold text-teal-600">{formatPrice(55.00)}/{t.page}</div>
+                  <div className="font-semibold text-teal-600">{formatPrice(35.00)}/{t.page}</div>
                 </label>
 
                 {/* RMV Certified Translation */}
