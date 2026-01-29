@@ -5452,39 +5452,47 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     const pageSizeCSS = pageFormat === 'a4' ? 'A4' : 'Letter';
     const certTitle = translationType === 'sworn' ? 'Sworn Translation Certificate' : 'Certification of Translation Accuracy';
 
-    // Cover Letter HTML - USING TABLE LAYOUT WITH INLINE STYLES (GUARANTEED TO WORK)
+    // Cover Letter HTML - MATCHING START PREVIEW EXACTLY
     const coverLetterHTML = `
-    <!-- COVER LETTER PAGE -->
-    <div style="width: 100%; min-height: 9in; display: flex; flex-direction: column; page-break-after: always;">
-        <!-- HEADER WITH LOGOS - TABLE LAYOUT -->
-        <table style="width: 100%; border: none; border-collapse: collapse; margin-bottom: 8px;">
-            <tr>
-                <td style="width: 120px; vertical-align: middle; border: none; padding: 0;">
-                    ${logoLeft
-                      ? `<img src="${logoLeft}" alt="Logo" style="max-width: 110px; max-height: 50px; object-fit: contain;" />`
-                      : `<div style="font-size: 11px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 9px;">TRANSLATIONS</span></div>`}
-                </td>
-                <td style="text-align: center; vertical-align: middle; border: none; padding: 0 15px;">
-                    <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
-                    <div style="font-size: 9px; color: #333; line-height: 1.3;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
-                    <div style="font-size: 9px; color: #333;">(857) 316-7770 · contact@legacytranslations.com</div>
-                </td>
-                <td style="width: 80px; text-align: right; vertical-align: middle; border: none; padding: 0;">
-                    ${logoRight
-                      ? `<img src="${logoRight}" alt="ATA" style="max-width: 75px; max-height: 50px; object-fit: contain;" />`
-                      : `<div style="font-size: 9px; color: #666; font-style: italic; text-align: right;">ata<br/><span style="font-size: 8px;">Member # 275993</span></div>`}
-                </td>
-            </tr>
-        </table>
-        <div style="width: 100%; height: 2px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 20px;"></div>
+    <div style="font-family: Georgia, 'Times New Roman', serif; font-size: 12px; line-height: 1.6; max-width: 100%; padding: 0; page-break-after: always;">
 
-        ${orderNumber && !orderNumber.toLowerCase().includes('order0') && orderNumber !== 'P0000' ? `<div style="text-align: right; margin-bottom: 20px; font-size: 12px;">Order # <strong>${orderNumber}</strong></div>` : ''}
-        <h1 style="text-align: center; font-size: 22px; font-weight: normal; margin-bottom: 20px; color: #1a365d; line-height: 1.3;">${certTitle}</h1>
-        <div style="text-align: center; font-size: 13px; margin-bottom: 25px; line-height: 1.6;">
-            Translation of a <strong>${documentType}</strong> from <strong>${sourceLanguage}</strong> to<br>
-            <strong>${targetLanguage}</strong>
+        <!-- HEADER - Using fixed widths like START preview -->
+        <div style="width: 100%; margin-bottom: 8px; overflow: hidden;">
+            <div style="float: left; width: 128px;">
+                ${logoLeft
+                  ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
+                  : `<div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>`}
+            </div>
+            <div style="float: right; width: 80px; text-align: right;">
+                ${logoRight
+                  ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px; max-width: 75px;" />`
+                  : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>`}
+            </div>
+            <div style="margin-left: 138px; margin-right: 90px; text-align: center;">
+                <div style="font-weight: bold; color: #2563eb; font-size: 14px; font-style: italic;">Legacy Translations</div>
+                <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
+            </div>
         </div>
 
+        <!-- Blue line -->
+        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>
+
+        <!-- Order Number -->
+        ${orderNumber && !orderNumber.toLowerCase().includes('order0') && orderNumber !== 'P0000'
+          ? `<div style="text-align: right; margin-bottom: 24px; font-size: 14px;">Order # <strong>${orderNumber}</strong></div>`
+          : '<div style="margin-bottom: 24px;"></div>'}
+
+        <!-- Main Title -->
+        <h1 style="text-align: center; font-size: 24px; font-weight: normal; margin-bottom: 30px; color: #1a365d; letter-spacing: 0.5px;">${certTitle}</h1>
+
+        <!-- Translation of... -->
+        <p style="text-align: center; margin-bottom: 30px; font-size: 14px; line-height: 1.8;">
+            Translation of a <strong>${documentType}</strong> from <strong>${sourceLanguage}</strong> to<br/>
+            <strong>${targetLanguage}</strong>
+        </p>
+
+        <!-- Body Paragraphs -->
         ${(() => {
           let templateParagraphs;
           if (selectedCertificateTemplate.startsWith('custom-')) {
@@ -5495,55 +5503,52 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           }
           return templateParagraphs.map(p => {
             const processed = p.replace(/\{\{sourceLanguage\}\}/g, sourceLanguage).replace(/\{\{targetLanguage\}\}/g, targetLanguage);
-            return `<p style="text-align: justify; margin-bottom: 14px; line-height: 1.65; font-size: 12px;">${processed}</p>`;
+            return `<p style="text-align: justify; margin-bottom: 16px; line-height: 1.8; font-size: 12px;">${processed}</p>`;
           }).join('\n        ');
         })()}
 
-        <table style="width: 100%; border: none; border-collapse: collapse; margin-top: auto; padding-top: 20px;">
-            <tr>
-                <td style="vertical-align: bottom; border: none; padding: 0;">
-                    ${signatureImage
-                      ? `<img src="${signatureImage}" alt="Signature" style="max-height: 45px; max-width: 210px; object-fit: contain; margin-bottom: 2px;" />`
-                      : `<div style="font-family: cursive; font-size: 20px; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>`}
-                    <div style="font-weight: bold; font-size: 13px;">Authorized Representative</div>
-                    <div style="font-size: 12px;">Legacy Translations Inc.</div>
-                    <div style="font-size: 12px; margin-top: 3px;">Dated: ${translationDate}</div>
-                </td>
-                <td style="width: 140px; text-align: right; vertical-align: bottom; border: none; padding: 0;">
-                    ${logoStamp
-                      ? `<img src="${logoStamp}" alt="Stamp" style="width: 130px; height: 130px; object-fit: contain;" />`
-                      : `<div style="width: 130px; height: 130px; border: 3px solid #2563eb; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column;">
-                          <div style="font-size: 8px; font-weight: bold; color: #2563eb;">CERTIFIED TRANSLATOR</div>
-                          <div style="font-size: 10px; font-weight: bold; color: #2563eb; margin-top: 5px;">LEGACY TRANSLATIONS</div>
-                          <div style="font-size: 8px; color: #2563eb;">ATA # 275993</div>
-                        </div>`}
-                </td>
-            </tr>
-        </table>
+        <!-- Signature Section - Fixed at bottom -->
+        <div style="margin-top: 60px; overflow: hidden;">
+            <div style="float: left; width: 60%;">
+                ${signatureImage
+                  ? `<img src="${signatureImage}" alt="Signature" style="max-height: 40px; max-width: 180px; margin-bottom: 4px;" />`
+                  : `<div style="font-family: 'Brush Script MT', cursive; font-size: 24px; color: #1a365d; margin-bottom: 4px;">Beatriz Paiva</div>`}
+                <div style="font-weight: bold; font-size: 12px;">Authorized Representative</div>
+                <div style="font-size: 12px;">Legacy Translations Inc.</div>
+                <div style="font-size: 12px; margin-top: 8px;">Dated: ${translationDate}</div>
+            </div>
+            <div style="float: right; width: 35%; text-align: right;">
+                ${logoStamp
+                  ? `<img src="${logoStamp}" alt="Stamp" style="width: 120px; height: 120px; object-fit: contain;" />`
+                  : `<div style="width: 120px; height: 120px; border: 4px double #2563eb; border-radius: 50%; margin-left: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px;">
+                      <div style="font-size: 7px; font-weight: bold; color: #2563eb;">CERTIFIED TRANSLATOR</div>
+                      <div style="font-size: 9px; font-weight: bold; color: #2563eb; margin-top: 4px;">LEGACY TRANSLATIONS</div>
+                      <div style="font-size: 7px; color: #2563eb;">ATA # 275993</div>
+                    </div>`}
+            </div>
+        </div>
     </div>`;
 
-    // Letterhead for all pages - TABLE LAYOUT WITH INLINE STYLES
+    // Letterhead for all pages - Same style as cover
     const letterheadHTML = `
-        <table style="width: 100%; border: none; border-collapse: collapse; margin-bottom: 8px;">
-            <tr>
-                <td style="width: 120px; vertical-align: middle; border: none; padding: 0;">
-                    ${logoLeft
-                      ? `<img src="${logoLeft}" alt="Logo" style="max-width: 110px; max-height: 50px; object-fit: contain;" />`
-                      : `<div style="font-size: 11px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 9px;">TRANSLATIONS</span></div>`}
-                </td>
-                <td style="text-align: center; vertical-align: middle; border: none; padding: 0 15px;">
-                    <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
-                    <div style="font-size: 9px; color: #333; line-height: 1.3;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
-                    <div style="font-size: 9px; color: #333;">(857) 316-7770 · contact@legacytranslations.com</div>
-                </td>
-                <td style="width: 80px; text-align: right; vertical-align: middle; border: none; padding: 0;">
-                    ${logoRight
-                      ? `<img src="${logoRight}" alt="ATA" style="max-width: 75px; max-height: 50px; object-fit: contain;" />`
-                      : `<div style="font-size: 9px; color: #666; font-style: italic; text-align: right;">ata<br/><span style="font-size: 8px;">Member # 275993</span></div>`}
-                </td>
-            </tr>
-        </table>
-        <div style="width: 100%; height: 2px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 20px;"></div>`;
+        <div style="width: 100%; margin-bottom: 8px; overflow: hidden;">
+            <div style="float: left; width: 128px;">
+                ${logoLeft
+                  ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
+                  : `<div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>`}
+            </div>
+            <div style="float: right; width: 80px; text-align: right;">
+                ${logoRight
+                  ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px; max-width: 75px;" />`
+                  : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span></div>`}
+            </div>
+            <div style="margin-left: 138px; margin-right: 90px; text-align: center;">
+                <div style="font-weight: bold; color: #2563eb; font-size: 14px; font-style: italic;">Legacy Translations</div>
+                <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
+            </div>
+        </div>
+        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>`;
 
     // Translation pages - supports HTML content OR images (not both to avoid duplication)
     let translationPagesHTML = '';
@@ -5977,43 +5982,50 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     // Check if selected template is a form (like RMV Foreign DL)
     const isFormTemplate = CERTIFICATE_TEMPLATES[selectedCertificateTemplate]?.isForm;
 
-    // Cover Letter HTML - USING TABLE LAYOUT WITH INLINE STYLES (GUARANTEED TO WORK)
+    // Cover Letter HTML - MATCHING START PREVIEW EXACTLY
     const coverLetterHTML = isFormTemplate ? `
-    <!-- FORM TEMPLATE PAGE -->
-    <div style="width: 100%; min-height: 9in; padding: 20px; page-break-after: always;">
+    <div style="font-family: Georgia, 'Times New Roman', serif; padding: 20px; page-break-after: always;">
         ${CERTIFICATE_TEMPLATES[selectedCertificateTemplate].formHTML}
     </div>` : `
-    <!-- COVER LETTER PAGE -->
-    <div style="width: 100%; min-height: 9in; display: flex; flex-direction: column; page-break-after: always;">
-        <!-- HEADER WITH LOGOS - TABLE LAYOUT -->
-        <table style="width: 100%; border: none; border-collapse: collapse; margin-bottom: 8px;">
-            <tr>
-                <td style="width: 120px; vertical-align: middle; border: none; padding: 0;">
-                    ${logoLeft
-                      ? `<img src="${logoLeft}" alt="Logo" style="max-width: 110px; max-height: 50px; object-fit: contain;" />`
-                      : `<div style="font-size: 11px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 9px;">TRANSLATIONS</span></div>`}
-                </td>
-                <td style="text-align: center; vertical-align: middle; border: none; padding: 0 15px;">
-                    <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
-                    <div style="font-size: 9px; color: #333; line-height: 1.3;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
-                    <div style="font-size: 9px; color: #333;">(857) 316-7770 · contact@legacytranslations.com</div>
-                </td>
-                <td style="width: 80px; text-align: right; vertical-align: middle; border: none; padding: 0;">
-                    ${logoRight
-                      ? `<img src="${logoRight}" alt="ATA" style="max-width: 75px; max-height: 50px; object-fit: contain;" />`
-                      : `<div style="font-size: 9px; color: #666; font-style: italic; text-align: right;">ata<br/><span style="font-size: 8px;">Member # 275993</span></div>`}
-                </td>
-            </tr>
-        </table>
-        <div style="width: 100%; height: 2px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 20px;"></div>
+    <div style="font-family: Georgia, 'Times New Roman', serif; font-size: 12px; line-height: 1.6; max-width: 100%; padding: 0; page-break-after: always;">
 
-        ${orderNumber && !orderNumber.toLowerCase().includes('order0') && orderNumber !== 'P0000' ? `<div style="text-align: right; margin-bottom: 20px; font-size: 12px;">Order # <strong>${orderNumber}</strong></div>` : ''}
-        <h1 style="text-align: center; font-size: 22px; font-weight: normal; margin-bottom: 20px; color: #1a365d; line-height: 1.3;">${certTitle}</h1>
-        <div style="text-align: center; font-size: 13px; margin-bottom: 25px; line-height: 1.6;">
-            Translation of a <strong>${documentType}</strong> from <strong>${sourceLanguage}</strong> to<br>
-            <strong>${targetLanguage}</strong>
+        <!-- HEADER - Using fixed widths like START preview -->
+        <div style="width: 100%; margin-bottom: 8px; overflow: hidden;">
+            <div style="float: left; width: 128px;">
+                ${logoLeft
+                  ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
+                  : `<div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>`}
+            </div>
+            <div style="float: right; width: 80px; text-align: right;">
+                ${logoRight
+                  ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px; max-width: 75px;" />`
+                  : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>`}
+            </div>
+            <div style="margin-left: 138px; margin-right: 90px; text-align: center;">
+                <div style="font-weight: bold; color: #2563eb; font-size: 14px; font-style: italic;">Legacy Translations</div>
+                <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
+            </div>
         </div>
 
+        <!-- Blue line -->
+        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>
+
+        <!-- Order Number -->
+        ${orderNumber && !orderNumber.toLowerCase().includes('order0') && orderNumber !== 'P0000'
+          ? `<div style="text-align: right; margin-bottom: 24px; font-size: 14px;">Order # <strong>${orderNumber}</strong></div>`
+          : '<div style="margin-bottom: 24px;"></div>'}
+
+        <!-- Main Title -->
+        <h1 style="text-align: center; font-size: 24px; font-weight: normal; margin-bottom: 30px; color: #1a365d; letter-spacing: 0.5px;">${certTitle}</h1>
+
+        <!-- Translation of... -->
+        <p style="text-align: center; margin-bottom: 30px; font-size: 14px; line-height: 1.8;">
+            Translation of a <strong>${documentType}</strong> from <strong>${sourceLanguage}</strong> to<br/>
+            <strong>${targetLanguage}</strong>
+        </p>
+
+        <!-- Body Paragraphs -->
         ${(() => {
           let templateParagraphs;
           if (selectedCertificateTemplate.startsWith('custom-')) {
@@ -6024,55 +6036,52 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           }
           return templateParagraphs.map(p => {
             const processed = p.replace(/\{\{sourceLanguage\}\}/g, sourceLanguage).replace(/\{\{targetLanguage\}\}/g, targetLanguage);
-            return `<p style="text-align: justify; margin-bottom: 14px; line-height: 1.65; font-size: 12px;">${processed}</p>`;
+            return `<p style="text-align: justify; margin-bottom: 16px; line-height: 1.8; font-size: 12px;">${processed}</p>`;
           }).join('\n        ');
         })()}
 
-        <table style="width: 100%; border: none; border-collapse: collapse; margin-top: auto; padding-top: 20px;">
-            <tr>
-                <td style="vertical-align: bottom; border: none; padding: 0;">
-                    ${signatureImage
-                      ? `<img src="${signatureImage}" alt="Signature" style="max-height: 45px; max-width: 210px; object-fit: contain; margin-bottom: 2px;" />`
-                      : `<div style="font-family: cursive; font-size: 20px; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>`}
-                    <div style="font-weight: bold; font-size: 13px;">Authorized Representative</div>
-                    <div style="font-size: 12px;">Legacy Translations Inc.</div>
-                    <div style="font-size: 12px; margin-top: 3px;">Dated: ${translationDate}</div>
-                </td>
-                <td style="width: 140px; text-align: right; vertical-align: bottom; border: none; padding: 0;">
-                    ${logoStamp
-                      ? `<img src="${logoStamp}" alt="Stamp" style="width: 130px; height: 130px; object-fit: contain;" />`
-                      : `<div style="width: 130px; height: 130px; border: 3px solid #2563eb; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column;">
-                          <div style="font-size: 8px; font-weight: bold; color: #2563eb;">CERTIFIED TRANSLATOR</div>
-                          <div style="font-size: 10px; font-weight: bold; color: #2563eb; margin-top: 5px;">LEGACY TRANSLATIONS</div>
-                          <div style="font-size: 8px; color: #2563eb;">ATA # 275993</div>
-                        </div>`}
-                </td>
-            </tr>
-        </table>
+        <!-- Signature Section -->
+        <div style="margin-top: 60px; overflow: hidden;">
+            <div style="float: left; width: 60%;">
+                ${signatureImage
+                  ? `<img src="${signatureImage}" alt="Signature" style="max-height: 40px; max-width: 180px; margin-bottom: 4px;" />`
+                  : `<div style="font-family: 'Brush Script MT', cursive; font-size: 24px; color: #1a365d; margin-bottom: 4px;">Beatriz Paiva</div>`}
+                <div style="font-weight: bold; font-size: 12px;">Authorized Representative</div>
+                <div style="font-size: 12px;">Legacy Translations Inc.</div>
+                <div style="font-size: 12px; margin-top: 8px;">Dated: ${translationDate}</div>
+            </div>
+            <div style="float: right; width: 35%; text-align: right;">
+                ${logoStamp
+                  ? `<img src="${logoStamp}" alt="Stamp" style="width: 120px; height: 120px; object-fit: contain;" />`
+                  : `<div style="width: 120px; height: 120px; border: 4px double #2563eb; border-radius: 50%; margin-left: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px;">
+                      <div style="font-size: 7px; font-weight: bold; color: #2563eb;">CERTIFIED TRANSLATOR</div>
+                      <div style="font-size: 9px; font-weight: bold; color: #2563eb; margin-top: 4px;">LEGACY TRANSLATIONS</div>
+                      <div style="font-size: 7px; color: #2563eb;">ATA # 275993</div>
+                    </div>`}
+            </div>
+        </div>
     </div>`;
 
-    // Letterhead for all pages - TABLE LAYOUT WITH INLINE STYLES
+    // Letterhead for all pages - Same style as cover
     const letterheadHTML = `
-        <table style="width: 100%; border: none; border-collapse: collapse; margin-bottom: 8px;">
-            <tr>
-                <td style="width: 120px; vertical-align: middle; border: none; padding: 0;">
-                    ${logoLeft
-                      ? `<img src="${logoLeft}" alt="Logo" style="max-width: 110px; max-height: 50px; object-fit: contain;" />`
-                      : `<div style="font-size: 11px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 9px;">TRANSLATIONS</span></div>`}
-                </td>
-                <td style="text-align: center; vertical-align: middle; border: none; padding: 0 15px;">
-                    <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
-                    <div style="font-size: 9px; color: #333; line-height: 1.3;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
-                    <div style="font-size: 9px; color: #333;">(857) 316-7770 · contact@legacytranslations.com</div>
-                </td>
-                <td style="width: 80px; text-align: right; vertical-align: middle; border: none; padding: 0;">
-                    ${logoRight
-                      ? `<img src="${logoRight}" alt="ATA" style="max-width: 75px; max-height: 50px; object-fit: contain;" />`
-                      : `<div style="font-size: 9px; color: #666; font-style: italic; text-align: right;">ata<br/><span style="font-size: 8px;">Member # 275993</span></div>`}
-                </td>
-            </tr>
-        </table>
-        <div style="width: 100%; height: 2px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 20px;"></div>`;
+        <div style="width: 100%; margin-bottom: 8px; overflow: hidden;">
+            <div style="float: left; width: 128px;">
+                ${logoLeft
+                  ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
+                  : `<div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>`}
+            </div>
+            <div style="float: right; width: 80px; text-align: right;">
+                ${logoRight
+                  ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px; max-width: 75px;" />`
+                  : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span></div>`}
+            </div>
+            <div style="margin-left: 138px; margin-right: 90px; text-align: center;">
+                <div style="font-weight: bold; color: #2563eb; font-size: 14px; font-style: italic;">Legacy Translations</div>
+                <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
+            </div>
+        </div>
+        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>`;
 
     // Translation pages HTML (with or without letterhead)
     // First page doesn't need page-break since cover ends with one
