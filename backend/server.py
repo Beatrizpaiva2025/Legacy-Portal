@@ -2360,7 +2360,7 @@ async def send_to_make_webhook(order_data: dict, invoice_data: dict):
 BOT_PRICING = {
     "certified": {"price_per_page": 24.99, "name": "Certified Translation", "description": "Official documents, legal, immigration"},
     "standard": {"price_per_page": 19.99, "name": "Standard Translation", "description": "General use, no certification"},
-    "sworn": {"price_per_page": 55.00, "name": "Sworn Translation", "description": "For use outside USA - official sworn translator"},
+    "sworn": {"price_per_page": 35.00, "name": "Sworn Translation", "description": "For use outside USA - official sworn translator"},
     "rmv": {"price_per_page": 24.99, "name": "RMV Certified Translation", "description": "Massachusetts Motor Vehicle - requires physical copy"},
     # NOTE: Apostille is "Coming Soon" - not available yet
 }
@@ -2368,7 +2368,7 @@ BOT_PRICING = {
 BOT_URGENCY = {
     "standard": {"multiplier": 1.0, "name": "Standard (2-3 business days)"},
     "priority": {"multiplier": 1.25, "name": "Priority (+25%, 24 hours)"},
-    "urgent": {"multiplier": 2.0, "name": "Urgent (+100%, 12 hours)"},
+    "urgent": {"multiplier": 1.5, "name": "Urgent (+50%, 12 hours)"},
 }
 
 class BotQuoteRequest(BaseModel):
