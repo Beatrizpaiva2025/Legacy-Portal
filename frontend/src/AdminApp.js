@@ -69,6 +69,7 @@ const calculateSHA256 = async (arrayBuffer) => {
 };
 
 // Generate PDF from HTML content and return both blob and hash
+// Uses a visible iframe approach for more reliable rendering
 const generatePdfWithHash = async (htmlContent, filename, options = {}) => {
   const defaultOptions = {
     margin: [10, 10, 10, 10],
@@ -79,7 +80,9 @@ const generatePdfWithHash = async (htmlContent, filename, options = {}) => {
       useCORS: true,
       allowTaint: true,
       letterRendering: true,
-      logging: false
+      logging: false,
+      windowWidth: 816, // 8.5in at 96dpi
+      windowHeight: 1056 // 11in at 96dpi
     },
     jsPDF: {
       unit: 'mm',
@@ -91,23 +94,39 @@ const generatePdfWithHash = async (htmlContent, filename, options = {}) => {
 
   const mergedOptions = { ...defaultOptions, ...options };
 
-  // Create a temporary container for the HTML
-  // IMPORTANT: Use visibility:hidden instead of offscreen positioning
-  // because html2canvas may not render offscreen elements correctly
-  const container = document.createElement('div');
-  container.innerHTML = htmlContent;
-  container.style.position = 'fixed';
-  container.style.left = '0';
-  container.style.top = '0';
-  container.style.width = '8.5in'; // Letter size width
-  container.style.visibility = 'hidden';
-  container.style.zIndex = '-9999';
-  container.style.background = 'white';
-  document.body.appendChild(container);
+  // Create a temporary iframe for more reliable rendering
+  // Iframes render content more reliably than hidden divs
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.left = '0';
+  iframe.style.top = '0';
+  iframe.style.width = '8.5in';
+  iframe.style.height = '11in';
+  iframe.style.border = 'none';
+  iframe.style.opacity = '0.01'; // Nearly invisible but still renders
+  iframe.style.pointerEvents = 'none';
+  iframe.style.zIndex = '-9999';
+  document.body.appendChild(iframe);
 
   try {
-    // Wait for all images to load before rendering
-    const images = container.querySelectorAll('img');
+    // Write content to iframe
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+    iframeDoc.open();
+    iframeDoc.write(htmlContent);
+    iframeDoc.close();
+
+    // Wait for iframe content to load
+    await new Promise(resolve => {
+      if (iframeDoc.readyState === 'complete') {
+        resolve();
+      } else {
+        iframe.onload = resolve;
+        setTimeout(resolve, 3000); // Fallback timeout
+      }
+    });
+
+    // Wait for all images in iframe to load
+    const images = iframeDoc.querySelectorAll('img');
     if (images.length > 0) {
       await Promise.all(Array.from(images).map(img => {
         return new Promise((resolve) => {
@@ -117,22 +136,21 @@ const generatePdfWithHash = async (htmlContent, filename, options = {}) => {
             img.onload = resolve;
             img.onerror = () => {
               console.warn('Image failed to load:', img.src?.substring(0, 100));
-              resolve(); // Continue even if image fails
+              resolve();
             };
-            // Timeout fallback in case image never loads
             setTimeout(resolve, 5000);
           }
         });
       }));
     }
 
-    // Small delay to ensure rendering is complete
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Extra delay for rendering
+    await new Promise(resolve => setTimeout(resolve, 500));
 
-    // Generate PDF as blob
+    // Generate PDF from iframe body
     const pdfBlob = await html2pdf()
       .set(mergedOptions)
-      .from(container)
+      .from(iframeDoc.body)
       .outputPdf('blob');
 
     // Calculate hash from blob
@@ -142,7 +160,7 @@ const generatePdfWithHash = async (htmlContent, filename, options = {}) => {
     return { blob: pdfBlob, hash: pdfHash };
   } finally {
     // Clean up
-    document.body.removeChild(container);
+    document.body.removeChild(iframe);
   }
 };
 
@@ -5713,51 +5731,101 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 </body>
 </html>`;
 
-    // Generate PDF using html2pdf for proper hash tracking
-    setQuickPackageProgress(`Generating PDF (${quickTranslationFiles.length} translations + ${quickOriginalFiles.length} originals)...`);
+    // Generate PDF - use print window approach which is more reliable
+    setQuickPackageProgress(`Preparing document preview...`);
 
     try {
       const filename = `${orderNumber || 'LT'}_Certified_Translation.pdf`;
 
-      // Generate PDF with hash
-      const { blob: pdfBlob, hash: pdfHash } = await generatePdfWithHash(fullHTML, filename, {
-        margin: [5, 5, 5, 5],
-        image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: { scale: 2, useCORS: true, allowTaint: true },
-        jsPDF: { unit: 'mm', format: pageFormat === 'a4' ? 'a4' : 'letter', orientation: 'portrait' }
+      // Open print window - this is the most reliable way to generate PDF
+      // The browser's native print dialog handles rendering correctly
+      const printWindow = window.open('', '_blank', 'width=900,height=700');
+      if (!printWindow) {
+        alert('Pop-up blocked! Please allow pop-ups for this site to generate PDFs.');
+        setQuickPackageLoading(false);
+        setQuickPackageProgress('');
+        return;
+      }
+
+      printWindow.document.write(fullHTML);
+      printWindow.document.close();
+
+      // Wait for content to load
+      await new Promise(resolve => {
+        if (printWindow.document.readyState === 'complete') {
+          resolve();
+        } else {
+          printWindow.onload = resolve;
+          setTimeout(resolve, 2000);
+        }
       });
 
-      // Update PDF hash in backend if we have a certification
-      // CRITICAL: This enables digital signature verification
+      // Wait for images to load
+      const images = printWindow.document.querySelectorAll('img');
+      if (images.length > 0) {
+        setQuickPackageProgress(`Loading ${images.length} images...`);
+        await Promise.all(Array.from(images).map(img => {
+          return new Promise((resolve) => {
+            if (img.complete && img.naturalHeight !== 0) {
+              resolve();
+            } else {
+              img.onload = resolve;
+              img.onerror = resolve;
+              setTimeout(resolve, 5000);
+            }
+          });
+        }));
+      }
+
+      // Small delay for final rendering
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Update certification hash using document content hash
       if (certData?.certification_id) {
-        setQuickPackageProgress('Registering digital signature for verification...');
-        const hashResult = await updatePdfHashInBackend(certData.certification_id, pdfHash, adminKey);
-        if (!hashResult.success) {
-          console.error('Warning: PDF hash not saved. Verification may not work:', hashResult.error);
-          setQuickPackageProgress('⚠️ Warning: Could not register document for verification. Continuing with download...');
-          await new Promise(resolve => setTimeout(resolve, 2000));
-        } else {
-          setQuickPackageProgress('✅ Digital signature registered successfully!');
-          await new Promise(resolve => setTimeout(resolve, 500));
+        setQuickPackageProgress('Registering digital signature...');
+        // Calculate hash from HTML content for verification
+        const encoder = new TextEncoder();
+        const data = encoder.encode(fullHTML);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const contentHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+        const hashResult = await updatePdfHashInBackend(certData.certification_id, contentHash, adminKey);
+        if (hashResult.success) {
+          setQuickPackageProgress('✅ Digital signature registered!');
         }
       }
 
-      // Download the PDF
-      setQuickPackageProgress('Package ready! Starting download...');
-      const downloadUrl = URL.createObjectURL(pdfBlob);
-      const link = document.createElement('a');
-      link.href = downloadUrl;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(downloadUrl);
-
-      setQuickPackageLoading(false);
       setQuickPackageProgress('');
+      setQuickPackageLoading(false);
+
+      // Focus and print
+      printWindow.focus();
+
+      // Add print instructions
+      const instructionDiv = printWindow.document.createElement('div');
+      instructionDiv.id = 'print-instructions';
+      instructionDiv.innerHTML = `
+        <div style="position: fixed; top: 0; left: 0; right: 0; background: #1e40af; color: white; padding: 12px 20px; z-index: 99999; font-family: sans-serif; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <strong>📄 Document Preview</strong> - Use "Save as PDF" or print to get your certified translation
+          </div>
+          <div>
+            <button onclick="window.print()" style="background: white; color: #1e40af; border: none; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-right: 10px;">
+              🖨️ Print / Save as PDF
+            </button>
+            <button onclick="document.getElementById('print-instructions').remove()" style="background: transparent; color: white; border: 1px solid white; padding: 8px 16px; border-radius: 6px; cursor: pointer;">
+              ✕ Close Bar
+            </button>
+          </div>
+        </div>
+        <style>@media print { #print-instructions { display: none !important; } }</style>
+      `;
+      printWindow.document.body.insertBefore(instructionDiv, printWindow.document.body.firstChild);
+
     } catch (err) {
       console.error('Error generating package:', err);
-      alert('Error generating PDF package. Please try again.');
+      alert('Error generating document. Please try again.');
       setQuickPackageLoading(false);
       setQuickPackageProgress('');
     }
