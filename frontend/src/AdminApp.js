@@ -13360,24 +13360,13 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             orderData.translation_ready ||
                             orderData.translated_file ||
                             orderData.translated_gridfs_id ||
-                            orderData.translated_filename;
+                            orderData.translated_filename ||
+                            orderData.has_translated_documents;
 
       if (!hasTranslation) {
-        // Also check order_documents for translated files
-        try {
-          const docsResponse = await axios.get(`${API}/admin/orders/${order.id}/documents?admin_key=${adminKey}`);
-          const docs = docsResponse.data.documents || [];
-          const translatedDocs = docs.filter(d => d.source === 'translated_document' && d.has_data);
-          if (translatedDocs.length === 0) {
-            alert('This order does not have a completed translation yet.');
-            setDownloadingPackage(null);
-            return;
-          }
-        } catch (docErr) {
-          alert('This order does not have a completed translation yet.');
-          setDownloadingPackage(null);
-          return;
-        }
+        alert('This order does not have a completed translation yet.');
+        setDownloadingPackage(null);
+        return;
       }
 
       // Fetch order documents for originals
@@ -25616,24 +25605,13 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                             orderData.translation_ready ||
                             orderData.translated_file ||
                             orderData.translated_gridfs_id ||
-                            orderData.translated_filename;
+                            orderData.translated_filename ||
+                            orderData.has_translated_documents;
 
       if (!hasTranslation) {
-        // Also check order_documents for translated files
-        try {
-          const docsResponse = await axios.get(`${API}/admin/orders/${order.id}/documents?admin_key=${adminKey}`);
-          const docs = docsResponse.data.documents || [];
-          const translatedDocs = docs.filter(d => d.source === 'translated_document' && d.has_data);
-          if (translatedDocs.length === 0) {
-            alert('This order does not have a completed translation yet.');
-            setDownloadingPackagePM(null);
-            return;
-          }
-        } catch (docErr) {
-          alert('This order does not have a completed translation yet.');
-          setDownloadingPackagePM(null);
-          return;
-        }
+        alert('This order does not have a completed translation yet.');
+        setDownloadingPackagePM(null);
+        return;
       }
 
       // Fetch order documents for originals

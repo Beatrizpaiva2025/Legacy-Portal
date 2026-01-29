@@ -12132,6 +12132,21 @@ async def admin_get_single_order(order_id: str, admin_key: str):
         if '_id' in order:
             del order['_id']
 
+        # Check for translated documents in order_documents collection
+        translated_docs = await db.order_documents.find({
+            "order_id": order_id,
+            "source": "translated_document"
+        }).to_list(50)
+
+        # Add flags to indicate translation availability
+        has_translated_docs = len(translated_docs) > 0
+        order["has_translated_documents"] = has_translated_docs
+        order["translated_documents_count"] = len(translated_docs)
+
+        # If there are translated docs but no translated_filename, set it from first doc
+        if has_translated_docs and not order.get("translated_filename"):
+            order["translated_filename"] = translated_docs[0].get("filename")
+
         return {"order": order}
     except HTTPException:
         raise
