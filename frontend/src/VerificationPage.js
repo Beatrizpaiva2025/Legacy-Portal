@@ -13,7 +13,7 @@ const VerificationPage = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [pdfVerificationResult, setPdfVerificationResult] = useState(null);
   const [verifyingPdf, setVerifyingPdf] = useState(false);
-  const [showPdfVerifier, setShowPdfVerifier] = useState(false);
+  const [showPdfVerifier, setShowPdfVerifier] = useState(true); // Default to expanded
   const [dragActive, setDragActive] = useState(false);
 
   useEffect(() => {
@@ -295,21 +295,34 @@ const VerificationPage = () => {
                 </div>
               </div>
 
-              {/* PDF Document Verification Section */}
-              <div className="mt-6 border border-slate-200 rounded-lg overflow-hidden">
+              {/* DIGITAL SIGNATURE VERIFICATION - Critical Section */}
+              <div className="mt-6 border-2 border-amber-400 rounded-lg overflow-hidden bg-amber-50">
+                {/* Warning banner if PDF not yet verified */}
+                {!pdfVerificationResult && (
+                  <div className="bg-amber-500 text-white px-5 py-3 flex items-center gap-3">
+                    <svg className="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <div>
+                      <p className="font-bold">Important: Verify Document Integrity</p>
+                      <p className="text-sm text-amber-100">Upload the PDF file below to confirm it has not been altered since certification</p>
+                    </div>
+                  </div>
+                )}
+
                 <button
                   onClick={() => setShowPdfVerifier(!showPdfVerifier)}
-                  className="w-full px-5 py-4 bg-slate-50 hover:bg-slate-100 transition-colors flex items-center justify-between"
+                  className="w-full px-5 py-4 bg-white hover:bg-slate-50 transition-colors flex items-center justify-between border-b border-amber-200"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
-                      <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center">
+                      <svg className="w-7 h-7 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                       </svg>
                     </div>
                     <div className="text-left">
-                      <h3 className="font-bold text-slate-800">Verify Document Integrity</h3>
-                      <p className="text-sm text-slate-500">Upload PDF to check if it has been altered</p>
+                      <h3 className="font-bold text-slate-800 text-lg">🔐 Digital Signature Verification</h3>
+                      <p className="text-sm text-slate-600">Upload the PDF to verify it matches the certified original - any modification will be detected</p>
                     </div>
                   </div>
                   <svg
@@ -323,11 +336,22 @@ const VerificationPage = () => {
                 </button>
 
                 {showPdfVerifier && (
-                  <div className="p-5 border-t border-slate-200">
-                    <p className="text-sm text-slate-600 mb-4">
-                      Upload the certified PDF document to verify if it matches the original.
-                      Any modifications to the file will be detected.
-                    </p>
+                  <div className="p-5 bg-white">
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                      <h4 className="font-bold text-blue-800 mb-2 flex items-center gap-2">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        How Digital Signature Verification Works
+                      </h4>
+                      <ul className="text-sm text-blue-700 space-y-1">
+                        <li>• When this document was certified, a unique cryptographic hash (SHA-256) was calculated</li>
+                        <li>• This hash acts as a "digital fingerprint" - any change to the document changes this hash</li>
+                        <li>• Upload your PDF below - we'll calculate its hash and compare with the original</li>
+                        <li>• <strong>If hashes match</strong>: Document is authentic and unaltered ✓</li>
+                        <li>• <strong>If hashes differ</strong>: Document has been modified after certification ⚠</li>
+                      </ul>
+                    </div>
 
                     {/* Drag and Drop Zone */}
                     <div

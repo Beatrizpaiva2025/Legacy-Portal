@@ -147,16 +147,21 @@ const generatePdfWithHash = async (htmlContent, filename, options = {}) => {
 };
 
 // Update PDF hash in backend after PDF generation
+// CRITICAL: This hash enables digital signature verification - if not saved, PDF cannot be verified
 const updatePdfHashInBackend = async (certificationId, pdfHash, adminKey) => {
   try {
     const response = await axios.post(
       `${API}/certifications/${certificationId}/update-pdf-hash?admin_key=${adminKey}&pdf_hash=${pdfHash}`
     );
-    console.log('PDF hash updated successfully:', response.data);
-    return response.data;
+    console.log('✅ PDF hash registered for verification:', response.data);
+    return { success: true, data: response.data };
   } catch (err) {
-    console.error('Failed to update PDF hash:', err);
-    return null;
+    console.error('❌ CRITICAL: Failed to register PDF hash for verification:', err);
+    // Return error info so caller can handle it
+    return {
+      success: false,
+      error: err.response?.data?.detail || err.message || 'Failed to register PDF hash'
+    };
   }
 };
 
@@ -5707,9 +5712,18 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       });
 
       // Update PDF hash in backend if we have a certification
+      // CRITICAL: This enables digital signature verification
       if (certData?.certification_id) {
-        setQuickPackageProgress('Registering document hash for verification...');
-        await updatePdfHashInBackend(certData.certification_id, pdfHash, adminKey);
+        setQuickPackageProgress('Registering digital signature for verification...');
+        const hashResult = await updatePdfHashInBackend(certData.certification_id, pdfHash, adminKey);
+        if (!hashResult.success) {
+          console.error('Warning: PDF hash not saved. Verification may not work:', hashResult.error);
+          setQuickPackageProgress('⚠️ Warning: Could not register document for verification. Continuing with download...');
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        } else {
+          setQuickPackageProgress('✅ Digital signature registered successfully!');
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
       }
 
       // Download the PDF
@@ -6290,8 +6304,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         });
 
         // Update PDF hash in backend if we have a certification
+        // CRITICAL: This enables digital signature verification
         if (certData?.certification_id) {
-          await updatePdfHashInBackend(certData.certification_id, pdfHash, adminKey);
+          const hashResult = await updatePdfHashInBackend(certData.certification_id, pdfHash, adminKey);
+          if (!hashResult.success) {
+            console.error('Warning: PDF hash not saved. Verification may not work:', hashResult.error);
+          }
         }
 
         // Download the PDF
