@@ -5529,26 +5529,26 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
     </div>`;
 
-    // Letterhead for all pages - Same style as cover
+    // Letterhead for all pages - COMPACT to fit images on same page
     const letterheadHTML = `
-        <div style="width: 100%; margin-bottom: 8px; overflow: hidden;">
+        <div style="width: 100%; margin-bottom: 4px; overflow: hidden;">
             <div style="float: left; width: 128px;">
                 ${logoLeft
-                  ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
+                  ? `<img src="${logoLeft}" alt="Logo" style="max-height: 42px; max-width: 120px;" />`
                   : `<div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>`}
             </div>
             <div style="float: right; width: 80px; text-align: right;">
                 ${logoRight
-                  ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px; max-width: 75px;" />`
+                  ? `<img src="${logoRight}" alt="ATA" style="max-height: 36px; max-width: 75px;" />`
                   : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span></div>`}
             </div>
             <div style="margin-left: 138px; margin-right: 90px; text-align: center;">
-                <div style="font-weight: bold; color: #2563eb; font-size: 14px; font-style: italic;">Legacy Translations</div>
-                <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
-                <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
+                <div style="font-weight: bold; color: #2563eb; font-size: 13px; font-style: italic;">Legacy Translations</div>
+                <div style="font-size: 8px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                <div style="font-size: 8px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
-        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>`;
+        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 8px;"></div>`;
 
     // Translation pages - supports HTML content OR images (not both to avoid duplication)
     let translationPagesHTML = '';
@@ -5560,32 +5560,32 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     // First page doesn't need page-break since cover ends with one
     if (validTranslationFiles.length > 0) {
       translationPagesHTML = validTranslationFiles.map((file, idx) => `
-    <div style="${idx > 0 ? 'page-break-before: always;' : ''} padding-top: 10px;">
+    <div style="${idx > 0 ? 'page-break-before: always;' : ''} padding-top: 5px;">
         ${includeLetterhead ? letterheadHTML : ''}
-        <div style="margin-top: 10px;">
-            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Translation page ${idx + 1}" style="width: 100%; max-width: 100%; height: auto; display: block; margin: 0 auto;" />
+        <div>
+            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Translation page ${idx + 1}" style="width: 100%; max-height: 8.5in; object-fit: contain; display: block; margin: 0 auto;" />
         </div>
     </div>`).join('');
     }
     // Otherwise use HTML content (from Word/HTML/TXT)
     else if (quickTranslationHtml) {
       translationPagesHTML = `
-    <div style="padding-top: 10px;">
+    <div style="padding-top: 5px;">
         ${includeLetterhead ? letterheadHTML : ''}
-        <div style="margin-top: 10px; line-height: 1.5; font-size: 11pt;">
+        <div style="margin-top: 5px; line-height: 1.5; font-size: 11pt;">
             ${quickTranslationHtml}
         </div>
     </div>`;
     }
 
-    // Original document pages - first original page needs break, subsequent ones too
+    // Original document pages
     const validOriginalFiles = quickOriginalFiles.filter(file => file.data && file.data.length > 100);
     const originalPagesHTML = (includeOriginal && validOriginalFiles.length > 0) ? validOriginalFiles.map((file, idx) => `
-    <div style="page-break-before: always; padding-top: 10px;">
+    <div style="page-break-before: always; padding-top: 5px;">
         ${includeLetterhead ? letterheadHTML : ''}
-        ${idx === 0 ? '<div style="font-size: 13px; font-weight: bold; text-align: center; margin: 15px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px;">Original Document</div>' : ''}
+        ${idx === 0 ? '<div style="font-size: 13px; font-weight: bold; text-align: center; margin: 8px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px;">Original Document</div>' : ''}
         <div style="text-align: center;">
-            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Original page ${idx + 1}" style="width: 100%; max-width: 100%; height: auto; display: block; margin: 0 auto;" />
+            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Original page ${idx + 1}" style="width: 100%; max-height: 8.5in; object-fit: contain; display: block; margin: 0 auto;" />
         </div>
     </div>`).join('') : '';
 
@@ -6067,33 +6067,33 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
     </div>`;
 
-    // Letterhead for all pages - Same style as cover
+    // Letterhead for all pages - COMPACT to fit images on same page
     const letterheadHTML = `
-        <div style="width: 100%; margin-bottom: 8px; overflow: hidden;">
+        <div style="width: 100%; margin-bottom: 4px; overflow: hidden;">
             <div style="float: left; width: 128px;">
                 ${logoLeft
-                  ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
+                  ? `<img src="${logoLeft}" alt="Logo" style="max-height: 42px; max-width: 120px;" />`
                   : `<div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>`}
             </div>
             <div style="float: right; width: 80px; text-align: right;">
                 ${logoRight
-                  ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px; max-width: 75px;" />`
+                  ? `<img src="${logoRight}" alt="ATA" style="max-height: 36px; max-width: 75px;" />`
                   : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span></div>`}
             </div>
             <div style="margin-left: 138px; margin-right: 90px; text-align: center;">
-                <div style="font-weight: bold; color: #2563eb; font-size: 14px; font-style: italic;">Legacy Translations</div>
-                <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
-                <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
+                <div style="font-weight: bold; color: #2563eb; font-size: 13px; font-style: italic;">Legacy Translations</div>
+                <div style="font-size: 8px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                <div style="font-size: 8px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
-        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>`;
+        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 8px;"></div>`;
 
     // Translation pages HTML (with or without letterhead)
     // First page doesn't need page-break since cover ends with one
     const translationPagesHTML = translationResults.map((result, index) => `
-    <div style="${index > 0 ? 'page-break-before: always;' : ''} padding-top: 10px;">
+    <div style="${index > 0 ? 'page-break-before: always;' : ''} padding-top: 5px;">
         ${includeLetterhead ? letterheadHTML : ''}
-        <div style="margin-top: 10px; line-height: 1.5; font-size: 11pt;">${result.translatedText}</div>
+        <div style="margin-top: 5px; line-height: 1.5; font-size: 11pt;">${result.translatedText}</div>
     </div>
     `).join('');
 
@@ -6153,11 +6153,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
     // Original documents pages HTML (each image on separate page, title only on first)
     const originalPagesHTML = (includeOriginal && originalImages.length > 0) ? originalImages.map((img, index) => `
-    <div style="page-break-before: always; padding-top: 10px;">
+    <div style="page-break-before: always; padding-top: 5px;">
         ${includeLetterhead ? letterheadHTML : ''}
-        ${index === 0 ? '<div style="font-size: 13px; font-weight: bold; text-align: center; margin: 15px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px;">Original Document</div>' : ''}
+        ${index === 0 ? '<div style="font-size: 13px; font-weight: bold; text-align: center; margin: 8px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px;">Original Document</div>' : ''}
         <div style="text-align: center;">
-            <img src="${img.data}" alt="${img.filename}" style="width: 100%; max-width: 100%; height: auto; display: block; margin: 0 auto;" />
+            <img src="${img.data}" alt="${img.filename}" style="width: 100%; max-height: 8.5in; object-fit: contain; display: block; margin: 0 auto;" />
         </div>
     </div>
     `).join('') : '';
