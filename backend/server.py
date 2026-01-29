@@ -56,6 +56,78 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
+# GridFS for large file storage (to avoid BSON 16MB limit)
+from motor.motor_asyncio import AsyncIOMotorGridFSBucket
+fs_bucket = AsyncIOMotorGridFSBucket(db, bucket_name="document_files")
+
+# Helper function to sanitize error messages (hide internal URLs)
+def sanitize_error_message(error_msg: str) -> str:
+    """Remove internal URLs and sensitive information from error messages"""
+    import re
+    # Remove Render URLs
+    sanitized = re.sub(r'https?://[a-zA-Z0-9-]+\.onrender\.com[^\s]*', '[server]', str(error_msg))
+    # Remove other internal URLs
+    sanitized = re.sub(r'https?://localhost[:\d]*[^\s]*', '[server]', sanitized)
+    # Remove MongoDB connection strings
+    sanitized = re.sub(r'mongodb(\+srv)?://[^\s]+', '[database]', sanitized)
+    return sanitized
+
+# GridFS helper functions
+async def store_file_in_gridfs(file_data: str, filename: str, content_type: str, metadata: dict = None) -> str:
+    """Store a base64-encoded file in GridFS and return the file_id"""
+    try:
+        # Decode base64 data
+        if "base64," in file_data:
+            file_data = file_data.split("base64,")[1]
+        file_bytes = base64.b64decode(file_data)
+
+        # Create metadata
+        file_metadata = {
+            "filename": filename,
+            "content_type": content_type,
+            "uploaded_at": datetime.utcnow()
+        }
+        if metadata:
+            file_metadata.update(metadata)
+
+        # Upload to GridFS
+        file_id = await fs_bucket.upload_from_stream(
+            filename,
+            io.BytesIO(file_bytes),
+            metadata=file_metadata
+        )
+
+        return str(file_id)
+    except Exception as e:
+        logger.error(f"Error storing file in GridFS: {str(e)}")
+        raise
+
+async def retrieve_file_from_gridfs(file_id: str) -> tuple:
+    """Retrieve a file from GridFS by its ID. Returns (file_bytes, filename, content_type)"""
+    try:
+        from bson import ObjectId
+
+        # Download the file
+        grid_out = await fs_bucket.open_download_stream(ObjectId(file_id))
+        file_bytes = await grid_out.read()
+
+        # Get metadata
+        filename = grid_out.filename or "document"
+        content_type = grid_out.metadata.get("content_type", "application/octet-stream") if grid_out.metadata else "application/octet-stream"
+
+        return file_bytes, filename, content_type
+    except Exception as e:
+        logger.error(f"Error retrieving file from GridFS: {str(e)}")
+        raise
+
+async def get_file_base64_from_gridfs(file_id: str) -> str:
+    """Retrieve a file from GridFS and return as base64 string"""
+    file_bytes, _, _ = await retrieve_file_from_gridfs(file_id)
+    return base64.b64encode(file_bytes).decode('utf-8')
+
+# Size threshold for using GridFS (10MB in base64 ~ 7.5MB raw)
+GRIDFS_SIZE_THRESHOLD = 10 * 1024 * 1024  # 10MB
+
 # Configure Stripe
 stripe.api_key = os.environ.get('STRIPE_API_KEY', 'sk_test_51KNwnnCZYqv7a95ovlRcZyuZtQNhfB8UgpGGjYaAxOgWgNa4V4D34m5M4hhURTK68GazMTmkJzy5V7jhC9Xya7RJ00305uur7C')
 STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
@@ -9292,28 +9364,68 @@ async def admin_create_manual_order(project_data: ManualProjectCreate, admin_key
         if "_id" in order_dict:
             del order_dict["_id"]
 
-        # Save multiple documents if provided
+        # Save multiple documents if provided - use GridFS for large files
         if project_data.documents and len(project_data.documents) > 0:
             for doc in project_data.documents:
+                doc_data = doc.get("data", "")
+                filename = doc.get("filename", "document.pdf")
+                content_type = doc.get("content_type", "application/pdf")
+
                 doc_record = {
                     "id": str(uuid.uuid4()),
                     "order_id": order.id,
-                    "filename": doc.get("filename", "document.pdf"),
-                    "data": doc.get("data"),
-                    "content_type": doc.get("content_type", "application/pdf"),
+                    "filename": filename,
+                    "content_type": content_type,
                     "uploaded_at": datetime.utcnow()
                 }
+
+                # Use GridFS for large files (> 10MB base64 string)
+                if doc_data and len(doc_data) > GRIDFS_SIZE_THRESHOLD:
+                    try:
+                        gridfs_id = await store_file_in_gridfs(
+                            doc_data, filename, content_type,
+                            {"order_id": order.id}
+                        )
+                        doc_record["gridfs_id"] = gridfs_id
+                        doc_record["data"] = None  # Don't store inline
+                        logger.info(f"Large file '{filename}' stored in GridFS: {gridfs_id}")
+                    except Exception as gfs_err:
+                        logger.error(f"GridFS storage failed for {filename}: {str(gfs_err)}")
+                        # Fallback to inline if GridFS fails (may hit BSON limit)
+                        doc_record["data"] = doc_data
+                else:
+                    doc_record["data"] = doc_data
+
                 await db.order_documents.insert_one(doc_record)
             logger.info(f"Saved {len(project_data.documents)} documents for order {order.order_number}")
         # Fallback: If single document data provided (backwards compatibility)
         elif project_data.document_data and project_data.document_filename:
+            doc_data = project_data.document_data
+            filename = project_data.document_filename
+
             doc_record = {
                 "id": str(uuid.uuid4()),
                 "order_id": order.id,
-                "filename": project_data.document_filename,
-                "data": project_data.document_data,
+                "filename": filename,
                 "uploaded_at": datetime.utcnow()
             }
+
+            # Use GridFS for large files
+            if doc_data and len(doc_data) > GRIDFS_SIZE_THRESHOLD:
+                try:
+                    gridfs_id = await store_file_in_gridfs(
+                        doc_data, filename, "application/pdf",
+                        {"order_id": order.id}
+                    )
+                    doc_record["gridfs_id"] = gridfs_id
+                    doc_record["data"] = None
+                    logger.info(f"Large file '{filename}' stored in GridFS: {gridfs_id}")
+                except Exception as gfs_err:
+                    logger.error(f"GridFS storage failed for {filename}: {str(gfs_err)}")
+                    doc_record["data"] = doc_data
+            else:
+                doc_record["data"] = doc_data
+
             await db.order_documents.insert_one(doc_record)
 
         # Send to Make webhook for QuickBooks invoice if requested
@@ -9336,7 +9448,9 @@ async def admin_create_manual_order(project_data: ManualProjectCreate, admin_key
 
     except Exception as e:
         logger.error(f"Error creating manual order: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to create project: {str(e)}")
+        # Sanitize error message to hide internal URLs
+        safe_error = sanitize_error_message(str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to create project: {safe_error}")
 
 class CreateQuoteRequest(BaseModel):
     client_name: str
@@ -16579,7 +16693,25 @@ async def public_download_document(document_id: str):
     import base64
     from fastapi.responses import Response
 
-    file_data = document.get("file_data", "")
+    # Check if file is stored in GridFS
+    if document.get("gridfs_id"):
+        try:
+            file_bytes, _, _ = await retrieve_file_from_gridfs(document["gridfs_id"])
+            content_type = document.get("content_type", "application/octet-stream")
+            filename = document.get("filename", "document")
+            return Response(
+                content=file_bytes,
+                media_type=content_type,
+                headers={
+                    "Content-Disposition": f'inline; filename="{filename}"'
+                }
+            )
+        except Exception as e:
+            logger.error(f"Error retrieving file from GridFS: {str(e)}")
+            raise HTTPException(status_code=500, detail="Error retrieving document")
+
+    # Fallback to inline data
+    file_data = document.get("file_data", "") or document.get("data", "")
     if not file_data:
         raise HTTPException(status_code=404, detail="Document data not found")
 
@@ -16630,7 +16762,7 @@ async def admin_get_order_documents(order_id: str, admin_key: str):
             "id": doc.get("id"),
             "filename": doc.get("filename"),
             "content_type": doc.get("content_type", "application/pdf"),
-            "has_data": bool(doc.get("file_data")),
+            "has_data": bool(doc.get("file_data") or doc.get("gridfs_id")),
             "source": "partner_upload"
         })
 
@@ -16640,7 +16772,7 @@ async def admin_get_order_documents(order_id: str, admin_key: str):
             "id": doc.get("id"),
             "filename": doc.get("filename"),
             "content_type": doc.get("content_type", "application/pdf"),
-            "has_data": bool(doc.get("data")),
+            "has_data": bool(doc.get("data") or doc.get("gridfs_id")),
             "source": doc.get("source", "manual_upload"),
             "uploaded_at": doc.get("uploaded_at").isoformat() if doc.get("uploaded_at") else None
         })
@@ -16745,24 +16877,52 @@ async def admin_upload_order_document(order_id: str, doc_data: OrderDocumentUplo
             "id": str(uuid.uuid4()),
             "order_id": order_id,
             "filename": final_filename,
-            "data": final_data,
-            "file_data": final_data,
             "content_type": final_content_type,
             "source": doc_data.source,
             "uploaded_at": datetime.utcnow()
         }
+
+        # Use GridFS for large files (> 10MB base64 string)
+        if final_data and len(final_data) > GRIDFS_SIZE_THRESHOLD:
+            try:
+                gridfs_id = await store_file_in_gridfs(
+                    final_data, final_filename, final_content_type,
+                    {"order_id": order_id, "source": doc_data.source}
+                )
+                doc_record["gridfs_id"] = gridfs_id
+                doc_record["data"] = None
+                doc_record["file_data"] = None
+                logger.info(f"Large file '{final_filename}' stored in GridFS: {gridfs_id}")
+            except Exception as gfs_err:
+                logger.error(f"GridFS storage failed for {final_filename}: {str(gfs_err)}")
+                # Fallback to inline storage (may hit BSON limit for very large files)
+                doc_record["data"] = final_data
+                doc_record["file_data"] = final_data
+        else:
+            doc_record["data"] = final_data
+            doc_record["file_data"] = final_data
+
         await db.order_documents.insert_one(doc_record)
         logger.info(f"Document '{final_filename}' uploaded to order {order_id}")
 
         # Also update order with translated file for backwards compatibility
+        # Only store inline if file is small enough
         if doc_data.source == "translated_document":
+            update_data = {
+                "translated_filename": final_filename,
+                "translated_file_type": final_content_type
+            }
+            # Only store file data inline if it's not too large
+            if not doc_record.get("gridfs_id"):
+                update_data["translated_file"] = final_data
+            else:
+                # Store reference to GridFS
+                update_data["translated_gridfs_id"] = doc_record["gridfs_id"]
+                update_data["translated_file"] = None  # Clear inline storage
+
             await db.translation_orders.update_one(
                 {"id": order_id},
-                {"$set": {
-                    "translated_file": final_data,
-                    "translated_filename": final_filename,
-                    "translated_file_type": final_content_type
-                }}
+                {"$set": update_data}
             )
 
         return {
@@ -16772,7 +16932,9 @@ async def admin_upload_order_document(order_id: str, doc_data: OrderDocumentUplo
         }
     except Exception as e:
         logger.error(f"Error uploading document to order {order_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to upload document: {str(e)}")
+        # Sanitize error message to hide internal URLs
+        safe_error = sanitize_error_message(str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to upload document: {safe_error}")
 
 @api_router.get("/admin/order-documents/{doc_id}/download")
 async def admin_download_order_document(doc_id: str, admin_key: str):
@@ -16785,15 +16947,42 @@ async def admin_download_order_document(doc_id: str, admin_key: str):
     # Try order_documents first (manual uploads)
     document = await db.order_documents.find_one({"id": doc_id})
     if document:
+        # Check if file is stored in GridFS
+        if document.get("gridfs_id"):
+            try:
+                file_data = await get_file_base64_from_gridfs(document["gridfs_id"])
+                return {
+                    "filename": document.get("filename", "document.pdf"),
+                    "content_type": document.get("content_type", "application/pdf"),
+                    "file_data": file_data
+                }
+            except Exception as e:
+                logger.error(f"Error retrieving file from GridFS: {str(e)}")
+                raise HTTPException(status_code=500, detail="Failed to retrieve document")
+
+        # Fallback to inline data
         return {
             "filename": document.get("filename", "document.pdf"),
-            "content_type": "application/pdf",
-            "file_data": document.get("data", "")
+            "content_type": document.get("content_type", "application/pdf"),
+            "file_data": document.get("data", "") or document.get("file_data", "")
         }
 
     # Try main documents collection
     document = await db.documents.find_one({"id": doc_id})
     if document:
+        # Check for GridFS storage
+        if document.get("gridfs_id"):
+            try:
+                file_data = await get_file_base64_from_gridfs(document["gridfs_id"])
+                return {
+                    "filename": document.get("filename", "document.pdf"),
+                    "content_type": document.get("content_type", "application/pdf"),
+                    "file_data": file_data
+                }
+            except Exception as e:
+                logger.error(f"Error retrieving file from GridFS: {str(e)}")
+                raise HTTPException(status_code=500, detail="Failed to retrieve document")
+
         return {
             "filename": document.get("filename", "document.pdf"),
             "content_type": document.get("content_type", "application/pdf"),

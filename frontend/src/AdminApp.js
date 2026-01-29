@@ -130,6 +130,22 @@ const updatePdfHashInBackend = async (certificationId, pdfHash, adminKey) => {
   }
 };
 
+// ==================== ERROR MESSAGE SANITIZATION ====================
+// Sanitize error messages to hide internal URLs and sensitive information
+const sanitizeErrorMessage = (errorMsg) => {
+  if (!errorMsg) return 'An error occurred';
+  let sanitized = String(errorMsg);
+  // Remove Render URLs
+  sanitized = sanitized.replace(/https?:\/\/[a-zA-Z0-9-]+\.onrender\.com[^\s]*/g, '[server]');
+  // Remove localhost URLs
+  sanitized = sanitized.replace(/https?:\/\/localhost[:\d]*[^\s]*/g, '[server]');
+  // Remove MongoDB connection strings
+  sanitized = sanitized.replace(/mongodb(\+srv)?:\/\/[^\s]+/g, '[database]');
+  // Remove stack traces (lines starting with "at ")
+  sanitized = sanitized.replace(/\s+at\s+.+/g, '');
+  return sanitized;
+};
+
 // ==================== CONSTANTS ====================
 const STATUS_COLORS = {
   'Quote': 'bg-slate-100 text-slate-700',
@@ -14756,7 +14772,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       fetchOrders();
     } catch (err) {
       console.error('Error creating project:', err.response?.data || err);
-      const errorMsg = err.response?.data?.detail || 'Error creating project';
+      const rawError = err.response?.data?.detail || 'Error creating project';
+      const errorMsg = sanitizeErrorMessage(rawError);
       alert(errorMsg.includes('email') ? 'Invalid email format. Please enter a valid email (e.g., name@email.com)' : errorMsg);
     } finally {
       setCreatingProject(false);
