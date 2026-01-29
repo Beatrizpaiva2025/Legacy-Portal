@@ -140,6 +140,93 @@ const getNYDateISO = () => {
   return `${year}-${month}-${day}`;
 };
 
+// Extract date and time components in NY timezone from a UTC date string
+// Returns { date: 'YYYY-MM-DD', time: 'HH:MM' } in NY timezone
+const getDateTimePartsInNY = (dateStr) => {
+  if (!dateStr) {
+    // Return current date/time in NY
+    const now = new Date();
+    const dateOpts = { timeZone: NY_TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit' };
+    const timeOpts = { timeZone: NY_TIMEZONE, hour: '2-digit', minute: '2-digit', hour12: false };
+    const dateParts = new Intl.DateTimeFormat('en-CA', dateOpts).formatToParts(now);
+    const timeParts = new Intl.DateTimeFormat('en-GB', timeOpts).formatToParts(now);
+    const year = dateParts.find(p => p.type === 'year').value;
+    const month = dateParts.find(p => p.type === 'month').value;
+    const day = dateParts.find(p => p.type === 'day').value;
+    const hour = timeParts.find(p => p.type === 'hour').value;
+    const minute = timeParts.find(p => p.type === 'minute').value;
+    return { date: `${year}-${month}-${day}`, time: `${hour}:${minute}` };
+  }
+  // Parse the date as UTC
+  const utcDate = parseUTCDate(dateStr);
+  // Format in NY timezone
+  const dateOpts = { timeZone: NY_TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit' };
+  const timeOpts = { timeZone: NY_TIMEZONE, hour: '2-digit', minute: '2-digit', hour12: false };
+  const dateParts = new Intl.DateTimeFormat('en-CA', dateOpts).formatToParts(utcDate);
+  const timeParts = new Intl.DateTimeFormat('en-GB', timeOpts).formatToParts(utcDate);
+  const year = dateParts.find(p => p.type === 'year').value;
+  const month = dateParts.find(p => p.type === 'month').value;
+  const day = dateParts.find(p => p.type === 'day').value;
+  const hour = timeParts.find(p => p.type === 'hour').value;
+  const minute = timeParts.find(p => p.type === 'minute').value;
+  return { date: `${year}-${month}-${day}`, time: `${hour}:${minute}` };
+};
+
+// Convert NY timezone date/time parts to UTC ISO string for backend
+// Takes { date: 'YYYY-MM-DD', time: 'HH:MM' } in NY timezone and returns UTC datetime string
+const convertNYToUTC = (datePart, timePart) => {
+  // Create a date string that will be interpreted as NY time
+  const nyDateTimeStr = `${datePart}T${timePart || '17:00'}:00`;
+  // Create date in NY timezone using Intl API
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: NY_TIMEZONE,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+  });
+  // Parse the NY time and convert to UTC
+  // We need to find the UTC time that corresponds to this NY time
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hour, minute] = (timePart || '17:00').split(':').map(Number);
+
+  // Create a date object and adjust for NY timezone offset
+  // First, create a rough date to determine the offset
+  const roughDate = new Date(year, month - 1, day, hour, minute, 0);
+  const nyFormatted = formatter.format(roughDate);
+
+  // Use a more reliable approach: create the date and find when it matches NY time
+  // Try different UTC times until we find one that displays as our target NY time
+  const targetNY = `${datePart} ${timePart || '17:00'}`;
+
+  // Start with a guess (NY is UTC-5 or UTC-4 depending on DST)
+  let testDate = new Date(Date.UTC(year, month - 1, day, hour + 5, minute, 0));
+
+  // Check if this gives us the right NY time, adjust if needed
+  const checkFormatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: NY_TIMEZONE,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false
+  });
+
+  // Try offsets from +4 to +6 hours (covers EST and EDT)
+  for (let offset = 4; offset <= 6; offset++) {
+    testDate = new Date(Date.UTC(year, month - 1, day, hour + offset, minute, 0));
+    const testParts = checkFormatter.formatToParts(testDate);
+    const testYear = testParts.find(p => p.type === 'year').value;
+    const testMonth = testParts.find(p => p.type === 'month').value;
+    const testDay = testParts.find(p => p.type === 'day').value;
+    const testHour = testParts.find(p => p.type === 'hour').value;
+    const testMinute = testParts.find(p => p.type === 'minute').value;
+    const testNY = `${testYear}-${testMonth}-${testDay} ${testHour}:${testMinute}`;
+    if (testNY === targetNY) {
+      // Found the right UTC time
+      return testDate.toISOString().slice(0, 19); // Remove 'Z' and milliseconds
+    }
+  }
+
+  // Fallback: return the original string (shouldn't happen)
+  return nyDateTimeStr;
+};
+
 // ==================== PDF HASH UTILITIES ====================
 // Calculate SHA-256 hash of an ArrayBuffer using Web Crypto API
 const calculateSHA256 = async (arrayBuffer) => {
@@ -14021,16 +14108,15 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   // Edit deadline
   const startEditingDeadline = (order) => {
     setEditingDeadline(order.id);
-    const deadlineDate = order.deadline ? new Date(order.deadline) : new Date();
-    setTempDeadlineValue({
-      date: deadlineDate.toISOString().split('T')[0],
-      time: deadlineDate.toTimeString().slice(0, 5)
-    });
+    // Extract date/time in NY timezone (backend stores UTC, display in NY)
+    const { date, time } = getDateTimePartsInNY(order.deadline);
+    setTempDeadlineValue({ date, time });
   };
 
   const saveDeadlineEdit = async (orderId) => {
     try {
-      const deadlineDateTime = `${tempDeadlineValue.date}T${tempDeadlineValue.time || '17:00'}:00`;
+      // Convert NY timezone input to UTC for backend storage
+      const deadlineDateTime = convertNYToUTC(tempDeadlineValue.date, tempDeadlineValue.time);
       await axios.put(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`, {
         deadline: deadlineDateTime
       });
@@ -14044,16 +14130,15 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   // Edit translator deadline
   const startEditingTranslatorDeadline = (order) => {
     setEditingTranslatorDeadline(order.id);
-    const deadlineDate = order.translator_deadline ? new Date(order.translator_deadline) : new Date();
-    setTempTranslatorDeadlineValue({
-      date: deadlineDate.toISOString().split('T')[0],
-      time: deadlineDate.toTimeString().slice(0, 5)
-    });
+    // Extract date/time in NY timezone (backend stores UTC, display in NY)
+    const { date, time } = getDateTimePartsInNY(order.translator_deadline);
+    setTempTranslatorDeadlineValue({ date, time });
   };
 
   const saveTranslatorDeadlineEdit = async (orderId) => {
     try {
-      const deadlineDateTime = `${tempTranslatorDeadlineValue.date}T${tempTranslatorDeadlineValue.time || '17:00'}:00`;
+      // Convert NY timezone input to UTC for backend storage
+      const deadlineDateTime = convertNYToUTC(tempTranslatorDeadlineValue.date, tempTranslatorDeadlineValue.time);
       await axios.put(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`, {
         translator_deadline: deadlineDateTime
       });
