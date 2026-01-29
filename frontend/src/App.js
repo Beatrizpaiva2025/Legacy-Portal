@@ -5,6 +5,59 @@ import './App.css';
 
 const API = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
+// ==================== GLOBAL TOAST NOTIFICATION SYSTEM ====================
+// Global toast function - can be called from anywhere
+window.showAppToast = (message, type = 'info') => {
+  window.dispatchEvent(new CustomEvent('app-toast', { detail: { message, type } }));
+};
+
+const ToastContainer = () => {
+  const [toasts, setToasts] = useState([]);
+
+  useEffect(() => {
+    const handleToast = (e) => {
+      const { message, type } = e.detail;
+      const id = Date.now();
+      setToasts(prev => [...prev, { id, message, type }]);
+
+      // Auto-remove after 5 seconds
+      setTimeout(() => {
+        setToasts(prev => prev.filter(t => t.id !== id));
+      }, 5000);
+    };
+
+    window.addEventListener('app-toast', handleToast);
+    return () => window.removeEventListener('app-toast', handleToast);
+  }, []);
+
+  const removeToast = (id) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  };
+
+  if (toasts.length === 0) return null;
+
+  return (
+    <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2">
+      {toasts.map((toast, index) => {
+        const bgColor = toast.type === 'success' ? 'bg-green-500' : toast.type === 'error' ? 'bg-red-500' : 'bg-blue-500';
+        const icon = toast.type === 'success' ? '✓' : toast.type === 'error' ? '✕' : 'ℹ';
+
+        return (
+          <div
+            key={toast.id}
+            className={`${bgColor} text-white px-6 py-4 rounded-lg shadow-xl flex items-center gap-3 animate-slide-in max-w-md`}
+            style={{ marginTop: index > 0 ? '0' : '0' }}
+          >
+            <span className="text-xl font-bold">{icon}</span>
+            <span className="flex-1">{toast.message}</span>
+            <button onClick={() => removeToast(toast.id)} className="text-white/80 hover:text-white text-xl font-bold ml-2">&times;</button>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 // ==================== NEW YORK TIMEZONE HELPERS ====================
 const NY_TIMEZONE = 'America/New_York';
 
@@ -1668,7 +1721,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency, refreshPart
   // Send human message
   const sendHumanMessage = async () => {
     if (!messageRecipient || !messageContent.trim()) {
-      alert('Please select a recipient and enter a message');
+      window.showAppToast('Please select a recipient and enter a message', 'error');
       return;
     }
     setSendingMessage(true);
@@ -1689,7 +1742,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency, refreshPart
       }, 3000);
     } catch (err) {
       console.error('Failed to send message:', err);
-      alert('Failed to send message. Please try again.');
+      window.showAppToast('Failed to send message. Please try again.', 'error');
     } finally {
       setSendingMessage(false);
     }
@@ -3062,7 +3115,7 @@ const OrdersPage = ({ token, currency }) => {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Failed to download document:', err);
-      alert('Failed to download document. Please try again.');
+      window.showAppToast('Failed to download document. Please try again.', 'error');
     }
   };
 
@@ -3097,13 +3150,13 @@ const OrdersPage = ({ token, currency }) => {
         content: messageContent,
         order_number: messageOrder.order_number
       });
-      alert('Message sent successfully!');
+      window.showAppToast('Message sent successfully!', 'success');
       setShowMessageModal(false);
       setMessageContent('');
       setMessageOrder(null);
     } catch (err) {
       console.error('Failed to send message:', err);
-      alert('Failed to send message. Please try again.');
+      window.showAppToast('Failed to send message. Please try again.', 'error');
     } finally {
       setSendingMessage(false);
     }
@@ -3453,7 +3506,7 @@ const InvoicesPage = ({ token, t, currency, lang }) => {
         window.location.href = response.data.checkout_url;
       }
     } catch (err) {
-      alert('Error creating payment: ' + (err.response?.data?.detail || err.message));
+      window.showAppToast('Error creating payment: ' + (err.response?.data?.detail || err.message), 'error');
     } finally {
       setSubmittingPayment(false);
     }
@@ -3477,7 +3530,7 @@ const InvoicesPage = ({ token, t, currency, lang }) => {
         filename: file.name
       });
     } catch (err) {
-      alert('Error uploading receipt: ' + (err.response?.data?.detail || err.message));
+      window.showAppToast('Error uploading receipt: ' + (err.response?.data?.detail || err.message), 'error');
     } finally {
       setUploadingReceipt(false);
     }
@@ -3485,7 +3538,7 @@ const InvoicesPage = ({ token, t, currency, lang }) => {
 
   const handleSubmitZellePayment = async () => {
     if (!selectedInvoice || !zelleReceipt) {
-      alert('Please upload a receipt');
+      window.showAppToast('Please upload a receipt', 'error');
       return;
     }
 
@@ -3495,12 +3548,12 @@ const InvoicesPage = ({ token, t, currency, lang }) => {
         invoice_id: selectedInvoice.id,
         zelle_receipt_id: zelleReceipt.id
       });
-      alert(t?.receiptUploaded || 'Receipt uploaded successfully. Payment will be verified shortly.');
+      window.showAppToast(t?.receiptUploaded || 'Receipt uploaded successfully. Payment will be verified shortly.', 'success');
       setShowPayModal(false);
       setZelleReceipt(null);
       fetchInvoices();
     } catch (err) {
-      alert('Error submitting payment: ' + (err.response?.data?.detail || err.message));
+      window.showAppToast('Error submitting payment: ' + (err.response?.data?.detail || err.message), 'error');
     } finally {
       setSubmittingPayment(false);
     }
@@ -3845,7 +3898,7 @@ const PaymentPlanPage = ({ token, t, currency }) => {
         fetchQualification();
       } else {
         const err = await res.json();
-        alert(err.detail || 'Error submitting request');
+        window.showAppToast(err.detail || 'Error submitting request', 'error');
       }
     } catch (error) {
       console.error('Error requesting upgrade:', error);
@@ -4882,7 +4935,7 @@ const PartnerFloatingChatWidget = ({ token, partner, onNavigateToMessages }) => 
       setTimeout(() => setMessageSent(false), 5000);
     } catch (err) {
       console.error('Failed to send message:', err);
-      alert('Failed to send message. Please try again.');
+      window.showAppToast('Failed to send message. Please try again.', 'error');
     } finally {
       setSending(false);
     }
@@ -5357,6 +5410,9 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* Toast Notification */}
+      <ToastContainer />
     </div>
   );
 }
