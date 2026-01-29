@@ -27786,7 +27786,7 @@ async def invite_salesperson(salesperson_id: str, admin_key: str = Header(None))
     return {"success": True, "message": "Invitation sent", "invite_link": invite_link}
 
 # Verify salesperson invite token (before showing set-password form)
-@app.get("/salesperson/verify-invite")
+@api_router.get("/salesperson/verify-invite")
 async def verify_salesperson_invite(token: str):
     """Verify if invite token is valid before showing the password form"""
     salesperson = await db.salespeople.find_one({"invite_token": token})
@@ -27810,7 +27810,7 @@ async def verify_salesperson_invite(token: str):
     }
 
 # Salesperson set password (from invite)
-@app.post("/salesperson/set-password")
+@api_router.post("/salesperson/set-password")
 async def salesperson_set_password(invite_token: str = Form(...), password: str = Form(...)):
     salesperson = await db.salespeople.find_one({"invite_token": invite_token})
     if not salesperson:
@@ -27841,7 +27841,7 @@ async def salesperson_set_password(invite_token: str = Form(...), password: str 
     }}
 
 # Salesperson login
-@app.post("/salesperson/login")
+@api_router.post("/salesperson/login")
 async def salesperson_login(email: str = Form(...), password: str = Form(...)):
     salesperson = await db.salespeople.find_one({"email": email.lower().strip()})
     if not salesperson:
@@ -27876,7 +27876,7 @@ async def salesperson_login(email: str = Form(...), password: str = Form(...)):
     }
 
 # Get salesperson dashboard (for salesperson portal)
-@app.get("/salesperson/dashboard")
+@api_router.get("/salesperson/dashboard")
 async def get_salesperson_dashboard(token: str = Header(None, alias="salesperson-token")):
     if not token:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -27984,7 +27984,7 @@ async def get_salesperson_dashboard(token: str = Header(None, alias="salesperson
     }
 
 # Salesperson register a new partner
-@app.post("/salesperson/register-partner")
+@api_router.post("/salesperson/register-partner")
 async def salesperson_register_partner(
     token: str = Header(None, alias="salesperson-token"),
     company_name: str = Form(...),
@@ -28141,7 +28141,7 @@ async def salesperson_register_partner(
     }
 
 # Get commission structure explanation
-@app.get("/salesperson/commission-info")
+@api_router.get("/salesperson/commission-info")
 async def get_commission_info(token: str = Header(None, alias="salesperson-token")):
     if not token:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -28180,7 +28180,7 @@ async def get_commission_info(token: str = Header(None, alias="salesperson-token
     }
 
 # Salesperson notifications
-@app.get("/salesperson/notifications")
+@api_router.get("/salesperson/notifications")
 async def get_salesperson_notifications(token: str = Header(None, alias="salesperson-token")):
     if not token:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -28198,7 +28198,7 @@ async def get_salesperson_notifications(token: str = Header(None, alias="salespe
 
     return {"notifications": notifications}
 
-@app.put("/salesperson/notifications/{notification_id}/read")
+@api_router.put("/salesperson/notifications/{notification_id}/read")
 async def mark_notification_read(notification_id: str, token: str = Header(None, alias="salesperson-token")):
     if not token:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -28214,7 +28214,7 @@ async def mark_notification_read(notification_id: str, token: str = Header(None,
 
     return {"success": True}
 
-@app.put("/salesperson/notifications/read-all")
+@api_router.put("/salesperson/notifications/read-all")
 async def mark_all_notifications_read(token: str = Header(None, alias="salesperson-token")):
     if not token:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -28231,7 +28231,7 @@ async def mark_all_notifications_read(token: str = Header(None, alias="salespers
     return {"success": True}
 
 # Salesperson payment history
-@app.get("/salesperson/payment-history")
+@api_router.get("/salesperson/payment-history")
 async def get_payment_history(token: str = Header(None, alias="salesperson-token")):
     if not token:
         raise HTTPException(status_code=401, detail="Authentication required")
