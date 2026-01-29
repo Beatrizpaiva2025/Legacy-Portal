@@ -12992,6 +12992,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   // Document viewer state
   const [viewingOrder, setViewingOrder] = useState(null);
   const [orderDocuments, setOrderDocuments] = useState([]);
+  const [selectedDocsForDelivery, setSelectedDocsForDelivery] = useState([]); // IDs of translated docs selected for client delivery
   const [loadingDocuments, setLoadingDocuments] = useState(false);
   const [projectModalTab, setProjectModalTab] = useState('details');
   const [uploadingProjectDoc, setUploadingProjectDoc] = useState(false);
@@ -13925,10 +13926,15 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     setViewingOrder(order);
     setLoadingDocuments(true);
     setOrderDocuments([]);
+    setSelectedDocsForDelivery([]); // Reset selection
     try {
       const response = await axios.get(`${API}/admin/orders/${order.id}/documents?admin_key=${adminKey}`);
       console.log('Documents loaded:', response.data);
-      setOrderDocuments(response.data.documents || []);
+      const docs = response.data.documents || [];
+      setOrderDocuments(docs);
+      // Auto-select all translated documents for delivery
+      const translatedDocIds = docs.filter(d => d.source === 'translated_document').map(d => d.id);
+      setSelectedDocsForDelivery(translatedDocIds);
     } catch (err) {
       console.error('Failed to fetch documents:', err);
       setOrderDocuments([]);
@@ -17088,6 +17094,22 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         {orderDocuments.filter(doc => doc.source === 'translated_document').map((doc, idx) => (
                           <div key={doc.id || idx} className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200 hover:bg-green-100">
                             <div className="flex items-center">
+                              {/* Checkbox for selecting files to send to client */}
+                              {(viewingOrder.translation_status === 'ready' || viewingOrder.translation_status === 'final') && (
+                                <input
+                                  type="checkbox"
+                                  checked={selectedDocsForDelivery.includes(doc.id)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedDocsForDelivery(prev => [...prev, doc.id]);
+                                    } else {
+                                      setSelectedDocsForDelivery(prev => prev.filter(id => id !== doc.id));
+                                    }
+                                  }}
+                                  className="w-4 h-4 mr-3 text-purple-600 bg-white border-gray-300 rounded focus:ring-purple-500 cursor-pointer"
+                                  title="Selecionar para enviar ao cliente"
+                                />
+                              )}
                               <span className="text-2xl mr-3">📗</span>
                               <div>
                                 <div className="text-sm font-medium text-green-800">{doc.filename || 'Translated Document'}</div>
@@ -17161,6 +17183,33 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                   </div>
                                 </div>
                                 <div className="flex flex-col gap-2">
+                                  {/* Show selected files count with select all/none buttons */}
+                                  <div className="flex items-center justify-between text-xs text-purple-700 bg-purple-100 px-2 py-1 rounded">
+                                    <span>
+                                      {selectedDocsForDelivery.length > 0 ? (
+                                        <span>{selectedDocsForDelivery.length} arquivo(s) selecionado(s) para envio</span>
+                                      ) : (
+                                        <span className="text-orange-600">Selecione os arquivos acima para enviar</span>
+                                      )}
+                                    </span>
+                                    <div className="flex gap-1">
+                                      <button
+                                        onClick={() => {
+                                          const translatedDocIds = orderDocuments.filter(d => d.source === 'translated_document').map(d => d.id);
+                                          setSelectedDocsForDelivery(translatedDocIds);
+                                        }}
+                                        className="px-2 py-0.5 text-[10px] bg-purple-200 hover:bg-purple-300 rounded"
+                                      >
+                                        Todos
+                                      </button>
+                                      <button
+                                        onClick={() => setSelectedDocsForDelivery([])}
+                                        className="px-2 py-0.5 text-[10px] bg-purple-200 hover:bg-purple-300 rounded"
+                                      >
+                                        Nenhum
+                                      </button>
+                                    </div>
+                                  </div>
                                   <div className="flex items-center gap-2">
                                     <input
                                       type="email"
@@ -17171,10 +17220,18 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                   </div>
                                   <button
                                     onClick={async () => {
+                                      if (selectedDocsForDelivery.length === 0) {
+                                        alert('Por favor, selecione pelo menos um arquivo para enviar ao cliente.');
+                                        return;
+                                      }
                                       const bccInput = document.getElementById('bcc-email-input');
                                       const bccEmail = bccInput?.value?.trim() || null;
+                                      const selectedFilenames = orderDocuments
+                                        .filter(d => selectedDocsForDelivery.includes(d.id))
+                                        .map(d => d.filename)
+                                        .join('\n  - ');
 
-                                      if (confirm(`Enviar tradução para ${viewingOrder.client_email}?${bccEmail ? `\n\nCópia (BCC): ${bccEmail}` : ''}`)) {
+                                      if (confirm(`Enviar tradução para ${viewingOrder.client_email}?\n\nArquivos selecionados:\n  - ${selectedFilenames}${bccEmail ? `\n\nCópia (BCC): ${bccEmail}` : ''}`)) {
                                         try {
                                           await axios.post(`${API}/admin/orders/${viewingOrder.id}/deliver?admin_key=${adminKey}`, {
                                             bcc_email: bccEmail,
@@ -17183,9 +17240,13 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                             generate_combined_pdf: true,
                                             include_certificate: true,
                                             include_translation: true,
-                                            include_original: true
+                                            include_original: true,
+                                            attachments: {
+                                              include_workspace: false,
+                                              additional_document_ids: selectedDocsForDelivery
+                                            }
                                           });
-                                          alert('Tradução enviada para o cliente!' + (bccEmail ? ` (BCC: ${bccEmail})` : ''));
+                                          alert(`Tradução enviada para o cliente!\n\n${selectedDocsForDelivery.length} arquivo(s) enviado(s).` + (bccEmail ? `\n\nCópia (BCC): ${bccEmail}` : ''));
                                           setViewingOrder(prev => ({ ...prev, translation_status: 'delivered' }));
                                           fetchOrders();
                                         } catch (err) {
@@ -17194,7 +17255,12 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                         }
                                       }
                                     }}
-                                    className="w-full px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg flex items-center justify-center gap-2 transition-colors"
+                                    disabled={selectedDocsForDelivery.length === 0}
+                                    className={`w-full px-4 py-3 text-white text-sm font-medium rounded-lg flex items-center justify-center gap-2 transition-colors ${
+                                      selectedDocsForDelivery.length === 0
+                                        ? 'bg-gray-400 cursor-not-allowed'
+                                        : 'bg-purple-600 hover:bg-purple-700'
+                                    }`}
                                   >
                                     <span className="text-lg">✉️</span>
                                     Enviar Email ao Cliente
