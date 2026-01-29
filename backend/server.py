@@ -15215,11 +15215,10 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                             doc_content_type = doc.get("content_type", "application/pdf").lower()
                             doc_filename = doc.get("filename", f"document_{doc_id}.pdf")
 
-                            # Skip translated documents if combined PDF was already generated
-                            # (the translation is already included in the combined PDF)
-                            if has_attachments and doc_source == "translated_document":
-                                logger.info(f"Skipping translated document '{doc_filename}' - already included in combined PDF")
-                                continue
+                            # NOTE: Do NOT skip translated_document source here!
+                            # The combined PDF is generated from workspace HTML (order.translation_html),
+                            # while additional_document_ids are SEPARATE uploaded files that should always be included.
+                            # Previous bug was skipping all uploaded translations when workspace translation was included.
 
                             # Convert HTML files to PDF before attaching
                             if "html" in doc_content_type or doc_filename.lower().endswith(".html"):
