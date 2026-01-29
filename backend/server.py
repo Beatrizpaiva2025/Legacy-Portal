@@ -27012,21 +27012,47 @@ async def get_salespeople(admin_key: str = Header(None)):
             raise HTTPException(status_code=401, detail="Invalid admin key or insufficient permissions")
 
     try:
-        salespeople = await db.salespeople.find().sort("created_at", -1).to_list(100)
+        current_month = datetime.now().strftime("%Y-%m")
 
-        # Get acquisition counts for each salesperson
+        # Use aggregation to get all data in a single query instead of N+1 queries
+        pipeline = [
+            {"$sort": {"created_at": -1}},
+            {"$limit": 100},
+            {
+                "$lookup": {
+                    "from": "partner_acquisitions",
+                    "localField": "id",
+                    "foreignField": "salesperson_id",
+                    "as": "acquisitions"
+                }
+            },
+            {
+                "$addFields": {
+                    "total_acquisitions": {"$size": "$acquisitions"},
+                    "month_acquisitions": {
+                        "$size": {
+                            "$filter": {
+                                "input": "$acquisitions",
+                                "as": "acq",
+                                "cond": {
+                                    "$regexMatch": {
+                                        "input": "$$acq.acquisition_date",
+                                        "regex": f"^{current_month}"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            {"$project": {"acquisitions": 0}}  # Remove the full acquisitions array
+        ]
+
+        salespeople = await db.salespeople.aggregate(pipeline).to_list(100)
+
+        # Convert _id to string
         for sp in salespeople:
             sp["_id"] = str(sp["_id"])
-            acquisitions = await db.partner_acquisitions.count_documents({"salesperson_id": sp["id"]})
-            sp["total_acquisitions"] = acquisitions
-
-            # Get current month acquisitions
-            current_month = datetime.now().strftime("%Y-%m")
-            month_acquisitions = await db.partner_acquisitions.count_documents({
-                "salesperson_id": sp["id"],
-                "acquisition_date": {"$regex": f"^{current_month}"}
-            })
-            sp["month_acquisitions"] = month_acquisitions
 
         return salespeople
     except HTTPException:
@@ -28363,56 +28389,92 @@ async def get_salesperson_ranking(admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
 
-    salespeople = await db.salespeople.find({"status": "active"}).to_list(100)
-
     current_month = datetime.now().strftime("%Y-%m")
+
+    # Use aggregation to get all data in a single query instead of N+1 queries (was 400+ queries)
+    pipeline = [
+        {"$match": {"status": "active"}},
+        {"$limit": 100},
+        {
+            "$lookup": {
+                "from": "partner_acquisitions",
+                "localField": "id",
+                "foreignField": "salesperson_id",
+                "as": "all_acquisitions"
+            }
+        },
+        {
+            "$addFields": {
+                "total_acquisitions": {"$size": "$all_acquisitions"},
+                "month_acquisitions": {
+                    "$size": {
+                        "$filter": {
+                            "input": "$all_acquisitions",
+                            "as": "acq",
+                            "cond": {
+                                "$regexMatch": {
+                                    "input": "$$acq.acquisition_date",
+                                    "regex": f"^{current_month}"
+                                }
+                            }
+                        }
+                    }
+                },
+                "total_earned": {
+                    "$sum": {
+                        "$map": {
+                            "input": {
+                                "$filter": {
+                                    "input": "$all_acquisitions",
+                                    "as": "acq",
+                                    "cond": {"$eq": ["$$acq.commission_status", "paid"]}
+                                }
+                            },
+                            "as": "paid",
+                            "in": {"$ifNull": ["$$paid.commission_paid", 0]}
+                        }
+                    }
+                },
+                "pending_amount": {
+                    "$sum": {
+                        "$map": {
+                            "input": {
+                                "$filter": {
+                                    "input": "$all_acquisitions",
+                                    "as": "acq",
+                                    "cond": {"$in": ["$$acq.commission_status", ["pending", "approved"]]}
+                                }
+                            },
+                            "as": "pending",
+                            "in": {"$ifNull": ["$$pending.commission_paid", 0]}
+                        }
+                    }
+                }
+            }
+        },
+        {"$project": {"all_acquisitions": 0, "_id": 0}},  # Remove large arrays
+        {"$sort": {"month_acquisitions": -1}}
+    ]
+
+    salespeople = await db.salespeople.aggregate(pipeline).to_list(100)
+
     rankings = []
-
-    for sp in salespeople:
-        # Count this month's acquisitions
-        month_acquisitions = await db.partner_acquisitions.count_documents({
-            "salesperson_id": sp["id"],
-            "acquisition_date": {"$regex": f"^{current_month}"}
-        })
-
-        # Total acquisitions
-        total_acquisitions = await db.partner_acquisitions.count_documents({
-            "salesperson_id": sp["id"]
-        })
-
-        # Total commissions earned
-        acquisitions = await db.partner_acquisitions.find({
-            "salesperson_id": sp["id"],
-            "commission_status": "paid"
-        }).to_list(1000)
-        total_earned = sum(a.get("commission_paid", 0) for a in acquisitions)
-
-        # Pending commissions
-        pending_acq = await db.partner_acquisitions.find({
-            "salesperson_id": sp["id"],
-            "commission_status": {"$in": ["pending", "approved"]}
-        }).to_list(1000)
-        pending_amount = sum(a.get("commission_paid", 0) for a in pending_acq)
-
+    for i, sp in enumerate(salespeople):
+        monthly_target = sp.get("monthly_target", 10)
+        month_acq = sp.get("month_acquisitions", 0)
         rankings.append({
             "id": sp["id"],
             "name": sp["name"],
             "email": sp["email"],
-            "month_acquisitions": month_acquisitions,
-            "total_acquisitions": total_acquisitions,
-            "monthly_target": sp.get("monthly_target", 10),
-            "target_progress": round((month_acquisitions / sp.get("monthly_target", 10)) * 100, 1),
-            "total_earned": total_earned,
-            "pending_amount": pending_amount,
-            "commission_type": sp.get("commission_type", "tier")
+            "month_acquisitions": month_acq,
+            "total_acquisitions": sp.get("total_acquisitions", 0),
+            "monthly_target": monthly_target,
+            "target_progress": round((month_acq / monthly_target) * 100, 1) if monthly_target > 0 else 0,
+            "total_earned": sp.get("total_earned", 0),
+            "pending_amount": sp.get("pending_amount", 0),
+            "commission_type": sp.get("commission_type", "tier"),
+            "rank": i + 1
         })
-
-    # Sort by month_acquisitions (descending)
-    rankings.sort(key=lambda x: x["month_acquisitions"], reverse=True)
-
-    # Add rank positions
-    for i, r in enumerate(rankings):
-        r["rank"] = i + 1
 
     return {
         "month": current_month,
@@ -28430,12 +28492,16 @@ async def get_pending_commissions(admin_key: str = Header(None)):
         "commission_status": "approved"
     }).sort("acquisition_date", -1).to_list(500)
 
+    # Pre-fetch all salespeople to avoid N+1 queries
+    all_salespeople = await db.salespeople.find().to_list(500)
+    sp_lookup = {sp["id"]: sp for sp in all_salespeople}
+
     # Group by salesperson
     by_salesperson = {}
     for acq in acquisitions:
         sp_id = acq["salesperson_id"]
         if sp_id not in by_salesperson:
-            sp = await db.salespeople.find_one({"id": sp_id})
+            sp = sp_lookup.get(sp_id)
             by_salesperson[sp_id] = {
                 "salesperson_id": sp_id,
                 "salesperson_name": sp["name"] if sp else "Unknown",
