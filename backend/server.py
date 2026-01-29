@@ -12553,27 +12553,48 @@ async def admin_upload_translation(order_id: str, admin_key: str, file: UploadFi
     document_id = str(uuid.uuid4())
 
     # Save to order_documents collection for multiple file support
+    # Use GridFS for all files to avoid BSON size limits
     document_record = {
         "id": document_id,
         "order_id": order_id,
         "filename": final_filename,
-        "file_data": file_base64,
         "content_type": file_type,
         "source": "translated_document",
         "document_type": "translation",
         "uploaded_at": datetime.utcnow(),
         "uploaded_by": user_info.get("name", "Admin")
     }
+
+    # Store file in GridFS
+    try:
+        gridfs_id = await store_file_in_gridfs(
+            file_base64, final_filename, file_type,
+            {"order_id": order_id, "source": "translated_document"}
+        )
+        document_record["gridfs_id"] = gridfs_id
+        document_record["file_data"] = None  # Don't store inline
+        logger.info(f"Translation file stored in GridFS: {gridfs_id}")
+    except Exception as gfs_err:
+        logger.error(f"GridFS storage failed for translation: {str(gfs_err)}")
+        # Fallback to inline storage
+        document_record["file_data"] = file_base64
+
     await db.order_documents.insert_one(document_record)
 
-    # Also update order with latest translated file (for backwards compatibility)
+    # Also update order with latest translated file reference (for backwards compatibility)
+    update_data = {
+        "translated_filename": final_filename,
+        "translated_file_type": file_type
+    }
+    if document_record.get("gridfs_id"):
+        update_data["translated_gridfs_id"] = document_record["gridfs_id"]
+        update_data["translated_file"] = None  # Clear inline storage
+    else:
+        update_data["translated_file"] = file_base64
+
     await db.translation_orders.update_one(
         {"id": order_id},
-        {"$set": {
-            "translated_file": file_base64,
-            "translated_filename": final_filename,
-            "translated_file_type": file_type
-        }}
+        {"$set": update_data}
     )
 
     logger.info(f"Translation file uploaded: {final_filename} (doc_id: {document_id}) for order {order_id}")
@@ -14201,7 +14222,17 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                 original_file_list = []  # Support multiple originals
                 if original_docs:
                     for doc in original_docs:
-                        doc_data = doc.get("file_data") or doc.get("data")
+                        # Check for GridFS storage first
+                        doc_data = None
+                        if doc.get("gridfs_id"):
+                            try:
+                                doc_data = await get_file_base64_from_gridfs(doc["gridfs_id"])
+                                logger.info(f"  Retrieved original document from GridFS: {doc.get('filename')}")
+                            except Exception as gfs_err:
+                                logger.error(f"  Error retrieving original from GridFS: {str(gfs_err)}")
+                        # Fallback to inline data
+                        if not doc_data:
+                            doc_data = doc.get("file_data") or doc.get("data")
                         if doc_data:
                             original_file_list.append({
                                 "data": doc_data,
@@ -14241,7 +14272,17 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                     # Use the most recent translated document
                     logger.info(f"  Processing {len(translated_docs)} translated documents from order_documents")
                     for idx, trans_doc in enumerate(translated_docs):
-                        trans_data = trans_doc.get("file_data") or trans_doc.get("data")
+                        # Check for GridFS storage first
+                        trans_data = None
+                        if trans_doc.get("gridfs_id"):
+                            try:
+                                trans_data = await get_file_base64_from_gridfs(trans_doc["gridfs_id"])
+                                logger.info(f"  Retrieved translated document from GridFS: {trans_doc.get('filename')}")
+                            except Exception as gfs_err:
+                                logger.error(f"  Error retrieving from GridFS: {str(gfs_err)}")
+                        # Fallback to inline data
+                        if not trans_data:
+                            trans_data = trans_doc.get("file_data") or trans_doc.get("data")
                         if trans_data and len(str(trans_data)) > 100:
                             content_type = trans_doc.get("content_type", "application/pdf")
                             logger.info(f"  Using document from order_documents: {trans_doc.get('filename')} ({content_type})")
@@ -14621,7 +14662,15 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
 
                         for orig_doc in original_docs:
                             try:
-                                doc_data = orig_doc.get("file_data") or orig_doc.get("data")
+                                # Check for GridFS storage first
+                                doc_data = None
+                                if orig_doc.get("gridfs_id"):
+                                    try:
+                                        doc_data = await get_file_base64_from_gridfs(orig_doc["gridfs_id"])
+                                    except Exception as gfs_err:
+                                        logger.error(f"Error retrieving original from GridFS: {str(gfs_err)}")
+                                if not doc_data:
+                                    doc_data = orig_doc.get("file_data") or orig_doc.get("data")
                                 if doc_data:
                                     content_type = orig_doc.get("content_type", "").lower()
                                     filename = orig_doc.get("filename", "").lower()
@@ -14836,7 +14885,16 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
 
                 if translated_docs:
                     for doc in translated_docs:
-                        doc_data = doc.get("file_data") or doc.get("data")
+                        # Check for GridFS storage first
+                        doc_data = None
+                        if doc.get("gridfs_id"):
+                            try:
+                                doc_data = await get_file_base64_from_gridfs(doc["gridfs_id"])
+                                logger.info(f"Retrieved fallback translation from GridFS: {doc.get('filename')}")
+                            except Exception as gfs_err:
+                                logger.error(f"Error retrieving fallback from GridFS: {str(gfs_err)}")
+                        if not doc_data:
+                            doc_data = doc.get("file_data") or doc.get("data")
                         if doc_data:
                             content_type = doc.get("content_type", "application/pdf").lower()
                             filename = doc.get("filename", "translation.pdf")
@@ -15018,93 +15076,107 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                 try:
                     # Find document in order_documents collection
                     doc = await db.order_documents.find_one({"id": doc_id})
-                    if doc and doc.get("file_data"):
-                        doc_source = doc.get("source", "")
-                        doc_content_type = doc.get("content_type", "application/pdf").lower()
-                        doc_filename = doc.get("filename", f"document_{doc_id}.pdf")
-
-                        # Skip translated documents if combined PDF was already generated
-                        # (the translation is already included in the combined PDF)
-                        if has_attachments and doc_source == "translated_document":
-                            logger.info(f"Skipping translated document '{doc_filename}' - already included in combined PDF")
-                            continue
-
-                        # Convert HTML files to PDF before attaching
-                        if "html" in doc_content_type or doc_filename.lower().endswith(".html"):
+                    if doc:
+                        # Check for GridFS storage first
+                        file_data = None
+                        if doc.get("gridfs_id"):
                             try:
-                                import fitz
-                                from bs4 import BeautifulSoup
+                                file_data = await get_file_base64_from_gridfs(doc["gridfs_id"])
+                                logger.info(f"Retrieved additional doc from GridFS: {doc.get('filename')}")
+                            except Exception as gfs_err:
+                                logger.error(f"Error retrieving additional doc from GridFS: {str(gfs_err)}")
+                        if not file_data:
+                            file_data = doc.get("file_data") or doc.get("data")
 
-                                html_bytes = base64.b64decode(doc["file_data"])
-                                html_content = html_bytes.decode('utf-8')
+                        if file_data:
+                            doc_source = doc.get("source", "")
+                            doc_content_type = doc.get("content_type", "application/pdf").lower()
+                            doc_filename = doc.get("filename", f"document_{doc_id}.pdf")
 
-                                soup = BeautifulSoup(html_content, 'html.parser')
-                                for script in soup(["script", "style"]):
-                                    script.decompose()
-                                text_content = soup.get_text(separator='\n')
-                                lines = [line.strip() for line in text_content.split('\n') if line.strip()]
+                            # Skip translated documents if combined PDF was already generated
+                            # (the translation is already included in the combined PDF)
+                            if has_attachments and doc_source == "translated_document":
+                                logger.info(f"Skipping translated document '{doc_filename}' - already included in combined PDF")
+                                continue
 
-                                pdf_doc_extra = fitz.open()
-                                pw, ph = 612, 792
-                                bc = (0.11, 0.27, 0.53)
+                            # Convert HTML files to PDF before attaching
+                            if "html" in doc_content_type or doc_filename.lower().endswith(".html"):
+                                try:
+                                    import fitz
+                                    from bs4 import BeautifulSoup
 
-                                def draw_hdr(pg):
-                                    pg.draw_rect(fitz.Rect(50, 40, pw - 50, 43), color=bc, fill=bc)
-                                    pg.insert_text((pw/2 - 60, 30), "Legacy Translations", fontsize=12, fontname="helv", color=bc)
-                                    pg.insert_text((pw/2 - 50, 60), "TRANSLATION", fontsize=12, fontname="helvB", color=bc)
+                                    html_bytes = base64.b64decode(file_data)
+                                    html_content = html_bytes.decode('utf-8')
 
-                                page = pdf_doc_extra.new_page(width=pw, height=ph)
-                                draw_hdr(page)
-                                margin = 72
-                                y_pos = 100
+                                    soup = BeautifulSoup(html_content, 'html.parser')
+                                    for script in soup(["script", "style"]):
+                                        script.decompose()
+                                    text_content = soup.get_text(separator='\n')
+                                    lines = [line.strip() for line in text_content.split('\n') if line.strip()]
 
-                                for line in lines:
-                                    if y_pos > ph - margin:
-                                        page = pdf_doc_extra.new_page(width=pw, height=ph)
-                                        draw_hdr(page)
-                                        y_pos = 100
-                                    max_chars = 85
-                                    while len(line) > max_chars:
-                                        page.insert_text((margin, y_pos), line[:max_chars], fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
-                                        y_pos += 14
-                                        line = line[max_chars:]
+                                    pdf_doc_extra = fitz.open()
+                                    pw, ph = 612, 792
+                                    bc = (0.11, 0.27, 0.53)
+
+                                    def draw_hdr(pg):
+                                        pg.draw_rect(fitz.Rect(50, 40, pw - 50, 43), color=bc, fill=bc)
+                                        pg.insert_text((pw/2 - 60, 30), "Legacy Translations", fontsize=12, fontname="helv", color=bc)
+                                        pg.insert_text((pw/2 - 50, 60), "TRANSLATION", fontsize=12, fontname="helvB", color=bc)
+
+                                    page = pdf_doc_extra.new_page(width=pw, height=ph)
+                                    draw_hdr(page)
+                                    margin = 72
+                                    y_pos = 100
+
+                                    for line in lines:
                                         if y_pos > ph - margin:
                                             page = pdf_doc_extra.new_page(width=pw, height=ph)
                                             draw_hdr(page)
                                             y_pos = 100
-                                    if line:
-                                        page.insert_text((margin, y_pos), line, fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
-                                        y_pos += 14
+                                        max_chars = 85
+                                        while len(line) > max_chars:
+                                            page.insert_text((margin, y_pos), line[:max_chars], fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
+                                            y_pos += 14
+                                            line = line[max_chars:]
+                                            if y_pos > ph - margin:
+                                                page = pdf_doc_extra.new_page(width=pw, height=ph)
+                                                draw_hdr(page)
+                                                y_pos = 100
+                                        if line:
+                                            page.insert_text((margin, y_pos), line, fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
+                                            y_pos += 14
 
-                                pdf_bytes = pdf_doc_extra.tobytes()
-                                pdf_doc_extra.close()
+                                    pdf_bytes = pdf_doc_extra.tobytes()
+                                    pdf_doc_extra.close()
 
-                                pdf_filename = doc_filename.rsplit('.', 1)[0] + ".pdf"
+                                    pdf_filename = doc_filename.rsplit('.', 1)[0] + ".pdf"
+                                    all_attachments.append({
+                                        "content": base64.b64encode(pdf_bytes).decode('utf-8'),
+                                        "filename": pdf_filename,
+                                        "content_type": "application/pdf"
+                                    })
+                                    attachment_filenames.append(pdf_filename)
+                                    additional_docs_sent += 1
+                                    has_attachments = True
+                                    logger.info(f"Converted additional HTML to PDF: {doc_filename} -> {pdf_filename}")
+                                except Exception as html_conv_err:
+                                    logger.error(f"Failed to convert additional HTML doc: {str(html_conv_err)}")
+                                    # Skip HTML files that can't be converted rather than sending raw HTML
+                                    continue
+                            else:
                                 all_attachments.append({
-                                    "content": base64.b64encode(pdf_bytes).decode('utf-8'),
-                                    "filename": pdf_filename,
-                                    "content_type": "application/pdf"
+                                    "content": file_data,
+                                    "filename": doc_filename,
+                                    "content_type": doc.get("content_type", "application/pdf")
                                 })
-                                attachment_filenames.append(pdf_filename)
+                                attachment_filenames.append(doc_filename)
                                 additional_docs_sent += 1
                                 has_attachments = True
-                                logger.info(f"Converted additional HTML to PDF: {doc_filename} -> {pdf_filename}")
-                            except Exception as html_conv_err:
-                                logger.error(f"Failed to convert additional HTML doc: {str(html_conv_err)}")
-                                # Skip HTML files that can't be converted rather than sending raw HTML
-                                continue
+                                logger.info(f"Added additional document: {doc_filename} (id: {doc_id})")
                         else:
-                            all_attachments.append({
-                                "content": doc["file_data"],
-                                "filename": doc_filename,
-                                "content_type": doc.get("content_type", "application/pdf")
-                            })
-                            attachment_filenames.append(doc_filename)
-                            additional_docs_sent += 1
-                            has_attachments = True
-                            logger.info(f"Added additional document: {doc_filename} (id: {doc_id})")
+                            logger.warning(f"Additional document {doc_id} has no data")
                     else:
-                        logger.warning(f"Additional document not found or has no data: {doc_id}")
+                        logger.warning(f"Additional document not found: {doc_id}")
                 except Exception as e:
                     logger.error(f"Failed to add additional document {doc_id}: {str(e)}")
 
@@ -15318,6 +15390,46 @@ async def download_translated_document(order_id: str, admin_key: str):
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
+    # Check for GridFS storage first
+    if order.get("translated_gridfs_id"):
+        try:
+            file_data = await get_file_base64_from_gridfs(order["translated_gridfs_id"])
+            return {
+                "type": "file",
+                "filename": order.get("translated_filename", "translation.pdf"),
+                "content_type": order.get("translated_file_type", "application/pdf"),
+                "file_data": file_data
+            }
+        except Exception as e:
+            logger.error(f"Error retrieving translation from GridFS: {str(e)}")
+            # Fall through to check other sources
+
+    # Check order_documents collection for GridFS stored translations
+    trans_doc = await db.order_documents.find_one({
+        "order_id": order_id,
+        "source": "translated_document"
+    })
+    if trans_doc:
+        if trans_doc.get("gridfs_id"):
+            try:
+                file_data = await get_file_base64_from_gridfs(trans_doc["gridfs_id"])
+                return {
+                    "type": "file",
+                    "filename": trans_doc.get("filename", "translation.pdf"),
+                    "content_type": trans_doc.get("content_type", "application/pdf"),
+                    "file_data": file_data
+                }
+            except Exception as e:
+                logger.error(f"Error retrieving translation doc from GridFS: {str(e)}")
+        elif trans_doc.get("data") or trans_doc.get("file_data"):
+            return {
+                "type": "file",
+                "filename": trans_doc.get("filename", "translation.pdf"),
+                "content_type": trans_doc.get("content_type", "application/pdf"),
+                "file_data": trans_doc.get("data") or trans_doc.get("file_data")
+            }
+
+    # Fallback to inline translated_file
     if order.get("translated_file"):
         return {
             "type": "file",
