@@ -125,8 +125,10 @@ async def get_file_base64_from_gridfs(file_id: str) -> str:
     file_bytes, _, _ = await retrieve_file_from_gridfs(file_id)
     return base64.b64encode(file_bytes).decode('utf-8')
 
-# Size threshold for using GridFS (10MB in base64 ~ 7.5MB raw)
-GRIDFS_SIZE_THRESHOLD = 10 * 1024 * 1024  # 10MB
+# Size threshold for using GridFS - use GridFS for ALL document uploads
+# GridFS has no practical size limit (up to 16TB per file)
+# Setting to 0 means ALL documents use GridFS for maximum reliability
+GRIDFS_SIZE_THRESHOLD = 0  # Always use GridFS for documents
 
 # Configure Stripe
 stripe.api_key = os.environ.get('STRIPE_API_KEY', 'sk_test_51KNwnnCZYqv7a95ovlRcZyuZtQNhfB8UgpGGjYaAxOgWgNa4V4D34m5M4hhURTK68GazMTmkJzy5V7jhC9Xya7RJ00305uur7C')
