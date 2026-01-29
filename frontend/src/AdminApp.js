@@ -484,6 +484,33 @@ const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
         color: #2563eb;
     }
 
+    /* ============ RUNNING HEADER FOR MULTI-PAGE TEXT CONTENT ============ */
+    .running-header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        background: white;
+        padding: 0.4in 0.7in 0;
+        z-index: 1000;
+    }
+    .running-header .header {
+        height: 55px;
+        margin-bottom: 5px;
+    }
+    .running-header .header-line {
+        margin-bottom: 10px;
+    }
+    .running-header-spacer {
+        height: 85px;
+    }
+    .translation-text-page {
+        position: relative;
+    }
+    .translation-text {
+        padding-top: 10px;
+    }
+
     /* ============ TRANSLATION PAGES ============ */
     .translation-page {
         page-break-before: always;
@@ -651,6 +678,24 @@ const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
         .certification-verification-page {
             page-break-before: always;
             page-break-inside: avoid;
+        }
+        /* Running header appears on all printed pages for text content */
+        .running-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 0.4in 0.7in 0;
+        }
+        .running-header-spacer {
+            height: 85px;
+        }
+        /* Ensure header line only has blue gradient, no black border */
+        .header, .header-line {
+            border: none !important;
+            outline: none !important;
+            box-shadow: none !important;
         }
     }
 `;
