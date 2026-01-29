@@ -280,438 +280,51 @@ const sanitizeErrorMessage = (errorMsg) => {
 };
 
 // ==================== UNIFIED CSS STYLES FOR PDF GENERATION ====================
-// This ensures both Normal Flow and Quick Package have IDENTICAL layouts
+// SIMPLIFIED - Uses inline styles in HTML for maximum reliability
 const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
     @page {
         size: ${pageSizeCSS};
-        margin: 0.6in 0.7in 0.6in 0.7in;
+        margin: 0.7in 0.75in 0.7in 0.75in;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-        font-family: 'Times New Roman', Georgia, serif;
+        font-family: Georgia, 'Times New Roman', serif;
         font-size: 12px;
-        line-height: 1.5;
-        color: #333;
-        background: white;
-    }
-
-    /* ============ HEADER/LETTERHEAD - NO BLACK LINES ============ */
-    .header {
-        display: flex !important;
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-        justify-content: space-between;
-        align-items: center;
-        width: 100%;
-        height: 60px;
-        margin-bottom: 8px;
-        padding: 0;
-        border: none !important;
-    }
-    .header-line {
-        width: 100%;
-        height: 2px;
-        background: linear-gradient(to right, #3B82F6, #60A5FA);
-        margin-bottom: 20px;
-        border: none !important;
-    }
-    .logo-left {
-        width: 120px;
-        min-width: 120px;
-        max-width: 120px;
-        height: 55px;
-        display: flex;
-        align-items: center;
-        flex-shrink: 0;
-    }
-    .logo-left img {
-        max-width: 110px;
-        max-height: 55px;
-        object-fit: contain;
-    }
-    .logo-placeholder {
-        width: 110px;
-        height: 50px;
-        border: 1px dashed #ccc;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 10px;
-        color: #999;
-        background: #fafafa;
-        text-align: center;
-    }
-    .header-center {
-        text-align: center;
-        flex: 1;
-        padding: 0 20px;
-    }
-    .company-name {
-        font-size: 15px;
-        font-weight: bold;
-        color: #2563eb;
-        margin-bottom: 3px;
-    }
-    .company-address {
-        font-size: 9px;
-        line-height: 1.3;
-        color: #333;
-    }
-    .logo-right {
-        width: 80px;
-        min-width: 80px;
-        max-width: 80px;
-        height: 55px;
-        display: flex;
-        align-items: center;
-        justify-content: flex-end;
-        flex-shrink: 0;
-    }
-    .logo-right img {
-        max-width: 75px;
-        max-height: 55px;
-        object-fit: contain;
-    }
-    .logo-placeholder-right {
-        width: 70px;
-        height: 50px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 9px;
-        color: #1a365d;
-        text-align: center;
-    }
-
-    /* ============ COVER PAGE ============ */
-    .cover-page {
-        width: 100%;
-        min-height: 9in;
-        display: flex;
-        flex-direction: column;
-        page-break-after: always;
-    }
-    .order-number {
-        text-align: right;
-        margin-bottom: 20px;
-        font-size: 12px;
-    }
-    .main-title {
-        text-align: center;
-        font-size: 22px;
-        font-weight: normal;
-        margin-bottom: 20px;
-        color: #1a365d;
-        line-height: 1.3;
-    }
-    .subtitle {
-        text-align: center;
-        font-size: 13px;
-        margin-bottom: 25px;
         line-height: 1.6;
-    }
-    .body-text {
-        text-align: justify;
-        margin-bottom: 14px;
-        line-height: 1.65;
-        font-size: 12px;
-    }
-    .body-text:last-of-type {
-        margin-bottom: 30px;
-    }
-    .footer-section {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-end;
-        margin-top: auto;
-        padding-top: 20px;
-    }
-    .signature-block {
-        line-height: 1.4;
-    }
-    .signature-name {
-        font-weight: bold;
-        font-size: 13px;
-    }
-    .signature-title {
-        font-size: 12px;
-    }
-    .signature-date {
-        font-size: 12px;
-        margin-top: 3px;
-    }
-    .stamp-container {
-        width: 140px;
-        height: 140px;
-    }
-    .stamp {
-        width: 130px;
-        height: 130px;
-        border: 3px solid #2563eb;
-        border-radius: 50%;
-        position: relative;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        color: #333;
         background: white;
     }
-    .stamp::before {
-        content: '';
-        position: absolute;
-        top: 7px; left: 7px; right: 7px; bottom: 7px;
-        border: 1px solid #2563eb;
-        border-radius: 50%;
-    }
-    .stamp-text-top {
-        position: absolute;
-        top: 14px;
-        left: 50%;
-        transform: translateX(-50%);
-        font-size: 8px;
-        font-weight: bold;
-        color: #2563eb;
-        letter-spacing: 1.5px;
-    }
-    .stamp-center {
-        text-align: center;
-        padding: 0 12px;
-    }
-    .stamp-company {
-        font-size: 10px;
-        font-weight: bold;
-        color: #2563eb;
-        margin-bottom: 2px;
-    }
-    .stamp-ata {
-        font-size: 8px;
-        color: #2563eb;
-    }
-
-    /* ============ RUNNING HEADER FOR MULTI-PAGE TEXT CONTENT ============ */
-    .running-header {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        background: white;
-        padding: 0.5in 0.7in 0;
-        z-index: 1000;
-    }
-    .running-header .header {
-        height: 55px;
-        margin-bottom: 5px;
-    }
-    .running-header .header-line {
-        margin-bottom: 10px;
-    }
-    .running-header-spacer {
-        height: 100px;
-    }
-    .translation-text-page {
-        position: relative;
-    }
-    .translation-text {
-        padding-top: 15px;
-    }
-
-    /* ============ TRANSLATION PAGES ============ */
-    .translation-page {
-        page-break-before: always;
-        page-break-inside: avoid;
-        padding-top: 10px;
-    }
-    .translation-content {
-        margin-top: 15px;
-        line-height: 1.5;
-        font-size: 11pt;
-    }
-    .translation-content p {
-        margin-bottom: 10px;
-        text-align: justify;
-    }
-    .translation-content table {
-        width: 100%;
-        border-collapse: collapse;
-        margin: 10px 0;
-    }
-    .translation-content td,
-    .translation-content th {
-        border: 1px solid #333;
-        padding: 5px 6px;
-        font-size: 10pt;
-    }
-    .translation-image {
-        width: 100%;
-        max-width: 100%;
-        height: auto;
-        border: none !important;
-        display: block;
-        margin: 0 auto;
-    }
-
-    /* ============ ORIGINAL DOCUMENTS ============ */
-    .original-documents-page {
-        page-break-before: always;
-        page-break-inside: avoid;
-        padding-top: 10px;
-    }
-    .page-title {
-        font-size: 13px;
-        font-weight: bold;
-        text-align: center;
-        margin: 15px 0 15px 0;
-        color: #1a365d;
-        text-transform: uppercase;
-        letter-spacing: 2px;
-    }
-    .original-image-container {
-        text-align: center;
-    }
-    .original-image {
-        width: 100%;
-        max-width: 100%;
-        height: auto;
-        border: none !important;
-        display: block;
-        margin: 0 auto;
-    }
-
-    /* ============ CERTIFICATION PAGE ============ */
-    .certification-verification-page {
-        page-break-before: always;
-    }
-    .certification-box {
-        max-width: 550px;
-        margin: 20px auto;
-        padding: 25px;
-        border: 2px solid #2563eb;
-        border-radius: 12px;
-        background: #f8fafc;
-    }
-    .cert-header {
-        text-align: center;
-        margin-bottom: 25px;
-    }
-    .cert-icon {
-        font-size: 48px;
-        margin-bottom: 10px;
-    }
-    .cert-title {
-        font-size: 20px;
-        font-weight: bold;
-        color: #1e40af;
-        margin-bottom: 5px;
-    }
-    .cert-subtitle {
-        font-size: 12px;
-        color: #64748b;
-    }
-    .cert-content {
-        display: flex;
-        gap: 30px;
-        align-items: flex-start;
-    }
-    .cert-info {
-        flex: 1;
-    }
-    .cert-row {
-        display: flex;
-        justify-content: space-between;
-        padding: 8px 0;
-        border-bottom: 1px solid #e2e8f0;
-    }
-    .cert-label {
-        font-size: 11px;
-        color: #64748b;
-    }
-    .cert-value {
-        font-size: 11px;
-        font-weight: 600;
-        color: #1e293b;
-        text-align: right;
-    }
-    .cert-id {
-        font-family: monospace;
-        color: #2563eb;
-    }
-    .cert-hash {
-        font-family: monospace;
-        font-size: 10px;
-    }
-    .cert-qr {
-        text-align: center;
-    }
-    .qr-image {
-        width: 120px;
-        height: 120px;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-    }
-    .qr-instruction {
-        font-size: 10px;
-        color: #64748b;
-        margin-top: 5px;
-    }
-    .cert-footer {
-        margin-top: 25px;
-        text-align: center;
-        padding-top: 20px;
-        border-top: 1px solid #e2e8f0;
-    }
-    .verify-url {
-        font-size: 11px;
-        color: #1e40af;
-        margin-bottom: 10px;
-    }
-    .cert-notice {
-        font-size: 9px;
-        color: #64748b;
-        line-height: 1.4;
-    }
-
-    /* ============ PRINT STYLES ============ */
+    img { max-width: 100%; height: auto; }
+    table { border-collapse: collapse; width: 100%; }
+    td, th { border: 1px solid #333; padding: 5px 6px; font-size: 10pt; }
     @media print {
-        body {
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-        }
-        .cover-page {
-            page-break-after: always;
-        }
-        .translation-page,
-        .original-documents-page,
-        .certification-verification-page {
-            page-break-before: always;
-            page-break-inside: avoid;
-        }
-        /* Running header appears on all printed pages for text content */
-        .running-header {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            background: white;
-            padding: 0.5in 0.7in 0;
-        }
-        .running-header-spacer {
-            height: 100px;
-        }
-        /* Content pages need extra top padding to not be covered by running header */
-        .translation-page,
-        .original-documents-page {
-            padding-top: 15px;
-        }
-        .translation-content {
-            margin-top: 15px;
-        }
-        /* Ensure header line only has blue gradient, no black border */
-        .header, .header-line {
-            border: none !important;
-            outline: none !important;
-            box-shadow: none !important;
-        }
+        body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .page-break { page-break-before: always; }
     }
 `;
+
+// Helper function to generate letterhead HTML with INLINE STYLES (guaranteed to work)
+const getLetterheadHTML = (logoLeft, logoRight) => `
+<table style="width: 100%; border: none; border-collapse: collapse; margin-bottom: 8px;">
+    <tr>
+        <td style="width: 120px; vertical-align: middle; border: none; padding: 0;">
+            ${logoLeft
+              ? `<img src="${logoLeft}" alt="Logo" style="max-width: 110px; max-height: 50px; object-fit: contain;" />`
+              : `<div style="font-size: 11px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 9px;">TRANSLATIONS</span></div>`}
+        </td>
+        <td style="text-align: center; vertical-align: middle; border: none; padding: 0 15px;">
+            <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
+            <div style="font-size: 9px; color: #333; line-height: 1.3;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+            <div style="font-size: 9px; color: #333;">(857) 316-7770 · contact@legacytranslations.com</div>
+        </td>
+        <td style="width: 80px; text-align: right; vertical-align: middle; border: none; padding: 0;">
+            ${logoRight
+              ? `<img src="${logoRight}" alt="ATA" style="max-width: 75px; max-height: 50px; object-fit: contain;" />`
+              : `<div style="font-size: 9px; color: #666; font-style: italic; text-align: right;">ata<br/><span style="font-size: 8px;">Member # 275993</span></div>`}
+        </td>
+    </tr>
+</table>
+<div style="width: 100%; height: 2px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 20px;"></div>`;
 
 // ==================== CONSTANTS ====================
 const STATUS_COLORS = {
@@ -5839,41 +5452,40 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     const pageSizeCSS = pageFormat === 'a4' ? 'A4' : 'Letter';
     const certTitle = translationType === 'sworn' ? 'Sworn Translation Certificate' : 'Certification of Translation Accuracy';
 
-    // Cover Letter HTML (SAME as handleDownload)
+    // Cover Letter HTML - USING TABLE LAYOUT WITH INLINE STYLES (GUARANTEED TO WORK)
     const coverLetterHTML = `
     <!-- COVER LETTER PAGE -->
-    <div class="cover-page">
-        <!-- HEADER WITH LOGOS -->
-        <div class="header">
-            <div class="logo-left">
-                ${logoLeft
-                  ? `<img src="${logoLeft}" alt="Logo" style="max-width: 120px; max-height: 50px; object-fit: contain;" />`
-                  : `<div class="logo-placeholder"><span style="text-align:center;">LEGACY<br/>TRANSLATIONS</span></div>`}
-            </div>
-            <div class="header-center">
-                <div class="company-name">Legacy Translations</div>
-                <div class="company-address">
-                    867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116<br>
-                    (857) 316-7770 · contact@legacytranslations.com
-                </div>
-            </div>
-            <div class="logo-right">
-                ${logoRight
-                  ? `<img src="${logoRight}" alt="ATA Logo" style="max-width: 80px; max-height: 50px; object-fit: contain;" />`
-                  : `<div class="logo-placeholder-right"><span>ata<br/>Member #275993</span></div>`}
-            </div>
-        </div>
-        <div class="header-line"></div>
+    <div style="width: 100%; min-height: 9in; display: flex; flex-direction: column; page-break-after: always;">
+        <!-- HEADER WITH LOGOS - TABLE LAYOUT -->
+        <table style="width: 100%; border: none; border-collapse: collapse; margin-bottom: 8px;">
+            <tr>
+                <td style="width: 120px; vertical-align: middle; border: none; padding: 0;">
+                    ${logoLeft
+                      ? `<img src="${logoLeft}" alt="Logo" style="max-width: 110px; max-height: 50px; object-fit: contain;" />`
+                      : `<div style="font-size: 11px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 9px;">TRANSLATIONS</span></div>`}
+                </td>
+                <td style="text-align: center; vertical-align: middle; border: none; padding: 0 15px;">
+                    <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
+                    <div style="font-size: 9px; color: #333; line-height: 1.3;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                    <div style="font-size: 9px; color: #333;">(857) 316-7770 · contact@legacytranslations.com</div>
+                </td>
+                <td style="width: 80px; text-align: right; vertical-align: middle; border: none; padding: 0;">
+                    ${logoRight
+                      ? `<img src="${logoRight}" alt="ATA" style="max-width: 75px; max-height: 50px; object-fit: contain;" />`
+                      : `<div style="font-size: 9px; color: #666; font-style: italic; text-align: right;">ata<br/><span style="font-size: 8px;">Member # 275993</span></div>`}
+                </td>
+            </tr>
+        </table>
+        <div style="width: 100%; height: 2px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 20px;"></div>
 
-        ${orderNumber && !orderNumber.toLowerCase().includes('order0') && orderNumber !== 'P0000' ? `<div class="order-number">Order # <strong>${orderNumber}</strong></div>` : ''}
-        <h1 class="main-title">${certTitle}</h1>
-        <div class="subtitle">
+        ${orderNumber && !orderNumber.toLowerCase().includes('order0') && orderNumber !== 'P0000' ? `<div style="text-align: right; margin-bottom: 20px; font-size: 12px;">Order # <strong>${orderNumber}</strong></div>` : ''}
+        <h1 style="text-align: center; font-size: 22px; font-weight: normal; margin-bottom: 20px; color: #1a365d; line-height: 1.3;">${certTitle}</h1>
+        <div style="text-align: center; font-size: 13px; margin-bottom: 25px; line-height: 1.6;">
             Translation of a <strong>${documentType}</strong> from <strong>${sourceLanguage}</strong> to<br>
             <strong>${targetLanguage}</strong>
         </div>
 
         ${(() => {
-          // Get the template tographs for download
           let templateParagraphs;
           if (selectedCertificateTemplate.startsWith('custom-')) {
             const customTemplate = customCertificateTemplates.find(t => `custom-${t.id}` === selectedCertificateTemplate);
@@ -5881,61 +5493,57 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           } else {
             templateParagraphs = CERTIFICATE_TEMPLATES[selectedCertificateTemplate]?.bodyParagraphs || CERTIFICATE_TEMPLATES['default'].bodyParagraphs;
           }
-
-          // Replace placeholders and generate HTML
-          return templateParagraphs.map(tograph => {
-            const processedParagraph = tograph
-              .replace(/\{\{sourceLanguage\}\}/g, sourceLanguage)
-              .replace(/\{\{targetLanguage\}\}/g, targetLanguage);
-            return `<p class="body-text">${processedParagraph}</p>`;
+          return templateParagraphs.map(p => {
+            const processed = p.replace(/\{\{sourceLanguage\}\}/g, sourceLanguage).replace(/\{\{targetLanguage\}\}/g, targetLanguage);
+            return `<p style="text-align: justify; margin-bottom: 14px; line-height: 1.65; font-size: 12px;">${processed}</p>`;
           }).join('\n        ');
         })()}
 
-        <div class="footer-section">
-            <div class="signature-block">
-                ${signatureImage
-                  ? `<img src="${signatureImage}" alt="Signature" style="max-height: 45px; max-width: 210px; object-fit: contain; margin-bottom: 2px;" />`
-                  : `<div style="font-family: 'Rage Italic', cursive; font-size: 20px; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>`}
-                <div class="signature-name">Authorized Representative</div>
-                <div class="signature-title">Legacy Translations Inc.</div>
-                <div class="signature-date">Dated: ${translationDate}</div>
-            </div>
-            <div class="stamp-container">
-                ${logoStamp
-                  ? `<img src="${logoStamp}" alt="Stamp" style="width: 140px; height: 140px; object-fit: contain;" />`
-                  : `<div class="stamp">
-                    <div class="stamp-text-top">CERTIFIED TRANSLATOR</div>
-                    <div class="stamp-center">
-                        <div class="stamp-company">LEGACY TRANSLATIONS</div>
-                        <div class="stamp-ata">ATA # 275993</div>
-                    </div>
-                </div>`}
-            </div>
-        </div>
+        <table style="width: 100%; border: none; border-collapse: collapse; margin-top: auto; padding-top: 20px;">
+            <tr>
+                <td style="vertical-align: bottom; border: none; padding: 0;">
+                    ${signatureImage
+                      ? `<img src="${signatureImage}" alt="Signature" style="max-height: 45px; max-width: 210px; object-fit: contain; margin-bottom: 2px;" />`
+                      : `<div style="font-family: cursive; font-size: 20px; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>`}
+                    <div style="font-weight: bold; font-size: 13px;">Authorized Representative</div>
+                    <div style="font-size: 12px;">Legacy Translations Inc.</div>
+                    <div style="font-size: 12px; margin-top: 3px;">Dated: ${translationDate}</div>
+                </td>
+                <td style="width: 140px; text-align: right; vertical-align: bottom; border: none; padding: 0;">
+                    ${logoStamp
+                      ? `<img src="${logoStamp}" alt="Stamp" style="width: 130px; height: 130px; object-fit: contain;" />`
+                      : `<div style="width: 130px; height: 130px; border: 3px solid #2563eb; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column;">
+                          <div style="font-size: 8px; font-weight: bold; color: #2563eb;">CERTIFIED TRANSLATOR</div>
+                          <div style="font-size: 10px; font-weight: bold; color: #2563eb; margin-top: 5px;">LEGACY TRANSLATIONS</div>
+                          <div style="font-size: 8px; color: #2563eb;">ATA # 275993</div>
+                        </div>`}
+                </td>
+            </tr>
+        </table>
     </div>`;
 
-    // Letterhead for all pages (SAME as handleDownload) with blue line
+    // Letterhead for all pages - TABLE LAYOUT WITH INLINE STYLES
     const letterheadHTML = `
-        <div class="header">
-            <div class="logo-left">
-                ${logoLeft
-                  ? `<img src="${logoLeft}" alt="Logo" style="max-width: 120px; max-height: 50px; object-fit: contain;" />`
-                  : `<div class="logo-placeholder"><span style="text-align:center;">LEGACY<br/>TRANSLATIONS</span></div>`}
-            </div>
-            <div class="header-center">
-                <div class="company-name">Legacy Translations</div>
-                <div class="company-address">
-                    867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116<br>
-                    (857) 316-7770 · contact@legacytranslations.com
-                </div>
-            </div>
-            <div class="logo-right">
-                ${logoRight
-                  ? `<img src="${logoRight}" alt="ATA Logo" style="max-width: 80px; max-height: 50px; object-fit: contain;" />`
-                  : `<div class="logo-placeholder-right"><span>ata<br/>Member #275993</span></div>`}
-            </div>
-        </div>
-        <div class="header-line"></div>`;
+        <table style="width: 100%; border: none; border-collapse: collapse; margin-bottom: 8px;">
+            <tr>
+                <td style="width: 120px; vertical-align: middle; border: none; padding: 0;">
+                    ${logoLeft
+                      ? `<img src="${logoLeft}" alt="Logo" style="max-width: 110px; max-height: 50px; object-fit: contain;" />`
+                      : `<div style="font-size: 11px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 9px;">TRANSLATIONS</span></div>`}
+                </td>
+                <td style="text-align: center; vertical-align: middle; border: none; padding: 0 15px;">
+                    <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
+                    <div style="font-size: 9px; color: #333; line-height: 1.3;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                    <div style="font-size: 9px; color: #333;">(857) 316-7770 · contact@legacytranslations.com</div>
+                </td>
+                <td style="width: 80px; text-align: right; vertical-align: middle; border: none; padding: 0;">
+                    ${logoRight
+                      ? `<img src="${logoRight}" alt="ATA" style="max-width: 75px; max-height: 50px; object-fit: contain;" />`
+                      : `<div style="font-size: 9px; color: #666; font-style: italic; text-align: right;">ata<br/><span style="font-size: 8px;">Member # 275993</span></div>`}
+                </td>
+            </tr>
+        </table>
+        <div style="width: 100%; height: 2px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 20px;"></div>`;
 
     // Translation pages - supports HTML content OR images (not both to avoid duplication)
     let translationPagesHTML = '';
@@ -5946,40 +5554,32 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     // Prefer image files if available (from images or PDF conversion) - each page gets its own header
     if (validTranslationFiles.length > 0) {
       translationPagesHTML = validTranslationFiles.map((file, idx) => `
-    <div class="translation-page">
+    <div style="page-break-before: always; padding-top: 10px;">
         ${includeLetterhead ? letterheadHTML : ''}
-        <div class="translation-content">
-            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Translation page ${idx + 1}" class="translation-image" />
+        <div style="margin-top: 15px;">
+            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Translation page ${idx + 1}" style="width: 100%; max-width: 100%; height: auto; display: block; margin: 0 auto;" />
         </div>
     </div>`).join('');
     }
     // Otherwise use HTML content (from Word/HTML/TXT)
     else if (quickTranslationHtml) {
-      // For HTML content, use a running header that appears on every printed page
       translationPagesHTML = `
-    <div class="translation-text-page">
-        ${includeLetterhead ? `
-        <!-- Running header that repeats on each printed page -->
-        <div class="running-header">
-            ${letterheadHTML}
-        </div>
-        <div class="running-header-spacer"></div>
-        ` : ''}
-        <div class="translation-content translation-text">
+    <div style="page-break-before: always; padding-top: 10px;">
+        ${includeLetterhead ? letterheadHTML : ''}
+        <div style="margin-top: 15px; line-height: 1.5; font-size: 11pt;">
             ${quickTranslationHtml}
         </div>
     </div>`;
     }
 
-    // Original document pages (SAME structure as handleDownload)
-    // Filter out files with invalid/missing data
+    // Original document pages
     const validOriginalFiles = quickOriginalFiles.filter(file => file.data && file.data.length > 100);
     const originalPagesHTML = (includeOriginal && validOriginalFiles.length > 0) ? validOriginalFiles.map((file, idx) => `
-    <div class="original-documents-page">
+    <div style="page-break-before: always; padding-top: 10px;">
         ${includeLetterhead ? letterheadHTML : ''}
-        ${idx === 0 ? '<div class="page-title">Original Document</div>' : ''}
-        <div class="original-image-container">
-            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Original page ${idx + 1}" class="original-image" />
+        ${idx === 0 ? '<div style="font-size: 13px; font-weight: bold; text-align: center; margin: 15px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px;">Original Document</div>' : ''}
+        <div style="text-align: center;">
+            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Original page ${idx + 1}" style="width: 100%; max-width: 100%; height: auto; display: block; margin: 0 auto;" />
         </div>
     </div>`).join('') : '';
 
@@ -6367,49 +5967,44 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     // Check if selected template is a form (like RMV Foreign DL)
     const isFormTemplate = CERTIFICATE_TEMPLATES[selectedCertificateTemplate]?.isForm;
 
-    // Cover Letter HTML - use form HTML if it's a form template
+    // Cover Letter HTML - USING TABLE LAYOUT WITH INLINE STYLES (GUARANTEED TO WORK)
     const coverLetterHTML = isFormTemplate ? `
     <!-- FORM TEMPLATE PAGE -->
-    <div class="cover-page" style="padding: 20px;">
+    <div style="width: 100%; min-height: 9in; padding: 20px; page-break-after: always;">
         ${CERTIFICATE_TEMPLATES[selectedCertificateTemplate].formHTML}
     </div>` : `
     <!-- COVER LETTER PAGE -->
-    <div class="cover-page">
-        <!-- HEADER WITH LOGOS -->
-        <div class="header">
-            <div class="logo-left">
-                ${logoLeft
-                  ? `<img src="${logoLeft}" alt="Logo" style="max-width: 120px; max-height: 50px; object-fit: contain;" />`
-                  : `<div class="logo-placeholder" contenteditable="true" title="Click to add logo">
-                    <span style="text-align:center;">LEGACY<br/>TRANSLATIONS</span>
-                </div>`}
-            </div>
-            <div class="header-center">
-                <div class="company-name">Legacy Translations</div>
-                <div class="company-address">
-                    867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116<br>
-                    (857) 316-7770 · contact@legacytranslations.com
-                </div>
-            </div>
-            <div class="logo-right">
-                ${logoRight
-                  ? `<img src="${logoRight}" alt="ATA Logo" style="max-width: 80px; max-height: 50px; object-fit: contain;" />`
-                  : `<div class="logo-placeholder-right" contenteditable="true" title="Click to add ATA logo">
-                    <span>ata<br/>Member #275993</span>
-                </div>`}
-            </div>
-        </div>
-        <div class="header-line"></div>
+    <div style="width: 100%; min-height: 9in; display: flex; flex-direction: column; page-break-after: always;">
+        <!-- HEADER WITH LOGOS - TABLE LAYOUT -->
+        <table style="width: 100%; border: none; border-collapse: collapse; margin-bottom: 8px;">
+            <tr>
+                <td style="width: 120px; vertical-align: middle; border: none; padding: 0;">
+                    ${logoLeft
+                      ? `<img src="${logoLeft}" alt="Logo" style="max-width: 110px; max-height: 50px; object-fit: contain;" />`
+                      : `<div style="font-size: 11px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 9px;">TRANSLATIONS</span></div>`}
+                </td>
+                <td style="text-align: center; vertical-align: middle; border: none; padding: 0 15px;">
+                    <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
+                    <div style="font-size: 9px; color: #333; line-height: 1.3;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                    <div style="font-size: 9px; color: #333;">(857) 316-7770 · contact@legacytranslations.com</div>
+                </td>
+                <td style="width: 80px; text-align: right; vertical-align: middle; border: none; padding: 0;">
+                    ${logoRight
+                      ? `<img src="${logoRight}" alt="ATA" style="max-width: 75px; max-height: 50px; object-fit: contain;" />`
+                      : `<div style="font-size: 9px; color: #666; font-style: italic; text-align: right;">ata<br/><span style="font-size: 8px;">Member # 275993</span></div>`}
+                </td>
+            </tr>
+        </table>
+        <div style="width: 100%; height: 2px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 20px;"></div>
 
-        ${orderNumber && !orderNumber.toLowerCase().includes('order0') && orderNumber !== 'P0000' ? `<div class="order-number">Order # <strong>${orderNumber}</strong></div>` : ''}
-        <h1 class="main-title">${certTitle}</h1>
-        <div class="subtitle">
+        ${orderNumber && !orderNumber.toLowerCase().includes('order0') && orderNumber !== 'P0000' ? `<div style="text-align: right; margin-bottom: 20px; font-size: 12px;">Order # <strong>${orderNumber}</strong></div>` : ''}
+        <h1 style="text-align: center; font-size: 22px; font-weight: normal; margin-bottom: 20px; color: #1a365d; line-height: 1.3;">${certTitle}</h1>
+        <div style="text-align: center; font-size: 13px; margin-bottom: 25px; line-height: 1.6;">
             Translation of a <strong>${documentType}</strong> from <strong>${sourceLanguage}</strong> to<br>
             <strong>${targetLanguage}</strong>
         </div>
 
         ${(() => {
-          // Get the template tographs for download
           let templateParagraphs;
           if (selectedCertificateTemplate.startsWith('custom-')) {
             const customTemplate = customCertificateTemplates.find(t => `custom-${t.id}` === selectedCertificateTemplate);
@@ -6417,67 +6012,63 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           } else {
             templateParagraphs = CERTIFICATE_TEMPLATES[selectedCertificateTemplate]?.bodyParagraphs || CERTIFICATE_TEMPLATES['default'].bodyParagraphs;
           }
-
-          // Replace placeholders and generate HTML
-          return templateParagraphs.map(tograph => {
-            const processedParagraph = tograph
-              .replace(/\{\{sourceLanguage\}\}/g, sourceLanguage)
-              .replace(/\{\{targetLanguage\}\}/g, targetLanguage);
-            return `<p class="body-text">${processedParagraph}</p>`;
+          return templateParagraphs.map(p => {
+            const processed = p.replace(/\{\{sourceLanguage\}\}/g, sourceLanguage).replace(/\{\{targetLanguage\}\}/g, targetLanguage);
+            return `<p style="text-align: justify; margin-bottom: 14px; line-height: 1.65; font-size: 12px;">${processed}</p>`;
           }).join('\n        ');
         })()}
 
-        <div class="footer-section">
-            <div class="signature-block">
-                ${signatureImage
-                  ? `<img src="${signatureImage}" alt="Signature" style="max-height: 45px; max-width: 210px; object-fit: contain; margin-bottom: 2px;" />`
-                  : `<div style="font-family: 'Rage Italic', cursive; font-size: 20px; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>`}
-                <div class="signature-name">Authorized Representative</div>
-                <div class="signature-title">Legacy Translations Inc.</div>
-                <div class="signature-date">Dated: ${translationDate}</div>
-            </div>
-            <div class="stamp-container">
-                ${logoStamp
-                  ? `<img src="${logoStamp}" alt="Stamp" style="width: 140px; height: 140px; object-fit: contain;" />`
-                  : `<div class="stamp">
-                    <div class="stamp-text-top">CERTIFIED TRANSLATOR</div>
-                    <div class="stamp-center">
-                        <div class="stamp-company">LEGACY TRANSLATIONS</div>
-                        <div class="stamp-ata">ATA # 275993</div>
-                    </div>
-                </div>`}
-            </div>
-        </div>
+        <table style="width: 100%; border: none; border-collapse: collapse; margin-top: auto; padding-top: 20px;">
+            <tr>
+                <td style="vertical-align: bottom; border: none; padding: 0;">
+                    ${signatureImage
+                      ? `<img src="${signatureImage}" alt="Signature" style="max-height: 45px; max-width: 210px; object-fit: contain; margin-bottom: 2px;" />`
+                      : `<div style="font-family: cursive; font-size: 20px; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>`}
+                    <div style="font-weight: bold; font-size: 13px;">Authorized Representative</div>
+                    <div style="font-size: 12px;">Legacy Translations Inc.</div>
+                    <div style="font-size: 12px; margin-top: 3px;">Dated: ${translationDate}</div>
+                </td>
+                <td style="width: 140px; text-align: right; vertical-align: bottom; border: none; padding: 0;">
+                    ${logoStamp
+                      ? `<img src="${logoStamp}" alt="Stamp" style="width: 130px; height: 130px; object-fit: contain;" />`
+                      : `<div style="width: 130px; height: 130px; border: 3px solid #2563eb; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column;">
+                          <div style="font-size: 8px; font-weight: bold; color: #2563eb;">CERTIFIED TRANSLATOR</div>
+                          <div style="font-size: 10px; font-weight: bold; color: #2563eb; margin-top: 5px;">LEGACY TRANSLATIONS</div>
+                          <div style="font-size: 8px; color: #2563eb;">ATA # 275993</div>
+                        </div>`}
+                </td>
+            </tr>
+        </table>
     </div>`;
 
-    // Letterhead for all pages with blue line
+    // Letterhead for all pages - TABLE LAYOUT WITH INLINE STYLES
     const letterheadHTML = `
-        <div class="header">
-            <div class="logo-left">
-                ${logoLeft
-                  ? `<img src="${logoLeft}" alt="Logo" style="max-width: 120px; max-height: 50px; object-fit: contain;" />`
-                  : `<div class="logo-placeholder"><span style="text-align:center;">LEGACY<br/>TRANSLATIONS</span></div>`}
-            </div>
-            <div class="header-center">
-                <div class="company-name">Legacy Translations</div>
-                <div class="company-address">
-                    867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116<br>
-                    (857) 316-7770 · contact@legacytranslations.com
-                </div>
-            </div>
-            <div class="logo-right">
-                ${logoRight
-                  ? `<img src="${logoRight}" alt="ATA Logo" style="max-width: 80px; max-height: 50px; object-fit: contain;" />`
-                  : `<div class="logo-placeholder-right"><span>ata<br/>Member #275993</span></div>`}
-            </div>
-        </div>
-        <div class="header-line"></div>`;
+        <table style="width: 100%; border: none; border-collapse: collapse; margin-bottom: 8px;">
+            <tr>
+                <td style="width: 120px; vertical-align: middle; border: none; padding: 0;">
+                    ${logoLeft
+                      ? `<img src="${logoLeft}" alt="Logo" style="max-width: 110px; max-height: 50px; object-fit: contain;" />`
+                      : `<div style="font-size: 11px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 9px;">TRANSLATIONS</span></div>`}
+                </td>
+                <td style="text-align: center; vertical-align: middle; border: none; padding: 0 15px;">
+                    <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
+                    <div style="font-size: 9px; color: #333; line-height: 1.3;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                    <div style="font-size: 9px; color: #333;">(857) 316-7770 · contact@legacytranslations.com</div>
+                </td>
+                <td style="width: 80px; text-align: right; vertical-align: middle; border: none; padding: 0;">
+                    ${logoRight
+                      ? `<img src="${logoRight}" alt="ATA" style="max-width: 75px; max-height: 50px; object-fit: contain;" />`
+                      : `<div style="font-size: 9px; color: #666; font-style: italic; text-align: right;">ata<br/><span style="font-size: 8px;">Member # 275993</span></div>`}
+                </td>
+            </tr>
+        </table>
+        <div style="width: 100%; height: 2px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 20px;"></div>`;
 
     // Translation pages HTML (with or without letterhead)
     const translationPagesHTML = translationResults.map((result, index) => `
-    <div class="translation-page">
+    <div style="page-break-before: always; padding-top: 10px;">
         ${includeLetterhead ? letterheadHTML : ''}
-        <div class="translation-content">${result.translatedText}</div>
+        <div style="margin-top: 15px; line-height: 1.5; font-size: 11pt;">${result.translatedText}</div>
     </div>
     `).join('');
 
@@ -6530,13 +6121,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     </div>
     ` : '';
 
-    // Original documents pages HTML (each image on setote page, title only on first)
+    // Original documents pages HTML (each image on separate page, title only on first)
     const originalPagesHTML = (includeOriginal && originalImages.length > 0) ? originalImages.map((img, index) => `
-    <div class="original-documents-page">
+    <div style="page-break-before: always; padding-top: 10px;">
         ${includeLetterhead ? letterheadHTML : ''}
-        ${index === 0 ? '<div class="page-title">Original Document</div>' : ''}
-        <div class="original-image-container">
-            <img src="${img.data}" alt="${img.filename}" class="original-image" />
+        ${index === 0 ? '<div style="font-size: 13px; font-weight: bold; text-align: center; margin: 15px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px;">Original Document</div>' : ''}
+        <div style="text-align: center;">
+            <img src="${img.data}" alt="${img.filename}" style="width: 100%; max-width: 100%; height: auto; display: block; margin: 0 auto;" />
         </div>
     </div>
     `).join('') : '';
