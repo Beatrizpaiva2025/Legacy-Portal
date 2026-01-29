@@ -30140,42 +30140,42 @@ const SalesControlPage = ({ adminKey }) => {
 
       {/* Add Salesperson Modal */}
       {showAddSalesperson && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl w-full max-w-md max-h-[90vh] flex flex-col">
-            <div className="p-4 border-b">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl w-full max-w-md max-h-[90vh] flex flex-col my-auto">
+            <div className="p-3 border-b">
+              <h3 className="text-base font-semibold flex items-center gap-2">
                 <span>👤</span> Add Salesperson
               </h3>
             </div>
-            <div className="p-4 overflow-y-auto flex-1 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+            <div className="p-3 overflow-y-auto flex-1 space-y-1.5">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-0.5">Name *</label>
                   <input
                     type="text"
                     value={newSalesperson.name}
                     onChange={(e) => setNewSalesperson({...newSalesperson, name: e.target.value})}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                    className="w-full px-2 py-1.5 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                     placeholder="John Doe"
                   />
                 </div>
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-0.5">Email *</label>
                   <input
                     type="email"
                     value={newSalesperson.email}
                     onChange={(e) => setNewSalesperson({...newSalesperson, email: e.target.value})}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                    className="w-full px-2 py-1.5 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                     placeholder="john@example.com"
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                  <div className="flex gap-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-0.5">Phone</label>
+                  <div className="flex gap-1">
                     <select
                       value={newSalesperson.country_code}
                       onChange={(e) => setNewSalesperson({...newSalesperson, country_code: e.target.value})}
-                      className="px-2 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm w-24"
+                      className="px-1 py-1.5 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm w-20"
                     >
                       <option value="+1">🇺🇸 +1</option>
                       <option value="+55">🇧🇷 +55</option>
@@ -30184,17 +30184,17 @@ const SalesControlPage = ({ adminKey }) => {
                       type="text"
                       value={newSalesperson.phone}
                       onChange={(e) => setNewSalesperson({...newSalesperson, phone: e.target.value})}
-                      className="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                      className="flex-1 px-2 py-1.5 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                       placeholder="(555) 123-4567"
                     />
                   </div>
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Comissão</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-0.5">Tipo de Comissão</label>
                   <select
                     value={newSalesperson.commission_type}
                     onChange={(e) => setNewSalesperson({...newSalesperson, commission_type: e.target.value})}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                    className="w-full px-2 py-1.5 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                   >
                     <option value="tier">Por Tier ($50-150/parceiro)</option>
                     <option value="fixed">Valor Fixo por Parceiro</option>
@@ -30204,24 +30204,24 @@ const SalesControlPage = ({ adminKey }) => {
                 </div>
                 {newSalesperson.commission_type === 'fixed' && (
                   <div className="col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Comissão Fixa ($)</label>
+                    <label className="block text-xs font-medium text-gray-700 mb-0.5">Comissão Fixa ($)</label>
                     <input
                       type="number"
                       value={newSalesperson.commission_rate}
                       onChange={(e) => setNewSalesperson({...newSalesperson, commission_rate: parseFloat(e.target.value) || 0})}
-                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                      className="w-full px-2 py-1.5 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                       placeholder="50"
                     />
                   </div>
                 )}
                 {newSalesperson.commission_type === 'percentage' && (
                   <div className="col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Percentual de Comissão (%)</label>
+                    <label className="block text-xs font-medium text-gray-700 mb-0.5">Comissão (%)</label>
                     <input
                       type="number"
                       value={newSalesperson.commission_rate}
                       onChange={(e) => setNewSalesperson({...newSalesperson, commission_rate: parseFloat(e.target.value) || 0})}
-                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                      className="w-full px-2 py-1.5 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                       placeholder="10"
                       min="0"
                       max="100"
@@ -30232,22 +30232,22 @@ const SalesControlPage = ({ adminKey }) => {
                 {newSalesperson.commission_type === 'referral_plus_commission' && (
                   <>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Bônus Referral ($)</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-0.5">Bônus Referral ($)</label>
                       <input
                         type="number"
                         value={newSalesperson.referral_bonus}
                         onChange={(e) => setNewSalesperson({...newSalesperson, referral_bonus: parseFloat(e.target.value) || 0})}
-                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                        className="w-full px-2 py-1.5 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                         placeholder="50"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Comissão (%)</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-0.5">Comissão (%)</label>
                       <input
                         type="number"
                         value={newSalesperson.commission_rate}
                         onChange={(e) => setNewSalesperson({...newSalesperson, commission_rate: parseFloat(e.target.value) || 0})}
-                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                        className="w-full px-2 py-1.5 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                         placeholder="5"
                         min="0"
                         max="100"
@@ -30257,52 +30257,64 @@ const SalesControlPage = ({ adminKey }) => {
                   </>
                 )}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Base Salary ($)</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-0.5">Base Salary ($)</label>
                   <input
                     type="number"
                     value={newSalesperson.base_salary}
                     onChange={(e) => setNewSalesperson({...newSalesperson, base_salary: parseFloat(e.target.value) || 0})}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                    className="w-full px-2 py-1.5 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                     placeholder="0"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Meta Mensal</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-0.5">Meta Mensal</label>
                   <input
                     type="number"
                     value={newSalesperson.monthly_target}
                     onChange={(e) => setNewSalesperson({...newSalesperson, monthly_target: parseInt(e.target.value) || 10})}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                    className="w-full px-2 py-1.5 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                     placeholder="10"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Idioma do Email</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-0.5">Idioma</label>
                   <select
                     value={newSalesperson.preferred_language}
                     onChange={(e) => setNewSalesperson({...newSalesperson, preferred_language: e.target.value})}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                    className="w-full px-2 py-1.5 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                   >
                     <option value="en">🇺🇸 English</option>
                     <option value="pt">🇧🇷 Português</option>
                     <option value="es">🇪🇸 Español</option>
                   </select>
                 </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-0.5">Status</label>
+                  <select
+                    value={newSalesperson.status || 'active'}
+                    onChange={(e) => setNewSalesperson({...newSalesperson, status: e.target.value})}
+                    className="w-full px-2 py-1.5 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                  >
+                    <option value="active">Active</option>
+                    <option value="pending">Pending</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
               </div>
             </div>
-            <div className="p-4 border-t flex justify-end gap-3">
+            <div className="p-3 border-t flex justify-end gap-2">
               <button
                 onClick={() => setShowAddSalesperson(false)}
-                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm"
+                className="px-3 py-1.5 text-gray-600 hover:bg-gray-100 rounded-lg text-sm"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleAddSalesperson}
                 disabled={!newSalesperson.name || !newSalesperson.email}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 text-sm"
+                className="px-3 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 text-sm"
               >
-                Add Salesperson
+                Adicionar
               </button>
             </div>
           </div>
