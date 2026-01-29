@@ -5529,26 +5529,26 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
     </div>`;
 
-    // Letterhead for all pages - COMPACT to fit images on same page
+    // Letterhead for all pages - Same style as cover
     const letterheadHTML = `
-        <div style="width: 100%; margin-bottom: 4px; overflow: hidden;">
+        <div style="width: 100%; margin-bottom: 8px; overflow: hidden;">
             <div style="float: left; width: 128px;">
                 ${logoLeft
-                  ? `<img src="${logoLeft}" alt="Logo" style="max-height: 42px; max-width: 120px;" />`
+                  ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
                   : `<div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>`}
             </div>
             <div style="float: right; width: 80px; text-align: right;">
                 ${logoRight
-                  ? `<img src="${logoRight}" alt="ATA" style="max-height: 36px; max-width: 75px;" />`
+                  ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px; max-width: 75px;" />`
                   : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span></div>`}
             </div>
             <div style="margin-left: 138px; margin-right: 90px; text-align: center;">
-                <div style="font-weight: bold; color: #2563eb; font-size: 13px; font-style: italic;">Legacy Translations</div>
-                <div style="font-size: 8px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
-                <div style="font-size: 8px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
+                <div style="font-weight: bold; color: #2563eb; font-size: 14px; font-style: italic;">Legacy Translations</div>
+                <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
-        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 8px;"></div>`;
+        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>`;
 
     // Translation pages - supports HTML content OR images (not both to avoid duplication)
     let translationPagesHTML = '';
@@ -6067,26 +6067,26 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
     </div>`;
 
-    // Letterhead for all pages - COMPACT to fit images on same page
+    // Letterhead for all pages - Same style as cover
     const letterheadHTML = `
-        <div style="width: 100%; margin-bottom: 4px; overflow: hidden;">
+        <div style="width: 100%; margin-bottom: 8px; overflow: hidden;">
             <div style="float: left; width: 128px;">
                 ${logoLeft
-                  ? `<img src="${logoLeft}" alt="Logo" style="max-height: 42px; max-width: 120px;" />`
+                  ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
                   : `<div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>`}
             </div>
             <div style="float: right; width: 80px; text-align: right;">
                 ${logoRight
-                  ? `<img src="${logoRight}" alt="ATA" style="max-height: 36px; max-width: 75px;" />`
+                  ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px; max-width: 75px;" />`
                   : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span></div>`}
             </div>
             <div style="margin-left: 138px; margin-right: 90px; text-align: center;">
-                <div style="font-weight: bold; color: #2563eb; font-size: 13px; font-style: italic;">Legacy Translations</div>
-                <div style="font-size: 8px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
-                <div style="font-size: 8px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
+                <div style="font-weight: bold; color: #2563eb; font-size: 14px; font-style: italic;">Legacy Translations</div>
+                <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
-        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 8px;"></div>`;
+        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>`;
 
     // Translation pages HTML (with or without letterhead)
     // First page doesn't need page-break since cover ends with one
