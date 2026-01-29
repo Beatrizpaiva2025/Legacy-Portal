@@ -5676,50 +5676,55 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
     </div>`).join('') : '';
 
-    // Certification verification page HTML (with QR code and serial number)
+    // Certification verification page HTML - ALL INLINE STYLES
     const certificationPageHTML = (includeCertification && certData) ? `
-    <div class="certification-verification-page">
+    <div style="page-break-before: always; padding-top: 10px;">
         ${includeLetterhead ? letterheadHTML : ''}
-        <div class="certification-box">
-            <div class="cert-header">
-                <div class="cert-icon">🔐</div>
-                <h2 class="cert-title">Document Verification</h2>
-                <p class="cert-subtitle">This certified translation can be verified online</p>
+
+        <div style="max-width: 520px; margin: 25px auto; padding: 28px; border: 2px solid #2563eb; border-radius: 12px; background: #f8fafc; font-family: Georgia, 'Times New Roman', serif;">
+            <!-- Header -->
+            <div style="text-align: center; margin-bottom: 25px;">
+                <div style="font-size: 40px; margin-bottom: 10px;">🔐</div>
+                <h2 style="font-size: 20px; font-weight: bold; color: #1e40af; margin-bottom: 5px;">Document Verification</h2>
+                <p style="font-size: 12px; color: #64748b;">This certified translation can be verified online</p>
             </div>
 
-            <div class="cert-content">
-                <div class="cert-info">
-                    <div class="cert-row">
-                        <span class="cert-label">Certification ID:</span>
-                        <span class="cert-value cert-id">${certData.certification_id}</span>
+            <!-- Content: Info + QR side by side -->
+            <div style="overflow: hidden; margin-bottom: 20px;">
+                <div style="float: left; width: 55%;">
+                    <div style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; overflow: hidden;">
+                        <span style="float: left; font-size: 11px; color: #64748b;">Certification ID:</span>
+                        <span style="float: right; font-size: 11px; font-weight: 600; color: #2563eb; font-family: monospace;">${certData.certification_id}</span>
                     </div>
-                    <div class="cert-row">
-                        <span class="cert-label">Document Type:</span>
-                        <span class="cert-value">${documentType}</span>
+                    <div style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; overflow: hidden;">
+                        <span style="float: left; font-size: 11px; color: #64748b;">Document Type:</span>
+                        <span style="float: right; font-size: 11px; font-weight: 600; color: #1e293b;">${documentType}</span>
                     </div>
-                    <div class="cert-row">
-                        <span class="cert-label">Translation:</span>
-                        <span class="cert-value">${sourceLanguage} → ${targetLanguage}</span>
+                    <div style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; overflow: hidden;">
+                        <span style="float: left; font-size: 11px; color: #64748b;">Translation:</span>
+                        <span style="float: right; font-size: 11px; font-weight: 600; color: #1e293b;">${sourceLanguage} → ${targetLanguage}</span>
                     </div>
-                    <div class="cert-row">
-                        <span class="cert-label">Certified Date:</span>
-                        <span class="cert-value">${new Date(certData.certified_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                    <div style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; overflow: hidden;">
+                        <span style="float: left; font-size: 11px; color: #64748b;">Certified Date:</span>
+                        <span style="float: right; font-size: 11px; font-weight: 600; color: #1e293b;">${new Date(certData.certified_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
                     </div>
-                    <div class="cert-row">
-                        <span class="cert-label">Document Hash:</span>
-                        <span class="cert-value cert-hash">${certData.document_hash?.substring(0, 16)}...</span>
+                    <div style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; overflow: hidden;">
+                        <span style="float: left; font-size: 11px; color: #64748b;">Document Hash:</span>
+                        <span style="float: right; font-size: 10px; font-weight: 600; color: #1e293b; font-family: monospace;">${certData.document_hash?.substring(0, 16)}...</span>
                     </div>
                 </div>
-
-                <div class="cert-qr">
-                    ${certData.qr_code_data ? `<img src="data:image/png;base64,${certData.qr_code_data}" alt="QR Code" class="qr-image" />` : '<div class="qr-placeholder">QR Code</div>'}
-                    <p class="qr-instruction">Scan to verify</p>
+                <div style="float: right; width: 40%; text-align: center; padding-left: 15px;">
+                    ${certData.qr_code_data
+                      ? `<img src="data:image/png;base64,${certData.qr_code_data}" alt="QR Code" style="width: 120px; height: 120px; border: 1px solid #e2e8f0; border-radius: 8px;" />`
+                      : '<div style="width: 120px; height: 120px; border: 1px solid #e2e8f0; border-radius: 8px; margin: 0 auto; color: #999; text-align: center; line-height: 120px;">QR Code</div>'}
+                    <p style="font-size: 10px; color: #64748b; margin-top: 5px;">Scan to verify</p>
                 </div>
             </div>
 
-            <div class="cert-footer">
-                <p class="verify-url">Verify at: <strong>${certData.verification_url}</strong></p>
-                <p class="cert-notice">This document has been digitally certified by Legacy Translations Inc. Any alterations to this document will invalidate this certification.</p>
+            <!-- Footer -->
+            <div style="clear: both; text-align: center; padding-top: 20px; border-top: 1px solid #e2e8f0; margin-top: 10px;">
+                <p style="font-size: 11px; color: #1e40af; margin-bottom: 10px;">Verify at: <strong>${certData.verification_url}</strong></p>
+                <p style="font-size: 9px; color: #64748b; line-height: 1.4;">This document has been digitally certified by Legacy Translations Inc. Any alterations to this document will invalidate this certification.</p>
             </div>
         </div>
     </div>
@@ -6179,50 +6184,55 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     </div>
     `).join('');
 
-    // Certification verification page HTML (with QR code and serial number)
+    // Certification verification page HTML - ALL INLINE STYLES
     const certificationPageHTML = (includeCertification && certData) ? `
-    <div class="certification-verification-page">
+    <div style="page-break-before: always; padding-top: 10px;">
         ${includeLetterhead ? letterheadHTML : ''}
-        <div class="certification-box">
-            <div class="cert-header">
-                <div class="cert-icon">🔐</div>
-                <h2 class="cert-title">Document Verification</h2>
-                <p class="cert-subtitle">This certified translation can be verified online</p>
+
+        <div style="max-width: 520px; margin: 25px auto; padding: 28px; border: 2px solid #2563eb; border-radius: 12px; background: #f8fafc; font-family: Georgia, 'Times New Roman', serif;">
+            <!-- Header -->
+            <div style="text-align: center; margin-bottom: 25px;">
+                <div style="font-size: 40px; margin-bottom: 10px;">🔐</div>
+                <h2 style="font-size: 20px; font-weight: bold; color: #1e40af; margin-bottom: 5px;">Document Verification</h2>
+                <p style="font-size: 12px; color: #64748b;">This certified translation can be verified online</p>
             </div>
 
-            <div class="cert-content">
-                <div class="cert-info">
-                    <div class="cert-row">
-                        <span class="cert-label">Certification ID:</span>
-                        <span class="cert-value cert-id">${certData.certification_id}</span>
+            <!-- Content: Info + QR side by side -->
+            <div style="overflow: hidden; margin-bottom: 20px;">
+                <div style="float: left; width: 55%;">
+                    <div style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; overflow: hidden;">
+                        <span style="float: left; font-size: 11px; color: #64748b;">Certification ID:</span>
+                        <span style="float: right; font-size: 11px; font-weight: 600; color: #2563eb; font-family: monospace;">${certData.certification_id}</span>
                     </div>
-                    <div class="cert-row">
-                        <span class="cert-label">Document Type:</span>
-                        <span class="cert-value">${documentType}</span>
+                    <div style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; overflow: hidden;">
+                        <span style="float: left; font-size: 11px; color: #64748b;">Document Type:</span>
+                        <span style="float: right; font-size: 11px; font-weight: 600; color: #1e293b;">${documentType}</span>
                     </div>
-                    <div class="cert-row">
-                        <span class="cert-label">Translation:</span>
-                        <span class="cert-value">${sourceLanguage} → ${targetLanguage}</span>
+                    <div style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; overflow: hidden;">
+                        <span style="float: left; font-size: 11px; color: #64748b;">Translation:</span>
+                        <span style="float: right; font-size: 11px; font-weight: 600; color: #1e293b;">${sourceLanguage} → ${targetLanguage}</span>
                     </div>
-                    <div class="cert-row">
-                        <span class="cert-label">Certified Date:</span>
-                        <span class="cert-value">${new Date(certData.certified_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                    <div style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; overflow: hidden;">
+                        <span style="float: left; font-size: 11px; color: #64748b;">Certified Date:</span>
+                        <span style="float: right; font-size: 11px; font-weight: 600; color: #1e293b;">${new Date(certData.certified_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
                     </div>
-                    <div class="cert-row">
-                        <span class="cert-label">Document Hash:</span>
-                        <span class="cert-value cert-hash">${certData.document_hash?.substring(0, 16)}...</span>
+                    <div style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; overflow: hidden;">
+                        <span style="float: left; font-size: 11px; color: #64748b;">Document Hash:</span>
+                        <span style="float: right; font-size: 10px; font-weight: 600; color: #1e293b; font-family: monospace;">${certData.document_hash?.substring(0, 16)}...</span>
                     </div>
                 </div>
-
-                <div class="cert-qr">
-                    ${certData.qr_code_data ? `<img src="data:image/png;base64,${certData.qr_code_data}" alt="QR Code" class="qr-image" />` : '<div class="qr-placeholder">QR Code</div>'}
-                    <p class="qr-instruction">Scan to verify</p>
+                <div style="float: right; width: 40%; text-align: center; padding-left: 15px;">
+                    ${certData.qr_code_data
+                      ? `<img src="data:image/png;base64,${certData.qr_code_data}" alt="QR Code" style="width: 120px; height: 120px; border: 1px solid #e2e8f0; border-radius: 8px;" />`
+                      : '<div style="width: 120px; height: 120px; border: 1px solid #e2e8f0; border-radius: 8px; margin: 0 auto; color: #999; text-align: center; line-height: 120px;">QR Code</div>'}
+                    <p style="font-size: 10px; color: #64748b; margin-top: 5px;">Scan to verify</p>
                 </div>
             </div>
 
-            <div class="cert-footer">
-                <p class="verify-url">Verify at: <strong>${certData.verification_url}</strong></p>
-                <p class="cert-notice">This document has been digitally certified by Legacy Translations Inc. Any alterations to this document will invalidate this certification.</p>
+            <!-- Footer -->
+            <div style="clear: both; text-align: center; padding-top: 20px; border-top: 1px solid #e2e8f0; margin-top: 10px;">
+                <p style="font-size: 11px; color: #1e40af; margin-bottom: 10px;">Verify at: <strong>${certData.verification_url}</strong></p>
+                <p style="font-size: 9px; color: #64748b; line-height: 1.4;">This document has been digitally certified by Legacy Translations Inc. Any alterations to this document will invalidate this certification.</p>
             </div>
         </div>
     </div>
