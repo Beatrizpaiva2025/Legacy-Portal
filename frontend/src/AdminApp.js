@@ -491,7 +491,7 @@ const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
         left: 0;
         right: 0;
         background: white;
-        padding: 0.4in 0.7in 0;
+        padding: 0.5in 0.7in 0;
         z-index: 1000;
     }
     .running-header .header {
@@ -502,22 +502,23 @@ const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
         margin-bottom: 10px;
     }
     .running-header-spacer {
-        height: 85px;
+        height: 100px;
     }
     .translation-text-page {
         position: relative;
     }
     .translation-text {
-        padding-top: 10px;
+        padding-top: 15px;
     }
 
     /* ============ TRANSLATION PAGES ============ */
     .translation-page {
         page-break-before: always;
         page-break-inside: avoid;
+        padding-top: 10px;
     }
     .translation-content {
-        margin-top: 10px;
+        margin-top: 15px;
         line-height: 1.5;
         font-size: 11pt;
     }
@@ -549,12 +550,13 @@ const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
     .original-documents-page {
         page-break-before: always;
         page-break-inside: avoid;
+        padding-top: 10px;
     }
     .page-title {
         font-size: 13px;
         font-weight: bold;
         text-align: center;
-        margin: 10px 0 15px 0;
+        margin: 15px 0 15px 0;
         color: #1a365d;
         text-transform: uppercase;
         letter-spacing: 2px;
@@ -686,10 +688,18 @@ const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
             left: 0;
             right: 0;
             background: white;
-            padding: 0.4in 0.7in 0;
+            padding: 0.5in 0.7in 0;
         }
         .running-header-spacer {
-            height: 85px;
+            height: 100px;
+        }
+        /* Content pages need extra top padding to not be covered by running header */
+        .translation-page,
+        .original-documents-page {
+            padding-top: 15px;
+        }
+        .translation-content {
+            margin-top: 15px;
         }
         /* Ensure header line only has blue gradient, no black border */
         .header, .header-line {
