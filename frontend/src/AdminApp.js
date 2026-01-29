@@ -5518,209 +5518,411 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     </div>
     ` : '';
 
-    // Complete HTML with SAME styles as handleDownload
+    // Complete HTML with FIXED layout styles matching exact template
     const fullHTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>${certTitle} - ${orderNumber || 'Document'}</title>
     <style>
-        @page { size: ${pageSizeCSS}; margin: 0.5in 0.6in 0.6in 0.6in; }
-        @page cover { size: ${pageSizeCSS}; margin: 0.75in; }
+        /* FIXED PAGE SIZE - Letter 8.5x11in */
+        @page {
+            size: Letter;
+            margin: 0.6in 0.65in 0.6in 0.65in;
+        }
+        @page :first {
+            margin: 0.75in;
+        }
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
+
         body {
             font-family: 'Times New Roman', Georgia, serif;
-            font-size: 13px;
+            font-size: 12px;
             line-height: 1.5;
             color: #333;
+            background: white;
         }
+
+        /* ============ HEADER/LETTERHEAD - FIXED DIMENSIONS ============ */
         .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 8px;
-            padding-bottom: 8px;
-            border: none;
+            width: 100%;
+            height: 55px;
+            margin-bottom: 6px;
         }
         .header-line {
+            width: 100%;
             height: 3px;
             background: linear-gradient(to right, #3B82F6, #60A5FA);
-            margin-bottom: 12px;
-            border: none;
+            margin-bottom: 15px;
         }
-        .logo-left { width: 130px; height: 55px; display: flex; align-items: center; }
-        .logo-left img { max-width: 100%; max-height: 100%; }
+        .logo-left {
+            width: 130px;
+            min-width: 130px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+        }
+        .logo-left img {
+            max-width: 120px;
+            max-height: 50px;
+            object-fit: contain;
+        }
         .logo-placeholder {
-            width: 130px; height: 55px; border: 1px dashed #ccc;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 10px; color: #999; background: #fafafa;
+            width: 120px;
+            height: 50px;
+            border: 1px dashed #ccc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: #999;
+            background: #fafafa;
+            text-align: center;
         }
-        .header-center { text-align: center; flex: 1; padding: 0 15px; }
-        .company-name { font-size: 15px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
-        .company-address { font-size: 9px; line-height: 1.3; color: #333; }
-        .logo-right { width: 85px; height: 55px; display: flex; align-items: center; justify-content: flex-end; }
-        .logo-right img { max-width: 100%; max-height: 100%; }
+        .header-center {
+            text-align: center;
+            flex: 1;
+            padding: 0 15px;
+        }
+        .company-name {
+            font-size: 16px;
+            font-weight: bold;
+            color: #2563eb;
+            margin-bottom: 2px;
+        }
+        .company-address {
+            font-size: 9px;
+            line-height: 1.4;
+            color: #333;
+        }
+        .logo-right {
+            width: 85px;
+            min-width: 85px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+        }
+        .logo-right img {
+            max-width: 80px;
+            max-height: 50px;
+            object-fit: contain;
+        }
         .logo-placeholder-right {
-            width: 85px; height: 55px; border: 1px dashed #ccc;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 9px; color: #1a365d; background: #fafafa; text-align: center; font-style: italic;
+            width: 80px;
+            height: 50px;
+            border: 1px dashed #ccc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 9px;
+            color: #1a365d;
+            background: #fafafa;
+            text-align: center;
+            font-style: italic;
         }
-        .order-number { text-align: right; margin-bottom: 20px; font-size: 12px; margin-top: 5px; }
-        .main-title { text-align: center; font-size: 26px; font-weight: normal; margin-bottom: 20px; color: #1a365d; line-height: 1.2; }
-        .subtitle { text-align: center; font-size: 13px; margin-bottom: 25px; line-height: 1.5; }
-        .body-text { text-align: justify; margin-bottom: 14px; line-height: 1.6; font-size: 12px; }
-        .body-text:last-of-type { margin-bottom: 30px; }
-        .footer-section { display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; padding-top: 20px; }
-        .signature-block { line-height: 1.3; }
-        .signature-name { font-weight: bold; font-size: 13px; }
-        .signature-title { font-weight: bold; font-size: 12px; }
-        .signature-date { font-size: 12px; }
-        .stamp-container { width: 130px; height: 130px; position: relative; }
+
+        /* ============ COVER PAGE - FIXED LAYOUT ============ */
+        .cover-page {
+            width: 100%;
+            min-height: 9.5in;
+            display: flex;
+            flex-direction: column;
+            page-break-after: always;
+        }
+        .order-number {
+            text-align: right;
+            margin-bottom: 25px;
+            font-size: 12px;
+        }
+        .main-title {
+            text-align: center;
+            font-size: 22px;
+            font-weight: normal;
+            margin-bottom: 25px;
+            color: #1a365d;
+            line-height: 1.3;
+        }
+        .subtitle {
+            text-align: center;
+            font-size: 13px;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+        .body-text {
+            text-align: justify;
+            margin-bottom: 16px;
+            line-height: 1.7;
+            font-size: 12px;
+        }
+        .body-text:last-of-type {
+            margin-bottom: 40px;
+        }
+        .footer-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-top: auto;
+            padding-top: 30px;
+        }
+        .signature-block {
+            line-height: 1.4;
+        }
+        .signature-name {
+            font-weight: bold;
+            font-size: 13px;
+        }
+        .signature-title {
+            font-size: 12px;
+        }
+        .signature-date {
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        .stamp-container {
+            width: 140px;
+            height: 140px;
+        }
         .stamp {
-            width: 130px; height: 130px; border: 3px solid #2563eb; border-radius: 50%;
-            position: relative; display: flex; align-items: center; justify-content: center; background: white;
+            width: 130px;
+            height: 130px;
+            border: 3px solid #2563eb;
+            border-radius: 50%;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: white;
         }
         .stamp::before {
-            content: ''; position: absolute; top: 7px; left: 7px; right: 7px; bottom: 7px;
-            border: 1px solid #2563eb; border-radius: 50%;
+            content: '';
+            position: absolute;
+            top: 7px; left: 7px; right: 7px; bottom: 7px;
+            border: 1px solid #2563eb;
+            border-radius: 50%;
         }
         .stamp-text-top {
-            position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
-            font-size: 8px; font-weight: bold; color: #2563eb; letter-spacing: 1.5px;
+            position: absolute;
+            top: 14px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 8px;
+            font-weight: bold;
+            color: #2563eb;
+            letter-spacing: 1.5px;
         }
-        .stamp-center { text-align: center; padding: 0 12px; }
-        .stamp-company { font-size: 10px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
-        .stamp-ata { font-size: 8px; color: #2563eb; }
-        .cover-page { page: cover; page-break-after: always; min-height: 100%; display: flex; flex-direction: column; }
-        .translation-page { page-break-after: always; page-break-inside: avoid; padding-top: 15px; }
-        .translation-page:first-of-type { page-break-before: auto; }
-        .translation-page:last-of-type { page-break-after: auto; }
-        .translation-content { text-align: center; }
+        .stamp-center {
+            text-align: center;
+            padding: 0 12px;
+        }
+        .stamp-company {
+            font-size: 10px;
+            font-weight: bold;
+            color: #2563eb;
+            margin-bottom: 2px;
+        }
+        .stamp-ata {
+            font-size: 8px;
+            color: #2563eb;
+        }
+
+        /* ============ TRANSLATION PAGES ============ */
+        .translation-page {
+            page-break-before: always;
+            page-break-inside: avoid;
+            padding-top: 0;
+        }
+        .translation-content {
+            text-align: center;
+            margin-top: 10px;
+        }
+        .translation-image {
+            width: 100%;
+            max-width: 100%;
+            height: auto;
+            border: none;
+            display: block;
+            margin: 0 auto;
+        }
+
+        /* For text translations */
+        .translation-text-page {
+            page-break-before: always;
+        }
         .translation-content.translation-text {
             text-align: left;
             font-family: 'Times New Roman', Georgia, serif;
             font-size: 11pt;
             line-height: 1.5;
-            color: #333;
-            orphans: 4;
-            widows: 4;
+            margin-top: 15px;
         }
         .translation-content.translation-text p {
-            margin-bottom: 10px;
+            margin-bottom: 12px;
             text-align: justify;
-            page-break-inside: avoid;
         }
         .translation-content.translation-text table {
             width: 100%;
-            max-width: 100%;
             border-collapse: collapse;
-            margin: 10px 0;
-            table-layout: fixed;
-            page-break-inside: auto;
+            margin: 12px 0;
         }
-        .translation-content.translation-text td, .translation-content.translation-text th {
+        .translation-content.translation-text td,
+        .translation-content.translation-text th {
             border: 1px solid #333;
             padding: 6px;
             font-size: 10pt;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-            max-width: 200px;
         }
-        .translation-content.translation-text tr {
+
+        /* ============ ORIGINAL DOCUMENTS ============ */
+        .original-documents-page {
+            page-break-before: always;
             page-break-inside: avoid;
-            page-break-after: auto;
         }
-        .translation-content.translation-text thead {
-            display: table-header-group;
-        }
-        .translation-content.translation-text h1, .translation-content.translation-text h2, .translation-content.translation-text h3 {
-            margin: 12px 0 8px;
+        .page-title {
+            font-size: 14px;
+            font-weight: bold;
+            text-align: center;
+            margin: 10px 0 15px 0;
             color: #1a365d;
-            page-break-after: avoid;
+            text-transform: uppercase;
+            letter-spacing: 2px;
         }
-        .translation-content.translation-text ul, .translation-content.translation-text ol { margin: 8px 0 8px 20px; }
-        .translation-image { width: 100%; height: auto; max-height: none; border: none; object-fit: contain; display: block; margin: 0 auto; }
-        .page-title { font-size: 13px; font-weight: bold; text-align: center; margin: 10px 0 8px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; page-break-after: avoid; }
-        .original-documents-page { page-break-after: always; page-break-inside: avoid; padding-top: 15px; }
-        .original-documents-page:last-of-type { page-break-after: auto; }
-        .original-image-container { text-align: center; margin-bottom: 5px; }
-        .original-image { width: 100%; height: auto; max-height: none; border: none; object-fit: contain; display: block; margin: 0 auto; }
-
-        /* Bank statement / Financial document optimization */
-        .financial-doc .translation-content.translation-text {
-            font-size: 10pt;
-            line-height: 1.3;
+        .original-image-container {
+            text-align: center;
         }
-        .financial-doc table td { padding: 4px 6px; font-size: 9pt; }
+        .original-image {
+            width: 100%;
+            max-width: 100%;
+            height: auto;
+            border: none;
+            display: block;
+            margin: 0 auto;
+        }
 
+        /* ============ CERTIFICATION PAGE ============ */
+        .certification-verification-page {
+            page-break-before: always;
+            padding-top: 0;
+        }
+        .certification-box {
+            max-width: 550px;
+            margin: 20px auto;
+            padding: 25px;
+            border: 2px solid #2563eb;
+            border-radius: 12px;
+            background: #f8fafc;
+        }
+        .cert-header {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        .cert-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        .cert-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: #1e40af;
+            margin-bottom: 5px;
+        }
+        .cert-subtitle {
+            font-size: 12px;
+            color: #64748b;
+        }
+        .cert-content {
+            display: flex;
+            gap: 30px;
+            align-items: flex-start;
+        }
+        .cert-info {
+            flex: 1;
+        }
+        .cert-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .cert-label {
+            font-size: 11px;
+            color: #64748b;
+        }
+        .cert-value {
+            font-size: 11px;
+            font-weight: 600;
+            color: #1e293b;
+            text-align: right;
+        }
+        .cert-id {
+            font-family: monospace;
+            color: #2563eb;
+        }
+        .cert-hash {
+            font-family: monospace;
+            font-size: 10px;
+        }
+        .cert-qr {
+            text-align: center;
+        }
+        .qr-image {
+            width: 120px;
+            height: 120px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+        }
+        .qr-placeholder {
+            width: 120px;
+            height: 120px;
+            border: 2px dashed #cbd5e1;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #94a3b8;
+            font-size: 12px;
+        }
+        .qr-instruction {
+            font-size: 10px;
+            color: #64748b;
+            margin-top: 5px;
+        }
+        .cert-footer {
+            margin-top: 25px;
+            text-align: center;
+            padding-top: 20px;
+            border-top: 1px solid #e2e8f0;
+        }
+        .verify-url {
+            font-size: 11px;
+            color: #1e40af;
+            margin-bottom: 10px;
+        }
+        .cert-notice {
+            font-size: 9px;
+            color: #64748b;
+            line-height: 1.4;
+        }
+
+        /* ============ PRINT STYLES ============ */
         @media print {
             body {
-                padding: 0;
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
-                orphans: 4;
-                widows: 4;
             }
-
-            /* Ensure each image page stays on its own page */
-            .translation-page {
+            .cover-page {
                 page-break-after: always;
-                page-break-inside: avoid;
             }
-            .translation-page:last-of-type {
-                page-break-after: auto;
-            }
-            .original-documents-page {
-                page-break-after: always;
-                page-break-inside: avoid;
-            }
-            .original-documents-page:last-of-type {
-                page-break-after: auto;
-            }
-
-            /* Running header for HTML content pages */
-            .running-header {
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                background: white;
-                padding: 20px 50px 10px;
-            }
-            .running-header-spacer {
-                height: 100px;
-            }
-            .translation-text-page {
+            .translation-page,
+            .original-documents-page,
+            .certification-verification-page {
                 page-break-before: always;
-            }
-            .translation-text-page:first-child {
-                page-break-before: auto;
+                page-break-inside: avoid;
             }
         }
-        /* Certification Verification Page Styles */
-        .certification-verification-page { page-break-before: always; padding-top: 10px; }
-        .certification-box {
-            max-width: 550px; margin: 15px auto; padding: 25px;
-            border: 2px solid #2563eb; border-radius: 12px; background: #f8fafc;
-        }
-        .cert-header { text-align: center; margin-bottom: 25px; }
-        .cert-icon { font-size: 48px; margin-bottom: 10px; }
-        .cert-title { font-size: 20px; font-weight: bold; color: #1e40af; margin-bottom: 5px; }
-        .cert-subtitle { font-size: 12px; color: #64748b; }
-        .cert-content { display: flex; gap: 30px; align-items: flex-start; }
-        .cert-info { flex: 1; }
-        .cert-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e2e8f0; }
-        .cert-label { font-size: 11px; color: #64748b; }
-        .cert-value { font-size: 11px; font-weight: 600; color: #1e293b; text-align: right; }
-        .cert-id { font-family: monospace; color: #2563eb; }
-        .cert-hash { font-family: monospace; font-size: 10px; }
-        .cert-qr { text-align: center; }
-        .qr-image { width: 120px; height: 120px; border: 1px solid #e2e8f0; border-radius: 8px; }
-        .qr-placeholder { width: 120px; height: 120px; border: 2px dashed #cbd5e1; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 12px; }
-        .qr-instruction { font-size: 10px; color: #64748b; margin-top: 5px; }
-        .cert-footer { margin-top: 25px; text-align: center; padding-top: 20px; border-top: 1px solid #e2e8f0; }
-        .verify-url { font-size: 11px; color: #1e40af; margin-bottom: 10px; }
-        .cert-notice { font-size: 9px; color: #64748b; line-height: 1.4; }
     </style>
 </head>
 <body>
