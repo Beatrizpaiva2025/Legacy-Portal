@@ -3,6 +3,49 @@ import axios from 'axios';
 
 const API = process.env.REACT_APP_API_URL || 'https://legacyportalbackend.onrender.com';
 
+// Global toast function
+if (!window.showAppToast) {
+  window.showAppToast = (message, type = 'info') => {
+    window.dispatchEvent(new CustomEvent('app-toast', { detail: { message, type } }));
+  };
+}
+
+// Toast Container Component
+const ToastContainer = () => {
+  const [toasts, setToasts] = useState([]);
+
+  useEffect(() => {
+    const handleToast = (e) => {
+      const { message, type } = e.detail;
+      const id = Date.now();
+      setToasts(prev => [...prev, { id, message, type }]);
+      setTimeout(() => {
+        setToasts(prev => prev.filter(t => t.id !== id));
+      }, 5000);
+    };
+    window.addEventListener('app-toast', handleToast);
+    return () => window.removeEventListener('app-toast', handleToast);
+  }, []);
+
+  if (toasts.length === 0) return null;
+
+  return (
+    <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2">
+      {toasts.map((toast) => {
+        const bgColor = toast.type === 'success' ? 'bg-green-500' : toast.type === 'error' ? 'bg-red-500' : 'bg-blue-500';
+        const icon = toast.type === 'success' ? '✓' : toast.type === 'error' ? '✕' : 'ℹ';
+        return (
+          <div key={toast.id} className={`${bgColor} text-white px-6 py-4 rounded-lg shadow-xl flex items-center gap-3 max-w-md`}>
+            <span className="text-xl font-bold">{icon}</span>
+            <span className="flex-1">{toast.message}</span>
+            <button onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))} className="text-white/80 hover:text-white text-xl font-bold ml-2">&times;</button>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 const VerificationPage = () => {
   const [certificationId, setCertificationId] = useState('');
   const [verificationResult, setVerificationResult] = useState(null);
@@ -52,7 +95,7 @@ const VerificationPage = () => {
       setSelectedFile(file);
       setPdfVerificationResult(null);
     } else if (file) {
-      alert('Please select a PDF file.');
+      window.showAppToast('Please select a PDF file.', 'error');
     }
   };
 
@@ -651,6 +694,7 @@ const VerificationPage = () => {
           </div>
         </div>
       </footer>
+      <ToastContainer />
     </div>
   );
 };

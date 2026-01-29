@@ -10,6 +10,86 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.vers
 
 const API = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
+// ==================== GLOBAL TOAST NOTIFICATION SYSTEM ====================
+// Global toast function - can be called from anywhere
+if (!window.showAppToast) {
+  window.showAppToast = (message, type = 'info') => {
+    window.dispatchEvent(new CustomEvent('app-toast', { detail: { message, type } }));
+  };
+}
+
+// Smart toast that auto-detects message type
+const showToast = (message) => {
+  const msgLower = (message || '').toLowerCase();
+  let type = 'info';
+
+  if (msgLower.includes('error') || msgLower.includes('failed') || msgLower.includes('erro') ||
+      msgLower.includes('please') || msgLower.includes('cannot') || msgLower.includes('invalid') ||
+      msgLower.includes('required') || msgLower.includes('missing') || msgLower.includes('falha')) {
+    type = 'error';
+  } else if (msgLower.includes('success') || msgLower.includes('✅') || msgLower.includes('sent') ||
+             msgLower.includes('created') || msgLower.includes('uploaded') || msgLower.includes('saved') ||
+             msgLower.includes('approved') || msgLower.includes('deleted') || msgLower.includes('copied') ||
+             msgLower.includes('enviado') || msgLower.includes('sucesso') || msgLower.includes('criado')) {
+    type = 'success';
+  }
+
+  window.showAppToast(message, type);
+};
+
+const ToastContainer = () => {
+  const [toasts, setToasts] = useState([]);
+
+  useEffect(() => {
+    const handleToast = (e) => {
+      const { message, type } = e.detail;
+      const id = Date.now();
+      setToasts(prev => [...prev, { id, message, type }]);
+
+      // Auto-remove after 5 seconds
+      setTimeout(() => {
+        setToasts(prev => prev.filter(t => t.id !== id));
+      }, 5000);
+    };
+
+    window.addEventListener('app-toast', handleToast);
+    return () => window.removeEventListener('app-toast', handleToast);
+  }, []);
+
+  const removeToast = (id) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  };
+
+  if (toasts.length === 0) return null;
+
+  return (
+    <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2">
+      {toasts.map((toast) => {
+        const bgColor = toast.type === 'success' ? 'bg-green-500' : toast.type === 'error' ? 'bg-red-500' : 'bg-blue-500';
+        const icon = toast.type === 'success' ? '✓' : toast.type === 'error' ? '✕' : 'ℹ';
+
+        return (
+          <div
+            key={toast.id}
+            className={`${bgColor} text-white px-6 py-4 rounded-lg shadow-xl flex items-center gap-3 max-w-md`}
+            style={{ animation: 'slideIn 0.3s ease-out' }}
+          >
+            <span className="text-xl font-bold">{icon}</span>
+            <span className="flex-1">{toast.message}</span>
+            <button onClick={() => removeToast(toast.id)} className="text-white/80 hover:text-white text-xl font-bold ml-2">&times;</button>
+          </div>
+        );
+      })}
+      <style>{`
+        @keyframes slideIn {
+          from { transform: translateX(100%); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+      `}</style>
+    </div>
+  );
+};
+
 // ==================== UTC DATE HELPER - NEW YORK TIMEZONE ====================
 // All dates/times displayed in EST/EDT (America/New_York)
 const NY_TIMEZONE = 'America/New_York';
@@ -734,10 +814,10 @@ const TopBar = ({
     if (!window.confirm('Approve this Zelle payment?')) return;
     try {
       await axios.put(`${API}/admin/invoice-payments/${invoiceId}/approve-zelle?admin_key=${adminKey}`);
-      alert('Payment approved!');
+      showToast('Payment approved!');
       if (onRefreshNotifications) onRefreshNotifications();
     } catch (err) {
-      alert('Error: ' + (err.response?.data?.detail || err.message));
+      showToast('Error: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -746,10 +826,10 @@ const TopBar = ({
     if (reason === null) return;
     try {
       await axios.put(`${API}/admin/invoice-payments/${invoiceId}/reject-zelle?admin_key=${adminKey}&reason=${encodeURIComponent(reason)}`);
-      alert('Payment rejected');
+      showToast('Payment rejected');
       if (onRefreshNotifications) onRefreshNotifications();
     } catch (err) {
-      alert('Error: ' + (err.response?.data?.detail || err.message));
+      showToast('Error: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -2098,7 +2178,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         }
       } catch (err) {
         console.error('Error fetching exchange rate:', err);
-        alert('Could not fetch exchange rate. Please enter manually.');
+        showToast('Could not fetch exchange rate. Please enter manually.');
       }
     } finally {
       setFetchingRate(false);
@@ -2712,7 +2792,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   // Send message from translator to Admin/PM
   const sendTranslatorMessageToAdmin = async () => {
     if (!translatorChatMessage.trim() || !selectedAdminPm) {
-      alert('Please select a recipient and enter a message');
+      showToast('Please select a recipient and enter a message');
       return;
     }
     setSendingTranslatorMessage(true);
@@ -2726,12 +2806,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         recipient_role: recipient?.role || 'admin',
         content: translatorChatMessage
       });
-      alert('✅ Message sent successfully!');
+      showToast('✅ Message sent successfully!');
       setTranslatorChatMessage('');
       setShowTranslatorChat(false);
     } catch (err) {
       console.error('Failed to send message:', err);
-      alert('Error sending message. Please try again.');
+      showToast('Error sending message. Please try again.');
     } finally {
       setSendingTranslatorMessage(false);
     }
@@ -2915,7 +2995,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       }
     } catch (err) {
       console.error('Failed to download:', err);
-      alert('Error downloading document');
+      showToast('Error downloading document');
     }
   };
 
@@ -2926,12 +3006,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
     try {
       await axios.delete(`${API}/admin/order-documents/${docId}?admin_key=${adminKey}`);
-      alert(`Documento "${filename}" excluído com sucesso`);
+      showToast(`Documento "${filename}" excluído com sucesso`);
       // Update local state to remove the deleted document
       setProjectDocuments(prev => prev.filter(doc => doc.id !== docId));
     } catch (err) {
       console.error('Failed to delete document:', err);
-      alert('Erro ao excluir documento');
+      showToast('Erro ao excluir documento');
     }
   };
 
@@ -2986,12 +3066,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             // Load images into workspace
             setOriginalImages(images);
             setProcessingStatus('');
-            alert(`✅ PDF converted! ${images.length} page(s) loaded to workspace.`);
+            showToast(`✅ PDF converted! ${images.length} page(s) loaded to workspace.`);
 
           } catch (pdfErr) {
             console.error('PDF conversion error:', pdfErr);
             setProcessingStatus('');
-            alert('Error converting PDF. The file may be corrupted or password-protected.');
+            showToast('Error converting PDF. The file may be corrupted or password-protected.');
           }
 
         } else if (contentType.startsWith('image/')) {
@@ -3002,7 +3082,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             type: contentType
           }]);
           setProcessingStatus('');
-          alert('✅ Image loaded to workspace!');
+          showToast('✅ Image loaded to workspace!');
 
         } else {
           // Other file types - just download
@@ -3011,13 +3091,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           link.href = `data:${contentType};base64,${base64Data}`;
           link.download = filename || 'document';
           link.click();
-          alert('File downloaded. This file type cannot be loaded to workspace directly.');
+          showToast('File downloaded. This file type cannot be loaded to workspace directly.');
         }
       }
     } catch (err) {
       console.error('Failed to load file to workspace:', err);
       setProcessingStatus('');
-      alert('Error loading file to workspace');
+      showToast('Error loading file to workspace');
     }
   };
 
@@ -3157,19 +3237,19 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     if (destination !== 'save') {
       // Validate document type
       if (!documentType.trim()) {
-        alert('Please fill in the Document Type field');
+        showToast('Please fill in the Document Type field');
         return;
       }
 
       // Validate approval checklist only for delivery
       if (destination === 'deliver' && !isApprovalComplete) {
-        alert('Please complete all items in the Approval Checklist before sending');
+        showToast('Please complete all items in the Approval Checklist before sending');
         return;
       }
     }
 
     if (!selectedOrderId) {
-      alert('Please select an order to link this translation.\n\nGo to the START tab and select a project first.');
+      showToast('Please select an order to link this translation.\n\nGo to the START tab and select a project first.');
       return;
     }
 
@@ -3179,7 +3259,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       : translationResults.length > 0;
 
     if (!hasTranslation) {
-      alert('No translation to save. Please translate the document first.');
+      showToast('No translation to save. Please translate the document first.');
       return;
     }
 
@@ -3383,7 +3463,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   // Approve translation (PM/Admin) - sends to admin for final approval or marks as ready
   const approveTranslation = async (sendDirectToReady = false) => {
     if (!selectedOrderId) {
-      alert('No order selected');
+      showToast('No order selected');
       return;
     }
 
@@ -3438,7 +3518,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   // Open rejection modal (PM/Admin) - fetches translators and shows selection
   const openRejectModal = async () => {
     if (!selectedOrderId) {
-      alert('No order selected');
+      showToast('No order selected');
       return;
     }
 
@@ -3479,12 +3559,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   // Confirm rejection with selected translator
   const confirmRejectTranslation = async () => {
     if (!rejectReason.trim()) {
-      alert('Please provide a reason for rejection');
+      showToast('Please provide a reason for rejection');
       return;
     }
 
     if (!selectedTranslatorForReject) {
-      alert('Please select a translator to send the work back to');
+      showToast('Please select a translator to send the work back to');
       return;
     }
 
@@ -3637,11 +3717,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const handleSaveInstruction = async () => {
     // Validate required fields
     if (!instructionForm.title || !instructionForm.title.trim()) {
-      alert('Please enter a title for the instruction');
+      showToast('Please enter a title for the instruction');
       return;
     }
     if (!instructionForm.content || !instructionForm.content.trim()) {
-      alert('Please enter instruction content');
+      showToast('Please enter instruction content');
       return;
     }
 
@@ -3685,7 +3765,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           ? 'Network Error - Server may be restarting. Saved locally as backup.'
           : (err.response?.data?.detail || err.message);
 
-      alert('Failed to save instruction: ' + errorMsg);
+      showToast('Failed to save instruction: ' + errorMsg);
       setProcessingStatus('❌ Save failed - backed up locally');
     }
   };
@@ -3709,7 +3789,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   // Glossaries CRUD
   const handleSaveGlossary = async () => {
     if (!glossaryForm.name || !glossaryForm.name.trim()) {
-      alert('Please enter a name for the glossary');
+      showToast('Please enter a name for the glossary');
       return;
     }
 
@@ -3781,7 +3861,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         errorMsg = err.message;
       }
 
-      alert('Failed to save glossary: ' + errorMsg);
+      showToast('Failed to save glossary: ' + errorMsg);
       setProcessingStatus('❌ Save failed - backed up locally');
     }
   };
@@ -3995,11 +4075,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   // Send external translation to Review
   const handleExternalToReview = () => {
     if (externalOriginalImages.length === 0) {
-      alert('Please upload the original document first');
+      showToast('Please upload the original document first');
       return;
     }
     if (!externalTranslationText && externalTranslationImages.length === 0) {
-      alert('Please upload or paste the translation');
+      showToast('Please upload or paste the translation');
       return;
     }
 
@@ -4081,13 +4161,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   // Run detailed proofreading (admin only)
   const runProofreading = async () => {
     if (!claudeApiKey) {
-      alert('Please configure Claude API key in Settings');
+      showToast('Please configure Claude API key in Settings');
       return;
     }
 
     const currentResult = translationResults[selectedResultIndex];
     if (!currentResult?.translatedText) {
-      alert('No translation to proofread');
+      showToast('No translation to proofread');
       return;
     }
 
@@ -4117,7 +4197,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
     // If no text and no image, show error
     if (!originalText && !originalImageBase64) {
-      alert('No original document available for comparison. Please upload the original document in the Original Document section.');
+      showToast('No original document available for comparison. Please upload the original document in the Original Document section.');
       return;
     }
 
@@ -4351,7 +4431,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     const suggestionText = (erro.correcao || erro.sugestao || '').trim();
 
     if (!foundText || !suggestionText) {
-      alert('Cannot apply correction: missing original text or suggestion');
+      showToast('Cannot apply correction: missing original text or suggestion');
       return;
     }
 
@@ -4361,7 +4441,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     const result = tryReplaceText(currentResult.translatedText, foundText, suggestionText);
 
     if (!result.replaced) {
-      alert(`Could not find text to replace: "${foundText.substring(0, 50)}${foundText.length > 50 ? '...' : ''}"\n\nThe text may have been modified or contains special formatting.`);
+      showToast(`Could not find text to replace: "${foundText.substring(0, 50)}${foundText.length > 50 ? '...' : ''}"\n\nThe text may have been modified or contains special formatting.`);
       return;
     }
 
@@ -4426,7 +4506,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     });
 
     if (appliedCount === 0) {
-      alert('No corrections could be applied. The text may have been modified or contains special formatting.');
+      showToast('No corrections could be applied. The text may have been modified or contains special formatting.');
       return;
     }
 
@@ -4643,12 +4723,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   // OCR with backend (supports regular OCR or Claude OCR)
   const handleOCR = async () => {
     if (files.length === 0) {
-      alert('Please select files first');
+      showToast('Please select files first');
       return;
     }
 
     if (useClaudeOcr && !claudeApiKey) {
-      alert('API Key is required for AI OCR. Please add it in Setup tab.');
+      showToast('API Key is required for AI OCR. Please add it in Setup tab.');
       return;
     }
 
@@ -4695,12 +4775,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   // Translation with Claude
   const handleTranslate = async () => {
     if (ocrResults.length === 0) {
-      alert('Please perform OCR first');
+      showToast('Please perform OCR first');
       return;
     }
 
     if (!claudeApiKey) {
-      alert('Please configure your API Key in the Setup tab');
+      showToast('Please configure your API Key in the Setup tab');
       setActiveSubTab('start');
       return;
     }
@@ -4791,12 +4871,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   // Direct translation - Claude sees image directly, no OCR needed
   const handleDirectTranslate = async () => {
     if (originalImages.length === 0) {
-      alert('Please upload a document first');
+      showToast('Please upload a document first');
       return;
     }
 
     if (!claudeApiKey) {
-      alert('Please configure your API Key in the Setup tab');
+      showToast('Please configure your API Key in the Setup tab');
       setActiveSubTab('start');
       return;
     }
@@ -4929,7 +5009,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       }
     } catch (error) {
       console.error('Correction error:', error);
-      alert('Error applying correction: ' + error.message);
+      showToast('Error applying correction: ' + error.message);
     } finally {
       setApplyingCorrection(false);
     }
@@ -5757,7 +5837,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       setQuickPackageProgress('');
     } catch (err) {
       console.error('Error generating package:', err);
-      alert('Error generating PDF package. Please try again.');
+      showToast('Error generating PDF package. Please try again.');
       setQuickPackageLoading(false);
       setQuickPackageProgress('');
     }
@@ -6339,7 +6419,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         URL.revokeObjectURL(downloadUrl);
       } catch (err) {
         console.error('Error generating PDF:', err);
-        alert('Error generating PDF. Please try again.');
+        showToast('Error generating PDF. Please try again.');
       }
     } else {
       // Download as HTML
@@ -7004,7 +7084,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           key={order.id}
                           onClick={() => {
                             if (isPendingAcceptance) {
-                              alert('⚠️ Please accept this assignment first!\n\nCheck your email for the assignment notification and click "Accept" to start working on this project.');
+                              showToast('⚠️ Please accept this assignment first!\n\nCheck your email for the assignment notification and click "Accept" to start working on this project.');
                               return;
                             }
                             selectProject(order);
@@ -7406,7 +7486,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         onClick={() => {
                           const note = generateTranslatorNote();
                           navigator.clipboard.writeText(note);
-                          alert('Note copied to clipboard!');
+                          showToast('Note copied to clipboard!');
                         }}
                         className="text-xs text-blue-600 hover:underline"
                       >
@@ -8017,7 +8097,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                         link.click();
                                       }
                                     } catch (err) {
-                                      alert('Error downloading file');
+                                      showToast('Error downloading file');
                                     }
                                   }}
                                   className="px-2 py-1.5 bg-blue-100 text-blue-600 rounded text-xs hover:bg-blue-200 transition-colors"
@@ -8055,7 +8135,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                         };
                                         reader.readAsDataURL(file);
                                       } catch (err) {
-                                        alert('Error replacing file');
+                                        showToast('Error replacing file');
                                       }
                                     }}
                                   />
@@ -9036,7 +9116,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                 const updated = [...customCertificateTemplates, newTemplate];
                                 setCustomCertificateTemplates(updated);
                                 localStorage.setItem('custom_certificate_templates', JSON.stringify(updated));
-                                alert(`Template "${name}" uploaded successfully!`);
+                                showToast(`Template "${name}" uploaded successfully!`);
                               }
                             };
                             reader.readAsText(file);
@@ -9618,7 +9698,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       onClick={async () => {
                         const success = await sendToProjects('pm');
                         if (success) {
-                          alert('Translation sent to PM!');
+                          showToast('Translation sent to PM!');
                           // Data clearing is now handled inside sendToProjects on success
                         }
                         // If failed, data is preserved and user can retry
@@ -11667,7 +11747,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                   await axios.delete(`${API}/admin/translation-instructions/${instr.id}?admin_key=${adminKey}`);
                                   setInstructions(instructions.filter(i => i.id !== instr.id));
                                 } catch (err) {
-                                  alert('Failed to delete instruction: ' + (err.response?.data?.detail || err.message));
+                                  showToast('Failed to delete instruction: ' + (err.response?.data?.detail || err.message));
                                 }
                               }
                             }}
@@ -11735,7 +11815,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     a.click();
                     window.URL.revokeObjectURL(url);
                   } catch (err) {
-                    alert('Failed to download: ' + err.message);
+                    showToast('Failed to download: ' + err.message);
                   }
                 }}
                 className="px-3 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700 flex items-center"
@@ -11754,7 +11834,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     a.click();
                     window.URL.revokeObjectURL(url);
                   } catch (err) {
-                    alert('Failed to download: ' + err.message);
+                    showToast('Failed to download: ' + err.message);
                   }
                 }}
                 className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center"
@@ -11771,7 +11851,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     const res = await axios.get(`${API}/admin/translation-memory?admin_key=${adminKey}`);
                     setTranslationMemories(res.data.memories || []);
                   } catch (err) {
-                    alert('Failed to clear: ' + err.message);
+                    showToast('Failed to clear: ' + err.message);
                   }
                 }}
                 className="px-3 py-1.5 bg-red-100 text-red-600 text-xs rounded hover:bg-red-200 flex items-center"
@@ -11823,7 +11903,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     const res = await axios.get(url);
                     setTranslationMemories(res.data.memories || []);
                   } catch (err) {
-                    alert('Failed to load TM: ' + err.message);
+                    showToast('Failed to load TM: ' + err.message);
                   }
                 }}
                 className="px-3 py-1.5 bg-gray-100 text-gray-700 text-xs rounded hover:bg-gray-200"
@@ -11914,7 +11994,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                   await axios.delete(`${API}/admin/translation-memory/${tm.id}?admin_key=${adminKey}`);
                                   setTranslationMemories(translationMemories.filter(t => t.id !== tm.id));
                                 } catch (err) {
-                                  alert('Failed to delete: ' + err.message);
+                                  showToast('Failed to delete: ' + err.message);
                                 }
                               }}
                               className="text-red-500 hover:text-red-700"
@@ -12094,7 +12174,7 @@ Examples:
               <button
                 onClick={async () => {
                   if (!instructionForm.title || !instructionForm.content) {
-                    alert('Please fill in the title and instructions');
+                    showToast('Please fill in the title and instructions');
                     return;
                   }
                   try {
@@ -12118,7 +12198,7 @@ Examples:
                     setProcessingStatus('✅ Instruction saved!');
                     setTimeout(() => setProcessingStatus(''), 3000);
                   } catch (err) {
-                    alert('Failed to save instruction: ' + (err.response?.data?.detail || err.message));
+                    showToast('Failed to save instruction: ' + (err.response?.data?.detail || err.message));
                   }
                 }}
                 className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -12288,9 +12368,9 @@ translation juramentada | certified translation`}
                             terms: [...glossaryForm.terms, ...newTerms]
                           });
                           setBulkTermsText('');
-                          alert(`✅ Added ${newTerms.length} terms to glossary!`);
+                          showToast(`✅ Added ${newTerms.length} terms to glossary!`);
                         } else {
-                          alert('No valid terms found. Use format: source | target | notes');
+                          showToast('No valid terms found. Use format: source | target | notes');
                         }
                       }}
                       disabled={!bulkTermsText.trim()}
@@ -12551,7 +12631,7 @@ translation juramentada | certified translation`}
               <button
                 onClick={async () => {
                   if (!glossaryUploadConfig.name.trim()) {
-                    alert('Please enter a name for the glossary');
+                    showToast('Please enter a name for the glossary');
                     return;
                   }
 
@@ -12576,7 +12656,7 @@ translation juramentada | certified translation`}
                     const res = await axios.get(`${API}/admin/glossaries?admin_key=${adminKey}`);
                     setGlossaries(res.data.glossaries || []);
                   } catch (err) {
-                    alert('Upload failed: ' + (err.response?.data?.detail || err.message));
+                    showToast('Upload failed: ' + (err.response?.data?.detail || err.message));
                     setProcessingStatus('');
                   }
                   setGlossaryUploadFile(null);
@@ -12687,7 +12767,7 @@ translation juramentada | certified translation`}
                     const res = await axios.get(`${API}/admin/translation-memory?admin_key=${adminKey}`);
                     setTranslationMemories(res.data.memories || []);
                   } catch (err) {
-                    alert('Upload failed: ' + (err.response?.data?.detail || err.message));
+                    showToast('Upload failed: ' + (err.response?.data?.detail || err.message));
                     setProcessingStatus('');
                   }
                   setTmUploadFile(null);
@@ -12795,7 +12875,7 @@ translation juramentada | certified translation`}
               <button
                 onClick={async () => {
                   if (!tmEditForm.source.trim() || !tmEditForm.target.trim()) {
-                    alert('Source and target text are required');
+                    showToast('Source and target text are required');
                     return;
                   }
 
@@ -12822,7 +12902,7 @@ translation juramentada | certified translation`}
                     setEditingTmEntry(null);
                     setProcessingStatus('✅ TM entry updated successfully');
                   } catch (err) {
-                    alert('Failed to update: ' + (err.response?.data?.detail || err.message));
+                    showToast('Failed to update: ' + (err.response?.data?.detail || err.message));
                   }
                 }}
                 className="px-4 py-2 text-xs bg-purple-600 text-white rounded hover:bg-purple-700"
@@ -13386,11 +13466,11 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         payment_status: 'paid',
         translation_status: 'received'
       });
-      alert('✅ Payment confirmed! Order is now active.');
+      showToast('✅ Payment confirmed! Order is now active.');
       fetchOrders();
     } catch (err) {
       console.error('Failed to confirm payment:', err);
-      alert('Error confirming payment');
+      showToast('Error confirming payment');
     }
   };
 
@@ -13412,11 +13492,11 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         reopened_at: new Date().toISOString(),
         reopened_for_corrections: true
       });
-      alert('✅ Order reopened! You can now upload new documents and re-deliver to the client.');
+      showToast('✅ Order reopened! You can now upload new documents and re-deliver to the client.');
       fetchOrders();
     } catch (err) {
       console.error('Failed to reopen order:', err);
-      alert('Error reopening order');
+      showToast('Error reopening order');
     }
   };
 
@@ -13429,7 +13509,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       const orderData = orderResponse.data.order || orderResponse.data;
 
       if (!orderData.translation_html && !orderData.translation_ready) {
-        alert('This order does not have a completed translation yet.');
+        showToast('This order does not have a completed translation yet.');
         setDownloadingPackage(null);
         return;
       }
@@ -13629,12 +13709,12 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
           printWindow.focus();
           setTimeout(() => { printWindow.print(); }, 500);
         } else {
-          alert('Please allow popups to download the translation package.');
+          showToast('Please allow popups to download the translation package.');
         }
       }
     } catch (err) {
       console.error('Failed to download package:', err);
-      alert('Error generating translation package: ' + (err.message || 'Unknown error'));
+      showToast('Error generating translation package: ' + (err.message || 'Unknown error'));
     } finally {
       setDownloadingPackage(null);
     }
@@ -13720,7 +13800,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       fetchOrders();
     } catch (err) {
       console.error('Failed to delete:', err);
-      alert('Error deleting order');
+      showToast('Error deleting order');
     }
   };
 
@@ -13738,12 +13818,12 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       });
       if (response.data.success) {
         const recipient = isPartnerOrder ? (order.partner_company || 'partner') : (order.client_email || 'client');
-        alert(`Receipt #${response.data.receipt_number} created and sent to ${recipient}!`);
+        showToast(`Receipt #${response.data.receipt_number} created and sent to ${recipient}!`);
         fetchOrders();
       }
     } catch (err) {
       console.error('Failed to sync to QuickBooks:', err);
-      alert('Failed to sync: ' + (err.response?.data?.detail || err.message));
+      showToast('Failed to sync: ' + (err.response?.data?.detail || err.message));
     } finally {
       setQbSyncing(prev => ({ ...prev, [order.id]: false }));
     }
@@ -13887,7 +13967,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       }
     } catch (err) {
       console.error('Failed to download translation:', err);
-      alert('Error downloading translation');
+      showToast('Error downloading translation');
     }
   };
 
@@ -13917,10 +13997,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       // Refresh doc info
       const response = await axios.get(`${API}/admin/orders/${orderId}/translated-document?admin_key=${adminKey}`);
       setTranslatedDocInfo(response.data);
-      alert(`${fileList.length} file(s) sent(s) successfully!`);
+      showToast(`${fileList.length} file(s) sent(s) successfully!`);
     } catch (err) {
       console.error('Failed to upload translation:', err);
-      alert('Error sending file');
+      showToast('Error sending file');
     } finally {
       setUploadingFile(false);
     }
@@ -13988,7 +14068,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         message += '\n📧 BCC copy sent.';
       }
 
-      alert(message);
+      showToast(message);
       setSendingOrder(null);
       setSendBccEmail('');
       setAdditionalAttachments([]);
@@ -13997,7 +14077,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       fetchOrders();
     } catch (err) {
       console.error('Failed to deliver:', err);
-      alert('Error sending: ' + (err.response?.data?.detail || err.message));
+      showToast('Error sending: ' + (err.response?.data?.detail || err.message));
     } finally {
       setSendingToClient(false);
     }
@@ -14042,11 +14122,11 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         link.download = filename || 'document.pdf';
         link.click();
       } else {
-        alert('Document not found');
+        showToast('Document not found');
       }
     } catch (err) {
       console.error('Failed to download:', err);
-      alert('Error downloading document');
+      showToast('Error downloading document');
     }
   };
 
@@ -14077,7 +14157,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       viewOrderDocuments(viewingOrder);
     } catch (err) {
       console.error('Failed to upload document:', err);
-      alert('Error uploading document');
+      showToast('Error uploading document');
     } finally {
       setUploadingProjectDoc(false);
     }
@@ -14121,7 +14201,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       for (const file of files) {
         // Check file size
         if (file.size > maxFileSize) {
-          alert(`File "${file.name}" exceeds 100MB limit and was skipped.`);
+          showToast(`File "${file.name}" exceeds 100MB limit and was skipped.`);
           errorCount++;
           continue;
         }
@@ -14153,18 +14233,18 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
       // Show summary
       if (successCount > 0 && errorCount === 0) {
-        alert(`Successfully uploaded ${successCount} file(s)!`);
+        showToast(`Successfully uploaded ${successCount} file(s)!`);
       } else if (successCount > 0 && errorCount > 0) {
-        alert(`Uploaded ${successCount} file(s), ${errorCount} failed.`);
+        showToast(`Uploaded ${successCount} file(s), ${errorCount} failed.`);
       } else {
-        alert('Failed to upload files.');
+        showToast('Failed to upload files.');
       }
 
       // Refresh documents
       viewOrderDocuments(viewingOrder);
     } catch (err) {
       console.error('Failed to upload documents:', err);
-      alert('Error uploading documents');
+      showToast('Error uploading documents');
     } finally {
       setUploadingProjectDoc(false);
     }
@@ -14177,7 +14257,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     }
     try {
       await axios.delete(`${API}/admin/order-documents/${docId}?admin_key=${adminKey}`);
-      alert(`Document "${filename}" deleted successfully`);
+      showToast(`Document "${filename}" deleted successfully`);
       // Refresh files list
       if (viewingOrder) {
         viewOrderDocuments(viewingOrder);
@@ -14207,7 +14287,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       }
     } catch (err) {
       console.error('Failed to delete document:', err);
-      alert('Error deleting document');
+      showToast('Error deleting document');
     }
   };
 
@@ -14235,7 +14315,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         content_type: file.type || 'application/octet-stream'
       });
 
-      alert(`Document replaced successfully with "${file.name}"`);
+      showToast(`Document replaced successfully with "${file.name}"`);
       // Refresh files list
       if (viewingOrder) {
         viewOrderDocuments(viewingOrder);
@@ -14265,7 +14345,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       }
     } catch (err) {
       console.error('Failed to replace document:', err);
-      alert('Error replacing document');
+      showToast('Error replacing document');
     }
   };
 
@@ -14282,7 +14362,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       fetchOrders();
     } catch (err) {
       console.error('Failed to update notes:', err);
-      alert('Error updating notes');
+      showToast('Error updating notes');
     }
   };
 
@@ -14302,7 +14382,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       fetchOrders();
     } catch (err) {
       console.error('Failed to update deadline:', err);
-      alert('Error updating deadline');
+      showToast('Error updating deadline');
     }
   };
 
@@ -14327,10 +14407,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       // Also refresh from server to ensure consistency
       fetchOrders();
 
-      alert('✅ Projeto salvo successfully!');
+      showToast('✅ Projeto salvo successfully!');
     } catch (err) {
       console.error('Failed to save project:', err);
-      alert('Error saving project: ' + (err.response?.data?.detail || err.message));
+      showToast('Error saving project: ' + (err.response?.data?.detail || err.message));
     } finally {
       setSavingProject(false);
     }
@@ -14410,13 +14490,13 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         partner_name: replyingToMessage.from_partner_name,
         admin_name: user?.name || 'Admin'
       });
-      alert('Reply sent to ' + replyingToMessage.from_partner_name + '!');
+      showToast('Reply sent to ' + replyingToMessage.from_partner_name + '!');
       setReplyingToMessage(null);
       setReplyContent('');
       fetchPartnerMessages();
     } catch (err) {
       console.error('Failed to send reply:', err);
-      alert('Failed to send reply. Please try again.');
+      showToast('Failed to send reply. Please try again.');
     } finally {
       setSendingReply(false);
     }
@@ -14435,12 +14515,12 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         order_number: messagingTranslator.order_number,
         admin_name: user?.name || 'Admin'
       });
-      alert('Message sent to ' + messagingTranslator.name + '!');
+      showToast('Message sent to ' + messagingTranslator.name + '!');
       setMessagingTranslator(null);
       setTranslatorMessageContent('');
     } catch (err) {
       console.error('Failed to send message:', err);
-      alert('Failed to send message. Please try again.');
+      showToast('Failed to send message. Please try again.');
     } finally {
       setSendingTranslatorMessage(false);
     }
@@ -14482,7 +14562,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   // Quick Add Translator (PM can add new translators from assignment modal)
   const quickAddTranslator = async () => {
     if (!newTranslatorData.name || !newTranslatorData.email || !newTranslatorData.password) {
-      alert('Please fill in name, email and password');
+      showToast('Please fill in name, email and password');
       return;
     }
     setAddingTranslator(true);
@@ -14497,7 +14577,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         language_pairs: newTranslatorData.language_pairs || null
       });
 
-      alert(`Translator "${newTranslatorData.name}" created successfully!`);
+      showToast(`Translator "${newTranslatorData.name}" created successfully!`);
 
       // Reset form and refresh translator list
       setNewTranslatorData({ name: '', email: '', password: '', rate_per_page: '', rate_per_word: '', language_pairs: '' });
@@ -14513,7 +14593,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       }
     } catch (err) {
       console.error('Failed to add translator:', err);
-      alert(err.response?.data?.detail || 'Error creating translator');
+      showToast(err.response?.data?.detail || 'Error creating translator');
     } finally {
       setAddingTranslator(false);
     }
@@ -14575,7 +14655,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       }
     } catch (err) {
       console.error('Failed to load review documents:', err);
-      alert('Error loading documents for review');
+      showToast('Error loading documents for review');
     } finally {
       setLoadingReview(false);
     }
@@ -14592,12 +14672,12 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         pm_review_comment: reviewComment,
         pm_reviewed_at: new Date().toISOString()
       });
-      alert('Translation approved! Ready for delivery.');
+      showToast('Translation approved! Ready for delivery.');
       setReviewingOrder(null);
       fetchOrders();
     } catch (err) {
       console.error('Failed to approve:', err);
-      alert('Error approving translation');
+      showToast('Error approving translation');
     } finally {
       setSubmittingReview(false);
     }
@@ -14607,7 +14687,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const requestCorrection = async () => {
     if (!reviewingOrder) return;
     if (!reviewComment.trim()) {
-      alert('Please add a comment explaining what needs to be corrected');
+      showToast('Please add a comment explaining what needs to be corrected');
       return;
     }
     setSubmittingReview(true);
@@ -14618,12 +14698,12 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         pm_review_comment: reviewComment,
         pm_reviewed_at: new Date().toISOString()
       });
-      alert('Correction requested. Translator will be notified.');
+      showToast('Correction requested. Translator will be notified.');
       setReviewingOrder(null);
       fetchOrders();
     } catch (err) {
       console.error('Failed to request correction:', err);
-      alert('Error requesting correction');
+      showToast('Error requesting correction');
     } finally {
       setSubmittingReview(false);
     }
@@ -14632,7 +14712,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   // Send translator assignment with email invitation
   const sendTranslatorAssignment = async () => {
     if (!assignmentDetails.translator_id) {
-      alert('Please select a translator');
+      showToast('Please select a translator');
       return;
     }
     setSendingAssignment(true);
@@ -14662,9 +14742,9 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       });
 
       if (isSelfAssignment) {
-        alert(`Project assigned to yourself (${user?.name || 'Admin'})! You can start translating now.`);
+        showToast(`Project assigned to yourself (${user?.name || 'Admin'})! You can start translating now.`);
       } else {
-        alert(`Invitation sent to ${selectedTranslator?.name || 'translator'}! They will receive an email to accept or decline.`);
+        showToast(`Invitation sent to ${selectedTranslator?.name || 'translator'}! They will receive an email to accept or decline.`);
       }
       setAssigningTranslatorModal(null);
       setAssigningTranslator(null);
@@ -14672,7 +14752,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       fetchNotifications();
     } catch (err) {
       console.error('Failed to assign translator:', err);
-      alert('Error sending assignment');
+      showToast('Error sending assignment');
     } finally {
       setSendingAssignment(false);
     }
@@ -14710,11 +14790,11 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       await axios.put(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`, {
         translator_assignment_status: newStatus
       });
-      alert(`Translator status updated to: ${newStatus}`);
+      showToast(`Translator status updated to: ${newStatus}`);
       fetchOrders();
     } catch (err) {
       console.error('Failed to update translator assignment status:', err);
-      alert('Failed to update status');
+      showToast('Failed to update status');
     }
   };
 
@@ -14731,17 +14811,17 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
     // Validate required fields
     if (!newProject.client_name || !newProject.client_name.trim()) {
-      alert('Client name is required');
+      showToast('Client name is required');
       return;
     }
     if (!newProject.client_email || !newProject.client_email.trim()) {
-      alert('Client email is required');
+      showToast('Client email is required');
       return;
     }
     // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(newProject.client_email)) {
-      alert('Please enter a valid email address');
+      showToast('Please enter a valid email address');
       return;
     }
 
@@ -14847,7 +14927,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       console.error('Error creating project:', err.response?.data || err);
       const rawError = err.response?.data?.detail || 'Error creating project';
       const errorMsg = sanitizeErrorMessage(rawError);
-      alert(errorMsg.includes('email') ? 'Invalid email format. Please enter a valid email (e.g., name@email.com)' : errorMsg);
+      showToast(errorMsg.includes('email') ? 'Invalid email format. Please enter a valid email (e.g., name@email.com)' : errorMsg);
     } finally {
       setCreatingProject(false);
     }
@@ -17021,7 +17101,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                         send_email: true
                                       }).then(response => {
                                         if (response.data.success) {
-                                          alert(`Invoice #${response.data.invoice_number} sent!`);
+                                          showToast(`Invoice #${response.data.invoice_number} sent!`);
                                           fetchOrders();
                                           setViewingOrder(prev => ({
                                             ...prev,
@@ -17030,7 +17110,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                           }));
                                         }
                                       }).catch(err => {
-                                        alert('Failed: ' + (err.response?.data?.detail || err.message));
+                                        showToast('Failed: ' + (err.response?.data?.detail || err.message));
                                       }).finally(() => {
                                         setQbSyncing(prev => ({ ...prev, [viewingOrder.id]: false }));
                                       });
@@ -17167,10 +17247,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                     });
                                   } catch (err) {
                                     console.error('Failed to upload translation:', err);
-                                    alert(`Error uploading ${file.name}`);
+                                    showToast(`Error uploading ${file.name}`);
                                   }
                                 }
-                                alert('Translation(s) uploaded successfully!');
+                                showToast('Translation(s) uploaded successfully!');
                                 viewOrderDocuments(viewingOrder);
                               }
                               e.target.value = '';
@@ -17243,12 +17323,12 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                           translation_status: 'ready',
                                           translation_ready_at: new Date().toISOString()
                                         });
-                                        alert('Tradução aceita! Agora você pode enviar para o cliente.');
+                                        showToast('Tradução aceita! Agora você pode enviar para o cliente.');
                                         setViewingOrder(prev => ({ ...prev, translation_status: 'ready' }));
                                         fetchOrders();
                                       } catch (err) {
                                         console.error('Failed to update status:', err);
-                                        alert('Erro ao atualizar status');
+                                        showToast('Erro ao atualizar status');
                                       }
                                     }
                                   }}
@@ -17311,7 +17391,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                   <button
                                     onClick={async () => {
                                       if (selectedDocsForDelivery.length === 0) {
-                                        alert('Por favor, selecione pelo menos um arquivo para enviar ao cliente.');
+                                        showToast('Por favor, selecione pelo menos um arquivo para enviar ao cliente.');
                                         return;
                                       }
                                       const bccInput = document.getElementById('bcc-email-input');
@@ -17336,12 +17416,12 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                               additional_document_ids: selectedDocsForDelivery
                                             }
                                           });
-                                          alert(`Tradução enviada para o cliente!\n\n${selectedDocsForDelivery.length} arquivo(s) enviado(s).` + (bccEmail ? `\n\nCópia (BCC): ${bccEmail}` : ''));
+                                          showToast(`Tradução enviada para o cliente!\n\n${selectedDocsForDelivery.length} arquivo(s) enviado(s).` + (bccEmail ? `\n\nCópia (BCC): ${bccEmail}` : ''));
                                           setViewingOrder(prev => ({ ...prev, translation_status: 'delivered' }));
                                           fetchOrders();
                                         } catch (err) {
                                           console.error('Failed to deliver:', err);
-                                          alert('Erro ao enviar para o cliente');
+                                          showToast('Erro ao enviar para o cliente');
                                         }
                                       }
                                     }}
@@ -18616,10 +18696,10 @@ const FollowupsPage = ({ adminKey }) => {
       if (result.errors?.length > 0) {
         console.log('Follow-up errors:', result.errors);
       }
-      alert(`Follow-ups processed!\n\nReminders sent: ${result.reminders_sent}\nMarked as lost: ${result.marked_lost}${errorDetails}`);
+      showToast(`Follow-ups processed!\n\nReminders sent: ${result.reminders_sent}\nMarked as lost: ${result.marked_lost}${errorDetails}`);
       fetchFollowupStatus();
     } catch (err) {
-      alert('Failed to process follow-ups. Check console for details.');
+      showToast('Failed to process follow-ups. Check console for details.');
       console.error(err);
     } finally {
       setProcessing(false);
@@ -18634,7 +18714,7 @@ const FollowupsPage = ({ adminKey }) => {
       await axios.post(`${API}/admin/quotes/exclude-from-followup?admin_key=${adminKey}&quote_id=${quoteId}&quote_type=${quoteType}`);
       fetchFollowupStatus();
     } catch (err) {
-      alert('Erro ao excluir cliente do follow-up');
+      showToast('Erro ao excluir cliente do follow-up');
       console.error(err);
     }
   };
@@ -19015,7 +19095,7 @@ const SettingsPage = ({ adminKey }) => {
       }
     } catch (err) {
       console.error('Failed to connect to QuickBooks:', err);
-      alert('Failed to start QuickBooks connection: ' + (err.response?.data?.detail || err.message));
+      showToast('Failed to start QuickBooks connection: ' + (err.response?.data?.detail || err.message));
     } finally {
       setQbConnecting(false);
     }
@@ -19028,14 +19108,14 @@ const SettingsPage = ({ adminKey }) => {
       setQbStatus({ connected: false, company_name: null, loading: false });
     } catch (err) {
       console.error('Failed to disconnect QuickBooks:', err);
-      alert('Failed to disconnect: ' + (err.response?.data?.detail || err.message));
+      showToast('Failed to disconnect: ' + (err.response?.data?.detail || err.message));
     }
   };
 
   // Export functions
   const exportToCSV = (data, filename) => {
     if (!data || data.length === 0) {
-      alert('No data to export');
+      showToast('No data to export');
       return;
     }
     const headers = Object.keys(data[0]);
@@ -19318,7 +19398,7 @@ const SettingsPage = ({ adminKey }) => {
       await axios.delete(`${API}/admin/backup/restore-point/${restorePointId}?admin_key=${adminKey}`);
       fetchRestorePoints();
     } catch (err) {
-      alert('Error deleting restore point');
+      showToast('Error deleting restore point');
       console.error(err);
     }
   };
@@ -20157,15 +20237,15 @@ const ReviewPage = ({ adminKey, user }) => {
       fetchPendingSubmissions();
       setSelectedSubmission(null);
       setFullScreenReview(false);
-      alert('Translation approved and sent to client!');
+      showToast('Translation approved and sent to client!');
     } catch (err) {
-      alert('Error approving: ' + (err.response?.data?.detail || err.message));
+      showToast('Error approving: ' + (err.response?.data?.detail || err.message));
     }
   };
 
   const handleRequestRevision = async (submissionId) => {
     if (!revisionNote.trim()) {
-      alert('Please add a note explaining the corrections needed.');
+      showToast('Please add a note explaining the corrections needed.');
       return;
     }
     try {
@@ -20176,9 +20256,9 @@ const ReviewPage = ({ adminKey, user }) => {
       setSelectedSubmission(null);
       setRevisionNote('');
       setFullScreenReview(false);
-      alert('Revision requested from translator!');
+      showToast('Revision requested from translator!');
     } catch (err) {
-      alert('Error: ' + (err.response?.data?.detail || err.message));
+      showToast('Error: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -20189,10 +20269,10 @@ const ReviewPage = ({ adminKey, user }) => {
       await axios.put(`${API}/admin/translations/submission/${selectedSubmission._id}/update?admin_key=${adminKey}`, {
         translation_html: editedTranslation
       });
-      alert('Changes saved!');
+      showToast('Changes saved!');
       fetchPendingSubmissions();
     } catch (err) {
-      alert('Error saving: ' + (err.response?.data?.detail || err.message));
+      showToast('Error saving: ' + (err.response?.data?.detail || err.message));
     } finally {
       setSaving(false);
     }
@@ -20707,10 +20787,10 @@ const UsersPage = ({ adminKey, user }) => {
       await fetchUsers();
       setEditingUser(null);
       setEditForm({});
-      alert('Perfil atualizado successfully!');
+      showToast('Perfil atualizado successfully!');
     } catch (err) {
       console.error('Error updating user:', err);
-      alert(err.response?.data?.detail || 'Error updating profile');
+      showToast(err.response?.data?.detail || 'Error updating profile');
     } finally {
       setSavingUser(false);
     }
@@ -20728,10 +20808,10 @@ const UsersPage = ({ adminKey, user }) => {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       await fetchUserDocuments(userId);
-      alert('Document sent successfully!');
+      showToast('Document sent successfully!');
     } catch (err) {
       console.error('Error uploading document:', err);
-      alert('Error uploading document');
+      showToast('Error uploading document');
     } finally {
       setUploadingDoc(false);
     }
@@ -20747,7 +20827,7 @@ const UsersPage = ({ adminKey, user }) => {
       link.click();
     } catch (err) {
       console.error('Error downloading document:', err);
-      alert('Error downloading document');
+      showToast('Error downloading document');
     }
   };
 
@@ -20759,7 +20839,7 @@ const UsersPage = ({ adminKey, user }) => {
       await fetchUserDocuments(userId);
     } catch (err) {
       console.error('Error deleting document:', err);
-      alert('Error deleting document');
+      showToast('Error deleting document');
     }
   };
 
@@ -20800,17 +20880,17 @@ const UsersPage = ({ adminKey, user }) => {
         );
         if (copyLink) {
           navigator.clipboard.writeText(response.data.invitation_link);
-          alert('Link copied! Send it to the user via WhatsApp or another method.');
+          showToast('Link copied! Send it to the user via WhatsApp or another method.');
         }
       } else {
-        alert(response.data?.message || 'User created!');
+        showToast(response.data?.message || 'User created!');
       }
 
       setNewUser({ name: '', email: '', role: 'translator', rate_per_page: '', rate_per_word: '', language_pairs: '', translator_type: 'contractor' });
       setShowCreateForm(false);
       fetchUsers();
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error creating user');
+      showToast(err.response?.data?.detail || 'Error creating user');
     } finally {
       setCreating(false);
     }
@@ -20821,7 +20901,7 @@ const UsersPage = ({ adminKey, user }) => {
       await axios.put(`${API}/admin/users/${userId}/toggle-active?admin_key=${adminKey}`);
       fetchUsers();
     } catch (err) {
-      alert('Error toggling user status');
+      showToast('Error toggling user status');
     }
   };
 
@@ -20831,7 +20911,7 @@ const UsersPage = ({ adminKey, user }) => {
       await axios.delete(`${API}/admin/users/${userId}?admin_key=${adminKey}`);
       fetchUsers();
     } catch (err) {
-      alert('Error deleting user');
+      showToast('Error deleting user');
     }
   };
 
@@ -20851,13 +20931,13 @@ const UsersPage = ({ adminKey, user }) => {
         );
         if (copyLink) {
           navigator.clipboard.writeText(response.data.invitation_link);
-          alert('Link copied! Send it to the user via WhatsApp or another method.');
+          showToast('Link copied! Send it to the user via WhatsApp or another method.');
         }
       } else {
-        alert(response.data?.message || 'Invite resent!');
+        showToast(response.data?.message || 'Invite resent!');
       }
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error resending invite');
+      showToast(err.response?.data?.detail || 'Error resending invite');
     }
   };
 
@@ -21319,7 +21399,7 @@ const UsersPage = ({ adminKey, user }) => {
                                     onChange={(e) => {
                                       const docType = document.getElementById(`doc-type-${u.id}`).value;
                                       if (!docType) {
-                                        alert('Select o tipo de document first');
+                                        showToast('Select o tipo de document first');
                                         e.target.value = '';
                                         return;
                                       }
@@ -21490,9 +21570,9 @@ const ProductionPage = ({ adminKey }) => {
       setShowPaymentModal(false);
       fetchStats();
       fetchPayments();
-      alert('Payment registrado successfully!');
+      showToast('Payment registrado successfully!');
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error registering payment');
+      showToast(err.response?.data?.detail || 'Error registering payment');
     }
   };
 
@@ -21503,7 +21583,7 @@ const ProductionPage = ({ adminKey }) => {
       fetchPayments();
       fetchStats();
     } catch (err) {
-      alert('Error updating payment');
+      showToast('Error updating payment');
     }
   };
 
@@ -21514,7 +21594,7 @@ const ProductionPage = ({ adminKey }) => {
       fetchPayments();
       fetchStats();
     } catch (err) {
-      alert('Error deleting payment');
+      showToast('Error deleting payment');
     }
   };
 
@@ -22140,7 +22220,7 @@ const FinancesPage = ({ adminKey }) => {
 
   const handleRegisterPayment = async () => {
     if (!selectedTranslatorForPayment || !paymentAmount || !paymentMethod) {
-      alert('Please select a vendor, enter amount and payment method');
+      showToast('Please select a vendor, enter amount and payment method');
       return;
     }
     const translatorId = selectedTranslatorForPayment.translator_id || selectedTranslatorForPayment._id;
@@ -22161,7 +22241,7 @@ const FinancesPage = ({ adminKey }) => {
       await axios.post(`${API}/admin/payments/register?admin_key=${adminKey}`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      alert('Payment registered successfully!');
+      showToast('Payment registered successfully!');
       setPaymentAmount('');
       setPaymentNote('');
       setPaymentMethod('');
@@ -22175,7 +22255,7 @@ const FinancesPage = ({ adminKey }) => {
         fetchTranslatorPaymentHistory(translatorId);
       }
     } catch (err) {
-      alert('Error registering payment: ' + (err.response?.data?.detail || err.message));
+      showToast('Error registering payment: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -22184,11 +22264,11 @@ const FinancesPage = ({ adminKey }) => {
     if (file) {
       const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'application/pdf'];
       if (!allowedTypes.includes(file.type)) {
-        alert('Please upload an image (PNG, JPG, GIF) or PDF file');
+        showToast('Please upload an image (PNG, JPG, GIF) or PDF file');
         return;
       }
       if (file.size > 10 * 1024 * 1024) {
-        alert('File size must be less than 10MB');
+        showToast('File size must be less than 10MB');
         return;
       }
       setReceiptFile(file);
@@ -22278,7 +22358,7 @@ const FinancesPage = ({ adminKey }) => {
 
   const handleCreateInvoice = async () => {
     if (selectedOrdersForInvoice.length === 0) {
-      alert('Please select at least one order');
+      showToast('Please select at least one order');
       return;
     }
     setCreatingInvoice(true);
@@ -22289,12 +22369,12 @@ const FinancesPage = ({ adminKey }) => {
         due_days: invoiceDueDays,
         notes: invoiceNotes
       });
-      alert('Invoice created successfully!');
+      showToast('Invoice created successfully!');
       setShowCreateInvoiceModal(false);
       fetchPartnerStats();
       fetchPartnerInvoices();
     } catch (err) {
-      alert('Error creating invoice: ' + (err.response?.data?.detail || err.message));
+      showToast('Error creating invoice: ' + (err.response?.data?.detail || err.message));
     } finally {
       setCreatingInvoice(false);
     }
@@ -22307,7 +22387,7 @@ const FinancesPage = ({ adminKey }) => {
       fetchPartnerInvoicesForPartner(selectedPartnerForInvoice.partner_id);
       fetchPartnerStats();
     } catch (err) {
-      alert('Error deleting invoice: ' + (err.response?.data?.detail || err.message));
+      showToast('Error deleting invoice: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -22317,7 +22397,7 @@ const FinancesPage = ({ adminKey }) => {
       fetchPartnerInvoicesForPartner(selectedPartnerForInvoice.partner_id);
       fetchPartnerStats();
     } catch (err) {
-      alert('Error marking invoice as paid: ' + (err.response?.data?.detail || err.message));
+      showToast('Error marking invoice as paid: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -22375,7 +22455,7 @@ const FinancesPage = ({ adminKey }) => {
 
   const handleAssignCoupon = async () => {
     if (!selectedCouponToAssign) {
-      alert('Please select a coupon to assign');
+      showToast('Please select a coupon to assign');
       return;
     }
     setAssigningCoupon(true);
@@ -22385,11 +22465,11 @@ const FinancesPage = ({ adminKey }) => {
         partner_id: selectedPartnerForCoupon.partner_id,
         max_uses: couponMaxUses
       });
-      alert(`Coupon ${selectedCouponToAssign} assigned successfully!`);
+      showToast(`Coupon ${selectedCouponToAssign} assigned successfully!`);
       await fetchPartnerCoupons(selectedPartnerForCoupon.partner_id);
       setSelectedCouponToAssign('');
     } catch (err) {
-      alert('Error assigning coupon: ' + (err.response?.data?.detail || err.message));
+      showToast('Error assigning coupon: ' + (err.response?.data?.detail || err.message));
     } finally {
       setAssigningCoupon(false);
     }
@@ -22401,7 +22481,7 @@ const FinancesPage = ({ adminKey }) => {
       await axios.delete(`${API}/admin/coupons/${couponId}?admin_key=${adminKey}`);
       await fetchPartnerCoupons(selectedPartnerForCoupon.partner_id);
     } catch (err) {
-      alert('Error removing coupon: ' + (err.response?.data?.detail || err.message));
+      showToast('Error removing coupon: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -22438,13 +22518,13 @@ const FinancesPage = ({ adminKey }) => {
     if (!window.confirm('Are you sure you want to approve this Zelle payment?')) return;
     try {
       await axios.put(`${API}/admin/invoice-payments/${invoiceId}/approve-zelle?admin_key=${adminKey}`);
-      alert('Payment approved successfully!');
+      showToast('Payment approved successfully!');
       fetchPendingZelleInvoices();
       fetchPaymentHistory();
       fetchPartnerStats();
       fetchInvoiceNotifications();
     } catch (err) {
-      alert('Error approving payment: ' + (err.response?.data?.detail || err.message));
+      showToast('Error approving payment: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -22453,11 +22533,11 @@ const FinancesPage = ({ adminKey }) => {
     if (reason === null) return; // User cancelled
     try {
       await axios.put(`${API}/admin/invoice-payments/${invoiceId}/reject-zelle?admin_key=${adminKey}&reason=${encodeURIComponent(reason)}`);
-      alert('Payment rejected');
+      showToast('Payment rejected');
       fetchPendingZelleInvoices();
       fetchInvoiceNotifications();
     } catch (err) {
-      alert('Error rejecting payment: ' + (err.response?.data?.detail || err.message));
+      showToast('Error rejecting payment: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -22470,10 +22550,10 @@ const FinancesPage = ({ adminKey }) => {
     setSendingReminder(invoiceId);
     try {
       const response = await axios.post(`${API}/admin/partner-invoices/${invoiceId}/send-reminder?admin_key=${adminKey}`);
-      alert(response.data.message || 'Reminder sent successfully!');
+      showToast(response.data.message || 'Reminder sent successfully!');
       fetchPartnerInvoices();
     } catch (err) {
-      alert('Error sending reminder: ' + (err.response?.data?.detail || err.message));
+      showToast('Error sending reminder: ' + (err.response?.data?.detail || err.message));
     } finally {
       setSendingReminder(null);
     }
@@ -22489,10 +22569,10 @@ const FinancesPage = ({ adminKey }) => {
     try {
       const response = await axios.post(`${API}/admin/partner-invoices/send-bulk-reminders?admin_key=${adminKey}&days_before_due=${daysNum}&include_overdue=true`);
       const summary = response.data.summary;
-      alert(`Bulk reminders completed!\n\nSent: ${summary.sent}\nSkipped: ${summary.skipped}\nFailed: ${summary.failed}`);
+      showToast(`Bulk reminders completed!\n\nSent: ${summary.sent}\nSkipped: ${summary.skipped}\nFailed: ${summary.failed}`);
       fetchPartnerInvoices();
     } catch (err) {
-      alert('Error sending bulk reminders: ' + (err.response?.data?.detail || err.message));
+      showToast('Error sending bulk reminders: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -22508,7 +22588,7 @@ const FinancesPage = ({ adminKey }) => {
   // Quick add vendor
   const handleQuickAddVendor = async () => {
     if (!quickVendorForm.name || !quickVendorForm.email) {
-      alert('Please fill name and email');
+      showToast('Please fill name and email');
       return;
     }
     setAddingVendor(true);
@@ -22519,14 +22599,14 @@ const FinancesPage = ({ adminKey }) => {
         role: quickVendorForm.role || 'translator',
         rate_per_page: parseFloat(quickVendorForm.rate_per_page) || 0
       });
-      alert('Vendor created successfully!');
+      showToast('Vendor created successfully!');
       setShowQuickAddVendor(false);
       setQuickVendorForm({ name: '', email: '', role: 'translator', rate_per_page: '' });
       // Small delay to ensure database write completes before refresh
       await new Promise(resolve => setTimeout(resolve, 500));
       fetchTranslatorsForPayment();
     } catch (err) {
-      alert('Error creating vendor: ' + (err.response?.data?.detail || err.message));
+      showToast('Error creating vendor: ' + (err.response?.data?.detail || err.message));
     } finally {
       setAddingVendor(false);
     }
@@ -22544,7 +22624,7 @@ const FinancesPage = ({ adminKey }) => {
 
   const handleAddPagesLog = async () => {
     if (!pagesForm.translator_id || !pagesForm.pages) {
-      alert('Please select translator and enter pages');
+      showToast('Please select translator and enter pages');
       return;
     }
     setAddingPages(true);
@@ -22555,13 +22635,13 @@ const FinancesPage = ({ adminKey }) => {
         date: pagesForm.date,
         note: pagesForm.note || ''
       });
-      alert('Pages registered successfully!');
+      showToast('Pages registered successfully!');
       setShowAddPagesModal(false);
       setPagesForm({ translator_id: '', pages: '', date: new Date().toISOString().split('T')[0], note: '' });
       fetchPagesLogs();
       fetchTranslatorsForPayment();
     } catch (err) {
-      alert('Error registering pages: ' + (err.response?.data?.detail || err.message));
+      showToast('Error registering pages: ' + (err.response?.data?.detail || err.message));
     } finally {
       setAddingPages(false);
     }
@@ -22573,7 +22653,7 @@ const FinancesPage = ({ adminKey }) => {
       await axios.delete(`${API}/admin/translator-pages/${logId}?admin_key=${adminKey}`);
       fetchPagesLogs();
     } catch (err) {
-      alert('Error deleting entry: ' + (err.response?.data?.detail || err.message));
+      showToast('Error deleting entry: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -22599,17 +22679,17 @@ const FinancesPage = ({ adminKey }) => {
       fetchPagesLogs();
       fetchTranslatorsForPayment();
     } catch (err) {
-      alert('Error updating entry: ' + (err.response?.data?.detail || err.message));
+      showToast('Error updating entry: ' + (err.response?.data?.detail || err.message));
     }
   };
 
   const deletePartner = async (partnerId) => {
     try {
       await axios.delete(`${API}/admin/partners/${partnerId}?admin_key=${adminKey}`);
-      alert('Partner deleted successfully');
+      showToast('Partner deleted successfully');
       fetchPartnerStats(); // Refresh the list
     } catch (err) {
-      alert('Error deleting partner: ' + (err.response?.data?.detail || err.message));
+      showToast('Error deleting partner: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -22617,10 +22697,10 @@ const FinancesPage = ({ adminKey }) => {
     try {
       await axios.post(`${API}/admin/partners/${partnerId}/set-payment-plan?admin_key=${adminKey}&plan=${plan}&send_notification=true`);
       const planNames = { pay_per_order: 'Pay Per Order', biweekly: 'Biweekly Invoice', monthly: 'Monthly Invoice' };
-      alert(`Payment plan set to ${planNames[plan] || plan}`);
+      showToast(`Payment plan set to ${planNames[plan] || plan}`);
       fetchPartnerStats(); // Refresh the list
     } catch (err) {
-      alert('Error setting payment plan: ' + (err.response?.data?.detail || err.message));
+      showToast('Error setting payment plan: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -22632,16 +22712,16 @@ const FinancesPage = ({ adminKey }) => {
     }
     try {
       await axios.post(`${API}/admin/partners/${partnerId}/toggle-invoice-unlock?admin_key=${adminKey}&unlock=${newStatus}`);
-      alert(`Invoice payments ${newStatus ? 'unlocked' : 'locked'} for ${companyName}`);
+      showToast(`Invoice payments ${newStatus ? 'unlocked' : 'locked'} for ${companyName}`);
       fetchPartnerStats(); // Refresh the list
     } catch (err) {
-      alert('Error toggling invoice unlock: ' + (err.response?.data?.detail || err.message));
+      showToast('Error toggling invoice unlock: ' + (err.response?.data?.detail || err.message));
     }
   };
 
   const findEmailInSystem = async () => {
     if (!emailSearchQuery.trim()) {
-      alert('Please enter an email to search');
+      showToast('Please enter an email to search');
       return;
     }
     setEmailSearching(true);
@@ -22653,7 +22733,7 @@ const FinancesPage = ({ adminKey }) => {
       if (err.response?.status === 404) {
         setEmailSearchResult({ status: 'not_found', message: `Email '${emailSearchQuery}' not found in any collection` });
       } else {
-        alert('Error searching email: ' + (err.response?.data?.detail || err.message));
+        showToast('Error searching email: ' + (err.response?.data?.detail || err.message));
       }
     } finally {
       setEmailSearching(false);
@@ -22672,12 +22752,12 @@ const FinancesPage = ({ adminKey }) => {
         ? `${API}/admin/delete-email/${encodeURIComponent(emailSearchQuery.trim())}?admin_key=${adminKey}&collection=${collection}`
         : `${API}/admin/delete-email/${encodeURIComponent(emailSearchQuery.trim())}?admin_key=${adminKey}`;
       const response = await axios.delete(url);
-      alert(`Email deleted successfully from: ${response.data.deleted_from.map(d => d.collection).join(', ')}`);
+      showToast(`Email deleted successfully from: ${response.data.deleted_from.map(d => d.collection).join(', ')}`);
       setEmailSearchResult(null);
       setEmailSearchQuery('');
       fetchPartnerStats(); // Refresh partner list
     } catch (err) {
-      alert('Error deleting email: ' + (err.response?.data?.detail || err.message));
+      showToast('Error deleting email: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -22699,12 +22779,12 @@ const FinancesPage = ({ adminKey }) => {
 
       if (response.data.success) {
         const recipient = isPartnerOrder ? (order.partner_company || 'partner') : (order.client_email || 'client');
-        alert(`Receipt #${response.data.receipt_number} created and sent to ${recipient}!`);
+        showToast(`Receipt #${response.data.receipt_number} created and sent to ${recipient}!`);
         fetchPaidOrders(); // Refresh the list
       }
     } catch (err) {
       console.error('Failed to sync to QuickBooks:', err);
-      alert('Failed to sync: ' + (err.response?.data?.detail || err.message));
+      showToast('Failed to sync: ' + (err.response?.data?.detail || err.message));
     } finally {
       setQbSyncing(prev => ({ ...prev, [order.id]: false }));
     }
@@ -22721,11 +22801,11 @@ const FinancesPage = ({ adminKey }) => {
       });
 
       if (response.data.success) {
-        alert(`Contractor payment recorded in QuickBooks!`);
+        showToast(`Contractor payment recorded in QuickBooks!`);
       }
     } catch (err) {
       console.error('Failed to sync contractor payment:', err);
-      alert('Failed to sync: ' + (err.response?.data?.detail || err.message));
+      showToast('Failed to sync: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -22739,10 +22819,10 @@ const FinancesPage = ({ adminKey }) => {
 
       if (response.data.success) {
         if (response.data.already_synced) {
-          alert(`Invoice already synced to QuickBooks as #${response.data.invoice_number}`);
+          showToast(`Invoice already synced to QuickBooks as #${response.data.invoice_number}`);
         } else {
           const emailMsg = response.data.email_sent ? ` and sent to ${response.data.sent_to}` : '';
-          alert(`Invoice created in QuickBooks as #${response.data.invoice_number}${emailMsg}!`);
+          showToast(`Invoice created in QuickBooks as #${response.data.invoice_number}${emailMsg}!`);
         }
         // Refresh the invoices list
         if (selectedPartnerForInvoice) {
@@ -22751,7 +22831,7 @@ const FinancesPage = ({ adminKey }) => {
       }
     } catch (err) {
       console.error('Failed to sync partner invoice to QuickBooks:', err);
-      alert('Failed to sync: ' + (err.response?.data?.detail || err.message));
+      showToast('Failed to sync: ' + (err.response?.data?.detail || err.message));
     } finally {
       setQbSyncing(prev => ({ ...prev, [`inv_${invoice.id}`]: false }));
     }
@@ -22792,11 +22872,11 @@ const FinancesPage = ({ adminKey }) => {
     if (file) {
       const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'application/pdf'];
       if (!allowedTypes.includes(file.type)) {
-        alert('Please upload an image (PNG, JPG, GIF) or PDF file');
+        showToast('Please upload an image (PNG, JPG, GIF) or PDF file');
         return;
       }
       if (file.size > 10 * 1024 * 1024) {
-        alert('File size must be less than 10MB');
+        showToast('File size must be less than 10MB');
         return;
       }
       setExpenseReceiptFile(file);
@@ -22841,10 +22921,10 @@ const FinancesPage = ({ adminKey }) => {
       setExpenseReceiptPreview(null);
       fetchExpenses();
       fetchSummary();
-      alert('Expense created successfully!');
+      showToast('Expense created successfully!');
     } catch (err) {
       console.error('Error creating expense:', err);
-      alert('Error creating expense: ' + (err.response?.data?.detail || err.message));
+      showToast('Error creating expense: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -22855,7 +22935,7 @@ const FinancesPage = ({ adminKey }) => {
       fetchExpenses();
       fetchSummary();
     } catch (err) {
-      alert('Error deleting expense');
+      showToast('Error deleting expense');
     }
   };
 
@@ -22881,7 +22961,7 @@ const FinancesPage = ({ adminKey }) => {
       }
     } catch (err) {
       console.error('Error fetching receipt:', err);
-      alert('Error loading receipt: ' + (err.response?.data?.detail || err.message));
+      showToast('Error loading receipt: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -22899,7 +22979,7 @@ const FinancesPage = ({ adminKey }) => {
       document.body.removeChild(link);
     } catch (err) {
       console.error('Error downloading receipt:', err);
-      alert('Error downloading receipt: ' + (err.response?.data?.detail || err.message));
+      showToast('Error downloading receipt: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -22908,11 +22988,11 @@ const FinancesPage = ({ adminKey }) => {
 
     const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'application/pdf'];
     if (!allowedTypes.includes(file.type)) {
-      alert('Please upload an image (PNG, JPG, GIF) or PDF file');
+      showToast('Please upload an image (PNG, JPG, GIF) or PDF file');
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
-      alert('File size must be less than 10MB');
+      showToast('File size must be less than 10MB');
       return;
     }
 
@@ -22926,11 +23006,11 @@ const FinancesPage = ({ adminKey }) => {
         { headers: { 'Content-Type': 'multipart/form-data' } }
       );
 
-      alert('Receipt uploaded successfully!');
+      showToast('Receipt uploaded successfully!');
       fetchExpenses(); // Refresh the list
     } catch (err) {
       console.error('Error uploading receipt:', err);
-      alert('Error uploading receipt: ' + (err.response?.data?.detail || err.message));
+      showToast('Error uploading receipt: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -25544,7 +25624,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   // Send quote via email
   const sendQuoteEmail = async () => {
     if (!quoteForm.clientEmail) {
-      alert('Please enter the client email.');
+      showToast('Please enter the client email.');
       return;
     }
     setSendingQuote(true);
@@ -25567,11 +25647,11 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         }
       });
 
-      alert(`✅ Orçamento sent successfully to ${quoteForm.clientEmail}!`);
+      showToast(`✅ Orçamento sent successfully to ${quoteForm.clientEmail}!`);
       setShowQuotePreview(false);
     } catch (err) {
       console.error('Failed to send quote:', err);
-      alert('❌ Error sending quote. Please try again.');
+      showToast('❌ Error sending quote. Please try again.');
     } finally {
       setSendingQuote(false);
     }
@@ -25666,7 +25746,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       const orderData = orderResponse.data.order || orderResponse.data;
 
       if (!orderData.translation_html && !orderData.translation_ready) {
-        alert('This order does not have a completed translation yet.');
+        showToast('This order does not have a completed translation yet.');
         setDownloadingPackagePM(null);
         return;
       }
@@ -25866,12 +25946,12 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
           printWindow.focus();
           setTimeout(() => { printWindow.print(); }, 500);
         } else {
-          alert('Please allow popups to download the translation package.');
+          showToast('Please allow popups to download the translation package.');
         }
       }
     } catch (err) {
       console.error('Failed to download package:', err);
-      alert('Error generating translation package: ' + (err.message || 'Unknown error'));
+      showToast('Error generating translation package: ' + (err.message || 'Unknown error'));
     } finally {
       setDownloadingPackagePM(null);
     }
@@ -25926,7 +26006,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   const [sendingFileInvite, setSendingFileInvite] = useState({});
   const sendFileTranslatorInvite = async (doc, translatorId, translatorName) => {
     if (!translatorId) {
-      alert('Please select a translator first');
+      showToast('Please select a translator first');
       return;
     }
 
@@ -25935,12 +26015,12 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
     if (!translator) {
       console.error('Translator not found for file invite:', { translatorId, translators });
-      alert('Error: Translator not found. Please try selecting again.');
+      showToast('Error: Translator not found. Please try selecting again.');
       return;
     }
 
     if (!translator.email) {
-      alert('Error: Selected translator has no email address configured.');
+      showToast('Error: Selected translator has no email address configured.');
       return;
     }
 
@@ -25959,11 +26039,11 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         pm_name: user?.name || 'PM'
       });
 
-      alert(`📧 Email invitation sent to ${translator.name}!`);
+      showToast(`📧 Email invitation sent to ${translator.name}!`);
     } catch (err) {
       console.error('Failed to send invite:', err);
       const errorMsg = err.response?.data?.detail || err.message || 'Unknown error';
-      alert(`Error sending email invitation: ${errorMsg}`);
+      showToast(`Error sending email invitation: ${errorMsg}`);
     } finally {
       setSendingFileInvite(prev => ({ ...prev, [doc.id]: false }));
     }
@@ -25972,12 +26052,12 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   // Send complete project to translator (all files at once)
   const sendCompleteProject = async () => {
     if (!projectTranslatorId) {
-      alert('Please select a translator first');
+      showToast('Please select a translator first');
       return;
     }
 
     if (projectDocuments.length === 0) {
-      alert('No files in this project');
+      showToast('No files in this project');
       return;
     }
 
@@ -25986,12 +26066,12 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
     if (!translator) {
       console.error('Translator not found:', { projectTranslatorId, translators });
-      alert('Error: Translator not found. Please try selecting again.');
+      showToast('Error: Translator not found. Please try selecting again.');
       return;
     }
 
     if (!translator.email) {
-      alert('Error: Selected translator has no email address configured.');
+      showToast('Error: Selected translator has no email address configured.');
       return;
     }
 
@@ -26061,13 +26141,13 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         return newState;
       });
 
-      alert(`Project invitation sent to ${translator.name}!\n\n${projectDocuments.length} file(s) assigned:\n${fileList}`);
+      showToast(`Project invitation sent to ${translator.name}!\n\n${projectDocuments.length} file(s) assigned:\n${fileList}`);
       setProjectTranslatorId('');
       setProjectTrDeadline({ date: '', time: '17:00' });
     } catch (err) {
       console.error('Failed to send complete project:', err);
       const errorMsg = err.response?.data?.detail || err.message || 'Unknown error';
-      alert(`Error sending project invitation: ${errorMsg}`);
+      showToast(`Error sending project invitation: ${errorMsg}`);
     } finally {
       setSendingCompleteProject(false);
     }
@@ -26088,7 +26168,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   // Send translator assignment with email invitation
   const sendTranslatorAssignment = async () => {
     if (!assignmentDetails.translator_id) {
-      alert('Please select a translator');
+      showToast('Please select a translator');
       return;
     }
     setSendingAssignment(true);
@@ -26108,12 +26188,12 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         internal_notes: assignmentDetails.project_notes
       });
 
-      alert(`📧 Email invitation sent to ${selectedTranslator?.name || 'translator'}! They will receive an email to accept or decline the project.`);
+      showToast(`📧 Email invitation sent to ${selectedTranslator?.name || 'translator'}! They will receive an email to accept or decline the project.`);
       setAssigningTranslatorModal(null);
       fetchDashboardData();
     } catch (err) {
       console.error('Failed to send translator assignment:', err);
-      alert('Error sending assignment. Please try again.');
+      showToast('Error sending assignment. Please try again.');
     } finally {
       setSendingAssignment(false);
     }
@@ -26167,7 +26247,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       setOriginalContents(allDocs);
       setCurrentDocIndex(0);
       setProcessingStatus('');
-      alert(`✅ ${allDocs.length} document(s) uploaded successfully!`);
+      showToast(`✅ ${allDocs.length} document(s) uploaded successfully!`);
     } else {
       setProcessingStatus('');
     }
@@ -26223,7 +26303,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
           htmlContent = result.value;
         } catch (err) {
           console.error('Word conversion error:', err);
-          alert(`Error converting Word document: ${file.name}`);
+          showToast(`Error converting Word document: ${file.name}`);
         }
       }
       // Plain text
@@ -26302,7 +26382,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     const hasOriginal = originalContents.length > 0 || originalImages.length > 0;
 
     if (!hasTranslation) {
-      alert('Please upload or create a translation first');
+      showToast('Please upload or create a translation first');
       return;
     }
 
@@ -26946,7 +27026,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         // Check for corrupted binary content
         if (order.translation_html.startsWith('PK') || (order.translation_html.slice(0, 100).split('').filter(c => c.charCodeAt(0) < 32 && ![9,10,13].includes(c.charCodeAt(0))).length > 10)) {
           console.warn('Binary content detected in translation_html');
-          alert('⚠️ Translation data appears corrupted. Please re-upload the translation file.');
+          showToast('⚠️ Translation data appears corrupted. Please re-upload the translation file.');
         } else {
           setTranslatedContent({
             filename: 'Translation',
@@ -26963,7 +27043,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
             // Check for corrupted binary content
             if (orderData.translation_html.startsWith('PK') || (orderData.translation_html.slice(0, 100).split('').filter(c => c.charCodeAt(0) < 32 && ![9,10,13].includes(c.charCodeAt(0))).length > 10)) {
               console.warn('Binary content detected in translation_html');
-              alert('⚠️ Translation data appears corrupted. Please re-upload the translation file.');
+              showToast('⚠️ Translation data appears corrupted. Please re-upload the translation file.');
             } else {
               setTranslatedContent({
                 filename: 'Translation',
@@ -26987,7 +27067,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
     // PM can only send to Admin - enforce this
     if (!isAdmin && sendTo !== 'pending_admin_approval') {
-      alert('PM can only send translations to Admin for approval');
+      showToast('PM can only send translations to Admin for approval');
       return;
     }
 
@@ -27038,10 +27118,10 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       setProofreadingResult(null);
       setProofreadingError('');
 
-      alert(alertMessage);
+      showToast(alertMessage);
     } catch (err) {
       console.error('Failed to approve:', err);
-      alert('❌ Error approving translation');
+      showToast('❌ Error approving translation');
     } finally {
       setSendingAction(false);
     }
@@ -27050,7 +27130,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   // Request correction
   const requestCorrection = async () => {
     if (!selectedReview || !correctionNotes.trim()) {
-      alert('Please add correction notes.');
+      showToast('Please add correction notes.');
       return;
     }
     setSendingAction(true);
@@ -27096,10 +27176,10 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       setProofreadingResult(null);
       setProofreadingError('');
 
-      alert('📨 Correction request sent to translator!');
+      showToast('📨 Correction request sent to translator!');
     } catch (err) {
       console.error('Failed to request correction:', err);
-      alert('❌ Error requesting correction');
+      showToast('❌ Error requesting correction');
     } finally {
       setSendingAction(false);
     }
@@ -27108,7 +27188,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   // Save TR Deadline
   const saveTrDeadline = async (orderId) => {
     if (!tempTrDeadline.date) {
-      alert('Please select a date');
+      showToast('Please select a date');
       return;
     }
 
@@ -27129,7 +27209,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       setTempTrDeadline({ date: '', time: '17:00' });
     } catch (err) {
       console.error('Failed to save TR deadline:', err);
-      alert('❌ Error saving TR deadline');
+      showToast('❌ Error saving TR deadline');
     } finally {
       setSavingTrDeadline(false);
     }
@@ -29441,11 +29521,11 @@ const SalesControlPage = ({ adminKey }) => {
         setNewSalesperson({ name: '', email: '', phone: '', country_code: '+1', commission_type: 'tier', commission_rate: 0, base_salary: 0, monthly_target: 10, referral_bonus: 0, preferred_language: 'en' });
         fetchAllData();
       } else {
-        alert(`Error: ${data.detail || 'Failed to add salesperson'}`);
+        showToast(`Error: ${data.detail || 'Failed to add salesperson'}`);
       }
     } catch (error) {
       console.error('Error adding salesperson:', error);
-      alert('Error adding salesperson. Please try again.');
+      showToast('Error adding salesperson. Please try again.');
     }
   };
 
@@ -29458,15 +29538,15 @@ const SalesControlPage = ({ adminKey }) => {
       });
       const data = await res.json();
       if (res.ok) {
-        alert('Salesperson updated successfully!');
+        showToast('Salesperson updated successfully!');
         setEditingSalesperson(null);
         fetchAllData();
       } else {
-        alert(`Error: ${data.detail || 'Failed to update salesperson'}`);
+        showToast(`Error: ${data.detail || 'Failed to update salesperson'}`);
       }
     } catch (error) {
       console.error('Error updating salesperson:', error);
-      alert('Error updating salesperson. Please try again.');
+      showToast('Error updating salesperson. Please try again.');
     }
   };
 
@@ -29492,14 +29572,14 @@ const SalesControlPage = ({ adminKey }) => {
       });
       const data = await res.json();
       if (res.ok) {
-        alert(`Convite enviado! Link: ${data.invite_link}`);
+        showToast(`Convite enviado! Link: ${data.invite_link}`);
         fetchAllData();
       } else {
-        alert(data.detail || 'Falha ao enviar convite');
+        showToast(data.detail || 'Falha ao enviar convite');
       }
     } catch (error) {
       console.error('Error inviting salesperson:', error);
-      alert('Erro ao enviar convite');
+      showToast('Erro ao enviar convite');
     }
   };
 
@@ -29510,12 +29590,12 @@ const SalesControlPage = ({ adminKey }) => {
         headers: { 'admin-key': adminKey }
       });
       if (res.ok) {
-        alert('Comissão aprovada! Vendedor será notificado.');
+        showToast('Comissão aprovada! Vendedor será notificado.');
         fetchAllData();
       }
     } catch (error) {
       console.error('Error approving commission:', error);
-      alert('Erro ao aprovar comissão');
+      showToast('Erro ao aprovar comissão');
     }
   };
 
@@ -29535,14 +29615,14 @@ const SalesControlPage = ({ adminKey }) => {
       });
 
       if (res.ok) {
-        alert(`Pagamento de $${spData.total_amount.toFixed(2)} processado! Vendedor notificado.`);
+        showToast(`Pagamento de $${spData.total_amount.toFixed(2)} processado! Vendedor notificado.`);
         setShowPaymentModal(null);
         setPaymentForm({ method: 'bank_transfer', reference: '', notes: '' });
         fetchAllData();
       }
     } catch (error) {
       console.error('Error processing payment:', error);
-      alert('Erro ao processar pagamento');
+      showToast('Erro ao processar pagamento');
     }
   };
 
@@ -29836,7 +29916,7 @@ const SalesControlPage = ({ adminKey }) => {
                             onClick={() => {
                               const link = `${window.location.origin}/#/partner?ref=${sp.referral_code}`;
                               navigator.clipboard.writeText(link);
-                              alert('Link copiado!\n' + link);
+                              showToast('Link copiado!\n' + link);
                             }}
                             className="text-xs text-purple-500 hover:text-purple-700"
                             title="Copiar link de referral"
@@ -30498,7 +30578,7 @@ const SalesControlPage = ({ adminKey }) => {
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(createdSalesperson.referral_code);
-                    alert('Código copiado!');
+                    showToast('Código copiado!');
                   }}
                   className="px-3 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm"
                 >
@@ -30519,7 +30599,7 @@ const SalesControlPage = ({ adminKey }) => {
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(`${window.location.origin}/#/partner/login?ref=${createdSalesperson.referral_code}`);
-                    alert('Link copiado!');
+                    showToast('Link copiado!');
                   }}
                   className="px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm"
                 >
@@ -30937,13 +31017,13 @@ const FloatingChatWidget = ({ adminKey, user }) => {
           admin_name: user?.name || 'Admin'
         });
       }
-      alert('Message sent successfully!');
+      showToast('Message sent successfully!');
       setMessageContent('');
       setSelectedRecipient('');
       setIsOpen(false);
     } catch (err) {
       console.error('Failed to send message:', err);
-      alert('Failed to send message. Please try again.');
+      showToast('Failed to send message. Please try again.');
     } finally {
       setSending(false);
     }
@@ -31335,6 +31415,7 @@ function AdminApp() {
       />
       <div className="flex-1 overflow-auto">{renderContent()}</div>
       <FloatingChatWidget adminKey={adminKey} user={user} />
+      <ToastContainer />
     </div>
   );
 }
