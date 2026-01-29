@@ -7900,10 +7900,22 @@ async def download_user_document(user_id: str, doc_id: str, admin_key: str):
         if not document:
             raise HTTPException(status_code=404, detail="Document not found")
 
+        # Check for GridFS storage first
+        file_data = None
+        if document.get("gridfs_id"):
+            try:
+                file_data = await get_file_base64_from_gridfs(document["gridfs_id"])
+            except Exception as e:
+                logger.error(f"Error retrieving user doc from GridFS: {str(e)}")
+
+        # Fallback to inline data
+        if not file_data:
+            file_data = document.get("file_data") or document.get("data", "")
+
         return {
             "filename": document["filename"],
             "content_type": document.get("content_type", "application/octet-stream"),
-            "file_data": document.get("file_data", "")
+            "file_data": file_data
         }
     except HTTPException:
         raise
@@ -14436,6 +14448,101 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                 has_attachments = True
                 logger.info(f"Generated combined PDF: Certified_Translation_{order['order_number']}.pdf")
 
+                # Add additional translated documents (if more than one was uploaded)
+                if len(translated_docs) > 1:
+                    logger.info(f"Adding {len(translated_docs) - 1} additional translated document(s) as separate attachments")
+                    for idx, extra_doc in enumerate(translated_docs[1:], start=2):
+                        try:
+                            # Get document data from GridFS or inline
+                            extra_data = None
+                            if extra_doc.get("gridfs_id"):
+                                try:
+                                    extra_data = await get_file_base64_from_gridfs(extra_doc["gridfs_id"])
+                                except Exception as gfs_err:
+                                    logger.error(f"Error getting extra doc from GridFS: {str(gfs_err)}")
+                            if not extra_data:
+                                extra_data = extra_doc.get("file_data") or extra_doc.get("data")
+
+                            if extra_data:
+                                extra_filename = extra_doc.get("filename", f"translation_{idx}.pdf")
+                                extra_content_type = extra_doc.get("content_type", "application/pdf")
+
+                                # PDFs: send directly without modification (maintain quality)
+                                if "pdf" in extra_content_type.lower() or extra_filename.lower().endswith(".pdf"):
+                                    # PDF - send as-is
+                                    pass
+
+                                # Images: convert to PDF maintaining full quality
+                                elif "image" in extra_content_type.lower() or extra_filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif')):
+                                    try:
+                                        from PIL import Image
+                                        img_bytes = base64.b64decode(extra_data)
+                                        pil_img = Image.open(io.BytesIO(img_bytes))
+                                        img_width, img_height = pil_img.size
+
+                                        # Create PDF with full image quality
+                                        extra_pdf = fitz.open()
+                                        # Use image dimensions for page (max letter size)
+                                        scale = min(612 / img_width, 792 / img_height, 1.0)  # Don't upscale
+                                        pdf_w = img_width * scale
+                                        pdf_h = img_height * scale
+                                        pdf_page = extra_pdf.new_page(width=612, height=792)
+                                        # Center image on page
+                                        x_off = (612 - pdf_w) / 2
+                                        y_off = (792 - pdf_h) / 2
+                                        pdf_page.insert_image(
+                                            fitz.Rect(x_off, y_off, x_off + pdf_w, y_off + pdf_h),
+                                            stream=img_bytes
+                                        )
+                                        extra_data = base64.b64encode(extra_pdf.tobytes()).decode('utf-8')
+                                        extra_pdf.close()
+                                        pil_img.close()
+                                        extra_filename = extra_filename.rsplit('.', 1)[0] + ".pdf"
+                                        extra_content_type = "application/pdf"
+                                        logger.info(f"Converted image to PDF with full quality: {extra_filename}")
+                                    except Exception as img_err:
+                                        logger.error(f"Error converting image to PDF: {str(img_err)}")
+                                        # Send image as-is if conversion fails
+
+                                # HTML: convert to PDF
+                                elif "html" in extra_content_type.lower() or extra_filename.lower().endswith(".html"):
+                                    try:
+                                        html_bytes = base64.b64decode(extra_data)
+                                        html_content = html_bytes.decode('utf-8')
+                                        soup = BeautifulSoup(html_content, 'html.parser')
+                                        for script in soup(["script", "style"]):
+                                            script.decompose()
+                                        text_content = soup.get_text(separator='\n')
+                                        lines = [line.strip() for line in text_content.split('\n') if line.strip()]
+
+                                        extra_pdf = fitz.open()
+                                        pw, ph = 612, 792
+                                        ep = extra_pdf.new_page(width=pw, height=ph)
+                                        y = 72
+                                        for line in lines:
+                                            if y > ph - 72:
+                                                ep = extra_pdf.new_page(width=pw, height=ph)
+                                                y = 72
+                                            ep.insert_text((72, y), line[:90], fontsize=10, fontname="helv")
+                                            y += 14
+                                        extra_data = base64.b64encode(extra_pdf.tobytes()).decode('utf-8')
+                                        extra_pdf.close()
+                                        extra_filename = extra_filename.rsplit('.', 1)[0] + ".pdf"
+                                        extra_content_type = "application/pdf"
+                                    except Exception as conv_err:
+                                        logger.error(f"Error converting extra HTML to PDF: {str(conv_err)}")
+                                        continue
+
+                                all_attachments.append({
+                                    "content": extra_data,
+                                    "filename": extra_filename,
+                                    "content_type": extra_content_type
+                                })
+                                attachment_filenames.append(extra_filename)
+                                logger.info(f"Added additional attachment: {extra_filename}")
+                        except Exception as extra_err:
+                            logger.error(f"Error adding extra document: {str(extra_err)}")
+
             except Exception as e:
                 logger.error(f"Failed to generate combined PDF: {str(e)}")
                 import traceback
@@ -16780,12 +16887,27 @@ async def admin_download_document(document_id: str, admin_key: str):
 
     document = await db.documents.find_one({"id": document_id})
     if not document:
+        # Try order_documents collection as fallback
+        document = await db.order_documents.find_one({"id": document_id})
+    if not document:
         raise HTTPException(status_code=404, detail="Document not found")
 
+    # Check for GridFS storage first
+    file_data = None
+    if document.get("gridfs_id"):
+        try:
+            file_data = await get_file_base64_from_gridfs(document["gridfs_id"])
+        except Exception as e:
+            logger.error(f"Error retrieving from GridFS: {str(e)}")
+
+    # Fallback to inline data
+    if not file_data:
+        file_data = document.get("file_data") or document.get("data", "")
+
     return {
-        "filename": document["filename"],
-        "content_type": document["content_type"],
-        "file_data": document["file_data"],
+        "filename": document.get("filename", "document.pdf"),
+        "content_type": document.get("content_type", "application/pdf"),
+        "file_data": file_data,
         "extracted_text": document.get("extracted_text", "")
     }
 
