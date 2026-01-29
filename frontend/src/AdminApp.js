@@ -13667,7 +13667,15 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       const orderResponse = await axios.get(`${API}/admin/orders/${order.id}?admin_key=${adminKey}`);
       const orderData = orderResponse.data.order || orderResponse.data;
 
-      if (!orderData.translation_html && !orderData.translation_ready) {
+      // Check for any form of completed translation
+      const hasTranslation = orderData.translation_html ||
+                            orderData.translation_ready ||
+                            orderData.translated_file ||
+                            orderData.translated_gridfs_id ||
+                            orderData.translated_filename ||
+                            orderData.has_translated_documents;
+
+      if (!hasTranslation) {
         showToast('This order does not have a completed translation yet.');
         setDownloadingPackage(null);
         return;
@@ -25904,7 +25912,15 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       const orderResponse = await axios.get(`${API}/admin/orders/${order.id}?admin_key=${adminKey}`);
       const orderData = orderResponse.data.order || orderResponse.data;
 
-      if (!orderData.translation_html && !orderData.translation_ready) {
+      // Check for any form of completed translation
+      const hasTranslation = orderData.translation_html ||
+                            orderData.translation_ready ||
+                            orderData.translated_file ||
+                            orderData.translated_gridfs_id ||
+                            orderData.translated_filename ||
+                            orderData.has_translated_documents;
+
+      if (!hasTranslation) {
         showToast('This order does not have a completed translation yet.');
         setDownloadingPackagePM(null);
         return;
