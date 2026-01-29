@@ -78,7 +78,8 @@ const generatePdfWithHash = async (htmlContent, filename, options = {}) => {
       scale: 2,
       useCORS: true,
       allowTaint: true,
-      letterRendering: true
+      letterRendering: true,
+      logging: false
     },
     jsPDF: {
       unit: 'mm',
@@ -91,14 +92,43 @@ const generatePdfWithHash = async (htmlContent, filename, options = {}) => {
   const mergedOptions = { ...defaultOptions, ...options };
 
   // Create a temporary container for the HTML
+  // IMPORTANT: Use visibility:hidden instead of offscreen positioning
+  // because html2canvas may not render offscreen elements correctly
   const container = document.createElement('div');
   container.innerHTML = htmlContent;
-  container.style.position = 'absolute';
-  container.style.left = '-9999px';
+  container.style.position = 'fixed';
+  container.style.left = '0';
   container.style.top = '0';
+  container.style.width = '8.5in'; // Letter size width
+  container.style.visibility = 'hidden';
+  container.style.zIndex = '-9999';
+  container.style.background = 'white';
   document.body.appendChild(container);
 
   try {
+    // Wait for all images to load before rendering
+    const images = container.querySelectorAll('img');
+    if (images.length > 0) {
+      await Promise.all(Array.from(images).map(img => {
+        return new Promise((resolve) => {
+          if (img.complete && img.naturalHeight !== 0) {
+            resolve();
+          } else {
+            img.onload = resolve;
+            img.onerror = () => {
+              console.warn('Image failed to load:', img.src?.substring(0, 100));
+              resolve(); // Continue even if image fails
+            };
+            // Timeout fallback in case image never loads
+            setTimeout(resolve, 5000);
+          }
+        });
+      }));
+    }
+
+    // Small delay to ensure rendering is complete
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     // Generate PDF as blob
     const pdfBlob = await html2pdf()
       .set(mergedOptions)
@@ -117,16 +147,21 @@ const generatePdfWithHash = async (htmlContent, filename, options = {}) => {
 };
 
 // Update PDF hash in backend after PDF generation
+// CRITICAL: This hash enables digital signature verification - if not saved, PDF cannot be verified
 const updatePdfHashInBackend = async (certificationId, pdfHash, adminKey) => {
   try {
     const response = await axios.post(
       `${API}/certifications/${certificationId}/update-pdf-hash?admin_key=${adminKey}&pdf_hash=${pdfHash}`
     );
-    console.log('PDF hash updated successfully:', response.data);
-    return response.data;
+    console.log('✅ PDF hash registered for verification:', response.data);
+    return { success: true, data: response.data };
   } catch (err) {
-    console.error('Failed to update PDF hash:', err);
-    return null;
+    console.error('❌ CRITICAL: Failed to register PDF hash for verification:', err);
+    // Return error info so caller can handle it
+    return {
+      success: false,
+      error: err.response?.data?.detail || err.message || 'Failed to register PDF hash'
+    };
   }
 };
 
@@ -4546,15 +4581,26 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             await page.render({ canvasContext: context, viewport }).promise;
 
             // Convert canvas to base64 PNG
-            const base64 = canvas.toDataURL('image/png').split(',')[1];
-            images.push({
-              filename: `${file.name}_page_${pageNum}.png`,
-              data: base64,
-              type: 'image/png'
-            });
+            const dataUrl = canvas.toDataURL('image/png');
+            const base64 = dataUrl.split(',')[1];
+
+            // Validate that we got actual image data (not empty/blank)
+            if (base64 && base64.length > 100) {
+              images.push({
+                filename: `${file.name}_page_${pageNum}.png`,
+                data: base64,
+                type: 'image/png'
+              });
+            } else {
+              console.warn(`PDF page ${pageNum} rendered as empty, skipping`);
+            }
           }
 
-          resolve(images);
+          if (images.length === 0) {
+            reject(new Error('PDF conversion produced no valid images'));
+          } else {
+            resolve(images);
+          }
         } catch (err) {
           reject(err);
         }
@@ -5115,12 +5161,18 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         // Images (JPG, PNG, etc.)
         else if (file.type.startsWith('image/')) {
           const base64 = await fileToBase64(file);
-          setQuickTranslationFiles(prev => [...prev, {
-            filename: file.name,
-            data: base64,
-            type: file.type
-          }]);
-          if (!quickTranslationHtml) setQuickTranslationType('images');
+          // Validate that we got actual data
+          if (base64 && base64.length > 100) {
+            setQuickTranslationFiles(prev => [...prev, {
+              filename: file.name,
+              data: base64,
+              type: file.type
+            }]);
+            if (!quickTranslationHtml) setQuickTranslationType('images');
+          } else {
+            console.warn(`Image file ${file.name} produced empty data, skipping`);
+            setQuickPackageProgress(`⚠️ Failed to process ${file.name}`);
+          }
         }
         else {
           console.warn(`Unsupported file type: ${file.name}`);
@@ -5173,11 +5225,16 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         // Images
         else if (file.type.startsWith('image/')) {
           const base64 = await fileToBase64(file);
-          processedFiles.push({
-            filename: file.name,
-            data: base64,
-            type: file.type
-          });
+          // Validate that we got actual data
+          if (base64 && base64.length > 100) {
+            processedFiles.push({
+              filename: file.name,
+              data: base64,
+              type: file.type
+            });
+          } else {
+            console.warn(`Image file ${file.name} produced empty data, skipping`);
+          }
         }
         else {
           console.warn(`Unsupported file type for original: ${file.name}`);
@@ -5351,9 +5408,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     // Translation pages - supports HTML content OR images (not both to avoid duplication)
     let translationPagesHTML = '';
 
+    // Filter out files with invalid/missing data to prevent blank pages
+    const validTranslationFiles = quickTranslationFiles.filter(file => file.data && file.data.length > 100);
+
     // Prefer image files if available (from images or PDF conversion) - each page gets its own header
-    if (quickTranslationFiles.length > 0) {
-      translationPagesHTML = quickTranslationFiles.map((file, idx) => `
+    if (validTranslationFiles.length > 0) {
+      translationPagesHTML = validTranslationFiles.map((file, idx) => `
     <div class="translation-page">
         ${includeLetterhead ? letterheadHTML : ''}
         <div class="translation-content">
@@ -5668,9 +5728,18 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       });
 
       // Update PDF hash in backend if we have a certification
+      // CRITICAL: This enables digital signature verification
       if (certData?.certification_id) {
-        setQuickPackageProgress('Registering document hash for verification...');
-        await updatePdfHashInBackend(certData.certification_id, pdfHash, adminKey);
+        setQuickPackageProgress('Registering digital signature for verification...');
+        const hashResult = await updatePdfHashInBackend(certData.certification_id, pdfHash, adminKey);
+        if (!hashResult.success) {
+          console.error('Warning: PDF hash not saved. Verification may not work:', hashResult.error);
+          setQuickPackageProgress('⚠️ Warning: Could not register document for verification. Continuing with download...');
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        } else {
+          setQuickPackageProgress('✅ Digital signature registered successfully!');
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
       }
 
       // Download the PDF
@@ -6251,8 +6320,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         });
 
         // Update PDF hash in backend if we have a certification
+        // CRITICAL: This enables digital signature verification
         if (certData?.certification_id) {
-          await updatePdfHashInBackend(certData.certification_id, pdfHash, adminKey);
+          const hashResult = await updatePdfHashInBackend(certData.certification_id, pdfHash, adminKey);
+          if (!hashResult.success) {
+            console.error('Warning: PDF hash not saved. Verification may not work:', hashResult.error);
+          }
         }
 
         // Download the PDF
