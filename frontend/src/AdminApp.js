@@ -5552,11 +5552,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     const validTranslationFiles = quickTranslationFiles.filter(file => file.data && file.data.length > 100);
 
     // Prefer image files if available (from images or PDF conversion) - each page gets its own header
+    // First page doesn't need page-break since cover ends with one
     if (validTranslationFiles.length > 0) {
       translationPagesHTML = validTranslationFiles.map((file, idx) => `
-    <div style="page-break-before: always; padding-top: 10px;">
+    <div style="${idx > 0 ? 'page-break-before: always;' : ''} padding-top: 10px;">
         ${includeLetterhead ? letterheadHTML : ''}
-        <div style="margin-top: 15px;">
+        <div style="margin-top: 10px;">
             <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Translation page ${idx + 1}" style="width: 100%; max-width: 100%; height: auto; display: block; margin: 0 auto;" />
         </div>
     </div>`).join('');
@@ -5564,15 +5565,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     // Otherwise use HTML content (from Word/HTML/TXT)
     else if (quickTranslationHtml) {
       translationPagesHTML = `
-    <div style="page-break-before: always; padding-top: 10px;">
+    <div style="padding-top: 10px;">
         ${includeLetterhead ? letterheadHTML : ''}
-        <div style="margin-top: 15px; line-height: 1.5; font-size: 11pt;">
+        <div style="margin-top: 10px; line-height: 1.5; font-size: 11pt;">
             ${quickTranslationHtml}
         </div>
     </div>`;
     }
 
-    // Original document pages
+    // Original document pages - first original page needs break, subsequent ones too
     const validOriginalFiles = quickOriginalFiles.filter(file => file.data && file.data.length > 100);
     const originalPagesHTML = (includeOriginal && validOriginalFiles.length > 0) ? validOriginalFiles.map((file, idx) => `
     <div style="page-break-before: always; padding-top: 10px;">
@@ -5651,21 +5652,30 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 </html>`;
 
     // Generate PDF - use print window approach which is more reliable
-    setQuickPackageProgress(`Preparing document preview...`);
+    setQuickPackageProgress(`Opening preview window...`);
 
     try {
       const filename = `${orderNumber || 'LT'}_Certified_Translation.pdf`;
 
-      // Open print window - this is the most reliable way to generate PDF
-      // The browser's native print dialog handles rendering correctly
-      const printWindow = window.open('', '_blank', 'width=900,height=700');
-      if (!printWindow) {
-        alert('Pop-up blocked! Please allow pop-ups for this site to generate PDFs.');
+      // Open print window - larger and more visible
+      const screenWidth = window.screen.width;
+      const screenHeight = window.screen.height;
+      const windowWidth = Math.min(1200, screenWidth - 100);
+      const windowHeight = Math.min(900, screenHeight - 100);
+      const left = (screenWidth - windowWidth) / 2;
+      const top = (screenHeight - windowHeight) / 2;
+
+      const printWindow = window.open('', 'PDFPreview', `width=${windowWidth},height=${windowHeight},left=${left},top=${top},scrollbars=yes,resizable=yes`);
+
+      if (!printWindow || printWindow.closed || typeof printWindow.closed === 'undefined') {
+        alert('⚠️ Pop-up bloqueado!\n\nPor favor, permita pop-ups para este site:\n1. Clique no ícone de pop-up bloqueado na barra de endereço\n2. Selecione "Sempre permitir pop-ups"\n3. Tente novamente');
         setQuickPackageLoading(false);
         setQuickPackageProgress('');
         return;
       }
 
+      // Write HTML to the window
+      printWindow.document.open();
       printWindow.document.write(fullHTML);
       printWindow.document.close();
 
@@ -6065,10 +6075,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         <div style="width: 100%; height: 2px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 20px;"></div>`;
 
     // Translation pages HTML (with or without letterhead)
+    // First page doesn't need page-break since cover ends with one
     const translationPagesHTML = translationResults.map((result, index) => `
-    <div style="page-break-before: always; padding-top: 10px;">
+    <div style="${index > 0 ? 'page-break-before: always;' : ''} padding-top: 10px;">
         ${includeLetterhead ? letterheadHTML : ''}
-        <div style="margin-top: 15px; line-height: 1.5; font-size: 11pt;">${result.translatedText}</div>
+        <div style="margin-top: 10px; line-height: 1.5; font-size: 11pt;">${result.translatedText}</div>
     </div>
     `).join('');
 
