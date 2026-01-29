@@ -1222,7 +1222,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
         basePrice = pages * 24.99;
         break;
       case 'sworn':
-        basePrice = pages * 55.00;
+        basePrice = pages * 35.00;
         break;
       default:
         basePrice = pages * 19.99;
@@ -2198,7 +2198,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
                     </div>
                     <div className="text-sm text-gray-500">{t.swornDesc}</div>
                   </div>
-                  <div className="font-semibold text-teal-600">{formatLocalPrice(55.00)}{t.perPage}</div>
+                  <div className="font-semibold text-teal-600">{formatLocalPrice(35.00)}{t.perPage}</div>
                 </label>
 
                 {/* RMV Certified Translation */}
