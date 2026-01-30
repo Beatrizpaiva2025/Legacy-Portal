@@ -384,6 +384,8 @@ const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
     img { max-width: 100%; height: auto; }
     table { border-collapse: collapse; width: 100%; }
     td, th { border: 1px solid #333; padding: 5px 6px; font-size: 10pt; }
+    .translation-content > *:first-child { margin-top: 0 !important; padding-top: 0 !important; }
+    .translation-content > div:first-child > *:first-child { margin-top: 0 !important; padding-top: 0 !important; }
     @media print {
         body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .page-break { page-break-before: always; }
@@ -5613,7 +5615,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
     // Letterhead for all pages - Same style as cover
     const letterheadHTML = `
-        <div style="width: 100%; margin-bottom: 8px; padding-bottom: 8px; overflow: hidden;">
+        <div style="width: 100%; margin-bottom: 2px; padding-bottom: 2px; overflow: hidden;">
             <div style="float: left; width: 128px;">
                 ${logoLeft
                   ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
@@ -5630,7 +5632,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
-        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>`;
+        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 4px;"></div>`;
 
     // Translation pages - supports HTML content OR images (not both to avoid duplication)
     let translationPagesHTML = '';
@@ -6179,7 +6181,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
     // Letterhead for all pages - Same style as cover
     const letterheadHTML = `
-        <div style="width: 100%; margin-bottom: 8px; padding-bottom: 8px; overflow: hidden;">
+        <div style="width: 100%; margin-bottom: 2px; padding-bottom: 2px; overflow: hidden;">
             <div style="float: left; width: 128px;">
                 ${logoLeft
                   ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
@@ -6196,7 +6198,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
-        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>`;
+        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 4px;"></div>`;
 
     // Translation pages HTML (with or without letterhead)
     // Content is auto-scaled via JS to always fit on 1 Letter page
