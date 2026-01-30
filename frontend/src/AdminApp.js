@@ -2390,8 +2390,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const uploadOriginalRef = useRef(null);
   const uploadOcrRef = useRef(null);
   const editableRef = useRef(null);
-  const proofreadingEditRef = useRef(null);
-  const quickPackageEditRef = useRef(null);
   const externalOriginalInputRef = useRef(null);
   const externalTranslationInputRef = useRef(null);
 
@@ -5217,8 +5215,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const savedSelection = useRef(null);
 
   const saveSelection = () => {
-    const win = editableRef.current?.contentWindow || window;
-    const sel = win.getSelection();
+    const sel = window.getSelection();
     if (sel.rangeCount > 0) {
       savedSelection.current = sel.getRangeAt(0);
     }
@@ -5226,39 +5223,34 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
   const restoreSelection = () => {
     if (savedSelection.current) {
-      const win = editableRef.current?.contentWindow || window;
-      const sel = win.getSelection();
+      const sel = window.getSelection();
       sel.removeAllRanges();
       sel.addRange(savedSelection.current);
     }
   };
 
-  // Execute formatting command and maintain focus on contentEditable iframe
+  // Execute formatting command and maintain focus on contentEditable
   const execFormatCommand = (command, value = null) => {
-    const editWin = editableRef.current?.contentWindow || window;
-    const editDoc = editableRef.current?.contentDocument || document;
-
-    // Focus iframe first to ensure execCommand works
-    if (editableRef.current?.contentWindow) {
-      editableRef.current.contentWindow.focus();
-    }
     restoreSelection();
 
     // Handle font size increase/decrease
     if (command === 'increaseFontSize' || command === 'decreaseFontSize') {
-      const selection = editWin.getSelection();
+      const selection = window.getSelection();
       if (selection.rangeCount > 0 && !selection.isCollapsed) {
         const range = selection.getRangeAt(0);
-        const span = editDoc.createElement('span');
+        const span = document.createElement('span');
 
+        // Get current font size from selection or default to 12pt
+        // Note: computedStyle.fontSize returns pixels, so we convert to points (px * 0.75 = pt)
         let currentSizePt = 12;
         const parentElement = range.commonAncestorContainer.parentElement;
         if (parentElement) {
-          const computedStyle = editWin.getComputedStyle(parentElement);
+          const computedStyle = window.getComputedStyle(parentElement);
           const fontSizePx = parseFloat(computedStyle.fontSize) || 16;
-          currentSizePt = Math.round(fontSizePx * 0.75);
+          currentSizePt = Math.round(fontSizePx * 0.75); // Convert px to pt
         }
 
+        // Increase or decrease by 2pt (min 4pt to allow very small sizes)
         const newSize = command === 'increaseFontSize'
           ? Math.min(currentSizePt + 2, 48)
           : Math.max(currentSizePt - 2, 4);
@@ -5268,7 +5260,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           span.appendChild(range.extractContents());
           range.insertNode(span);
           selection.removeAllRanges();
-          const newRange = editDoc.createRange();
+          const newRange = document.createRange();
           newRange.selectNodeContents(span);
           selection.addRange(newRange);
         } catch (e) {
@@ -5278,12 +5270,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
     // Handle fontSize and fontName specially since execCommand doesn't work well for these
     else if (command === 'fontSize' || command === 'fontName') {
-      const selection = editWin.getSelection();
+      const selection = window.getSelection();
       if (selection.rangeCount > 0 && !selection.isCollapsed) {
         const range = selection.getRangeAt(0);
-        const span = editDoc.createElement('span');
+        const span = document.createElement('span');
 
         if (command === 'fontSize') {
+          // Map values 1-7 to actual pt sizes
           const sizeMap = { '1': '8pt', '2': '10pt', '3': '12pt', '4': '14pt', '5': '18pt', '6': '24pt', '7': '36pt' };
           span.style.fontSize = sizeMap[value] || value;
         } else if (command === 'fontName') {
@@ -5293,8 +5286,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         try {
           span.appendChild(range.extractContents());
           range.insertNode(span);
+          // Select the new span content
           selection.removeAllRanges();
-          const newRange = editDoc.createRange();
+          const newRange = document.createRange();
           newRange.selectNodeContents(span);
           selection.addRange(newRange);
         } catch (e) {
@@ -5304,15 +5298,18 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
     // Handle line spacing
     else if (command === 'increaseLineHeight' || command === 'decreaseLineHeight') {
-      const selection = editWin.getSelection();
+      const selection = window.getSelection();
       if (selection.rangeCount > 0) {
-        const container = editDoc.body;
+        // Get the editable container
+        const container = editableRef.current;
         if (container) {
-          const computedStyle = editWin.getComputedStyle(container);
+          // Get current line height
+          const computedStyle = window.getComputedStyle(container);
           let currentLineHeight = parseFloat(computedStyle.lineHeight);
           if (isNaN(currentLineHeight)) currentLineHeight = 1.5;
           else currentLineHeight = currentLineHeight / parseFloat(computedStyle.fontSize);
 
+          // Increase or decrease by 0.2
           const newLineHeight = command === 'increaseLineHeight'
             ? Math.min(currentLineHeight + 0.2, 3.0)
             : Math.max(currentLineHeight - 0.2, 1.0);
@@ -5321,11 +5318,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         }
       }
     } else {
-      editDoc.execCommand(command, false, value);
+      document.execCommand(command, false, value);
     }
 
-    if (editableRef.current?.contentWindow) {
-      editableRef.current.contentWindow.focus();
+    if (editableRef.current) {
+      editableRef.current.focus();
     }
     // Save selection after command for next operation
     setTimeout(saveSelection, 0);
@@ -6204,16 +6201,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     // Translation pages HTML (with or without letterhead)
     // Content is auto-scaled via JS to always fit on 1 Letter page
     // First page doesn't need page-break since cover ends with one
-    // NOTE: extractBodyForEdit strips <html>/<head>/<style>/<body> wrapper from AI output.
-    // This prevents nested document styles (e.g. body{width:8.5in}) from conflicting
-    // with the download HTML's own getUnifiedPdfStyles(). Same approach as Quick Package
-    // which only embeds clean body content.
     const translationPagesHTML = translationResults.map((result, index) => `
     <div style="${index > 0 ? 'page-break-before: always;' : ''} padding-top: 5px;">
         ${includeLetterhead ? letterheadHTML : ''}
         <div style="overflow: hidden;" class="translation-wrapper">
             <div class="translation-content" style="padding: 0 20px; line-height: 1.5; font-size: 11pt;">
-                ${extractBodyForEdit(result.translatedText)}
+                ${result.translatedText}
             </div>
         </div>
     </div>
@@ -8332,15 +8325,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     <span className="text-[10px] text-gray-600">Mode:</span>
                     <div className="flex gap-1">
                       <button
-                        onClick={() => {
-                          if (translationEditMode && quickPackageEditRef.current?.contentDocument) {
-                            const doc = quickPackageEditRef.current.contentDocument;
-                            const newResults = [...translationResults];
-                            newResults[0] = { ...newResults[0], translatedText: '<!DOCTYPE html>\n' + doc.documentElement.outerHTML };
-                            setTranslationResults(newResults);
-                          }
-                          setTranslationEditMode && setTranslationEditMode(false);
-                        }}
+                        onClick={() => setTranslationEditMode && setTranslationEditMode(false)}
                         className={`px-2 py-0.5 text-[10px] rounded ${!translationEditMode ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border'}`}
                       >
                         Preview
@@ -8356,13 +8341,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 )}
                 {isInHouseTranslator && translationEditMode && translationResults.length > 0 && (
                   <div className="flex gap-1 px-2 py-1 bg-gray-50 border-b flex-wrap">
-                    <button onMouseDown={(e) => { e.preventDefault(); const d = quickPackageEditRef.current?.contentDocument; if (d) { quickPackageEditRef.current.contentWindow.focus(); d.execCommand('bold'); } }} className="px-2 py-0.5 text-xs border rounded hover:bg-gray-100 font-bold" title="Bold">B</button>
-                    <button onMouseDown={(e) => { e.preventDefault(); const d = quickPackageEditRef.current?.contentDocument; if (d) { quickPackageEditRef.current.contentWindow.focus(); d.execCommand('italic'); } }} className="px-2 py-0.5 text-xs border rounded hover:bg-gray-100 italic" title="Italic">I</button>
-                    <button onMouseDown={(e) => { e.preventDefault(); const d = quickPackageEditRef.current?.contentDocument; if (d) { quickPackageEditRef.current.contentWindow.focus(); d.execCommand('underline'); } }} className="px-2 py-0.5 text-xs border rounded hover:bg-gray-100 underline" title="Underline">U</button>
+                    <button onClick={() => document.execCommand('bold')} className="px-2 py-0.5 text-xs border rounded hover:bg-gray-100 font-bold" title="Bold">B</button>
+                    <button onClick={() => document.execCommand('italic')} className="px-2 py-0.5 text-xs border rounded hover:bg-gray-100 italic" title="Italic">I</button>
+                    <button onClick={() => document.execCommand('underline')} className="px-2 py-0.5 text-xs border rounded hover:bg-gray-100 underline" title="Underline">U</button>
                     <span className="border-l mx-1"></span>
-                    <button onMouseDown={(e) => { e.preventDefault(); const d = quickPackageEditRef.current?.contentDocument; if (d) { quickPackageEditRef.current.contentWindow.focus(); d.execCommand('fontSize', false, '2'); } }} className="px-2 py-0.5 text-[10px] border rounded hover:bg-gray-100" title="Small">A-</button>
-                    <button onMouseDown={(e) => { e.preventDefault(); const d = quickPackageEditRef.current?.contentDocument; if (d) { quickPackageEditRef.current.contentWindow.focus(); d.execCommand('fontSize', false, '4'); } }} className="px-2 py-0.5 text-xs border rounded hover:bg-gray-100" title="Normal">A</button>
-                    <button onMouseDown={(e) => { e.preventDefault(); const d = quickPackageEditRef.current?.contentDocument; if (d) { quickPackageEditRef.current.contentWindow.focus(); d.execCommand('fontSize', false, '6'); } }} className="px-2 py-0.5 text-sm border rounded hover:bg-gray-100" title="Large">A+</button>
+                    <button onClick={() => document.execCommand('fontSize', false, '2')} className="px-2 py-0.5 text-[10px] border rounded hover:bg-gray-100" title="Small">A-</button>
+                    <button onClick={() => document.execCommand('fontSize', false, '4')} className="px-2 py-0.5 text-xs border rounded hover:bg-gray-100" title="Normal">A</button>
+                    <button onClick={() => document.execCommand('fontSize', false, '6')} className="px-2 py-0.5 text-sm border rounded hover:bg-gray-100" title="Large">A+</button>
                   </div>
                 )}
                 <div className="grid grid-cols-2 gap-0 h-[500px] overflow-hidden">
@@ -8392,24 +8377,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   <div className="overflow-auto bg-white flex flex-col h-full">
                     {translationResults.length > 0 ? (
                       isInHouseTranslator && translationEditMode ? (
-                        <iframe
-                          ref={quickPackageEditRef}
-                          srcDoc={translationResults[0]?.translatedText || '<p>No translation</p>'}
-                          title="Translation Edit"
-                          className="w-full h-full border-0"
-                          style={{border: '3px solid #10B981', borderRadius: '4px'}}
-                          onLoad={() => {
-                            const iframe = quickPackageEditRef.current;
-                            if (iframe?.contentDocument) {
-                              iframe.contentDocument.designMode = 'on';
-                              const body = iframe.contentDocument.body;
-                              if (body) {
-                                body.style.width = '100%';
-                                body.style.maxWidth = '100%';
-                                body.style.margin = '0';
-                                body.style.padding = '8px';
-                              }
-                            }
+                        <div
+                          contentEditable
+                          suppressContentEditableWarning
+                          className="p-3 overflow-auto focus:outline-none h-full"
+                          style={{width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
+                          dangerouslySetInnerHTML={{ __html: extractBodyForEdit(translationResults[0]?.translatedText) }}
+                          onBlur={(e) => {
+                            // Save edits back to translationResults
+                            const newResults = [...translationResults];
+                            newResults[0] = { ...newResults[0], translatedText: e.target.innerHTML };
+                            setTranslationResults(newResults);
                           }}
                         />
                       ) : (
@@ -9570,14 +9548,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               <div className="flex items-center gap-2 mb-2">
                 <div className="inline-flex rounded-md shadow-sm" role="group">
                   <button
-                    onClick={() => {
-                      // Save iframe content before switching to preview
-                      if (reviewViewMode === 'edit' && editableRef.current?.contentDocument) {
-                        const doc = editableRef.current.contentDocument;
-                        handleTranslationEdit('<!DOCTYPE html>\n' + doc.documentElement.outerHTML);
-                      }
-                      setReviewViewMode('preview');
-                    }}
+                    onClick={() => setReviewViewMode('preview')}
                     className={`px-3 py-1 text-xs font-medium rounded-l-md border ${
                       reviewViewMode === 'preview'
                         ? 'bg-blue-600 text-white border-blue-600'
@@ -9599,11 +9570,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 </div>
                 <button
                   onClick={() => {
-                    // Save iframe content first if in edit mode
-                    if (reviewViewMode === 'edit' && editableRef.current?.contentDocument) {
-                      const doc = editableRef.current.contentDocument;
-                      handleTranslationEdit('<!DOCTYPE html>\n' + doc.documentElement.outerHTML);
-                    }
                     const content = translationResults[selectedResultIndex]?.translatedText || '';
                     const blob = new Blob([`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Translation</title></head><body>${content}</body></html>`], { type: 'text/html' });
                     const url = URL.createObjectURL(blob);
@@ -9698,28 +9664,16 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         className="w-full h-full border-0"
                       />
                     ) : (
-                      <iframe
+                      <div
                         ref={editableRef}
-                        srcDoc={translationResults[selectedResultIndex]?.translatedText || '<p>No translation</p>'}
-                        title="Translation Edit"
-                        className="w-full h-full border-0"
-                        style={{border: '3px solid #10B981', borderRadius: '4px'}}
-                        onLoad={() => {
-                          const iframe = editableRef.current;
-                          if (iframe?.contentDocument) {
-                            iframe.contentDocument.designMode = 'on';
-                            // Override body constraints to fill iframe (prevent shrink)
-                            const body = iframe.contentDocument.body;
-                            if (body) {
-                              body.style.width = '100%';
-                              body.style.maxWidth = '100%';
-                              body.style.margin = '0';
-                              body.style.padding = '8px';
-                            }
-                            iframe.contentDocument.addEventListener('mouseup', saveSelection);
-                            iframe.contentDocument.addEventListener('keyup', saveSelection);
-                          }
-                        }}
+                        contentEditable
+                        suppressContentEditableWarning
+                        dangerouslySetInnerHTML={{ __html: extractBodyForEdit(translationResults[selectedResultIndex]?.translatedText) }}
+                        onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
+                        onMouseUp={saveSelection}
+                        onKeyUp={saveSelection}
+                        className="p-3 text-xs focus:outline-none overflow-auto h-full"
+                        style={{width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
                       />
                     )}
                   </div>
@@ -9904,13 +9858,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     </span>
                     <div className="flex items-center gap-1">
                       <button
-                        onClick={() => {
-                          if (proofreadingViewMode === 'edit' && proofreadingEditRef.current?.contentDocument) {
-                            const doc = proofreadingEditRef.current.contentDocument;
-                            handleTranslationEdit('<!DOCTYPE html>\n' + doc.documentElement.outerHTML);
-                          }
-                          setProofreadingViewMode('preview');
-                        }}
+                        onClick={() => setProofreadingViewMode('preview')}
                         className={`px-2 py-0.5 text-[10px] rounded ${proofreadingViewMode === 'preview' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border'}`}
                       >
                         Preview
@@ -9973,25 +9921,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         className="w-full h-full border-0 translation-preview-iframe"
                       />
                     ) : (
-                      <iframe
-                        ref={proofreadingEditRef}
-                        srcDoc={translationResults[selectedResultIndex]?.translatedText || '<p>No translation</p>'}
-                        title="Translation Edit"
-                        className="w-full h-full border-0"
-                        style={{border: '3px solid #10B981', borderRadius: '4px'}}
-                        onLoad={() => {
-                          const iframe = proofreadingEditRef.current;
-                          if (iframe?.contentDocument) {
-                            iframe.contentDocument.designMode = 'on';
-                            const body = iframe.contentDocument.body;
-                            if (body) {
-                              body.style.width = '100%';
-                              body.style.maxWidth = '100%';
-                              body.style.margin = '0';
-                              body.style.padding = '8px';
-                            }
-                          }
-                        }}
+                      <div
+                        contentEditable
+                        suppressContentEditableWarning
+                        dangerouslySetInnerHTML={{ __html: extractBodyForEdit(translationResults[selectedResultIndex]?.translatedText) }}
+                        onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
+                        onMouseUp={saveSelection}
+                        onKeyUp={saveSelection}
+                        className="p-3 text-xs focus:outline-none overflow-auto h-full"
+                        style={{width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
                       />
                     )}
                   </div>
