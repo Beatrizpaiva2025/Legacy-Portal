@@ -5203,12 +5203,44 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     return bodyContent;
   };
 
+  // Reconstruct full HTML document by replacing body content while preserving styles/head
+  const reconstructFullHtml = (originalHtml, newBodyContent) => {
+    if (!originalHtml) return newBodyContent;
+
+    // If the original wasn't a full HTML document, just return the new content as-is
+    if (!originalHtml.includes('<body') && !originalHtml.includes('<html')) {
+      return newBodyContent;
+    }
+
+    // Replace body content in the original HTML, preserving <html>, <head>, <style> tags
+    // Use function replacement to avoid issues with $ in content (e.g. $1,598.99)
+    const bodyMatch = originalHtml.match(/(<body[^>]*>)([\s\S]*?)(<\/body>)/i);
+    if (bodyMatch) {
+      return originalHtml.replace(
+        /(<body[^>]*>)([\s\S]*?)(<\/body>)/i,
+        (match, openTag, oldContent, closeTag) => `${openTag}${newBodyContent}${closeTag}`
+      );
+    }
+
+    // Fallback: try to find </head> and wrap content
+    const headEndMatch = originalHtml.match(/([\s\S]*?<\/head>\s*)/i);
+    if (headEndMatch) {
+      return `${headEndMatch[1]}<body>${newBodyContent}</body></html>`;
+    }
+
+    return newBodyContent;
+  };
+
   // Update translation text manually
   const handleTranslationEdit = (newText) => {
     const updatedResults = [...translationResults];
+    const currentResult = updatedResults[selectedResultIndex];
+    // Reconstruct the full HTML document with the edited body content
+    // This preserves <html>, <head>, <style> so Preview mode keeps correct layout
+    const fullHtml = reconstructFullHtml(currentResult?.translatedText, newText);
     updatedResults[selectedResultIndex] = {
-      ...updatedResults[selectedResultIndex],
-      translatedText: newText
+      ...currentResult,
+      translatedText: fullHtml
     };
     setTranslationResults(updatedResults);
     setHasUnsavedChanges(true); // Mark as having unsaved changes
