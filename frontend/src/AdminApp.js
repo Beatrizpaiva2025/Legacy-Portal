@@ -13644,8 +13644,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       if (orderData.translation_html) {
         translationPagesHTML = `
         <div class="translation-text-page">
-          <div class="running-header">${letterheadHTML}</div>
-          <div class="running-header-spacer"></div>
+          ${letterheadHTML}
           <div class="translation-content translation-text">${orderData.translation_html}</div>
         </div>`;
       }
@@ -13709,8 +13708,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     .original-image { max-width: 100%; max-height: 630px; border: 1px solid #ddd; object-fit: contain; display: block; margin: 0 auto; }
     @media print {
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      .running-header { position: fixed; top: 0; left: 0; right: 0; background: white; padding: 20px 50px 10px; }
-      .running-header-spacer { height: 100px; }
+      /* running-header styles removed - using inline letterheads instead */
     }
   </style>
 </head>
@@ -25887,8 +25885,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       if (orderData.translation_html) {
         translationPagesHTML = `
         <div class="translation-text-page">
-          <div class="running-header">${letterheadHTML}</div>
-          <div class="running-header-spacer"></div>
+          ${letterheadHTML}
           <div class="translation-content translation-text">${orderData.translation_html}</div>
         </div>`;
       }
@@ -25952,8 +25949,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     .original-image { max-width: 100%; max-height: 630px; border: 1px solid #ddd; object-fit: contain; display: block; margin: 0 auto; }
     @media print {
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      .running-header { position: fixed; top: 0; left: 0; right: 0; background: white; padding: 20px 50px 10px; }
-      .running-header-spacer { height: 100px; }
+      /* running-header styles removed - using inline letterheads instead */
     }
   </style>
 </head>
@@ -26549,28 +26545,18 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     if (pmTranslationHtml) {
       translationPagesHTML = `
     <div class="translation-text-page">
-        ${includeLetterhead ? `
-        <div class="running-header">
-            ${letterheadHTML}
-        </div>
-        <div class="running-header-spacer"></div>
-        ` : ''}
+        ${includeLetterhead ? letterheadHTML : ''}
         <div class="translation-content translation-text">
             ${pmTranslationHtml}
         </div>
     </div>`;
     }
-    // Priority 2: translatedContent from PM Dashboard (loaded from dattabse)
+    // Priority 2: translatedContent from PM Dashboard (loaded from database)
     else if (translatedContent && pmTranslationFiles.length === 0) {
       const translationHTML = translatedContent.html || translatedContent.data || '';
       translationPagesHTML = `
     <div class="translation-text-page">
-        ${includeLetterhead ? `
-        <div class="running-header">
-            ${letterheadHTML}
-        </div>
-        <div class="running-header-spacer"></div>
-        ` : ''}
+        ${includeLetterhead ? letterheadHTML : ''}
         <div class="translation-content translation-text">
             ${translationHTML}
         </div>
@@ -26581,12 +26567,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       const translationHTML = translationResults.map(r => r.translatedText).join('\n\n');
       translationPagesHTML = `
     <div class="translation-text-page">
-        ${includeLetterhead ? `
-        <div class="running-header">
-            ${letterheadHTML}
-        </div>
-        <div class="running-header-spacer"></div>
-        ` : ''}
+        ${includeLetterhead ? letterheadHTML : ''}
         <div class="translation-content translation-text">
             ${translationHTML}
         </div>
@@ -26882,9 +26863,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         .page-title { font-size: 13px; font-weight: bold; text-align: center; margin: 15px 0 10px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; page-break-after: avoid; }
         .original-image-container { text-align: center; margin-bottom: 10px; }
         .original-image { width: 100%; height: auto; max-height: none; border: none; object-fit: contain; }
-        .running-header { position: running(header); }
-        .running-header-spacer { height: 80px; }
-        @page { @top-center { content: element(header); } }
+        /* running-header styles removed - using inline letterheads instead */
         /* Verification Page Styles */
         .verification-page { page-break-before: always; padding-top: 20px; }
         .verification-box {
@@ -26919,8 +26898,6 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
             .original-documents-page { page-break-before: always; }
             .verification-page { page-break-before: always; }
             .verification-box { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .running-header { position: fixed; top: 0; left: 0; right: 0; background: white; padding: 20px 50px 10px; }
-            .running-header-spacer { height: 100px; }
         }
     </style>
 </head>
