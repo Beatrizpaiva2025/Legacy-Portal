@@ -18032,6 +18032,7 @@ For DIPLOMAS / EDUCATIONAL:
 ❌ Download buttons or interface elements
 ❌ Comments about the translation
 ❌ Markdown formatting (use HTML only)
+❌ "PAGE 1", "Page X of Y", or any page number headers/labels (the document should start directly with the translated content)
 
 ═══════════════════════════════════════════════════════════════════
                     FINAL OUTPUT
@@ -18316,7 +18317,8 @@ CRITICAL INSTRUCTIONS:
 5. If you see bordered sections, use CSS borders
 6. Replicate the exact visual appearance of EACH page in HTML format
 7. DO NOT skip any pages - all pages must be translated
-8. IMPORTANT: For multi-page documents, REPEAT the document header/letterhead at the TOP of EACH page, just like in the original document"""
+8. IMPORTANT: For multi-page documents, REPEAT the document header/letterhead at the TOP of EACH page, just like in the original document
+9. Do NOT add "PAGE 1", "Page X of Y", or any page number labels/headers - start each page directly with the translated content"""
                     })
                 else:
                     message_content = user_message
@@ -22734,6 +22736,7 @@ Before submitting, verify:
 ☐ All notations included ([signature], [stamp], etc.)
 ☐ HTML is valid and properly formatted
 ☐ No translator notes or comments in output
+☐ No "PAGE 1" or "Page X of Y" headers added - start directly with translated content
 """
 
     return prompt
@@ -22794,7 +22797,7 @@ Orientation: Portrait (unless original is landscape)
 • Add page-break-inside: avoid; to important sections
 • Keep related content together (names, addresses, tables)
 • Avoid orphan/widow lines
-• If multi-page: add page numbers
+• If multi-page: do NOT add "PAGE 1" or "Page X" headers at the top of pages - only add subtle footer page numbers if needed
 
 3️⃣ TABLE FORMATTING
 • Tables must have visible borders: 1px solid #000
@@ -23502,7 +23505,8 @@ async def translate_single_chunk(client, config: dict, system_prompt: str, page_
 
 Produce a complete HTML translation ready for professional printing on US Letter format.
 ⚠️ CRITICAL: Each original page MUST fit on exactly ONE translated page. Scale font sizes and spacing as needed to fit.
-{"Include page breaks between pages using: <div class='page-break' style='page-break-before: always;'></div>" if len(page_images) > 1 else ""}"""
+{"Include page breaks between pages using: <div class='page-break' style='page-break-before: always;'></div>" if len(page_images) > 1 else ""}
+Do NOT add "PAGE 1", "Page X of Y", or any page number labels/headers - start directly with the translated document content."""
         else:
             text_prompt = f"""Translate this {config['document_type']} document from the images{chunk_info}.
 
@@ -23510,7 +23514,8 @@ Look at {'all ' + str(len(page_images)) + ' pages' if len(page_images) > 1 else 
 
 Produce a complete HTML translation ready for professional printing on US Letter format.
 ⚠️ CRITICAL: Each original page MUST fit on exactly ONE translated page. Scale font sizes and spacing as needed to fit.
-{"Include page breaks between pages using: <div class='page-break' style='page-break-before: always;'></div>" if len(page_images) > 1 else ""}"""
+{"Include page breaks between pages using: <div class='page-break' style='page-break-before: always;'></div>" if len(page_images) > 1 else ""}
+Do NOT add "PAGE 1", "Page X of Y", or any page number labels/headers - start directly with the translated document content."""
 
         message_content.append({
             "type": "text",
