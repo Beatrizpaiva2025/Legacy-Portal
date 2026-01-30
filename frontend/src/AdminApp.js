@@ -5568,13 +5568,22 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     </div>`).join('');
     }
     // Otherwise use HTML content (from Word/HTML/TXT)
+    // Uses table+thead so letterhead repeats on every printed page when content overflows
     else if (quickTranslationHtml) {
       translationPagesHTML = `
     <div style="padding-top: 5px;">
-        ${includeLetterhead ? letterheadHTML : ''}
-        <div style="margin-top: 5px; line-height: 1.5; font-size: 11pt;">
-            ${quickTranslationHtml}
-        </div>
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr><td style="border: none; padding: 0; font-size: inherit;">
+                    ${includeLetterhead ? letterheadHTML : ''}
+                </td></tr>
+            </thead>
+            <tbody>
+                <tr><td style="border: none; padding: 0; line-height: 1.5; font-size: 11pt;">
+                    ${quickTranslationHtml}
+                </td></tr>
+            </tbody>
+        </table>
     </div>`;
     }
 
@@ -6089,11 +6098,22 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>`;
 
     // Translation pages HTML (with or without letterhead)
+    // Uses table+thead so letterhead repeats on every printed page when content overflows
     // First page doesn't need page-break since cover ends with one
     const translationPagesHTML = translationResults.map((result, index) => `
     <div style="${index > 0 ? 'page-break-before: always;' : ''} padding-top: 5px;">
-        ${includeLetterhead ? letterheadHTML : ''}
-        <div style="margin-top: 5px; line-height: 1.5; font-size: 11pt;">${result.translatedText}</div>
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr><td style="border: none; padding: 0; font-size: inherit;">
+                    ${includeLetterhead ? letterheadHTML : ''}
+                </td></tr>
+            </thead>
+            <tbody>
+                <tr><td style="border: none; padding: 0; line-height: 1.5; font-size: 11pt;">
+                    ${result.translatedText}
+                </td></tr>
+            </tbody>
+        </table>
     </div>
     `).join('');
 
