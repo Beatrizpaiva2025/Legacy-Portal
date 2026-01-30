@@ -5568,22 +5568,14 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     </div>`).join('');
     }
     // Otherwise use HTML content (from Word/HTML/TXT)
-    // Uses table+thead so letterhead repeats on every printed page when content overflows
+    // Content is auto-scaled via JS to always fit on 1 Letter page
     else if (quickTranslationHtml) {
       translationPagesHTML = `
     <div style="padding-top: 5px;">
-        <table style="width: 100%; border-collapse: collapse;">
-            <thead>
-                <tr><td style="border: none; padding: 0; font-size: inherit;">
-                    ${includeLetterhead ? letterheadHTML : ''}
-                </td></tr>
-            </thead>
-            <tbody>
-                <tr><td style="border: none; padding: 0; line-height: 1.5; font-size: 11pt;">
-                    ${quickTranslationHtml}
-                </td></tr>
-            </tbody>
-        </table>
+        ${includeLetterhead ? letterheadHTML : ''}
+        <div class="translation-content" style="line-height: 1.5; font-size: 11pt;">
+            ${quickTranslationHtml}
+        </div>
     </div>`;
     }
 
@@ -5667,6 +5659,21 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     ${translationPagesHTML}
     ${originalPagesHTML}
     ${certificationPageHTML}
+    <script>
+        // Auto-scale translation content to always fit on 1 Letter page
+        window.addEventListener('load', function() {
+            // Letter: 11in - 0.7in top - 0.7in bottom = 9.6in usable
+            // Letterhead ~90px. Available for content: ~8.2in (safe margin)
+            var maxH = 8.2 * 96; // 787px
+            var items = document.querySelectorAll('.translation-content');
+            for (var i = 0; i < items.length; i++) {
+                var el = items[i];
+                if (el.scrollHeight > maxH) {
+                    el.style.zoom = (maxH / el.scrollHeight).toFixed(4);
+                }
+            }
+        });
+    </script>
 </body>
 </html>`;
 
@@ -6098,22 +6105,14 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>`;
 
     // Translation pages HTML (with or without letterhead)
-    // Uses table+thead so letterhead repeats on every printed page when content overflows
+    // Content is auto-scaled via JS to always fit on 1 Letter page
     // First page doesn't need page-break since cover ends with one
     const translationPagesHTML = translationResults.map((result, index) => `
     <div style="${index > 0 ? 'page-break-before: always;' : ''} padding-top: 5px;">
-        <table style="width: 100%; border-collapse: collapse;">
-            <thead>
-                <tr><td style="border: none; padding: 0; font-size: inherit;">
-                    ${includeLetterhead ? letterheadHTML : ''}
-                </td></tr>
-            </thead>
-            <tbody>
-                <tr><td style="border: none; padding: 0; line-height: 1.5; font-size: 11pt;">
-                    ${result.translatedText}
-                </td></tr>
-            </tbody>
-        </table>
+        ${includeLetterhead ? letterheadHTML : ''}
+        <div class="translation-content" style="line-height: 1.5; font-size: 11pt;">
+            ${result.translatedText}
+        </div>
     </div>
     `).join('');
 
@@ -6197,6 +6196,19 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     ${translationPagesHTML}
     ${originalPagesHTML}
     ${certificationPageHTML}
+    <script>
+        // Auto-scale translation content to always fit on 1 Letter page
+        window.addEventListener('load', function() {
+            var maxH = 8.2 * 96; // 787px
+            var items = document.querySelectorAll('.translation-content');
+            for (var i = 0; i < items.length; i++) {
+                var el = items[i];
+                if (el.scrollHeight > maxH) {
+                    el.style.zoom = (maxH / el.scrollHeight).toFixed(4);
+                }
+            }
+        });
+    </script>
 </body>
 </html>`;
 
