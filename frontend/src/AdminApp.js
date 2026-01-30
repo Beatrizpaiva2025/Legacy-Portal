@@ -5665,14 +5665,16 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     </div>`;
     }
 
-    // Original document pages
+    // Original document pages - wrapped for auto-scaling like translation pages
     const validOriginalFiles = quickOriginalFiles.filter(file => file.data && file.data.length > 100);
     const originalPagesHTML = (includeOriginal && validOriginalFiles.length > 0) ? validOriginalFiles.map((file, idx) => `
     <div style="page-break-before: always; padding-top: 5px;">
         ${includeLetterhead ? letterheadHTML : ''}
-        ${idx === 0 ? '<div style="font-size: 13px; font-weight: bold; text-align: center; margin: 8px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px;">Original Document</div>' : ''}
-        <div style="text-align: center;">
-            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Original page ${idx + 1}" style="width: 100%; max-height: 8.5in; object-fit: contain; display: block; margin: 0 auto;" />
+        ${idx === 0 ? '<div style="font-size: 13px; font-weight: bold; text-align: center; margin: 4px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px;">Original Document</div>' : ''}
+        <div style="overflow: hidden;" class="original-wrapper">
+            <div class="original-content" style="text-align: center;">
+                <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Original page ${idx + 1}" style="width: 100%; object-fit: contain; display: block; margin: 0 auto;" />
+            </div>
         </div>
     </div>`).join('') : '';
 
@@ -5746,28 +5748,32 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     ${originalPagesHTML}
     ${certificationPageHTML}
     <script>
-        // Auto-scale translation content to always fit on 1 Letter page
+        // Auto-scale translation AND original content to always fit on 1 Letter page
         window.addEventListener('load', function() {
             // Letter: 11in - 0.7in top - 0.7in bottom = 9.6in usable
-            // Letterhead ~90px. Available for content: ~8.2in
+            // Letterhead ~70px. Available for content: ~8.2in
             var maxH = 8.2 * 96; // ~787px
-            var items = document.querySelectorAll('.translation-content');
-            for (var i = 0; i < items.length; i++) {
-                var el = items[i];
-                var sh = el.scrollHeight;
-                if (sh > maxH) {
-                    var scale = maxH / sh;
-                    el.style.transformOrigin = 'top left';
-                    el.style.transform = 'scale(' + scale.toFixed(4) + ')';
-                    // Expand width so scaled result fills 100% of parent
-                    el.style.width = (100 / scale).toFixed(2) + '%';
-                    // Set wrapper height to actual rendered height
-                    var wrapper = el.parentElement;
-                    if (wrapper) {
-                        wrapper.style.height = maxH + 'px';
+
+            function autoScale(selector) {
+                var items = document.querySelectorAll(selector);
+                for (var i = 0; i < items.length; i++) {
+                    var el = items[i];
+                    var sh = el.scrollHeight;
+                    if (sh > maxH) {
+                        var scale = maxH / sh;
+                        el.style.transformOrigin = 'top left';
+                        el.style.transform = 'scale(' + scale.toFixed(4) + ')';
+                        el.style.width = (100 / scale).toFixed(2) + '%';
+                        var wrapper = el.parentElement;
+                        if (wrapper) {
+                            wrapper.style.height = maxH + 'px';
+                        }
                     }
                 }
             }
+
+            autoScale('.translation-content');
+            autoScale('.original-content');
         });
     </script>
 </body>
@@ -6273,12 +6279,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     ` : '';
 
     // Original documents pages HTML (each image on separate page, title only on first)
+    // Wrapped in original-wrapper/original-content for auto-scaling like translation pages
     const originalPagesHTML = (includeOriginal && originalImages.length > 0) ? originalImages.map((img, index) => `
     <div style="page-break-before: always; padding-top: 5px;">
         ${includeLetterhead ? letterheadHTML : ''}
-        ${index === 0 ? '<div style="font-size: 13px; font-weight: bold; text-align: center; margin: 8px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px;">Original Document</div>' : ''}
-        <div style="text-align: center;">
-            <img src="${img.data}" alt="${img.filename}" style="width: 100%; max-height: 8.5in; object-fit: contain; display: block; margin: 0 auto;" />
+        ${index === 0 ? '<div style="font-size: 13px; font-weight: bold; text-align: center; margin: 4px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px;">Original Document</div>' : ''}
+        <div style="overflow: hidden;" class="original-wrapper">
+            <div class="original-content" style="text-align: center;">
+                <img src="${img.data}" alt="${img.filename}" style="width: 100%; object-fit: contain; display: block; margin: 0 auto;" />
+            </div>
         </div>
     </div>
     `).join('') : '';
@@ -6299,28 +6308,32 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     ${originalPagesHTML}
     ${certificationPageHTML}
     <script>
-        // Auto-scale translation content to always fit on 1 Letter page
+        // Auto-scale translation AND original content to always fit on 1 Letter page
         window.addEventListener('load', function() {
             // Letter: 11in - 0.7in top - 0.7in bottom = 9.6in usable
-            // Letterhead ~90px. Available for content: ~8.2in
+            // Letterhead ~70px. Available for content: ~8.2in
             var maxH = 8.2 * 96; // ~787px
-            var items = document.querySelectorAll('.translation-content');
-            for (var i = 0; i < items.length; i++) {
-                var el = items[i];
-                var sh = el.scrollHeight;
-                if (sh > maxH) {
-                    var scale = maxH / sh;
-                    el.style.transformOrigin = 'top left';
-                    el.style.transform = 'scale(' + scale.toFixed(4) + ')';
-                    // Expand width so scaled result fills 100% of parent
-                    el.style.width = (100 / scale).toFixed(2) + '%';
-                    // Set wrapper height to actual rendered height
-                    var wrapper = el.parentElement;
-                    if (wrapper) {
-                        wrapper.style.height = maxH + 'px';
+
+            function autoScale(selector) {
+                var items = document.querySelectorAll(selector);
+                for (var i = 0; i < items.length; i++) {
+                    var el = items[i];
+                    var sh = el.scrollHeight;
+                    if (sh > maxH) {
+                        var scale = maxH / sh;
+                        el.style.transformOrigin = 'top left';
+                        el.style.transform = 'scale(' + scale.toFixed(4) + ')';
+                        el.style.width = (100 / scale).toFixed(2) + '%';
+                        var wrapper = el.parentElement;
+                        if (wrapper) {
+                            wrapper.style.height = maxH + 'px';
+                        }
                     }
                 }
             }
+
+            autoScale('.translation-content');
+            autoScale('.original-content');
         });
     </script>
 </body>
