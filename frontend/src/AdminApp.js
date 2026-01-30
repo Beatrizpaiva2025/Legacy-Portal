@@ -6320,7 +6320,82 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 </body>
 </html>`;
 
-    if (format === 'pdf') {
+    if (format === 'preview') {
+      // Open preview window (same approach as Quick Package)
+      try {
+        const screenWidth = window.screen.width;
+        const screenHeight = window.screen.height;
+        const windowWidth = Math.min(1200, screenWidth - 100);
+        const windowHeight = Math.min(900, screenHeight - 100);
+        const left = (screenWidth - windowWidth) / 2;
+        const top = (screenHeight - windowHeight) / 2;
+
+        const previewWindow = window.open('', 'DocumentPreview', `width=${windowWidth},height=${windowHeight},left=${left},top=${top},scrollbars=yes,resizable=yes`);
+
+        if (!previewWindow || previewWindow.closed || typeof previewWindow.closed === 'undefined') {
+          alert('Pop-up blocked! Please allow pop-ups for this site and try again.');
+          return;
+        }
+
+        previewWindow.document.open();
+        previewWindow.document.write(htmlContent);
+        previewWindow.document.close();
+
+        // Wait for content to load
+        await new Promise(resolve => {
+          if (previewWindow.document.readyState === 'complete') {
+            resolve();
+          } else {
+            previewWindow.onload = resolve;
+            setTimeout(resolve, 3000);
+          }
+        });
+
+        // Wait for images to load
+        const images = previewWindow.document.querySelectorAll('img');
+        if (images.length > 0) {
+          await Promise.all(Array.from(images).map(img => {
+            return new Promise((resolve) => {
+              if (img.complete && img.naturalHeight !== 0) {
+                resolve();
+              } else {
+                img.onload = resolve;
+                img.onerror = resolve;
+                setTimeout(resolve, 5000);
+              }
+            });
+          }));
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        previewWindow.focus();
+
+        // Add instruction bar (hidden during print)
+        const instructionDiv = previewWindow.document.createElement('div');
+        instructionDiv.id = 'print-instructions';
+        instructionDiv.innerHTML = `
+          <div style="position: fixed; top: 0; left: 0; right: 0; background: #1e40af; color: white; padding: 12px 20px; z-index: 99999; font-family: sans-serif; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <strong>📄 Document Preview</strong> - Review your document before downloading
+            </div>
+            <div>
+              <button onclick="window.print()" style="background: white; color: #1e40af; border: none; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-right: 10px;">
+                🖨️ Print / Save as PDF
+              </button>
+              <button onclick="document.getElementById('print-instructions').remove()" style="background: transparent; color: white; border: 1px solid white; padding: 8px 16px; border-radius: 6px; cursor: pointer;">
+                ✕ Close Bar
+              </button>
+            </div>
+          </div>
+          <style>@media print { #print-instructions { display: none !important; } }</style>
+        `;
+        previewWindow.document.body.insertBefore(instructionDiv, previewWindow.document.body.firstChild);
+      } catch (err) {
+        console.error('Error opening preview:', err);
+        showToast('Error opening preview. Please try again.');
+      }
+    } else if (format === 'pdf') {
       // Generate PDF with hash tracking for verification
       try {
         const filename = `${orderNumber || 'P0000'}_${documentType.replace(/\s+/g, '_')}_${translationType === 'sworn' ? 'Sworn' : 'Certified'}_Translation.pdf`;
@@ -11324,6 +11399,14 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   </p>
                 </div>
 
+                {/* Preview Button */}
+                <button
+                  onClick={() => handleDownload('preview')}
+                  className="w-full py-3 mb-2 bg-gradient-to-r from-indigo-600 to-blue-600 text-white text-sm font-bold rounded-lg hover:from-indigo-700 hover:to-blue-700 flex items-center justify-center gap-2"
+                >
+                  👁️ Preview Document
+                </button>
+
                 {/* Download Buttons */}
                 <div className="grid grid-cols-2 gap-2">
                   <button
@@ -11340,7 +11423,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   </button>
                 </div>
                 <p className="text-[10px] text-gray-500 mt-2 text-center">
-                  HTML: Edit in browser before printing | PDF: Opens print dialog
+                  Preview: Review before saving | HTML: Edit in browser | PDF: Direct download
                 </p>
               </div>
 
