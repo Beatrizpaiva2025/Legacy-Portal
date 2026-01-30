@@ -13323,6 +13323,35 @@ async def admin_save_translation(order_id: str, data: TranslationData, admin_key
 
     logger.info(f"Translation saved for order {order_id}, sent to {destination}, status: {new_status}")
 
+    # Save translation to order_documents when it's being sent (not just saved as draft)
+    # This ensures the delivery flow can find it via order_documents query
+    if destination != "save" and data.translation_html:
+        try:
+            order_number = order.get("order_number", "Translation")
+            doc_filename = f"{order_number}_Translation.html"
+            doc_base64 = base64.b64encode(data.translation_html.encode('utf-8')).decode('utf-8')
+
+            # Remove any existing translated documents for this order to avoid duplicates
+            await db.order_documents.delete_many({
+                "order_id": order_id,
+                "source": "translated_document"
+            })
+
+            doc_record = {
+                "id": str(uuid.uuid4()),
+                "order_id": order_id,
+                "filename": doc_filename,
+                "data": doc_base64,
+                "file_data": doc_base64,
+                "content_type": "text/html",
+                "source": "translated_document",
+                "uploaded_at": datetime.utcnow()
+            }
+            await db.order_documents.insert_one(doc_record)
+            logger.info(f"Saved workspace translation to order_documents: {doc_filename} for order {order_id}")
+        except Exception as doc_err:
+            logger.error(f"Failed to save workspace translation to order_documents: {str(doc_err)}")
+
     # Send notification to PM when translator sends translation for PM review
     if destination == "pm":
         # Get the assigned PM for this order
