@@ -9642,34 +9642,80 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <div className="grid grid-cols-2 gap-0 bg-gray-100 border-b">
                   <div className="px-3 py-2 border-r flex items-center justify-between">
                     <span className="text-xs font-bold text-gray-700">Original Document</span>
-                    <label className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded cursor-pointer hover:bg-blue-600">
-                      Upload
-                      <input
-                        type="file"
-                        accept="image/*,.pdf"
-                        className="hidden"
-                        onChange={(e) => {
-                          if (e.target.files && e.target.files[0]) {
-                            const file = e.target.files[0];
-                            const reader = new FileReader();
-                            reader.onload = (event) => {
-                              const newOriginalImages = [...originalImages];
-                              newOriginalImages[selectedResultIndex] = {
-                                data: event.target.result,
-                                filename: file.name
+                    <div className="flex items-center gap-1">
+                      <label className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded cursor-pointer hover:bg-blue-600">
+                        Upload
+                        <input
+                          type="file"
+                          accept="image/*,.pdf"
+                          className="hidden"
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              const file = e.target.files[0];
+                              const reader = new FileReader();
+                              reader.onload = (event) => {
+                                const newOriginalImages = [...originalImages];
+                                newOriginalImages[selectedResultIndex] = {
+                                  data: event.target.result,
+                                  filename: file.name
+                                };
+                                setOriginalImages(newOriginalImages);
                               };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      </label>
+                      {originalImages[selectedResultIndex] && (
+                        <button
+                          onClick={() => {
+                            if (window.confirm('Are you sure you want to delete this original page?')) {
+                              const newOriginalImages = [...originalImages];
+                              newOriginalImages[selectedResultIndex] = null;
                               setOriginalImages(newOriginalImages);
-                            };
-                            reader.readAsDataURL(file);
-                          }
-                        }}
-                      />
-                    </label>
+                            }
+                          }}
+                          className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
+                          title="Delete original page"
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className="px-3 py-2 flex items-center justify-between">
                     <span className="text-xs font-bold text-gray-700">
                       Translation ({targetLanguage}) - {reviewViewMode === 'preview' ? 'Preview' : 'Editing'}
                     </span>
+                    <div className="flex items-center gap-1">
+                      {translationResults[selectedResultIndex]?.translatedText && (
+                        <button
+                          onClick={() => {
+                            if (window.confirm('Are you sure you want to delete this translated page?')) {
+                              const updatedResults = [...translationResults];
+                              if (translationResults.length === 1) {
+                                updatedResults[0] = { ...updatedResults[0], translatedText: '', filename: '' };
+                                setTranslationResults(updatedResults);
+                              } else {
+                                updatedResults.splice(selectedResultIndex, 1);
+                                setTranslationResults(updatedResults);
+                                const newOriginalImages = [...originalImages];
+                                newOriginalImages.splice(selectedResultIndex, 1);
+                                setOriginalImages(newOriginalImages);
+                                if (selectedResultIndex >= updatedResults.length) {
+                                  setSelectedResultIndex(Math.max(0, updatedResults.length - 1));
+                                }
+                              }
+                              showToast('Page deleted!');
+                            }
+                          }}
+                          className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
+                          title="Delete translated page"
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
                 {/* Toolbar outside the height-constrained grid */}
@@ -9880,29 +9926,46 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <div className="grid grid-cols-2 gap-0 bg-gray-100 border-b">
                   <div className="px-3 py-2 border-r flex items-center justify-between">
                     <span className="text-xs font-bold text-gray-700">Original Document ({sourceLanguage})</span>
-                    <label className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded cursor-pointer hover:bg-blue-600">
-                      Upload
-                      <input
-                        type="file"
-                        accept="image/*,.pdf"
-                        className="hidden"
-                        onChange={(e) => {
-                          if (e.target.files && e.target.files[0]) {
-                            const file = e.target.files[0];
-                            const reader = new FileReader();
-                            reader.onload = (event) => {
-                              const newOriginalImages = [...originalImages];
-                              newOriginalImages[selectedResultIndex] = {
-                                data: event.target.result,
-                                filename: file.name
+                    <div className="flex items-center gap-1">
+                      <label className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded cursor-pointer hover:bg-blue-600">
+                        Upload
+                        <input
+                          type="file"
+                          accept="image/*,.pdf"
+                          className="hidden"
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              const file = e.target.files[0];
+                              const reader = new FileReader();
+                              reader.onload = (event) => {
+                                const newOriginalImages = [...originalImages];
+                                newOriginalImages[selectedResultIndex] = {
+                                  data: event.target.result,
+                                  filename: file.name
+                                };
+                                setOriginalImages(newOriginalImages);
                               };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      </label>
+                      {originalImages[selectedResultIndex] && (
+                        <button
+                          onClick={() => {
+                            if (window.confirm('Are you sure you want to delete this original page?')) {
+                              const newOriginalImages = [...originalImages];
+                              newOriginalImages[selectedResultIndex] = null;
                               setOriginalImages(newOriginalImages);
-                            };
-                            reader.readAsDataURL(file);
-                          }
-                        }}
-                      />
-                    </label>
+                            }
+                          }}
+                          className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
+                          title="Delete original page"
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className="px-3 py-2 flex items-center justify-between">
                     <span className="text-xs font-bold text-gray-700">
@@ -9921,6 +9984,84 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       >
                         Edit
                       </button>
+                      <label className="px-2 py-0.5 text-[10px] rounded bg-green-600 text-white cursor-pointer hover:bg-green-700">
+                        Upload
+                        <input
+                          type="file"
+                          accept=".docx,.doc,.html,.htm,.txt,.pdf,image/*"
+                          className="hidden"
+                          onChange={async (e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              const file = e.target.files[0];
+                              const fileName = file.name.toLowerCase();
+                              try {
+                                let html = '';
+                                if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
+                                  html = await convertWordToHtml(file);
+                                } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
+                                  html = await readHtmlFile(file);
+                                } else if (fileName.endsWith('.txt')) {
+                                  const text = await readTxtFile(file);
+                                  html = `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif; font-size: 12pt;">${text}</div>`;
+                                } else if (fileName.endsWith('.pdf')) {
+                                  const images = await convertPdfToImages(file);
+                                  html = images.map((img, idx) => `<div style="text-align:center;"><img src="data:${img.type};base64,${img.data}" style="max-width:100%; height:auto;" alt="${file.name} page ${idx + 1}" /></div>`).join('');
+                                } else if (file.type.startsWith('image/')) {
+                                  const dataUrl = await new Promise((resolve) => {
+                                    const reader = new FileReader();
+                                    reader.onload = () => resolve(reader.result);
+                                    reader.readAsDataURL(file);
+                                  });
+                                  html = `<div style="text-align:center;"><img src="${dataUrl}" style="max-width:100%; height:auto;" alt="${file.name}" /></div>`;
+                                }
+                                if (html) {
+                                  const updatedResults = [...translationResults];
+                                  updatedResults[selectedResultIndex] = {
+                                    ...updatedResults[selectedResultIndex],
+                                    translatedText: html,
+                                    filename: file.name
+                                  };
+                                  setTranslationResults(updatedResults);
+                                  showToast('Translation page replaced!');
+                                }
+                              } catch (err) {
+                                console.error('Upload error:', err);
+                                showToast('Error uploading file');
+                              }
+                              e.target.value = '';
+                            }
+                          }}
+                        />
+                      </label>
+                      {translationResults[selectedResultIndex]?.translatedText && (
+                        <button
+                          onClick={() => {
+                            if (window.confirm('Are you sure you want to delete this translated page?')) {
+                              const updatedResults = [...translationResults];
+                              if (translationResults.length === 1) {
+                                updatedResults[0] = { ...updatedResults[0], translatedText: '', filename: '' };
+                                setTranslationResults(updatedResults);
+                              } else {
+                                updatedResults.splice(selectedResultIndex, 1);
+                                setTranslationResults(updatedResults);
+                                // Also remove matching original image if exists
+                                const newOriginalImages = [...originalImages];
+                                newOriginalImages.splice(selectedResultIndex, 1);
+                                setOriginalImages(newOriginalImages);
+                                // Adjust selected index
+                                if (selectedResultIndex >= updatedResults.length) {
+                                  setSelectedResultIndex(Math.max(0, updatedResults.length - 1));
+                                }
+                              }
+                              showToast('Page deleted!');
+                            }
+                          }}
+                          className="px-2 py-0.5 text-[10px] rounded bg-red-500 text-white hover:bg-red-600"
+                          title="Delete translated page"
+                        >
+                          Delete
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
