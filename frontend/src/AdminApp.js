@@ -8377,19 +8377,26 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   <div className="overflow-auto bg-white flex flex-col h-full">
                     {translationResults.length > 0 ? (
                       isInHouseTranslator && translationEditMode ? (
-                        <div
-                          contentEditable
-                          suppressContentEditableWarning
-                          className="p-3 overflow-auto focus:outline-none h-full"
-                          style={{width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
-                          dangerouslySetInnerHTML={{ __html: extractBodyForEdit(translationResults[0]?.translatedText) }}
-                          onBlur={(e) => {
-                            // Save edits back to translationResults
-                            const newResults = [...translationResults];
-                            newResults[0] = { ...newResults[0], translatedText: e.target.innerHTML };
-                            setTranslationResults(newResults);
-                          }}
-                        />
+                        <>
+                          <style>{`
+                            .translation-edit-area table { border-collapse: collapse; width: 100%; }
+                            .translation-edit-area td, .translation-edit-area th { border: 1px solid #333; padding: 5px 6px; font-size: 10pt; }
+                            .translation-edit-area img { max-width: 100%; height: auto; }
+                          `}</style>
+                          <div
+                            contentEditable
+                            suppressContentEditableWarning
+                            className="translation-edit-area p-3 overflow-auto focus:outline-none h-full"
+                            style={{width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px', fontFamily: "Georgia, 'Times New Roman', serif", lineHeight: '1.6'}}
+                            dangerouslySetInnerHTML={{ __html: extractBodyForEdit(translationResults[0]?.translatedText) }}
+                            onBlur={(e) => {
+                              // Save edits back to translationResults
+                              const newResults = [...translationResults];
+                              newResults[0] = { ...newResults[0], translatedText: e.target.innerHTML };
+                              setTranslationResults(newResults);
+                            }}
+                          />
+                        </>
                       ) : (
                         <iframe
                           srcDoc={translationResults[0]?.translatedText || '<p>No translation</p>'}
@@ -9664,17 +9671,24 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         className="w-full h-full border-0"
                       />
                     ) : (
-                      <div
-                        ref={editableRef}
-                        contentEditable
-                        suppressContentEditableWarning
-                        dangerouslySetInnerHTML={{ __html: extractBodyForEdit(translationResults[selectedResultIndex]?.translatedText) }}
-                        onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
-                        onMouseUp={saveSelection}
-                        onKeyUp={saveSelection}
-                        className="p-3 text-xs focus:outline-none overflow-auto h-full"
-                        style={{width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
-                      />
+                      <>
+                        <style>{`
+                          .translation-edit-area table { border-collapse: collapse; width: 100%; }
+                          .translation-edit-area td, .translation-edit-area th { border: 1px solid #333; padding: 5px 6px; font-size: 10pt; }
+                          .translation-edit-area img { max-width: 100%; height: auto; }
+                        `}</style>
+                        <div
+                          ref={editableRef}
+                          contentEditable
+                          suppressContentEditableWarning
+                          dangerouslySetInnerHTML={{ __html: extractBodyForEdit(translationResults[selectedResultIndex]?.translatedText) }}
+                          onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
+                          onMouseUp={saveSelection}
+                          onKeyUp={saveSelection}
+                          className="translation-edit-area p-3 text-xs focus:outline-none overflow-auto h-full"
+                          style={{width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px', fontFamily: "Georgia, 'Times New Roman', serif", lineHeight: '1.6'}}
+                        />
+                      </>
                     )}
                   </div>
                 </div>
@@ -9921,16 +9935,23 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         className="w-full h-full border-0 translation-preview-iframe"
                       />
                     ) : (
-                      <div
-                        contentEditable
-                        suppressContentEditableWarning
-                        dangerouslySetInnerHTML={{ __html: extractBodyForEdit(translationResults[selectedResultIndex]?.translatedText) }}
-                        onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
-                        onMouseUp={saveSelection}
-                        onKeyUp={saveSelection}
-                        className="p-3 text-xs focus:outline-none overflow-auto h-full"
-                        style={{width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
-                      />
+                      <>
+                        <style>{`
+                          .translation-edit-area table { border-collapse: collapse; width: 100%; }
+                          .translation-edit-area td, .translation-edit-area th { border: 1px solid #333; padding: 5px 6px; font-size: 10pt; }
+                          .translation-edit-area img { max-width: 100%; height: auto; }
+                        `}</style>
+                        <div
+                          contentEditable
+                          suppressContentEditableWarning
+                          dangerouslySetInnerHTML={{ __html: extractBodyForEdit(translationResults[selectedResultIndex]?.translatedText) }}
+                          onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
+                          onMouseUp={saveSelection}
+                          onKeyUp={saveSelection}
+                          className="translation-edit-area p-3 text-xs focus:outline-none overflow-auto h-full"
+                          style={{width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px', fontFamily: "Georgia, 'Times New Roman', serif", lineHeight: '1.6'}}
+                        />
+                      </>
                     )}
                   </div>
                 </div>
