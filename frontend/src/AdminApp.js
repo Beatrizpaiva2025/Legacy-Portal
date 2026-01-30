@@ -6295,12 +6295,24 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     <script>
         // Auto-scale translation content to always fit on 1 Letter page
         window.addEventListener('load', function() {
-            var maxH = 8.2 * 96; // 787px
+            // Letter: 11in - 0.7in top - 0.7in bottom = 9.6in usable
+            // Letterhead ~90px. Available for content: ~8.2in
+            var maxH = 8.2 * 96; // ~787px
             var items = document.querySelectorAll('.translation-content');
             for (var i = 0; i < items.length; i++) {
                 var el = items[i];
-                if (el.scrollHeight > maxH) {
-                    el.style.zoom = (maxH / el.scrollHeight).toFixed(4);
+                var sh = el.scrollHeight;
+                if (sh > maxH) {
+                    var scale = maxH / sh;
+                    el.style.transformOrigin = 'top left';
+                    el.style.transform = 'scale(' + scale.toFixed(4) + ')';
+                    // Expand width so scaled result fills 100% of parent
+                    el.style.width = (100 / scale).toFixed(2) + '%';
+                    // Set wrapper height to actual rendered height
+                    var wrapper = el.parentElement;
+                    if (wrapper) {
+                        wrapper.style.height = maxH + 'px';
+                    }
                 }
             }
         });
