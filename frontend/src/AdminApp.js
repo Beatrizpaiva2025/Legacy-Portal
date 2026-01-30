@@ -5531,7 +5531,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
     // Letterhead for all pages - Same style as cover
     const letterheadHTML = `
-        <div style="width: 100%; margin-bottom: 8px; padding-bottom: 4px; overflow: hidden;">
+        <div style="width: 100%; margin-bottom: 8px; padding-bottom: 8px; overflow: hidden;">
             <div style="float: left; width: 128px;">
                 ${logoLeft
                   ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
@@ -6078,7 +6078,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
     // Letterhead for all pages - Same style as cover
     const letterheadHTML = `
-        <div style="width: 100%; margin-bottom: 8px; padding-bottom: 4px; overflow: hidden;">
+        <div style="width: 100%; margin-bottom: 8px; padding-bottom: 8px; overflow: hidden;">
             <div style="float: left; width: 128px;">
                 ${logoLeft
                   ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
