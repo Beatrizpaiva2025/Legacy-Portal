@@ -28695,6 +28695,91 @@ async def mark_all_notifications_read(token: str = Header(None, alias="salespers
 
     return {"success": True}
 
+# Salesperson messaging
+@api_router.get("/salesperson/messages")
+async def get_salesperson_messages(token: str = Header(None, alias="salesperson-token")):
+    if not token:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    salesperson = await db.salespeople.find_one({"token": token})
+    if not salesperson:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    messages = await db.salesperson_messages.find(
+        {"salesperson_id": salesperson["id"]}
+    ).sort("created_at", -1).to_list(100)
+
+    for msg in messages:
+        msg["_id"] = str(msg["_id"])
+        if msg.get("created_at"):
+            msg["created_at"] = msg["created_at"].isoformat()
+
+    return {"messages": messages}
+
+@api_router.post("/salesperson/messages")
+async def send_salesperson_message(
+    token: str = Header(None, alias="salesperson-token"),
+    subject: str = Form(...),
+    content: str = Form(...)
+):
+    if not token:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    salesperson = await db.salespeople.find_one({"token": token})
+    if not salesperson:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    message_id = str(uuid.uuid4())
+    now = datetime.utcnow()
+
+    message = {
+        "id": message_id,
+        "salesperson_id": salesperson["id"],
+        "salesperson_name": salesperson.get("name", "Salesperson"),
+        "salesperson_email": salesperson.get("email", ""),
+        "subject": subject,
+        "content": content,
+        "to_salesperson": False,
+        "read": False,
+        "created_at": now
+    }
+
+    await db.salesperson_messages.insert_one(message)
+
+    # Create notification for admin
+    notification = {
+        "id": str(uuid.uuid4()),
+        "type": "salesperson_message",
+        "title": f"New message from salesperson {salesperson.get('name', 'Unknown')}",
+        "message": content[:100] + ("..." if len(content) > 100 else ""),
+        "salesperson_id": salesperson["id"],
+        "salesperson_name": salesperson.get("name", "Salesperson"),
+        "is_read": False,
+        "created_at": now
+    }
+    await db.notifications.insert_one(notification)
+
+    return {"status": "success", "message_id": message_id}
+
+@api_router.put("/salesperson/messages/{message_id}/read")
+async def mark_salesperson_message_read(message_id: str, token: str = Header(None, alias="salesperson-token")):
+    if not token:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    salesperson = await db.salespeople.find_one({"token": token})
+    if not salesperson:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    result = await db.salesperson_messages.update_one(
+        {"id": message_id, "salesperson_id": salesperson["id"]},
+        {"$set": {"read": True, "read_at": datetime.utcnow()}}
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    return {"status": "success"}
+
 # Salesperson payment history
 @api_router.get("/salesperson/payment-history")
 async def get_payment_history(token: str = Header(None, alias="salesperson-token")):
@@ -28919,6 +29004,87 @@ async def get_salesperson_ranking(admin_key: str = Header(None)):
         "month": current_month,
         "rankings": rankings
     }
+
+# Admin: View salesperson messages
+@api_router.get("/admin/salesperson-messages")
+async def get_admin_salesperson_messages(admin_key: str = Header(None), limit: int = 50):
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info or user_info.get("role") not in ["admin", "pm", "translator", "contractor", "inhouse"]:
+        raise HTTPException(status_code=401, detail="Invalid admin key or insufficient permissions")
+
+    messages = await db.salesperson_messages.find(
+        {"to_salesperson": False}
+    ).sort("created_at", -1).limit(limit).to_list(limit)
+
+    for msg in messages:
+        msg["_id"] = str(msg["_id"])
+        if msg.get("created_at"):
+            msg["created_at"] = msg["created_at"].isoformat()
+
+    return {"messages": messages}
+
+@api_router.put("/admin/salesperson-messages/{message_id}/read")
+async def admin_mark_salesperson_message_read(message_id: str, admin_key: str = Header(None)):
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info or user_info.get("role") not in ["admin", "pm", "translator", "contractor", "inhouse"]:
+        raise HTTPException(status_code=401, detail="Invalid admin key or insufficient permissions")
+
+    result = await db.salesperson_messages.update_one(
+        {"id": message_id},
+        {"$set": {"read": True, "read_at": datetime.utcnow()}}
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    return {"status": "success"}
+
+@api_router.post("/admin/salesperson-messages/{salesperson_id}/reply")
+async def admin_reply_to_salesperson(
+    salesperson_id: str,
+    admin_key: str = Header(None),
+    subject: str = Form(...),
+    content: str = Form(...)
+):
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info or user_info.get("role") not in ["admin", "pm", "translator", "contractor", "inhouse"]:
+        raise HTTPException(status_code=401, detail="Invalid admin key or insufficient permissions")
+
+    salesperson = await db.salespeople.find_one({"id": salesperson_id})
+    if not salesperson:
+        raise HTTPException(status_code=404, detail="Salesperson not found")
+
+    message_id = str(uuid.uuid4())
+    now = datetime.utcnow()
+
+    message = {
+        "id": message_id,
+        "salesperson_id": salesperson_id,
+        "salesperson_name": salesperson.get("name", "Salesperson"),
+        "subject": subject,
+        "content": content,
+        "to_salesperson": True,
+        "read": False,
+        "from_admin": True,
+        "admin_name": user_info.get("name", "Admin"),
+        "created_at": now
+    }
+
+    await db.salesperson_messages.insert_one(message)
+
+    # Create notification for salesperson
+    notification = {
+        "id": str(uuid.uuid4()),
+        "salesperson_id": salesperson_id,
+        "type": "new_message",
+        "title": "New message from Admin",
+        "message": content[:100] + ("..." if len(content) > 100 else ""),
+        "read": False,
+        "created_at": now.isoformat()
+    }
+    await db.salesperson_notifications.insert_one(notification)
+
+    return {"status": "success", "message_id": message_id}
 
 # Admin: Get pending commissions for payment
 @api_router.get("/admin/pending-commissions")
