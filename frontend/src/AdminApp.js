@@ -6201,12 +6201,16 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     // Translation pages HTML (with or without letterhead)
     // Content is auto-scaled via JS to always fit on 1 Letter page
     // First page doesn't need page-break since cover ends with one
+    // NOTE: extractBodyForEdit strips <html>/<head>/<style>/<body> wrapper from AI output.
+    // This prevents nested document styles (e.g. body{width:8.5in}) from conflicting
+    // with the download HTML's own getUnifiedPdfStyles(). Same approach as Quick Package
+    // which only embeds clean body content.
     const translationPagesHTML = translationResults.map((result, index) => `
     <div style="${index > 0 ? 'page-break-before: always;' : ''} padding-top: 5px;">
         ${includeLetterhead ? letterheadHTML : ''}
         <div style="overflow: hidden;" class="translation-wrapper">
             <div class="translation-content" style="padding: 0 20px; line-height: 1.5; font-size: 11pt;">
-                ${result.translatedText}
+                ${extractBodyForEdit(result.translatedText)}
             </div>
         </div>
     </div>
