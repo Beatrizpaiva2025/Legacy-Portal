@@ -9417,62 +9417,44 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               )}
 
               {/* View Mode Toggle + Download */}
-              <div className="flex justify-between items-center mb-2">
-                <div className="flex items-center gap-2">
-                  <div className="inline-flex rounded-md shadow-sm" role="group">
-                    <button
-                      onClick={() => setReviewViewMode('preview')}
-                      className={`px-3 py-1 text-xs font-medium rounded-l-md border ${
-                        reviewViewMode === 'preview'
-                          ? 'bg-blue-600 text-white border-blue-600'
-                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                      }`}
-                    >
-                      Preview
-                    </button>
-                    <button
-                      onClick={() => setReviewViewMode('edit')}
-                      className={`px-3 py-1 text-xs font-medium rounded-r-md border-t border-b border-r ${
-                        reviewViewMode === 'edit'
-                          ? 'bg-blue-600 text-white border-blue-600'
-                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                      }`}
-                    >
-                      Edit
-                    </button>
-                  </div>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="inline-flex rounded-md shadow-sm" role="group">
                   <button
-                    onClick={() => {
-                      const content = translationResults[selectedResultIndex]?.translatedText || '';
-                      const blob = new Blob([`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Translation</title></head><body>${content}</body></html>`], { type: 'text/html' });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = `translation_${orderNumber || 'document'}.html`;
-                      a.click();
-                      URL.revokeObjectURL(url);
-                    }}
-                    className="px-3 py-1 text-xs font-medium bg-green-600 text-white rounded hover:bg-green-700"
+                    onClick={() => setReviewViewMode('preview')}
+                    className={`px-3 py-1 text-xs font-medium rounded-l-md border ${
+                      reviewViewMode === 'preview'
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    }`}
                   >
-                    Download
+                    Preview
+                  </button>
+                  <button
+                    onClick={() => setReviewViewMode('edit')}
+                    className={`px-3 py-1 text-xs font-medium rounded-r-md border-t border-b border-r ${
+                      reviewViewMode === 'edit'
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    Edit
                   </button>
                 </div>
-
-                {/* Edit Toolbar */}
-                {reviewViewMode === 'edit' && (
-                  <div className="flex items-center space-x-1 bg-gray-100 px-2 py-1 rounded">
-                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('bold'); }} className="px-2 py-1 text-xs font-bold bg-white border rounded hover:bg-gray-200" title="Bold">B</button>
-                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('italic'); }} className="px-2 py-1 text-xs italic bg-white border rounded hover:bg-gray-200" title="Italic">I</button>
-                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('underline'); }} className="px-2 py-1 text-xs underline bg-white border rounded hover:bg-gray-200" title="Underline">U</button>
-                    <div className="w-px h-5 bg-gray-300 mx-1"></div>
-                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('decreaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200">A-</button>
-                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('increaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200">A+</button>
-                    <div className="w-px h-5 bg-gray-300 mx-1"></div>
-                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyLeft'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Left">⬅</button>
-                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyCenter'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Center">⬌</button>
-                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyRight'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Right">➡</button>
-                  </div>
-                )}
+                <button
+                  onClick={() => {
+                    const content = translationResults[selectedResultIndex]?.translatedText || '';
+                    const blob = new Blob([`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Translation</title></head><body>${content}</body></html>`], { type: 'text/html' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `translation_${orderNumber || 'document'}.html`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                  className="px-3 py-1 text-xs font-medium bg-green-600 text-white rounded hover:bg-green-700"
+                >
+                  Download
+                </button>
               </div>
 
               {/* Side by side view: Original | Translation */}
@@ -9504,13 +9486,28 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       />
                     </label>
                   </div>
-                  <div className="px-3 py-2">
+                  <div className="px-3 py-2 flex items-center justify-between">
                     <span className="text-xs font-bold text-gray-700">
                       Translation ({targetLanguage}) - {reviewViewMode === 'preview' ? 'Preview' : 'Editing'}
                     </span>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-0 h-96 overflow-hidden">
+                {/* Toolbar outside the height-constrained grid */}
+                {reviewViewMode === 'edit' && (
+                  <div className="flex items-center space-x-1 bg-gray-100 px-2 py-1 border-b">
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('bold'); }} className="px-2 py-1 text-xs font-bold bg-white border rounded hover:bg-gray-200" title="Bold">B</button>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('italic'); }} className="px-2 py-1 text-xs italic bg-white border rounded hover:bg-gray-200" title="Italic">I</button>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('underline'); }} className="px-2 py-1 text-xs underline bg-white border rounded hover:bg-gray-200" title="Underline">U</button>
+                    <div className="w-px h-5 bg-gray-300 mx-1"></div>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('decreaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200">A-</button>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('increaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200">A+</button>
+                    <div className="w-px h-5 bg-gray-300 mx-1"></div>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyLeft'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Left">⬅</button>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyCenter'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Center">⬌</button>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyRight'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Right">➡</button>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-0 h-[384px] overflow-hidden">
                   {/* Left: Original Document */}
                   <div className="border-r overflow-auto bg-gray-50 p-2" ref={originalTextRef} onScroll={() => handleScroll('original')}>
                     {originalImages[selectedResultIndex] ? (
@@ -9542,6 +9539,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       <div
                         ref={editableRef}
                         contentEditable
+                        suppressContentEditableWarning
                         dangerouslySetInnerHTML={{ __html: extractBodyForEdit(translationResults[selectedResultIndex]?.translatedText) }}
                         onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
                         onMouseUp={saveSelection}
