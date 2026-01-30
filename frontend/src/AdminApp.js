@@ -296,7 +296,42 @@ const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
     }
     img { max-width: 100%; height: auto; }
     table { border-collapse: collapse; width: 100%; }
-    td, th { border: 1px solid #333; padding: 5px 6px; font-size: 10pt; }
+    td, th { border: 1px solid #333; padding: 5px 6px; font-size: 10pt; vertical-align: top; }
+    /* Translation content: robust table layout for complex documents (birth certificates, etc.) */
+    .translation-content table {
+        table-layout: fixed;
+        width: 100%;
+        max-width: 100%;
+        border-collapse: collapse;
+        margin: 4px 0;
+        page-break-inside: auto;
+    }
+    .translation-content td,
+    .translation-content th {
+        border: 1px solid #333;
+        padding: 3px 5px;
+        font-size: 9pt;
+        line-height: 1.3;
+        vertical-align: top;
+        text-align: left;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        word-break: normal;
+        overflow: hidden;
+    }
+    .translation-content tr {
+        page-break-inside: avoid;
+    }
+    .translation-content p {
+        margin: 0 0 2px 0;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+    .translation-content td p:last-child,
+    .translation-content th p:last-child {
+        margin-bottom: 0;
+    }
+    .translation-content thead { display: table-header-group; }
     @media print {
         body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .page-break { page-break-before: always; }
@@ -4691,7 +4726,16 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         try {
           const arrayBuffer = e.target.result;
           const result = await mammoth.convertToHtml({ arrayBuffer });
-          resolve(result.value);
+          // Post-process: add inline styles to tables for robust rendering
+          // This ensures tables render correctly even if external CSS is overridden
+          let html = result.value;
+          html = html.replace(/<table(?=[>\s])/g,
+            '<table style="table-layout:fixed;width:100%;border-collapse:collapse;"');
+          html = html.replace(/<td(?=[>\s])/g,
+            '<td style="vertical-align:top;word-wrap:break-word;overflow-wrap:break-word;overflow:hidden;padding:3px 5px;"');
+          html = html.replace(/<th(?=[>\s])/g,
+            '<th style="vertical-align:top;word-wrap:break-word;overflow-wrap:break-word;overflow:hidden;padding:3px 5px;font-weight:bold;"');
+          resolve(html);
         } catch (err) {
           reject(err);
         }
@@ -6212,13 +6256,22 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     ${certificationPageHTML}
     <script>
         // Auto-scale translation content to always fit on 1 Letter page
+        // Uses transform:scale() instead of CSS zoom to avoid text distortion/overlap
         window.addEventListener('load', function() {
-            var maxH = 8.2 * 96; // 787px
+            var maxH = 8.2 * 96; // ~787px
             var items = document.querySelectorAll('.translation-content');
             for (var i = 0; i < items.length; i++) {
                 var el = items[i];
-                if (el.scrollHeight > maxH) {
-                    el.style.zoom = (maxH / el.scrollHeight).toFixed(4);
+                var sh = el.scrollHeight;
+                if (sh > maxH) {
+                    var scale = maxH / sh;
+                    el.style.transformOrigin = 'top left';
+                    el.style.transform = 'scale(' + scale.toFixed(4) + ')';
+                    el.style.width = (100 / scale).toFixed(2) + '%';
+                    var wrapper = el.parentElement;
+                    if (wrapper) {
+                        wrapper.style.height = maxH + 'px';
+                    }
                 }
             }
         });
@@ -13496,9 +13549,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     .cover-page { page: cover; page-break-after: always; min-height: 100%; display: flex; flex-direction: column; }
     .translation-text-page { page-break-before: always; }
     .translation-content.translation-text { text-align: left; font-family: 'Times New Roman', Georgia, serif; font-size: 11pt; line-height: 1.5; color: #333; }
-    .translation-content.translation-text p { margin-bottom: 10px; text-align: justify; }
-    .translation-content.translation-text table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-    .translation-content.translation-text td, .translation-content.translation-text th { border: 1px solid #333; padding: 6px; font-size: 10pt; }
+    .translation-content.translation-text p { margin-bottom: 10px; text-align: justify; word-wrap: break-word; overflow-wrap: break-word; }
+    .translation-content.translation-text table { width: 100%; max-width: 100%; border-collapse: collapse; margin: 10px 0; table-layout: fixed; page-break-inside: auto; }
+    .translation-content.translation-text td, .translation-content.translation-text th { border: 1px solid #333; padding: 4px 6px; font-size: 9pt; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; overflow: hidden; line-height: 1.3; }
+    .translation-content.translation-text tr { page-break-inside: avoid; }
     .page-title { font-size: 13px; font-weight: bold; text-align: center; margin: 10px 0 8px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
     .original-documents-page { page-break-after: always; page-break-inside: avoid; padding-top: 15px; }
     .original-documents-page:last-of-type { page-break-after: auto; }
@@ -25733,9 +25787,10 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     .cover-page { page: cover; page-break-after: always; min-height: 100%; display: flex; flex-direction: column; }
     .translation-text-page { page-break-before: always; }
     .translation-content.translation-text { text-align: left; font-family: 'Times New Roman', Georgia, serif; font-size: 11pt; line-height: 1.5; color: #333; }
-    .translation-content.translation-text p { margin-bottom: 10px; text-align: justify; }
-    .translation-content.translation-text table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-    .translation-content.translation-text td, .translation-content.translation-text th { border: 1px solid #333; padding: 6px; font-size: 10pt; }
+    .translation-content.translation-text p { margin-bottom: 10px; text-align: justify; word-wrap: break-word; overflow-wrap: break-word; }
+    .translation-content.translation-text table { width: 100%; max-width: 100%; border-collapse: collapse; margin: 10px 0; table-layout: fixed; page-break-inside: auto; }
+    .translation-content.translation-text td, .translation-content.translation-text th { border: 1px solid #333; padding: 4px 6px; font-size: 9pt; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; overflow: hidden; line-height: 1.3; }
+    .translation-content.translation-text tr { page-break-inside: avoid; }
     .page-title { font-size: 13px; font-weight: bold; text-align: center; margin: 10px 0 8px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
     .original-documents-page { page-break-after: always; page-break-inside: avoid; padding-top: 15px; }
     .original-documents-page:last-of-type { page-break-after: auto; }
@@ -26139,7 +26194,15 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
           setProcessingStatus(`Converting Word document: ${file.name}`);
           const arrayBuffer = await file.arrayBuffer();
           const result = await mammoth.convertToHtml({ arrayBuffer });
-          htmlContent = result.value;
+          // Post-process: add inline styles to tables for robust rendering
+          let convertedHtml = result.value;
+          convertedHtml = convertedHtml.replace(/<table(?=[>\s])/g,
+            '<table style="table-layout:fixed;width:100%;border-collapse:collapse;"');
+          convertedHtml = convertedHtml.replace(/<td(?=[>\s])/g,
+            '<td style="vertical-align:top;word-wrap:break-word;overflow-wrap:break-word;overflow:hidden;padding:3px 5px;"');
+          convertedHtml = convertedHtml.replace(/<th(?=[>\s])/g,
+            '<th style="vertical-align:top;word-wrap:break-word;overflow-wrap:break-word;overflow:hidden;padding:3px 5px;font-weight:bold;"');
+          htmlContent = convertedHtml;
         } catch (err) {
           console.error('Word conversion error:', err);
           showToast(`Error converting Word document: ${file.name}`);
@@ -26667,7 +26730,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         .translation-text { font-size: 12px; line-height: 1.6; }
         .translation-text p { margin-bottom: 12px; text-align: justify; orphans: 4; widows: 4; }
         .translation-text table { width: 100%; max-width: 100%; border-collapse: collapse; margin: 15px 0; table-layout: fixed; page-break-inside: auto; }
-        .translation-text td, .translation-text th { border: 1px solid #ccc; padding: 6px 8px; font-size: 11px; word-wrap: break-word; overflow-wrap: break-word; }
+        .translation-text td, .translation-text th { border: 1px solid #ccc; padding: 4px 6px; font-size: 9pt; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; overflow: hidden; line-height: 1.3; }
         .translation-text tr { page-break-inside: avoid; page-break-after: auto; }
         .translation-text thead { display: table-header-group; }
         .page-title { font-size: 13px; font-weight: bold; text-align: center; margin: 15px 0 10px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; page-break-after: avoid; }

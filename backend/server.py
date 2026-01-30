@@ -3898,12 +3898,12 @@ def extract_tables_from_textract(blocks: list) -> list:
                     table_grid[row_idx][col_idx] = cell_text.strip()
 
             # Build HTML table
-            html = '<table style="border-collapse: collapse; width: 100%; margin: 10px 0;">\n'
+            html = '<table style="border-collapse: collapse; width: 100%; max-width: 100%; margin: 10px 0; table-layout: fixed;">\n'
             for row_idx, row in enumerate(table_grid):
                 html += '  <tr>\n'
                 for col_idx, cell_text in enumerate(row):
                     tag = 'th' if row_idx == 0 else 'td'
-                    style = 'border: 1px solid #333; padding: 8px; text-align: left;'
+                    style = 'border: 1px solid #333; padding: 4px 6px; font-size: 9pt; text-align: left; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; overflow: hidden; line-height: 1.3;'
                     if row_idx == 0:
                         style += ' background-color: #f0f0f0; font-weight: bold;'
                     html += f'    <{tag} style="{style}">{cell_text}</{tag}>\n'
@@ -4124,7 +4124,7 @@ def _render_table_block(table_block: dict, block_map: dict) -> str:
                             table_grid[row_idx + r][col_idx + c]['skip'] = True
 
     # Build HTML table
-    table_html = '<table style="border-collapse: collapse; width: 100%; font-size: 11px;">\n'
+    table_html = '<table style="border-collapse: collapse; width: 100%; max-width: 100%; font-size: 9pt; table-layout: fixed;">\n'
     for row_idx, row in enumerate(table_grid):
         table_html += '  <tr>\n'
         for col_idx, cell_data in enumerate(row):
@@ -4132,7 +4132,7 @@ def _render_table_block(table_block: dict, block_map: dict) -> str:
                 continue
 
             tag = 'th' if row_idx == 0 else 'td'
-            style = 'border: 1px solid #333; padding: 6px 8px; text-align: left; vertical-align: top;'
+            style = 'border: 1px solid #333; padding: 4px 6px; font-size: 9pt; text-align: left; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; overflow: hidden; line-height: 1.3;'
             if row_idx == 0:
                 style += ' background-color: #e8e8e8; font-weight: bold;'
 
@@ -23461,13 +23461,21 @@ def combine_chunk_translations(translations: list, total_pages: int) -> str:
         }}
         table {{
             width: 100%;
+            max-width: 100%;
             border-collapse: collapse;
             margin: 15px 0;
+            table-layout: fixed;
         }}
         td, th {{
             border: 1px solid #333;
-            padding: 8px;
+            padding: 4px 6px;
+            font-size: 9pt;
             text-align: left;
+            vertical-align: top;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            overflow: hidden;
+            line-height: 1.3;
         }}
         .page-break {{
             page-break-before: always;
@@ -23695,13 +23703,21 @@ def combine_layout_chunks(chunks: list, config: dict) -> str:
         }}
         table {{
             width: 100%;
+            max-width: 100%;
             border-collapse: collapse;
             margin: 15px 0;
+            table-layout: fixed;
         }}
         td, th {{
             border: 1px solid #333;
-            padding: 8px;
+            padding: 4px 6px;
+            font-size: 9pt;
             text-align: left;
+            vertical-align: top;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            overflow: hidden;
+            line-height: 1.3;
         }}
         .page-break {{
             page-break-before: always;
