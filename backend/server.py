@@ -21332,51 +21332,60 @@ async def send_followup_email(email: str, name: str, quote: dict, reminder_numbe
         intro = f"This is your final reminder! Don't miss out on {discount_percent}% off your translation. This offer expires soon!"
         cta_text = "Get Started Now"
 
-    discount_section = ""
+    discount_html = ""
     if discount_code and discount_percent > 0:
-        discount_section = f"""
-        <div style="background: #fef3c7; padding: 20px; border-radius: 10px; margin: 20px 0; text-align: center;">
-            <p style="margin: 0 0 10px 0; font-size: 14px;">Use code at checkout:</p>
-            <p style="font-size: 24px; font-weight: bold; color: #d97706; margin: 0;">{discount_code}</p>
-            <p style="margin: 10px 0 0 0; font-size: 14px;">for <strong>{discount_percent}% OFF</strong></p>
-            <p style="margin: 10px 0 0 0; font-size: 12px; color: #666;">Was: ${total_price:.2f} | Now: ${discounted_price:.2f}</p>
-        </div>
-        """
+        discount_html = f"""
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #fdf6e3 0%, #fef3c7 100%); border: 1px solid #e6c547; border-radius: 8px; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 25px; text-align: center;">
+                                        <p style="color: #1a2a4a; font-size: 14px; margin: 0 0 10px 0;">Use code at checkout:</p>
+                                        <p style="font-size: 24px; font-weight: 700; color: #c9a227; margin: 0; letter-spacing: 1px;">{discount_code}</p>
+                                        <p style="margin: 10px 0 0 0; font-size: 14px; color: #4a5568;">for <strong>{discount_percent}% OFF</strong></p>
+                                        <p style="margin: 10px 0 0 0; font-size: 12px; color: #64748b;">Was: ${total_price:.2f} | Now: ${discounted_price:.2f}</p>
+                                    </td>
+                                </tr>
+                            </table>"""
 
     content = f"""
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #fff;">
-        <div style="background: linear-gradient(135deg, #0d9488 0%, #0891b2 100%); padding: 20px; border-radius: 10px 10px 0 0;">
-            <img src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png" alt="Legacy Translations" style="max-width: 150px;">
-        </div>
+                            <p style="color: #1a2a4a; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
+                                Hello, {name}
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 25px 0;">
+                                {intro}
+                            </p>
 
-        <div style="padding: 30px;">
-            <h2 style="color: #0d9488; margin-top: 0;">Hello {name}!</h2>
-            <p>{intro}</p>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: #f0f4f8; border: 1px solid #e2e8f0; border-radius: 8px; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 20px;">
+                                        <p style="color: #1a2a4a; font-size: 14px; margin: 0 0 8px 0;"><strong>Service:</strong> <span style="color: #4a5568;">{quote.get('service_type', 'Translation').replace('_', ' ').title()}</span></p>
+                                        <p style="color: #1a2a4a; font-size: 14px; margin: 0 0 8px 0;"><strong>Languages:</strong> <span style="color: #4a5568;">{quote.get('translate_from', 'Source')} → {quote.get('translate_to', 'Target')}</span></p>
+                                        <p style="font-size: 20px; color: #c9a227; font-weight: 700; margin: 15px 0 0 0;">Total: ${total_price:.2f}</p>
+                                    </td>
+                                </tr>
+                            </table>
 
-            <div style="background: #f0fdfa; padding: 20px; border-radius: 10px; margin: 20px 0;">
-                <p><strong>Service:</strong> {quote.get('service_type', 'Translation').replace('_', ' ').title()}</p>
-                <p><strong>Languages:</strong> {quote.get('translate_from', 'Source')} → {quote.get('translate_to', 'Target')}</p>
-                <p style="font-size: 20px; color: #0d9488; font-weight: bold; margin: 10px 0 0 0;">Total: ${total_price:.2f}</p>
-            </div>
+                            {discount_html}
 
-            {discount_section}
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 30px 0;">
+                                <tr>
+                                    <td align="center">
+                                        <a href="{frontend_url}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); color: #ffffff; text-decoration: none; padding: 18px 45px; border-radius: 50px; font-size: 16px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(26, 42, 74, 0.3);">
+                                            {cta_text.upper()}
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
 
-            <div style="text-align: center; margin: 30px 0;">
-                <a href="{frontend_url}" style="display: inline-block; padding: 15px 40px; background: #0d9488; color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">{cta_text}</a>
-            </div>
+                            <p style="color: #64748b; font-size: 13px; line-height: 1.7; margin: 25px 0 0 0;">
+                                If you have any questions, feel free to reply to this email or call us at +1(857)316-7770.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 20px 0;">
+                                Regards,
+                            </p>"""
 
-            <p style="color: #666; font-size: 14px;">If you have any questions, feel free to reply to this email or call us at +1(857)316-7770.</p>
+    full_html = get_email_header() + content + get_email_footer(include_review_button=False)
 
-            <p>Best regards,<br>Legacy Translations Team</p>
-        </div>
-
-        <div style="background: #f3f4f6; padding: 20px; text-align: center; border-radius: 0 0 10px 10px;">
-            <p style="margin: 0; color: #666; font-size: 12px;">Legacy Translations | www.legacytranslations.com</p>
-        </div>
-    </div>
-    """
-
-    await email_service.send_email(email, subject, content)
+    await email_service.send_email(email, subject, full_html)
     logger.info(f"Follow-up email #{reminder_number} sent to {email}")
 
 async def send_quote_order_followup_email(email: str, name: str, order: dict, reminder_number: int, discount_percent: int, discount_code: str = None):
@@ -21399,65 +21408,96 @@ async def send_quote_order_followup_email(email: str, name: str, order: dict, re
         intro = f"This is your last chance to get {discount_percent}% off! Don't miss this special offer."
         cta_text = "Get Started Now"
 
-    discount_section = ""
+    discount_html = ""
     if discount_code and discount_percent > 0:
-        discount_section = f"""
-        <div style="background: #fef3c7; padding: 20px; border-radius: 10px; margin: 20px 0; text-align: center;">
-            <p style="margin: 0 0 10px 0; font-size: 14px;">Use code at checkout:</p>
-            <p style="font-size: 24px; font-weight: bold; color: #d97706; margin: 0;">{discount_code}</p>
-            <p style="margin: 10px 0 0 0; font-size: 14px;">for <strong>{discount_percent}% OFF</strong></p>
-            <p style="margin: 10px 0 0 0; font-size: 12px; color: #666;">Was: ${total_price:.2f} | Now: ${discounted_price:.2f}</p>
-        </div>
-        """
+        discount_html = f"""
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #fdf6e3 0%, #fef3c7 100%); border: 1px solid #e6c547; border-radius: 8px; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 25px; text-align: center;">
+                                        <p style="color: #1a2a4a; font-size: 14px; margin: 0 0 10px 0;">Use code at checkout:</p>
+                                        <p style="font-size: 24px; font-weight: 700; color: #c9a227; margin: 0; letter-spacing: 1px;">{discount_code}</p>
+                                        <p style="margin: 10px 0 0 0; font-size: 14px; color: #4a5568;">for <strong>{discount_percent}% OFF</strong></p>
+                                        <p style="margin: 10px 0 0 0; font-size: 12px; color: #64748b;">Was: ${total_price:.2f} | Now: ${discounted_price:.2f}</p>
+                                    </td>
+                                </tr>
+                            </table>"""
 
     content = f"""
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #fff;">
-        <div style="background: linear-gradient(135deg, #0d9488 0%, #0891b2 100%); padding: 20px; border-radius: 10px 10px 0 0;">
-            <img src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png" alt="Legacy Translations" style="max-width: 150px;">
-        </div>
+                            <p style="color: #1a2a4a; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
+                                Hello, {name}
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 25px 0;">
+                                {intro}
+                            </p>
 
-        <div style="padding: 30px;">
-            <h2 style="color: #0d9488; margin-top: 0;">Hello {name}!</h2>
-            <p>{intro}</p>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: #f0f4f8; border: 1px solid #e2e8f0; border-radius: 8px; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 20px;">
+                                        <p style="color: #1a2a4a; font-size: 14px; margin: 0 0 8px 0;"><strong>Quote #:</strong> <span style="color: #4a5568;">{order_number}</span></p>
+                                        <p style="color: #1a2a4a; font-size: 14px; margin: 0 0 8px 0;"><strong>Service:</strong> <span style="color: #4a5568;">{order.get('service_type', 'Translation').replace('_', ' ').title()}</span></p>
+                                        <p style="color: #1a2a4a; font-size: 14px; margin: 0 0 8px 0;"><strong>Languages:</strong> <span style="color: #4a5568;">{order.get('translate_from', 'Source')} → {order.get('translate_to', 'Target')}</span></p>
+                                        <p style="color: #1a2a4a; font-size: 14px; margin: 0 0 8px 0;"><strong>Pages:</strong> <span style="color: #4a5568;">{order.get('page_count', 1)}</span></p>
+                                        <p style="font-size: 20px; color: #c9a227; font-weight: 700; margin: 15px 0 0 0;">Total: ${total_price:.2f}</p>
+                                    </td>
+                                </tr>
+                            </table>
 
-            <div style="background: #f0fdfa; padding: 20px; border-radius: 10px; margin: 20px 0;">
-                <p><strong>Quote #:</strong> {order_number}</p>
-                <p><strong>Service:</strong> {order.get('service_type', 'Translation').replace('_', ' ').title()}</p>
-                <p><strong>Languages:</strong> {order.get('translate_from', 'Source')} → {order.get('translate_to', 'Target')}</p>
-                <p><strong>Pages:</strong> {order.get('page_count', 1)}</p>
-                <p style="font-size: 20px; color: #0d9488; font-weight: bold; margin: 10px 0 0 0;">Total: ${total_price:.2f}</p>
-            </div>
+                            {discount_html}
 
-            {discount_section}
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 30px 0;">
+                                <tr>
+                                    <td align="center">
+                                        <a href="{frontend_url}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); color: #ffffff; text-decoration: none; padding: 18px 45px; border-radius: 50px; font-size: 16px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(26, 42, 74, 0.3);">
+                                            {cta_text.upper()}
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
 
-            <div style="text-align: center; margin: 30px 0;">
-                <a href="{frontend_url}" style="display: inline-block; padding: 15px 40px; background: #0d9488; color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">{cta_text}</a>
-            </div>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: #f0f4f8; border: 1px solid #e2e8f0; border-radius: 8px; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 20px;">
+                                        <p style="color: #1a2a4a; font-size: 14px; font-weight: 600; margin: 0 0 12px 0;">
+                                            Payment Options
+                                        </p>
+                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                            <tr>
+                                                <td width="50%" style="padding-right: 8px; vertical-align: top;">
+                                                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px;">
+                                                        <tr>
+                                                            <td style="padding: 12px;">
+                                                                <p style="color: #1a2a4a; font-size: 13px; font-weight: 600; margin: 0;">Zelle</p>
+                                                                <p style="color: #64748b; font-size: 13px; margin: 5px 0 0 0;">857-208-1139</p>
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+                                                </td>
+                                                <td width="50%" style="padding-left: 8px; vertical-align: top;">
+                                                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px;">
+                                                        <tr>
+                                                            <td style="padding: 12px;">
+                                                                <p style="color: #1a2a4a; font-size: 13px; font-weight: 600; margin: 0;">Venmo</p>
+                                                                <p style="color: #64748b; font-size: 13px; margin: 5px 0 0 0;">@legacytranslations</p>
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
 
-            <h3 style="color: #0d9488;">Payment Options</h3>
-            <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-                <div style="flex: 1; min-width: 150px; background: #f0fdf4; padding: 15px; border-radius: 8px;">
-                    <p style="margin: 0;"><strong>Zelle</strong></p>
-                    <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">857-208-1139</p>
-                </div>
-                <div style="flex: 1; min-width: 150px; background: #eff6ff; padding: 15px; border-radius: 8px;">
-                    <p style="margin: 0;"><strong>Venmo</strong></p>
-                    <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">@legacytranslations</p>
-                </div>
-            </div>
+                            <p style="color: #64748b; font-size: 13px; line-height: 1.7; margin: 25px 0 0 0;">
+                                If you have any questions, feel free to reply to this email or call us at +1(857)316-7770.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 20px 0;">
+                                Regards,
+                            </p>"""
 
-            <p style="margin-top: 20px; color: #666; font-size: 14px;">Questions? Reply to this email or call +1(857)316-7770.</p>
+    full_html = get_email_header() + content + get_email_footer(include_review_button=False)
 
-            <p>Best regards,<br>Legacy Translations Team</p>
-        </div>
-
-        <div style="background: #f3f4f6; padding: 20px; text-align: center; border-radius: 0 0 10px 10px;">
-            <p style="margin: 0; color: #666; font-size: 12px;">Legacy Translations | www.legacytranslations.com</p>
-        </div>
-    </div>
-    """
-
-    await email_service.send_email(email, subject, content)
+    await email_service.send_email(email, subject, full_html)
     logger.info(f"Quote order follow-up email #{reminder_number} sent to {email} for {order_number}")
 
 @api_router.get("/admin/quotes/followup-status")
