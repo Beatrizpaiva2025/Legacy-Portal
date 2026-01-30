@@ -29848,16 +29848,16 @@ const SalesControlPage = ({ adminKey }) => {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-2">
-                        {!sp.password_hash && (
+                        {(!sp.password_hash || sp.status === 'pending') && (
                           <button
                             onClick={() => handleInviteSalesperson(sp.id)}
                             className="p-1 text-purple-500 hover:bg-purple-50 rounded"
-                            title="Send Invite"
+                            title={sp.password_hash ? "Resend Invite" : "Send Invite"}
                           >
                             📧
                           </button>
                         )}
-                        {sp.password_hash && (
+                        {sp.password_hash && sp.status === 'active' && (
                           <span className="p-1 text-green-500" title="Account Active">
                             ✅
                           </span>
