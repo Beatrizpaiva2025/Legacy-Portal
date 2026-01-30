@@ -5167,24 +5167,21 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
   };
 
-  // Extract body content and styles from full HTML document for contentEditable rendering
+  // Extract body content from full HTML document for contentEditable rendering
   // This fixes the "shrink" issue when editing full HTML documents in a div
+  // NOTE: <style> tags are NOT included because they apply globally to the page DOM
+  // (unlike an iframe which sandboxes styles). This prevents document CSS rules like
+  // body { width: 8.5in } from shrinking the entire workspace page.
+  // Inline styles on elements are preserved. For exact rendering, use Preview (iframe).
   const extractBodyForEdit = (html) => {
     if (!html) return '<p>No translation</p>';
 
-    // If it's not a full HTML document, return as-is
+    // If it's not a full HTML document, return as-is (but strip any style tags)
     if (!html.includes('<body') && !html.includes('<html')) {
-      return html;
+      return html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
     }
 
-    // Extract style content from head
-    let styles = '';
-    const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/gi);
-    if (styleMatch) {
-      styles = styleMatch.map(s => s.replace(/<\/?style[^>]*>/gi, '')).join('\n');
-    }
-
-    // Extract body content
+    // Extract body content only (no style tags)
     let bodyContent = html;
     const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
     if (bodyMatch) {
@@ -5197,10 +5194,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       }
     }
 
-    // Wrap with styles if present
-    if (styles) {
-      return `<style>${styles}</style>${bodyContent}`;
-    }
+    // Remove any remaining style tags from the body content
+    bodyContent = bodyContent.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
 
     return bodyContent;
   };
