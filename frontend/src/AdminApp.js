@@ -5047,7 +5047,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
         // Add page context to help Claude understand this is part of a multi-page document
         const pageContext = totalPages > 1
-          ? `IMPORTANT: This is PAGE ${pageNumber} of ${totalPages} of a multi-page document. Translate ONLY the content visible in THIS image completely. Do NOT ask for other pages - they will be translated setotely.`
+          ? `IMPORTANT: This is image ${pageNumber} of ${totalPages} of a multi-page document. Translate ONLY the content visible in THIS image completely. Do NOT ask for other pages - they will be translated separately. Do NOT include any "PAGE 1" or "Page X of Y" headers/labels in your translation output - just translate the document content directly.`
           : '';
 
         const response = await axios.post(`${API}/admin/translate?admin_key=${adminKey}`, {
