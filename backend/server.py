@@ -8100,9 +8100,70 @@ async def submit_translation(
                 "size": len(file_content)
             }
         await db.translation_submissions.insert_one(submission)
+
+        # Update order status
+        order_update = {
+            "translation_status": "ready_for_review",
+            "submission_id": submission_id,
+            "submitted_at": datetime.utcnow(),
+            "submitted_by": user["id"]
+        }
+
+        # IMPORTANT: Also save translation_html to the order so it's available for delivery
+        if translation_html:
+            order_update["translation_html"] = translation_html
+            logger.info(f"Saving translation_html to order {order_id} ({len(translation_html)} chars)")
+
+            # Also save as document in order_documents for the delivery flow
+            try:
+                order_data = await db.translation_orders.find_one({"id": order_id})
+                order_number = order_data.get("order_number", "Translation") if order_data else "Translation"
+                doc_filename = f"{order_number}_Translation.html"
+                doc_base64 = base64.b64encode(translation_html.encode('utf-8')).decode('utf-8')
+
+                doc_record = {
+                    "id": str(uuid.uuid4()),
+                    "order_id": order_id,
+                    "filename": doc_filename,
+                    "data": doc_base64,
+                    "file_data": doc_base64,
+                    "content_type": "text/html",
+                    "source": "translated_document",
+                    "uploaded_at": datetime.utcnow()
+                }
+                await db.order_documents.insert_one(doc_record)
+                logger.info(f"Saved translation as document: {doc_filename} for order {order_id}")
+            except Exception as doc_err:
+                logger.error(f"Failed to save translation as document: {str(doc_err)}")
+
+        # If translator uploaded a file, save it to the order and order_documents
+        if translation_file and submission.get("translation_file"):
+            tf = submission["translation_file"]
+            order_update["translated_file"] = tf["data"]
+            order_update["translated_filename"] = tf["filename"]
+            order_update["translated_file_type"] = tf["content_type"]
+            logger.info(f"Saving translated_file to order {order_id}: {tf['filename']}")
+
+            # Also save to order_documents
+            try:
+                doc_record = {
+                    "id": str(uuid.uuid4()),
+                    "order_id": order_id,
+                    "filename": tf["filename"],
+                    "data": tf["data"],
+                    "file_data": tf["data"],
+                    "content_type": tf["content_type"],
+                    "source": "translated_document",
+                    "uploaded_at": datetime.utcnow()
+                }
+                await db.order_documents.insert_one(doc_record)
+                logger.info(f"Saved translation file as document: {tf['filename']} for order {order_id}")
+            except Exception as doc_err:
+                logger.error(f"Failed to save translation file as document: {str(doc_err)}")
+
         await db.translation_orders.update_one(
             {"id": order_id},
-            {"$set": {"translation_status": "ready_for_review", "submission_id": submission_id, "submitted_at": datetime.utcnow(), "submitted_by": user["id"]}}
+            {"$set": order_update}
         )
         logger.info(f"Translation submitted: {submission_id} by {user.get('name', user['id'])}")
         return {"status": "success", "submission_id": submission_id, "message": "Translation submitted for review"}
