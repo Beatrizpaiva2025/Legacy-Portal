@@ -371,7 +371,7 @@ const sanitizeErrorMessage = (errorMsg) => {
 const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
     @page {
         size: ${pageSizeCSS};
-        margin: 0.7in 0.75in 0.7in 0.75in;
+        margin: 0.5in 0.5in;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -380,6 +380,7 @@ const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
         line-height: 1.6;
         color: #333;
         background: white;
+        padding: 0.2in 0.25in;
     }
     img { max-width: 100%; height: auto; }
     table { border-collapse: collapse; width: 100%; }
@@ -5640,20 +5641,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     // Filter out files with invalid/missing data to prevent blank pages
     const validTranslationFiles = quickTranslationFiles.filter(file => file.data && file.data.length > 100);
 
-    // Prefer image files if available (from images or PDF conversion) - each page gets its own header
-    // First page doesn't need page-break since cover ends with one
-    if (validTranslationFiles.length > 0) {
-      translationPagesHTML = validTranslationFiles.map((file, idx) => `
-    <div style="${idx > 0 ? 'page-break-before: always;' : ''} padding-top: 5px;">
-        ${includeLetterhead ? letterheadHTML : ''}
-        <div>
-            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Translation page ${idx + 1}" style="width: 100%; max-height: 8.5in; object-fit: contain; display: block; margin: 0 auto;" />
-        </div>
-    </div>`).join('');
-    }
-    // Otherwise use HTML content (from Word/HTML/TXT)
+    // Prefer HTML content to maintain original quality (not converted to image)
     // Content is auto-scaled via JS to always fit on 1 Letter page
-    else if (quickTranslationHtml) {
+    // First page doesn't need page-break since cover ends with one
+    if (quickTranslationHtml) {
       translationPagesHTML = `
     <div style="padding-top: 5px;">
         ${includeLetterhead ? letterheadHTML : ''}
@@ -5663,6 +5654,16 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             </div>
         </div>
     </div>`;
+    }
+    // Fallback to image files if no HTML available
+    else if (validTranslationFiles.length > 0) {
+      translationPagesHTML = validTranslationFiles.map((file, idx) => `
+    <div style="${idx > 0 ? 'page-break-before: always;' : ''} padding-top: 5px;">
+        ${includeLetterhead ? letterheadHTML : ''}
+        <div>
+            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Translation page ${idx + 1}" style="width: 100%; max-height: 8.5in; object-fit: contain; display: block; margin: 0 auto;" />
+        </div>
+    </div>`).join('');
     }
 
     // Original document pages - wrapped for auto-scaling like translation pages
@@ -13666,10 +13667,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   <meta charset="UTF-8">
   <title>Certified Translation - ${orderData.order_number || 'Document'}</title>
   <style>
-    @page { size: Letter; margin: 0.5in 0.6in 0.6in 0.6in; }
-    @page cover { size: Letter; margin: 0.75in; }
+    @page { size: Letter; margin: 0.5in 0.5in; }
+    @page cover { size: Letter; margin: 0.5in; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Times New Roman', Georgia, serif; font-size: 13px; line-height: 1.5; color: #333; }
+    body { font-family: 'Times New Roman', Georgia, serif; font-size: 13px; line-height: 1.5; color: #333; padding: 0.2in 0.25in; }
     .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; }
     .header-line { height: 3px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 12px; }
     .logo-left { width: 130px; height: 55px; display: flex; align-items: center; }
@@ -25909,10 +25910,10 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   <meta charset="UTF-8">
   <title>Certified Translation - ${orderData.order_number || 'Document'}</title>
   <style>
-    @page { size: Letter; margin: 0.5in 0.6in 0.6in 0.6in; }
-    @page cover { size: Letter; margin: 0.75in; }
+    @page { size: Letter; margin: 0.5in 0.5in; }
+    @page cover { size: Letter; margin: 0.5in; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Times New Roman', Georgia, serif; font-size: 13px; line-height: 1.5; color: #333; }
+    body { font-family: 'Times New Roman', Georgia, serif; font-size: 13px; line-height: 1.5; color: #333; padding: 0.2in 0.25in; }
     .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; }
     .header-line { height: 3px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 12px; }
     .logo-left { width: 130px; height: 55px; display: flex; align-items: center; }
