@@ -9642,34 +9642,80 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <div className="grid grid-cols-2 gap-0 bg-gray-100 border-b">
                   <div className="px-3 py-2 border-r flex items-center justify-between">
                     <span className="text-xs font-bold text-gray-700">Original Document</span>
-                    <label className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded cursor-pointer hover:bg-blue-600">
-                      Upload
-                      <input
-                        type="file"
-                        accept="image/*,.pdf"
-                        className="hidden"
-                        onChange={(e) => {
-                          if (e.target.files && e.target.files[0]) {
-                            const file = e.target.files[0];
-                            const reader = new FileReader();
-                            reader.onload = (event) => {
-                              const newOriginalImages = [...originalImages];
-                              newOriginalImages[selectedResultIndex] = {
-                                data: event.target.result,
-                                filename: file.name
+                    <div className="flex items-center gap-1">
+                      <label className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded cursor-pointer hover:bg-blue-600">
+                        Upload
+                        <input
+                          type="file"
+                          accept="image/*,.pdf"
+                          className="hidden"
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              const file = e.target.files[0];
+                              const reader = new FileReader();
+                              reader.onload = (event) => {
+                                const newOriginalImages = [...originalImages];
+                                newOriginalImages[selectedResultIndex] = {
+                                  data: event.target.result,
+                                  filename: file.name
+                                };
+                                setOriginalImages(newOriginalImages);
                               };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      </label>
+                      {originalImages[selectedResultIndex] && (
+                        <button
+                          onClick={() => {
+                            if (window.confirm('Are you sure you want to delete this original page?')) {
+                              const newOriginalImages = [...originalImages];
+                              newOriginalImages[selectedResultIndex] = null;
                               setOriginalImages(newOriginalImages);
-                            };
-                            reader.readAsDataURL(file);
-                          }
-                        }}
-                      />
-                    </label>
+                            }
+                          }}
+                          className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
+                          title="Delete original page"
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className="px-3 py-2 flex items-center justify-between">
                     <span className="text-xs font-bold text-gray-700">
                       Translation ({targetLanguage}) - {reviewViewMode === 'preview' ? 'Preview' : 'Editing'}
                     </span>
+                    <div className="flex items-center gap-1">
+                      {translationResults[selectedResultIndex]?.translatedText && (
+                        <button
+                          onClick={() => {
+                            if (window.confirm('Are you sure you want to delete this translated page?')) {
+                              const updatedResults = [...translationResults];
+                              if (translationResults.length === 1) {
+                                updatedResults[0] = { ...updatedResults[0], translatedText: '', filename: '' };
+                                setTranslationResults(updatedResults);
+                              } else {
+                                updatedResults.splice(selectedResultIndex, 1);
+                                setTranslationResults(updatedResults);
+                                const newOriginalImages = [...originalImages];
+                                newOriginalImages.splice(selectedResultIndex, 1);
+                                setOriginalImages(newOriginalImages);
+                                if (selectedResultIndex >= updatedResults.length) {
+                                  setSelectedResultIndex(Math.max(0, updatedResults.length - 1));
+                                }
+                              }
+                              showToast('Page deleted!');
+                            }
+                          }}
+                          className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
+                          title="Delete translated page"
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
                 {/* Toolbar outside the height-constrained grid */}
@@ -9880,29 +9926,46 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <div className="grid grid-cols-2 gap-0 bg-gray-100 border-b">
                   <div className="px-3 py-2 border-r flex items-center justify-between">
                     <span className="text-xs font-bold text-gray-700">Original Document ({sourceLanguage})</span>
-                    <label className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded cursor-pointer hover:bg-blue-600">
-                      Upload
-                      <input
-                        type="file"
-                        accept="image/*,.pdf"
-                        className="hidden"
-                        onChange={(e) => {
-                          if (e.target.files && e.target.files[0]) {
-                            const file = e.target.files[0];
-                            const reader = new FileReader();
-                            reader.onload = (event) => {
-                              const newOriginalImages = [...originalImages];
-                              newOriginalImages[selectedResultIndex] = {
-                                data: event.target.result,
-                                filename: file.name
+                    <div className="flex items-center gap-1">
+                      <label className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded cursor-pointer hover:bg-blue-600">
+                        Upload
+                        <input
+                          type="file"
+                          accept="image/*,.pdf"
+                          className="hidden"
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              const file = e.target.files[0];
+                              const reader = new FileReader();
+                              reader.onload = (event) => {
+                                const newOriginalImages = [...originalImages];
+                                newOriginalImages[selectedResultIndex] = {
+                                  data: event.target.result,
+                                  filename: file.name
+                                };
+                                setOriginalImages(newOriginalImages);
                               };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      </label>
+                      {originalImages[selectedResultIndex] && (
+                        <button
+                          onClick={() => {
+                            if (window.confirm('Are you sure you want to delete this original page?')) {
+                              const newOriginalImages = [...originalImages];
+                              newOriginalImages[selectedResultIndex] = null;
                               setOriginalImages(newOriginalImages);
-                            };
-                            reader.readAsDataURL(file);
-                          }
-                        }}
-                      />
-                    </label>
+                            }
+                          }}
+                          className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
+                          title="Delete original page"
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className="px-3 py-2 flex items-center justify-between">
                     <span className="text-xs font-bold text-gray-700">
@@ -9921,6 +9984,84 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       >
                         Edit
                       </button>
+                      <label className="px-2 py-0.5 text-[10px] rounded bg-green-600 text-white cursor-pointer hover:bg-green-700">
+                        Upload
+                        <input
+                          type="file"
+                          accept=".docx,.doc,.html,.htm,.txt,.pdf,image/*"
+                          className="hidden"
+                          onChange={async (e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              const file = e.target.files[0];
+                              const fileName = file.name.toLowerCase();
+                              try {
+                                let html = '';
+                                if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
+                                  html = await convertWordToHtml(file);
+                                } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
+                                  html = await readHtmlFile(file);
+                                } else if (fileName.endsWith('.txt')) {
+                                  const text = await readTxtFile(file);
+                                  html = `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif; font-size: 12pt;">${text}</div>`;
+                                } else if (fileName.endsWith('.pdf')) {
+                                  const images = await convertPdfToImages(file);
+                                  html = images.map((img, idx) => `<div style="text-align:center;"><img src="data:${img.type};base64,${img.data}" style="max-width:100%; height:auto;" alt="${file.name} page ${idx + 1}" /></div>`).join('');
+                                } else if (file.type.startsWith('image/')) {
+                                  const dataUrl = await new Promise((resolve) => {
+                                    const reader = new FileReader();
+                                    reader.onload = () => resolve(reader.result);
+                                    reader.readAsDataURL(file);
+                                  });
+                                  html = `<div style="text-align:center;"><img src="${dataUrl}" style="max-width:100%; height:auto;" alt="${file.name}" /></div>`;
+                                }
+                                if (html) {
+                                  const updatedResults = [...translationResults];
+                                  updatedResults[selectedResultIndex] = {
+                                    ...updatedResults[selectedResultIndex],
+                                    translatedText: html,
+                                    filename: file.name
+                                  };
+                                  setTranslationResults(updatedResults);
+                                  showToast('Translation page replaced!');
+                                }
+                              } catch (err) {
+                                console.error('Upload error:', err);
+                                showToast('Error uploading file');
+                              }
+                              e.target.value = '';
+                            }
+                          }}
+                        />
+                      </label>
+                      {translationResults[selectedResultIndex]?.translatedText && (
+                        <button
+                          onClick={() => {
+                            if (window.confirm('Are you sure you want to delete this translated page?')) {
+                              const updatedResults = [...translationResults];
+                              if (translationResults.length === 1) {
+                                updatedResults[0] = { ...updatedResults[0], translatedText: '', filename: '' };
+                                setTranslationResults(updatedResults);
+                              } else {
+                                updatedResults.splice(selectedResultIndex, 1);
+                                setTranslationResults(updatedResults);
+                                // Also remove matching original image if exists
+                                const newOriginalImages = [...originalImages];
+                                newOriginalImages.splice(selectedResultIndex, 1);
+                                setOriginalImages(newOriginalImages);
+                                // Adjust selected index
+                                if (selectedResultIndex >= updatedResults.length) {
+                                  setSelectedResultIndex(Math.max(0, updatedResults.length - 1));
+                                }
+                              }
+                              showToast('Page deleted!');
+                            }
+                          }}
+                          className="px-2 py-0.5 text-[10px] rounded bg-red-500 text-white hover:bg-red-600"
+                          title="Delete translated page"
+                        >
+                          Delete
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -25512,6 +25653,9 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   const [pmApprovalStatus, setPmApprovalStatus] = useState(null); // null, 'approved', 'rejected'
   const [processingStatus, setProcessingStatus] = useState('');
 
+  // PM Review edit mode
+  const [pmReviewEditMode, setPmReviewEditMode] = useState(false);
+
   // Translator Assignment Modal state (for email invites)
   const [assigningTranslatorModal, setAssigningTranslatorModal] = useState(null);
   const [assignmentDetails, setAssignmentDetails] = useState({
@@ -27274,7 +27418,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
   // Execute automatic proofreading
   const executeProofreading = async () => {
-    if (!selectedReview || !translatedContent) {
+    if (!selectedReview || (!translatedContent && !pmTranslationHtml)) {
       setProofreadingError('No translation selected to review.');
       return;
     }
@@ -27286,12 +27430,17 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
     // Get translated text (extract from HTML if needed)
     let translatedText = '';
-    if (translatedContent.html) {
+    if (pmTranslationHtml) {
+      // PM uploaded HTML content takes priority
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = pmTranslationHtml;
+      translatedText = tempDiv.textContent || tempDiv.innerText || '';
+    } else if (translatedContent && translatedContent.html) {
       // Strip HTML tags for proofreading
       const tempDiv = document.createElement('div');
       tempDiv.innerHTML = translatedContent.html;
       translatedText = tempDiv.textContent || tempDiv.innerText || '';
-    } else if (translatedContent.data) {
+    } else if (translatedContent && translatedContent.data) {
       try {
         translatedText = atob(translatedContent.data);
       } catch (e) {
@@ -28134,7 +28283,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 <div className="flex justify-between items-center mb-2">
                   <div>
                     <button
-                      onClick={() => { setSelectedReview(null); setOriginalContents([]); setTranslatedContent(null); setPmApprovalStatus(null); setProofreadingResult(null); setProofreadingError(''); }}
+                      onClick={() => { setSelectedReview(null); setOriginalContents([]); setTranslatedContent(null); setPmApprovalStatus(null); setProofreadingResult(null); setProofreadingError(''); setPmReviewEditMode(false); }}
                       className="text-gray-500 hover:text-gray-700 text-sm mb-1"
                     >
                       ← Back to queue
@@ -28213,7 +28362,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
               </div>
 
               {/* Side by Side Content */}
-              <div className="grid grid-cols-2 divide-x" style={{ height: 'calc(100vh - 300px)' }}>
+              <div className="grid grid-cols-2 divide-x" style={{ minHeight: 'calc(100vh - 300px)' }}>
                 {/* Original Document(s) */}
                 <div className="p-4 overflow-auto">
                   <div className="sticky top-0 bg-white py-1 z-10">
@@ -28221,16 +28370,37 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                       <h4 className="text-sm font-bold text-gray-700">
                         📄 Original Documents ({originalContents.length})
                       </h4>
-                      <label className="px-2 py-1 bg-blue-500 text-white text-xs rounded cursor-pointer hover:bg-blue-600">
-                        📤 Upload
-                        <input
-                          type="file"
-                          accept="image/*,.pdf"
-                          multiple
-                          onChange={handlePmOriginalUpload}
-                          className="hidden"
-                        />
-                      </label>
+                      <div className="flex items-center gap-1">
+                        <label className="px-2 py-1 bg-blue-500 text-white text-xs rounded cursor-pointer hover:bg-blue-600">
+                          📤 Upload
+                          <input
+                            type="file"
+                            accept="image/*,.pdf"
+                            multiple
+                            onChange={handlePmOriginalUpload}
+                            className="hidden"
+                          />
+                        </label>
+                        {originalContents.length > 0 && originalContents[currentDocIndex] && (
+                          <button
+                            onClick={() => {
+                              if (window.confirm('Delete this original page?')) {
+                                const updated = [...originalContents];
+                                updated.splice(currentDocIndex, 1);
+                                setOriginalContents(updated);
+                                if (currentDocIndex >= updated.length) {
+                                  setCurrentDocIndex(Math.max(0, updated.length - 1));
+                                }
+                                showToast('Original page deleted!');
+                              }
+                            }}
+                            className="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
+                            title="Delete this original page"
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </div>
                     </div>
                     {originalContents.length > 1 && (
                       <div className="flex items-center justify-between mb-2 bg-gray-100 rounded p-2">
@@ -28266,14 +28436,16 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                           ? originalContents[currentDocIndex].data
                           : `data:${originalContents[currentDocIndex].contentType};base64,${originalContents[currentDocIndex].data}`}
                         alt="Original"
-                        className="max-w-full border rounded"
+                        className="w-full border rounded"
+                        style={{ height: 'auto' }}
                       />
                     ) : originalContents[currentDocIndex].contentType?.includes('pdf') ? (
                       <iframe
                         src={originalContents[currentDocIndex].data?.startsWith('data:')
                           ? originalContents[currentDocIndex].data
                           : `data:application/pdf;base64,${originalContents[currentDocIndex].data}`}
-                        className="w-full h-full border rounded"
+                        className="w-full border rounded"
+                        style={{ height: 'calc(100vh - 400px)' }}
                         title="Original PDF"
                       />
                     ) : (
@@ -28300,38 +28472,83 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                           </span>
                         }
                       </h4>
-                      <label className="px-2 py-1 bg-green-500 text-white text-xs rounded cursor-pointer hover:bg-green-600">
-                        📤 Upload Translation
-                        <input
-                          type="file"
-                          accept="image/*,.pdf,.docx,.html,.htm,.txt"
-                          multiple
-                          onChange={handlePmTranslationUpload}
-                          className="hidden"
-                        />
-                      </label>
+                      <div className="flex items-center gap-1">
+                        {(translatedContent?.html || pmTranslationHtml) && (
+                          <button
+                            onClick={() => setPmReviewEditMode(!pmReviewEditMode)}
+                            className={`px-2 py-1 text-xs rounded ${pmReviewEditMode ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                          >
+                            {pmReviewEditMode ? 'Preview' : 'Edit'}
+                          </button>
+                        )}
+                        <label className="px-2 py-1 bg-green-500 text-white text-xs rounded cursor-pointer hover:bg-green-600">
+                          📤 Upload Translation
+                          <input
+                            type="file"
+                            accept="image/*,.pdf,.docx,.html,.htm,.txt"
+                            multiple
+                            onChange={handlePmTranslationUpload}
+                            className="hidden"
+                          />
+                        </label>
+                        {(translatedContent || pmTranslationHtml || pmTranslationFiles.length > 0) && (
+                          <button
+                            onClick={() => {
+                              if (window.confirm('Delete the entire translation?')) {
+                                setTranslatedContent(null);
+                                setPmTranslationHtml('');
+                                setPmTranslationFiles([]);
+                                setPmReviewEditMode(false);
+                                showToast('Translation deleted!');
+                              }
+                            }}
+                            className="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
+                            title="Delete translation"
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                   {translatedContent ? (
                     translatedContent.html ? (
-                      <div
-                        className="border rounded p-4 bg-white pm-translation-preview"
-                        dangerouslySetInnerHTML={{ __html: translatedContent.html }}
-                      />
+                      pmReviewEditMode ? (
+                        <div
+                          contentEditable
+                          suppressContentEditableWarning
+                          dangerouslySetInnerHTML={{ __html: translatedContent.html }}
+                          onBlur={(e) => {
+                            setTranslatedContent({
+                              ...translatedContent,
+                              html: e.target.innerHTML
+                            });
+                          }}
+                          className="border rounded p-4 bg-white pm-translation-preview focus:outline-none min-h-[200px]"
+                          style={{ border: '3px solid #10B981', borderRadius: '4px' }}
+                        />
+                      ) : (
+                        <div
+                          className="border rounded p-4 bg-white pm-translation-preview"
+                          dangerouslySetInnerHTML={{ __html: translatedContent.html }}
+                        />
+                      )
                     ) : translatedContent.contentType?.includes('image') ? (
                       <img
                         src={translatedContent.data?.startsWith('data:')
                           ? translatedContent.data
                           : `data:${translatedContent.contentType};base64,${translatedContent.data}`}
                         alt="Translation"
-                        className="max-w-full border rounded"
+                        className="w-full border rounded"
+                        style={{ height: 'auto' }}
                       />
                     ) : translatedContent.contentType?.includes('pdf') ? (
                       <iframe
                         src={translatedContent.data?.startsWith('data:')
                           ? translatedContent.data
                           : `data:application/pdf;base64,${translatedContent.data}`}
-                        className="w-full h-full border rounded"
+                        className="w-full border rounded"
+                        style={{ height: 'calc(100vh - 400px)' }}
                         title="Translation PDF"
                       />
                     ) : (
@@ -28343,19 +28560,47 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     <div>
                       {/* Show PM uploaded HTML content */}
                       {pmTranslationHtml && (
-                        <div
-                          className="border rounded p-4 bg-white mb-4 pm-translation-preview"
-                          dangerouslySetInnerHTML={{ __html: pmTranslationHtml }}
-                        />
+                        pmReviewEditMode ? (
+                          <div
+                            contentEditable
+                            suppressContentEditableWarning
+                            dangerouslySetInnerHTML={{ __html: pmTranslationHtml }}
+                            onBlur={(e) => {
+                              setPmTranslationHtml(e.target.innerHTML);
+                            }}
+                            className="border rounded p-4 bg-white mb-4 pm-translation-preview focus:outline-none min-h-[200px]"
+                            style={{ border: '3px solid #10B981', borderRadius: '4px' }}
+                          />
+                        ) : (
+                          <div
+                            className="border rounded p-4 bg-white mb-4 pm-translation-preview"
+                            dangerouslySetInnerHTML={{ __html: pmTranslationHtml }}
+                          />
+                        )
                       )}
                       {/* Show PM uploaded images */}
                       {pmTranslationFiles.map((file, idx) => (
                         <div key={idx} className="mb-4">
-                          <p className="text-xs text-gray-500 mb-1">📎 {file.filename}</p>
+                          <div className="flex items-center justify-between mb-1">
+                            <p className="text-xs text-gray-500">📎 {file.filename}</p>
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`Delete "${file.filename}"?`)) {
+                                  const updated = pmTranslationFiles.filter((_, i) => i !== idx);
+                                  setPmTranslationFiles(updated);
+                                  showToast('Translation page deleted!');
+                                }
+                              }}
+                              className="px-1.5 py-0.5 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
+                            >
+                              Delete
+                            </button>
+                          </div>
                           <img
                             src={`data:${file.type || 'image/png'};base64,${file.data}`}
                             alt={`Translation page ${idx + 1}`}
-                            className="max-w-full border rounded"
+                            className="w-full border rounded"
+                            style={{ height: 'auto' }}
                           />
                         </div>
                       ))}
@@ -28399,7 +28644,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   </div>
                   <button
                     onClick={executeProofreading}
-                    disabled={isProofreading || !translatedContent}
+                    disabled={isProofreading || (!translatedContent && !pmTranslationHtml)}
                     className={`px-4 py-2 rounded text-xs flex items-center gap-2 ${
                       !proofreadingResult
                         ? 'bg-yellow-500 text-white hover:bg-yellow-600 animate-pulse'
