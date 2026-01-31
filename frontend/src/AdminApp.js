@@ -391,6 +391,16 @@ const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
         body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .page-break { page-break-before: always; }
     }
+    /* Paged translation layout - letterhead repeats on every printed page via thead */
+    .paged-translation { width: 100%; border-collapse: collapse; border: none !important; }
+    .paged-translation > thead > tr > td,
+    .paged-translation > tbody > tr > td { border: none !important; padding: 0 !important; }
+    .paged-translation > thead > tr > td { padding: 5px 0 0 0 !important; }
+    .paged-translation > thead { display: table-header-group; }
+    .paged-translation > tbody { display: table-row-group; }
+    /* Avoid breaking inside table rows (bank statements, financial tables) */
+    .translation-content tr { page-break-inside: avoid; }
+    .translation-content table { page-break-inside: auto; }
 `;
 
 // Helper function to generate letterhead HTML with INLINE STYLES (guaranteed to work)
@@ -5674,16 +5684,24 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     const validTranslationFiles = quickTranslationFiles.filter(file => file.data && file.data.length > 100);
 
     // Prefer HTML content to maintain original quality (not converted to image)
-    // Content is auto-scaled via JS to always fit on 1 Letter page
+    // For large documents (bank statements etc.), CSS pagination + thead handles multi-page layout
+    // For mildly overflowing content, JS auto-scale still applies (scale >= 0.55)
     // First page doesn't need page-break since cover ends with one
     if (quickTranslationHtml) {
-      translationPagesHTML = `
-    <div style="padding-top: 5px;">
-        ${includeLetterhead ? letterheadHTML : ''}
-        <div style="overflow: hidden;" class="translation-wrapper">
+      translationPagesHTML = includeLetterhead ? `
+    <table class="paged-translation">
+        <thead><tr><td style="padding: 5px 0 0 0;">
+            ${letterheadHTML}
+        </td></tr></thead>
+        <tbody><tr><td>
             <div class="translation-content" style="padding: 0 20px; line-height: 1.5; font-size: 11pt;">
                 ${quickTranslationHtml}
             </div>
+        </td></tr></tbody>
+    </table>` : `
+    <div style="padding-top: 5px;">
+        <div class="translation-content" style="padding: 0 20px; line-height: 1.5; font-size: 11pt;">
+            ${quickTranslationHtml}
         </div>
     </div>`;
     }
@@ -5781,12 +5799,14 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     ${originalPagesHTML}
     ${certificationPageHTML}
     <script>
-        // Auto-scale translation AND original content to always fit on 1 Letter page
+        // Auto-scale content to fit pages. For translation HTML, only apply mild scaling;
+        // for large documents (bank statements etc.), CSS pagination + thead letterhead repetition handles it.
         window.addEventListener('load', function() {
             // Letter: 11in - 0.7in top - 0.7in bottom = 9.6in usable
             // Letterhead ~70px. Available for content: ~8.2in
             var maxH = 8.2 * 96; // ~787px
 
+            // For image-based content (original docs): always scale to fit one page
             function autoScale(selector) {
                 var items = document.querySelectorAll(selector);
                 for (var i = 0; i < items.length; i++) {
@@ -5805,7 +5825,33 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 }
             }
 
-            autoScale('.translation-content');
+            // For HTML translation content: only mild scaling (>= 55%).
+            // Below that threshold, content is too large - let CSS pagination handle it
+            // with thead repeating the letterhead on each printed page.
+            function autoScaleTranslation(selector) {
+                var items = document.querySelectorAll(selector);
+                for (var i = 0; i < items.length; i++) {
+                    var el = items[i];
+                    var sh = el.scrollHeight;
+                    if (sh > maxH) {
+                        var scale = maxH / sh;
+                        if (scale >= 0.55) {
+                            // Mild scaling OK - content overflows by up to ~1.8x
+                            el.style.transformOrigin = 'top left';
+                            el.style.transform = 'scale(' + scale.toFixed(4) + ')';
+                            el.style.width = (100 / scale).toFixed(2) + '%';
+                            var wrapper = el.parentElement;
+                            if (wrapper) {
+                                wrapper.style.height = maxH + 'px';
+                                wrapper.style.overflow = 'hidden';
+                            }
+                        }
+                        // else: large document - CSS pagination handles it automatically
+                    }
+                }
+            }
+
+            autoScaleTranslation('.translation-content');
             autoScale('.original-content');
         });
     </script>
@@ -6240,22 +6286,37 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 4px;"></div>`;
 
     // Translation pages HTML (with or without letterhead)
-    // Content is auto-scaled via JS to always fit on 1 Letter page
+    // For large documents (bank statements etc.), CSS pagination + thead handles multi-page layout
+    // For mildly overflowing content, JS auto-scale still applies (scale >= 0.55)
     // First page doesn't need page-break since cover ends with one
     // NOTE: extractBodyForEdit strips <html>/<head>/<style>/<body> wrapper from AI output.
     // This prevents nested document styles (e.g. body{width:8.5in}) from conflicting
     // with the download HTML's own getUnifiedPdfStyles(). Same approach as Quick Package
     // which only embeds clean body content.
-    const translationPagesHTML = translationResults.map((result, index) => `
-    <div style="${index > 0 ? 'page-break-before: always;' : ''} padding-top: 5px;">
-        ${includeLetterhead ? letterheadHTML : ''}
-        <div style="overflow: hidden;" class="translation-wrapper">
+    const translationPagesHTML = translationResults.map((result, index) => {
+      const pageBreak = index > 0 ? 'page-break-before: always;' : '';
+      const content = extractBodyForEdit(result.translatedText);
+      if (includeLetterhead) {
+        return `
+    <table class="paged-translation" style="${pageBreak}">
+        <thead><tr><td style="padding: 5px 0 0 0;">
+            ${letterheadHTML}
+        </td></tr></thead>
+        <tbody><tr><td>
             <div class="translation-content" style="padding: 0 20px; line-height: 1.5; font-size: 11pt;">
-                ${extractBodyForEdit(result.translatedText)}
+                ${content}
             </div>
+        </td></tr></tbody>
+    </table>`;
+      } else {
+        return `
+    <div style="${pageBreak} padding-top: 5px;">
+        <div class="translation-content" style="padding: 0 20px; line-height: 1.5; font-size: 11pt;">
+            ${content}
         </div>
-    </div>
-    `).join('');
+    </div>`;
+      }
+    }).join('');
 
     // Certification verification page HTML - ALL INLINE STYLES
     const certificationPageHTML = (includeCertification && certData) ? `
@@ -6341,12 +6402,14 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     ${originalPagesHTML}
     ${certificationPageHTML}
     <script>
-        // Auto-scale translation AND original content to always fit on 1 Letter page
+        // Auto-scale content to fit pages. For translation HTML, only apply mild scaling;
+        // for large documents (bank statements etc.), CSS pagination + thead letterhead repetition handles it.
         window.addEventListener('load', function() {
             // Letter: 11in - 0.7in top - 0.7in bottom = 9.6in usable
             // Letterhead ~70px. Available for content: ~8.2in
             var maxH = 8.2 * 96; // ~787px
 
+            // For image-based content (original docs): always scale to fit one page
             function autoScale(selector) {
                 var items = document.querySelectorAll(selector);
                 for (var i = 0; i < items.length; i++) {
@@ -6365,7 +6428,33 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 }
             }
 
-            autoScale('.translation-content');
+            // For HTML translation content: only mild scaling (>= 55%).
+            // Below that threshold, content is too large - let CSS pagination handle it
+            // with thead repeating the letterhead on each printed page.
+            function autoScaleTranslation(selector) {
+                var items = document.querySelectorAll(selector);
+                for (var i = 0; i < items.length; i++) {
+                    var el = items[i];
+                    var sh = el.scrollHeight;
+                    if (sh > maxH) {
+                        var scale = maxH / sh;
+                        if (scale >= 0.55) {
+                            // Mild scaling OK - content overflows by up to ~1.8x
+                            el.style.transformOrigin = 'top left';
+                            el.style.transform = 'scale(' + scale.toFixed(4) + ')';
+                            el.style.width = (100 / scale).toFixed(2) + '%';
+                            var wrapper = el.parentElement;
+                            if (wrapper) {
+                                wrapper.style.height = maxH + 'px';
+                                wrapper.style.overflow = 'hidden';
+                            }
+                        }
+                        // else: large document - CSS pagination handles it automatically
+                    }
+                }
+            }
+
+            autoScaleTranslation('.translation-content');
             autoScale('.original-content');
         });
     </script>
