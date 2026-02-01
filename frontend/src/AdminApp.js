@@ -5607,17 +5607,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     <div style="${idx > 0 ? 'page-break-before: always;' : ''} padding-top: 5px;">
         ${includeLetterhead ? letterheadHTML : ''}
         <div>
-            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Translation page ${idx + 1}" style="width: 100%; max-height: 8.5in; object-fit: contain; display: block; margin: 0 auto;" />
+            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Translation page ${idx + 1}" style="max-width: 100%; max-height: 8in; object-fit: contain; display: block; margin: 0 auto;" />
         </div>
     </div>`).join('');
     }
     // Otherwise use HTML content (from Word/HTML/TXT)
-    // Content is auto-scaled via JS to always fit on 1 Letter page
+    // Content flows naturally across pages
     else if (quickTranslationHtml) {
       translationPagesHTML = `
     <div style="padding-top: 5px;">
         ${includeLetterhead ? letterheadHTML : ''}
-        <div style="overflow: hidden;" class="translation-wrapper">
+        <div class="translation-wrapper">
             <div class="translation-content" style="padding: 0 20px; line-height: 1.5; font-size: 11pt;">
                 ${quickTranslationHtml}
             </div>
@@ -5632,7 +5632,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         ${includeLetterhead ? letterheadHTML : ''}
         ${idx === 0 ? '<div style="font-size: 13px; font-weight: bold; text-align: center; margin: 8px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px;">Original Document</div>' : ''}
         <div style="text-align: center;">
-            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Original page ${idx + 1}" style="width: 100%; max-height: 8.5in; object-fit: contain; display: block; margin: 0 auto;" />
+            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Original page ${idx + 1}" style="max-width: 100%; max-height: 7.5in; object-fit: contain; display: block; margin: 0 auto;" />
         </div>
     </div>`).join('') : '';
 
@@ -5705,31 +5705,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     ${translationPagesHTML}
     ${originalPagesHTML}
     ${certificationPageHTML}
-    <script>
-        // Auto-scale translation content to always fit on 1 Letter page
-        window.addEventListener('load', function() {
-            // Letter: 11in - 0.7in top - 0.7in bottom = 9.6in usable
-            // Letterhead ~90px. Available for content: ~8.2in
-            var maxH = 8.2 * 96; // ~787px
-            var items = document.querySelectorAll('.translation-content');
-            for (var i = 0; i < items.length; i++) {
-                var el = items[i];
-                var sh = el.scrollHeight;
-                if (sh > maxH) {
-                    var scale = maxH / sh;
-                    el.style.transformOrigin = 'top left';
-                    el.style.transform = 'scale(' + scale.toFixed(4) + ')';
-                    // Expand width so scaled result fills 100% of parent
-                    el.style.width = (100 / scale).toFixed(2) + '%';
-                    // Set wrapper height to actual rendered height
-                    var wrapper = el.parentElement;
-                    if (wrapper) {
-                        wrapper.style.height = maxH + 'px';
-                    }
-                }
-            }
-        });
-    </script>
 </body>
 </html>`;
 
@@ -6161,12 +6136,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>`;
 
     // Translation pages HTML (with or without letterhead)
-    // Content is auto-scaled via JS to always fit on 1 Letter page
+    // Content flows naturally across pages
     // First page doesn't need page-break since cover ends with one
     const translationPagesHTML = translationResults.map((result, index) => `
     <div style="${index > 0 ? 'page-break-before: always;' : ''} padding-top: 5px;">
         ${includeLetterhead ? letterheadHTML : ''}
-        <div style="overflow: hidden;" class="translation-wrapper">
+        <div class="translation-wrapper">
             <div class="translation-content" style="padding: 0 20px; line-height: 1.5; font-size: 11pt;">
                 ${result.translatedText}
             </div>
@@ -6234,7 +6209,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         ${includeLetterhead ? letterheadHTML : ''}
         ${index === 0 ? '<div style="font-size: 13px; font-weight: bold; text-align: center; margin: 8px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px;">Original Document</div>' : ''}
         <div style="text-align: center;">
-            <img src="${img.data}" alt="${img.filename}" style="width: 100%; max-height: 8.5in; object-fit: contain; display: block; margin: 0 auto;" />
+            <img src="${img.data}" alt="${img.filename}" style="max-width: 100%; max-height: 7.5in; object-fit: contain; display: block; margin: 0 auto;" />
         </div>
     </div>
     `).join('') : '';
@@ -6254,28 +6229,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     ${translationPagesHTML}
     ${originalPagesHTML}
     ${certificationPageHTML}
-    <script>
-        // Auto-scale translation content to always fit on 1 Letter page
-        // Uses transform:scale() instead of CSS zoom to avoid text distortion/overlap
-        window.addEventListener('load', function() {
-            var maxH = 8.2 * 96; // ~787px
-            var items = document.querySelectorAll('.translation-content');
-            for (var i = 0; i < items.length; i++) {
-                var el = items[i];
-                var sh = el.scrollHeight;
-                if (sh > maxH) {
-                    var scale = maxH / sh;
-                    el.style.transformOrigin = 'top left';
-                    el.style.transform = 'scale(' + scale.toFixed(4) + ')';
-                    el.style.width = (100 / scale).toFixed(2) + '%';
-                    var wrapper = el.parentElement;
-                    if (wrapper) {
-                        wrapper.style.height = maxH + 'px';
-                    }
-                }
-            }
-        });
-    </script>
 </body>
 </html>`;
 
