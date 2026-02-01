@@ -384,7 +384,42 @@ const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
     }
     img { max-width: 100%; height: auto; }
     table { border-collapse: collapse; width: 100%; }
-    td, th { border: 1px solid #333; padding: 5px 6px; font-size: 10pt; }
+    td, th { border: 1px solid #333; padding: 5px 6px; font-size: 10pt; vertical-align: top; }
+    /* Translation content: robust table layout for complex documents (birth certificates, etc.) */
+    .translation-content table {
+        table-layout: fixed;
+        width: 100%;
+        max-width: 100%;
+        border-collapse: collapse;
+        margin: 4px 0;
+        page-break-inside: auto;
+    }
+    .translation-content td,
+    .translation-content th {
+        border: 1px solid #333;
+        padding: 3px 5px;
+        font-size: 9pt;
+        line-height: 1.3;
+        vertical-align: top;
+        text-align: left;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        word-break: normal;
+        overflow: hidden;
+    }
+    .translation-content tr {
+        page-break-inside: avoid;
+    }
+    .translation-content p {
+        margin: 0 0 2px 0;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+    .translation-content td p:last-child,
+    .translation-content th p:last-child {
+        margin-bottom: 0;
+    }
+    .translation-content thead { display: table-header-group; }
     .translation-content > *:first-child { margin-top: 0 !important; padding-top: 0 !important; }
     .translation-content > div:first-child > *:first-child { margin-top: 0 !important; padding-top: 0 !important; }
     @media print {
@@ -1439,7 +1474,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               {{LOGO_LEFT}}
             </div>
             <div style="text-align: center; flex: 1; padding: 0 16px;">
-              <div style="font-weight: bold; color: #2563eb; font-size: 14px; font-style: italic;">Legacy Translations</div>
+              <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
               <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
               <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
@@ -4791,7 +4826,16 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         try {
           const arrayBuffer = e.target.result;
           const result = await mammoth.convertToHtml({ arrayBuffer });
-          resolve(result.value);
+          // Post-process: add inline styles to tables for robust rendering
+          // This ensures tables render correctly even if external CSS is overridden
+          let html = result.value;
+          html = html.replace(/<table(?=[>\s])/g,
+            '<table style="table-layout:fixed;width:100%;border-collapse:collapse;"');
+          html = html.replace(/<td(?=[>\s])/g,
+            '<td style="vertical-align:top;word-wrap:break-word;overflow-wrap:break-word;overflow:hidden;padding:3px 5px;"');
+          html = html.replace(/<th(?=[>\s])/g,
+            '<th style="vertical-align:top;word-wrap:break-word;overflow-wrap:break-word;overflow:hidden;padding:3px 5px;font-weight:bold;"');
+          resolve(html);
         } catch (err) {
           reject(err);
         }
@@ -5596,7 +5640,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>`}
             </div>
             <div style="margin-left: 138px; margin-right: 90px; text-align: center;">
-                <div style="font-weight: bold; color: #2563eb; font-size: 14px; font-style: italic;">Legacy Translations</div>
+                <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
                 <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
                 <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
@@ -5611,10 +5655,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           : '<div style="margin-bottom: 24px;"></div>'}
 
         <!-- Main Title -->
-        <h1 style="text-align: center; font-size: 24px; font-weight: normal; margin-bottom: 30px; color: #1a365d; letter-spacing: 0.5px;">${certTitle}</h1>
+        <h1 style="text-align: center; font-size: 28px; font-weight: normal; margin-bottom: 30px; color: #1a365d; letter-spacing: 0.5px;">${certTitle}</h1>
 
         <!-- Translation of... -->
-        <p style="text-align: center; margin-bottom: 30px; font-size: 14px; line-height: 1.8;">
+        <p style="text-align: center; margin-bottom: 30px; font-size: 14px; line-height: 1.6;">
             Translation of a <strong>${documentType}</strong> from <strong>${sourceLanguage}</strong> to<br/>
             <strong>${targetLanguage}</strong>
         </p>
@@ -5630,7 +5674,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           }
           return templateParagraphs.map(p => {
             const processed = p.replace(/\{\{sourceLanguage\}\}/g, sourceLanguage).replace(/\{\{targetLanguage\}\}/g, targetLanguage);
-            return `<p style="text-align: justify; margin-bottom: 16px; line-height: 1.8; font-size: 12px;">${processed}</p>`;
+            return `<p style="text-align: justify; margin-bottom: 18px; line-height: 1.6; font-size: 13px;">${processed}</p>`;
           }).join('\n        ');
         })()}
 
@@ -5639,10 +5683,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             <div style="float: left; width: 60%;">
                 ${signatureImage
                   ? `<img src="${signatureImage}" alt="Signature" style="max-height: 40px; max-width: 180px; margin-bottom: 4px;" />`
-                  : `<div style="font-family: 'Brush Script MT', cursive; font-size: 24px; color: #1a365d; margin-bottom: 4px;">Beatriz Paiva</div>`}
-                <div style="font-weight: bold; font-size: 12px;">Authorized Representative</div>
-                <div style="font-size: 12px;">Legacy Translations Inc.</div>
-                <div style="font-size: 12px; margin-top: 8px;">Dated: ${translationDate}</div>
+                  : `<div style="font-family: 'Brush Script MT', cursive; font-size: 24px; color: #1a365d; margin-bottom: 4px;">${translatorNameForCert || 'Beatriz Paiva'}</div>`}
+                <div style="font-weight: bold; font-size: 13px;">${translatorNameForCert || 'Beatriz Paiva'}</div>
+                <div style="font-weight: bold; font-size: 13px;">${translator?.title || 'Managing Director'}</div>
+                <div style="font-size: 13px; margin-top: 8px;">Dated: ${translationDate}</div>
             </div>
             <div style="float: right; width: 35%; text-align: right;">
                 ${logoStamp
@@ -5670,7 +5714,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span></div>`}
             </div>
             <div style="margin-left: 138px; margin-right: 90px; text-align: center;">
-                <div style="font-weight: bold; color: #2563eb; font-size: 14px; font-style: italic;">Legacy Translations</div>
+                <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
                 <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
                 <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
@@ -5711,7 +5755,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     <div style="${idx > 0 ? 'page-break-before: always;' : ''} padding-top: 5px;">
         ${includeLetterhead ? letterheadHTML : ''}
         <div>
-            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Translation page ${idx + 1}" style="width: 100%; max-height: 8.5in; object-fit: contain; display: block; margin: 0 auto;" />
+            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Translation page ${idx + 1}" style="max-width: 100%; max-height: 8in; object-fit: contain; display: block; margin: 0 auto;" />
         </div>
     </div>`).join('');
     }
@@ -5722,10 +5766,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     <div style="page-break-before: always; padding-top: 5px;">
         ${includeLetterhead ? letterheadHTML : ''}
         ${idx === 0 ? '<div style="font-size: 13px; font-weight: bold; text-align: center; margin: 4px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px;">Original Document</div>' : ''}
-        <div style="overflow: hidden;" class="original-wrapper">
-            <div class="original-content" style="text-align: center;">
-                <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Original page ${idx + 1}" style="width: 100%; object-fit: contain; display: block; margin: 0 auto;" />
-            </div>
+        <div style="text-align: center;">
+            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Original page ${idx + 1}" style="max-width: 100%; max-height: 7.5in; object-fit: contain; display: block; margin: 0 auto;" />
         </div>
     </div>`).join('') : '';
 
@@ -5798,63 +5840,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     ${translationPagesHTML}
     ${originalPagesHTML}
     ${certificationPageHTML}
-    <script>
-        // Auto-scale content to fit pages. For translation HTML, only apply mild scaling;
-        // for large documents (bank statements etc.), CSS pagination + thead letterhead repetition handles it.
-        window.addEventListener('load', function() {
-            // Letter: 11in - 0.7in top - 0.7in bottom = 9.6in usable
-            // Letterhead ~70px. Available for content: ~8.2in
-            var maxH = 8.2 * 96; // ~787px
-
-            // For image-based content (original docs): always scale to fit one page
-            function autoScale(selector) {
-                var items = document.querySelectorAll(selector);
-                for (var i = 0; i < items.length; i++) {
-                    var el = items[i];
-                    var sh = el.scrollHeight;
-                    if (sh > maxH) {
-                        var scale = maxH / sh;
-                        el.style.transformOrigin = 'top left';
-                        el.style.transform = 'scale(' + scale.toFixed(4) + ')';
-                        el.style.width = (100 / scale).toFixed(2) + '%';
-                        var wrapper = el.parentElement;
-                        if (wrapper) {
-                            wrapper.style.height = maxH + 'px';
-                        }
-                    }
-                }
-            }
-
-            // For HTML translation content: only mild scaling (>= 55%).
-            // Below that threshold, content is too large - let CSS pagination handle it
-            // with thead repeating the letterhead on each printed page.
-            function autoScaleTranslation(selector) {
-                var items = document.querySelectorAll(selector);
-                for (var i = 0; i < items.length; i++) {
-                    var el = items[i];
-                    var sh = el.scrollHeight;
-                    if (sh > maxH) {
-                        var scale = maxH / sh;
-                        if (scale >= 0.55) {
-                            // Mild scaling OK - content overflows by up to ~1.8x
-                            el.style.transformOrigin = 'top left';
-                            el.style.transform = 'scale(' + scale.toFixed(4) + ')';
-                            el.style.width = (100 / scale).toFixed(2) + '%';
-                            var wrapper = el.parentElement;
-                            if (wrapper) {
-                                wrapper.style.height = maxH + 'px';
-                                wrapper.style.overflow = 'hidden';
-                            }
-                        }
-                        // else: large document - CSS pagination handles it automatically
-                    }
-                }
-            }
-
-            autoScaleTranslation('.translation-content');
-            autoScale('.original-content');
-        });
-    </script>
 </body>
 </html>`;
 
@@ -6098,12 +6083,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         ` : ''}
 
         <!-- Main Title -->
-        <h1 style="text-align: center; font-size: 24px; font-weight: normal; margin-bottom: 24px; color: #1a365d;">${certTitle}</h1>
+        <h1 style="text-align: center; font-size: 28px; font-weight: normal; margin-bottom: 24px; color: #1a365d;">${certTitle}</h1>
 
         <!-- Translation of ... -->
-        <p style="text-align: center; margin-bottom: 24px; font-size: 14px;">
-          Translation of <strong>${documentType}</strong> from<br/>
-          <strong>${sourceLanguage}</strong> to <strong>${targetLanguage}</strong>
+        <p style="text-align: center; margin-bottom: 24px; font-size: 14px; line-height: 1.6;">
+          Translation of a <strong>${documentType}</strong> from <strong>${sourceLanguage}</strong> to<br/>
+          <strong>${targetLanguage}</strong>
         </p>
 
         <!-- Body paragraphs -->
@@ -6111,7 +6096,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           const processed = para
             .replace(/\{\{sourceLanguage\}\}/g, sourceLanguage)
             .replace(/\{\{targetLanguage\}\}/g, targetLanguage);
-          return `<p style="text-align: justify; margin-bottom: 16px; font-size: 12px; line-height: 1.6;">${processed}</p>`;
+          return `<p style="text-align: justify; margin-bottom: 18px; font-size: 13px; line-height: 1.6;">${processed}</p>`;
         }).join('')}
 
         <!-- Signature and Stamp Section -->
@@ -6119,11 +6104,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           <div>
             ${signatureImage
               ? `<img src="${signatureImage}" alt="Signature" style="height: 60px; max-width: 200px; margin-bottom: 8px;" />`
-              : `<div style="font-family: cursive; font-size: 28px; color: #1a365d; margin-bottom: 8px;">Beatriz Paiva</div>`}
-            <div style="font-size: 14px; font-style: italic; font-weight: bold; color: #1a365d;">Beatriz Paiva</div>
-            <div style="font-size: 14px; color: #333;">Authorized Representative</div>
-            <div style="font-size: 14px; color: #333;">Legacy Translations Inc.</div>
-            <div style="font-size: 14px; color: #666; margin-top: 4px;">Dated: ${new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York' })}</div>
+              : `<div style="font-family: cursive; font-size: 28px; color: #1a365d; margin-bottom: 8px;">${translator?.name || 'Beatriz Paiva'}</div>`}
+            <div style="font-size: 13px; font-weight: bold;">${translator?.name || 'Beatriz Paiva'}</div>
+            <div style="font-size: 13px; font-weight: bold;">${translator?.title || 'Managing Director'}</div>
+            <div style="font-size: 13px; margin-top: 4px;">Dated: ${new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York' })}</div>
           </div>
           <div style="text-align: center;">
             ${logoStamp
@@ -6204,7 +6188,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>`}
             </div>
             <div style="margin-left: 138px; margin-right: 90px; text-align: center;">
-                <div style="font-weight: bold; color: #2563eb; font-size: 14px; font-style: italic;">Legacy Translations</div>
+                <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
                 <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
                 <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
@@ -6219,10 +6203,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           : '<div style="margin-bottom: 24px;"></div>'}
 
         <!-- Main Title -->
-        <h1 style="text-align: center; font-size: 24px; font-weight: normal; margin-bottom: 30px; color: #1a365d; letter-spacing: 0.5px;">${certTitle}</h1>
+        <h1 style="text-align: center; font-size: 28px; font-weight: normal; margin-bottom: 30px; color: #1a365d; letter-spacing: 0.5px;">${certTitle}</h1>
 
         <!-- Translation of... -->
-        <p style="text-align: center; margin-bottom: 30px; font-size: 14px; line-height: 1.8;">
+        <p style="text-align: center; margin-bottom: 30px; font-size: 14px; line-height: 1.6;">
             Translation of a <strong>${documentType}</strong> from <strong>${sourceLanguage}</strong> to<br/>
             <strong>${targetLanguage}</strong>
         </p>
@@ -6238,7 +6222,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           }
           return templateParagraphs.map(p => {
             const processed = p.replace(/\{\{sourceLanguage\}\}/g, sourceLanguage).replace(/\{\{targetLanguage\}\}/g, targetLanguage);
-            return `<p style="text-align: justify; margin-bottom: 16px; line-height: 1.8; font-size: 12px;">${processed}</p>`;
+            return `<p style="text-align: justify; margin-bottom: 18px; line-height: 1.6; font-size: 13px;">${processed}</p>`;
           }).join('\n        ');
         })()}
 
@@ -6247,10 +6231,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             <div style="float: left; width: 60%;">
                 ${signatureImage
                   ? `<img src="${signatureImage}" alt="Signature" style="max-height: 40px; max-width: 180px; margin-bottom: 4px;" />`
-                  : `<div style="font-family: 'Brush Script MT', cursive; font-size: 24px; color: #1a365d; margin-bottom: 4px;">Beatriz Paiva</div>`}
-                <div style="font-weight: bold; font-size: 12px;">Authorized Representative</div>
-                <div style="font-size: 12px;">Legacy Translations Inc.</div>
-                <div style="font-size: 12px; margin-top: 8px;">Dated: ${translationDate}</div>
+                  : `<div style="font-family: 'Brush Script MT', cursive; font-size: 24px; color: #1a365d; margin-bottom: 4px;">${translatorNameForCert || 'Beatriz Paiva'}</div>`}
+                <div style="font-weight: bold; font-size: 13px;">${translatorNameForCert || 'Beatriz Paiva'}</div>
+                <div style="font-weight: bold; font-size: 13px;">${translator?.title || 'Managing Director'}</div>
+                <div style="font-size: 13px; margin-top: 8px;">Dated: ${translationDate}</div>
             </div>
             <div style="float: right; width: 35%; text-align: right;">
                 ${logoStamp
@@ -6278,7 +6262,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span></div>`}
             </div>
             <div style="margin-left: 138px; margin-right: 90px; text-align: center;">
-                <div style="font-weight: bold; color: #2563eb; font-size: 14px; font-style: italic;">Legacy Translations</div>
+                <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
                 <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
                 <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
@@ -6286,13 +6270,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 4px;"></div>`;
 
     // Translation pages HTML (with or without letterhead)
-    // For large documents (bank statements etc.), CSS pagination + thead handles multi-page layout
-    // For mildly overflowing content, JS auto-scale still applies (scale >= 0.55)
+    // Content flows naturally across pages; CSS pagination + thead handles multi-page layout
     // First page doesn't need page-break since cover ends with one
     // NOTE: extractBodyForEdit strips <html>/<head>/<style>/<body> wrapper from AI output.
-    // This prevents nested document styles (e.g. body{width:8.5in}) from conflicting
-    // with the download HTML's own getUnifiedPdfStyles(). Same approach as Quick Package
-    // which only embeds clean body content.
     const translationPagesHTML = translationResults.map((result, index) => {
       const pageBreak = index > 0 ? 'page-break-before: always;' : '';
       const content = extractBodyForEdit(result.translatedText);
@@ -6378,10 +6358,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     <div style="page-break-before: always; padding-top: 5px;">
         ${includeLetterhead ? letterheadHTML : ''}
         ${index === 0 ? '<div style="font-size: 13px; font-weight: bold; text-align: center; margin: 4px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px;">Original Document</div>' : ''}
-        <div style="overflow: hidden;" class="original-wrapper">
-            <div class="original-content" style="text-align: center;">
-                <img src="${img.data}" alt="${img.filename}" style="width: 100%; object-fit: contain; display: block; margin: 0 auto;" />
-            </div>
+        <div style="text-align: center;">
+            <img src="${img.data}" alt="${img.filename}" style="max-width: 100%; max-height: 7.5in; object-fit: contain; display: block; margin: 0 auto;" />
         </div>
     </div>
     `).join('') : '';
@@ -6401,63 +6379,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     ${translationPagesHTML}
     ${originalPagesHTML}
     ${certificationPageHTML}
-    <script>
-        // Auto-scale content to fit pages. For translation HTML, only apply mild scaling;
-        // for large documents (bank statements etc.), CSS pagination + thead letterhead repetition handles it.
-        window.addEventListener('load', function() {
-            // Letter: 11in - 0.7in top - 0.7in bottom = 9.6in usable
-            // Letterhead ~70px. Available for content: ~8.2in
-            var maxH = 8.2 * 96; // ~787px
-
-            // For image-based content (original docs): always scale to fit one page
-            function autoScale(selector) {
-                var items = document.querySelectorAll(selector);
-                for (var i = 0; i < items.length; i++) {
-                    var el = items[i];
-                    var sh = el.scrollHeight;
-                    if (sh > maxH) {
-                        var scale = maxH / sh;
-                        el.style.transformOrigin = 'top left';
-                        el.style.transform = 'scale(' + scale.toFixed(4) + ')';
-                        el.style.width = (100 / scale).toFixed(2) + '%';
-                        var wrapper = el.parentElement;
-                        if (wrapper) {
-                            wrapper.style.height = maxH + 'px';
-                        }
-                    }
-                }
-            }
-
-            // For HTML translation content: only mild scaling (>= 55%).
-            // Below that threshold, content is too large - let CSS pagination handle it
-            // with thead repeating the letterhead on each printed page.
-            function autoScaleTranslation(selector) {
-                var items = document.querySelectorAll(selector);
-                for (var i = 0; i < items.length; i++) {
-                    var el = items[i];
-                    var sh = el.scrollHeight;
-                    if (sh > maxH) {
-                        var scale = maxH / sh;
-                        if (scale >= 0.55) {
-                            // Mild scaling OK - content overflows by up to ~1.8x
-                            el.style.transformOrigin = 'top left';
-                            el.style.transform = 'scale(' + scale.toFixed(4) + ')';
-                            el.style.width = (100 / scale).toFixed(2) + '%';
-                            var wrapper = el.parentElement;
-                            if (wrapper) {
-                                wrapper.style.height = maxH + 'px';
-                                wrapper.style.overflow = 'hidden';
-                            }
-                        }
-                        // else: large document - CSS pagination handles it automatically
-                    }
-                }
-            }
-
-            autoScaleTranslation('.translation-content');
-            autoScale('.original-content');
-        });
-    </script>
 </body>
 </html>`;
 
@@ -7783,8 +7704,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     ) : (
                       <div className="mb-1" style={{fontFamily: 'Rage Italic, cursive', fontSize: '20px', color: '#1a365d'}}>Beatriz Paiva</div>
                   )}
-                  <div className="text-xs">Authorized Representative</div>
-                  <div className="text-xs">Legacy Translations Inc.</div>
+                  <div className="text-xs font-bold">{selectedTranslator || 'Beatriz Paiva'}</div>
+                  <div className="text-xs font-bold">{TRANSLATORS.find(t => t.name === selectedTranslator)?.title || 'Managing Director'}</div>
                   <div className="text-xs mt-2">
                     Dated:{' '}
                     <input type="text" value={translationDate} onChange={(e) => setTranslationDate(e.target.value)} className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 w-28 focus:outline-none focus:border-blue-600" />
@@ -13885,8 +13806,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         <div class="footer-section">
           <div class="signature-block">
             <div style="font-family: 'Times New Roman', serif; font-size: 18px; font-style: italic; color: #1a365d; margin-bottom: 2px;">${translatorName}</div>
-            <div class="signature-name">Authorized Representative</div>
-            <div class="signature-title">Legacy Translations Inc.</div>
+            <div class="signature-name">${translatorName}</div>
+            <div class="signature-title">Managing Director</div>
             <div class="signature-date">Dated: ${translationDate}</div>
           </div>
           <div class="stamp-container">
@@ -13942,9 +13863,9 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     .logo-right { width: 85px; height: 55px; display: flex; align-items: center; justify-content: flex-end; }
     .logo-placeholder-right { width: 85px; height: 55px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #1a365d; background: #fafafa; text-align: center; font-style: italic; }
     .order-number { text-align: right; margin-bottom: 20px; font-size: 12px; margin-top: 5px; }
-    .main-title { text-align: center; font-size: 26px; font-weight: normal; margin-bottom: 20px; color: #1a365d; line-height: 1.2; }
+    .main-title { text-align: center; font-size: 28px; font-weight: normal; margin-bottom: 20px; color: #1a365d; line-height: 1.2; }
     .subtitle { text-align: center; font-size: 13px; margin-bottom: 25px; line-height: 1.5; }
-    .body-text { text-align: justify; margin-bottom: 14px; line-height: 1.6; font-size: 12px; }
+    .body-text { text-align: justify; margin-bottom: 18px; line-height: 1.6; font-size: 13px; }
     .footer-section { display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; padding-top: 20px; }
     .signature-block { line-height: 1.3; }
     .signature-name { font-weight: bold; font-size: 13px; }
@@ -13960,9 +13881,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     .cover-page { page: cover; page-break-after: always; min-height: 100%; display: flex; flex-direction: column; }
     .translation-text-page { page-break-before: always; }
     .translation-content.translation-text { text-align: left; font-family: 'Times New Roman', Georgia, serif; font-size: 11pt; line-height: 1.5; color: #333; }
-    .translation-content.translation-text p { margin-bottom: 10px; text-align: justify; }
-    .translation-content.translation-text table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-    .translation-content.translation-text td, .translation-content.translation-text th { border: 1px solid #333; padding: 6px; font-size: 10pt; }
+    .translation-content.translation-text p { margin-bottom: 10px; text-align: justify; word-wrap: break-word; overflow-wrap: break-word; }
+    .translation-content.translation-text table { width: 100%; max-width: 100%; border-collapse: collapse; margin: 10px 0; table-layout: fixed; page-break-inside: auto; }
+    .translation-content.translation-text td, .translation-content.translation-text th { border: 1px solid #333; padding: 4px 6px; font-size: 9pt; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; overflow: hidden; line-height: 1.3; }
+    .translation-content.translation-text tr { page-break-inside: avoid; }
     .page-title { font-size: 13px; font-weight: bold; text-align: center; margin: 10px 0 8px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
     .original-documents-page { page-break-after: always; page-break-inside: avoid; padding-top: 15px; }
     .original-documents-page:last-of-type { page-break-after: auto; }
@@ -26129,8 +26051,8 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         <div class="footer-section">
           <div class="signature-block">
             <div style="font-family: 'Times New Roman', serif; font-size: 18px; font-style: italic; color: #1a365d; margin-bottom: 2px;">${translatorName}</div>
-            <div class="signature-name">Authorized Representative</div>
-            <div class="signature-title">Legacy Translations Inc.</div>
+            <div class="signature-name">${translatorName}</div>
+            <div class="signature-title">Managing Director</div>
             <div class="signature-date">Dated: ${translationDateStr}</div>
           </div>
           <div class="stamp-container">
@@ -26186,9 +26108,9 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     .logo-right { width: 85px; height: 55px; display: flex; align-items: center; justify-content: flex-end; }
     .logo-placeholder-right { width: 85px; height: 55px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #1a365d; background: #fafafa; text-align: center; font-style: italic; }
     .order-number { text-align: right; margin-bottom: 20px; font-size: 12px; margin-top: 5px; }
-    .main-title { text-align: center; font-size: 26px; font-weight: normal; margin-bottom: 20px; color: #1a365d; line-height: 1.2; }
+    .main-title { text-align: center; font-size: 28px; font-weight: normal; margin-bottom: 20px; color: #1a365d; line-height: 1.2; }
     .subtitle { text-align: center; font-size: 13px; margin-bottom: 25px; line-height: 1.5; }
-    .body-text { text-align: justify; margin-bottom: 14px; line-height: 1.6; font-size: 12px; }
+    .body-text { text-align: justify; margin-bottom: 18px; line-height: 1.6; font-size: 13px; }
     .footer-section { display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; padding-top: 20px; }
     .signature-block { line-height: 1.3; }
     .signature-name { font-weight: bold; font-size: 13px; }
@@ -26204,9 +26126,10 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     .cover-page { page: cover; page-break-after: always; min-height: 100%; display: flex; flex-direction: column; }
     .translation-text-page { page-break-before: always; }
     .translation-content.translation-text { text-align: left; font-family: 'Times New Roman', Georgia, serif; font-size: 11pt; line-height: 1.5; color: #333; }
-    .translation-content.translation-text p { margin-bottom: 10px; text-align: justify; }
-    .translation-content.translation-text table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-    .translation-content.translation-text td, .translation-content.translation-text th { border: 1px solid #333; padding: 6px; font-size: 10pt; }
+    .translation-content.translation-text p { margin-bottom: 10px; text-align: justify; word-wrap: break-word; overflow-wrap: break-word; }
+    .translation-content.translation-text table { width: 100%; max-width: 100%; border-collapse: collapse; margin: 10px 0; table-layout: fixed; page-break-inside: auto; }
+    .translation-content.translation-text td, .translation-content.translation-text th { border: 1px solid #333; padding: 4px 6px; font-size: 9pt; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; overflow: hidden; line-height: 1.3; }
+    .translation-content.translation-text tr { page-break-inside: avoid; }
     .page-title { font-size: 13px; font-weight: bold; text-align: center; margin: 10px 0 8px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
     .original-documents-page { page-break-after: always; page-break-inside: avoid; padding-top: 15px; }
     .original-documents-page:last-of-type { page-break-after: auto; }
@@ -26609,7 +26532,15 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
           setProcessingStatus(`Converting Word document: ${file.name}`);
           const arrayBuffer = await file.arrayBuffer();
           const result = await mammoth.convertToHtml({ arrayBuffer });
-          htmlContent = result.value;
+          // Post-process: add inline styles to tables for robust rendering
+          let convertedHtml = result.value;
+          convertedHtml = convertedHtml.replace(/<table(?=[>\s])/g,
+            '<table style="table-layout:fixed;width:100%;border-collapse:collapse;"');
+          convertedHtml = convertedHtml.replace(/<td(?=[>\s])/g,
+            '<td style="vertical-align:top;word-wrap:break-word;overflow-wrap:break-word;overflow:hidden;padding:3px 5px;"');
+          convertedHtml = convertedHtml.replace(/<th(?=[>\s])/g,
+            '<th style="vertical-align:top;word-wrap:break-word;overflow-wrap:break-word;overflow:hidden;padding:3px 5px;font-weight:bold;"');
+          htmlContent = convertedHtml;
         } catch (err) {
           console.error('Word conversion error:', err);
           showToast(`Error converting Word document: ${file.name}`);
@@ -26762,8 +26693,8 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 ${signatureImage
                   ? `<img src="${signatureImage}" alt="Signature" style="max-height: 45px; max-width: 210px; object-fit: contain; margin-bottom: 2px;" />`
                   : `<div style="font-family: 'Rage Italic', cursive; font-size: 20px; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>`}
-                <div class="signature-name">Authorized Representative</div>
-                <div class="signature-title">Legacy Translations Inc.</div>
+                <div class="signature-name">${savedTranslatorName || 'Beatriz Paiva'}</div>
+                <div class="signature-title">Managing Director</div>
                 <div class="signature-date">Dated: ${translationDate}</div>
             </div>
             <div class="stamp-container">
@@ -27088,9 +27019,9 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
             font-size: 9px; color: #1a365d; background: #fafafa; text-align: center; font-style: italic;
         }
         .order-number { text-align: right; margin-bottom: 20px; font-size: 12px; margin-top: 5px; }
-        .main-title { text-align: center; font-size: 26px; font-weight: normal; margin-bottom: 20px; color: #1a365d; line-height: 1.2; }
+        .main-title { text-align: center; font-size: 28px; font-weight: normal; margin-bottom: 20px; color: #1a365d; line-height: 1.2; }
         .subtitle { text-align: center; font-size: 13px; margin-bottom: 25px; line-height: 1.5; }
-        .body-text { text-align: justify; margin-bottom: 14px; line-height: 1.6; font-size: 12px; }
+        .body-text { text-align: justify; margin-bottom: 18px; line-height: 1.6; font-size: 13px; }
         .footer-section { display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; padding-top: 20px; }
         .signature-block { text-align: left; line-height: 1.3; }
         .signature-name { font-size: 13px; font-weight: bold; margin-top: 5px; }
@@ -27122,7 +27053,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         .translation-text { font-size: 12px; line-height: 1.6; }
         .translation-text p { margin-bottom: 12px; text-align: justify; orphans: 4; widows: 4; }
         .translation-text table { width: 100%; max-width: 100%; border-collapse: collapse; margin: 15px 0; table-layout: fixed; page-break-inside: auto; }
-        .translation-text td, .translation-text th { border: 1px solid #ccc; padding: 6px 8px; font-size: 11px; word-wrap: break-word; overflow-wrap: break-word; }
+        .translation-text td, .translation-text th { border: 1px solid #ccc; padding: 4px 6px; font-size: 9pt; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; overflow: hidden; line-height: 1.3; }
         .translation-text tr { page-break-inside: avoid; page-break-after: auto; }
         .translation-text thead { display: table-header-group; }
         .page-title { font-size: 13px; font-weight: bold; text-align: center; margin: 15px 0 10px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; page-break-after: avoid; }
