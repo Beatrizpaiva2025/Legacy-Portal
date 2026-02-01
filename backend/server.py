@@ -8100,9 +8100,70 @@ async def submit_translation(
                 "size": len(file_content)
             }
         await db.translation_submissions.insert_one(submission)
+
+        # Update order status
+        order_update = {
+            "translation_status": "ready_for_review",
+            "submission_id": submission_id,
+            "submitted_at": datetime.utcnow(),
+            "submitted_by": user["id"]
+        }
+
+        # IMPORTANT: Also save translation_html to the order so it's available for delivery
+        if translation_html:
+            order_update["translation_html"] = translation_html
+            logger.info(f"Saving translation_html to order {order_id} ({len(translation_html)} chars)")
+
+            # Also save as document in order_documents for the delivery flow
+            try:
+                order_data = await db.translation_orders.find_one({"id": order_id})
+                order_number = order_data.get("order_number", "Translation") if order_data else "Translation"
+                doc_filename = f"{order_number}_Translation.html"
+                doc_base64 = base64.b64encode(translation_html.encode('utf-8')).decode('utf-8')
+
+                doc_record = {
+                    "id": str(uuid.uuid4()),
+                    "order_id": order_id,
+                    "filename": doc_filename,
+                    "data": doc_base64,
+                    "file_data": doc_base64,
+                    "content_type": "text/html",
+                    "source": "translated_document",
+                    "uploaded_at": datetime.utcnow()
+                }
+                await db.order_documents.insert_one(doc_record)
+                logger.info(f"Saved translation as document: {doc_filename} for order {order_id}")
+            except Exception as doc_err:
+                logger.error(f"Failed to save translation as document: {str(doc_err)}")
+
+        # If translator uploaded a file, save it to the order and order_documents
+        if translation_file and submission.get("translation_file"):
+            tf = submission["translation_file"]
+            order_update["translated_file"] = tf["data"]
+            order_update["translated_filename"] = tf["filename"]
+            order_update["translated_file_type"] = tf["content_type"]
+            logger.info(f"Saving translated_file to order {order_id}: {tf['filename']}")
+
+            # Also save to order_documents
+            try:
+                doc_record = {
+                    "id": str(uuid.uuid4()),
+                    "order_id": order_id,
+                    "filename": tf["filename"],
+                    "data": tf["data"],
+                    "file_data": tf["data"],
+                    "content_type": tf["content_type"],
+                    "source": "translated_document",
+                    "uploaded_at": datetime.utcnow()
+                }
+                await db.order_documents.insert_one(doc_record)
+                logger.info(f"Saved translation file as document: {tf['filename']} for order {order_id}")
+            except Exception as doc_err:
+                logger.error(f"Failed to save translation file as document: {str(doc_err)}")
+
         await db.translation_orders.update_one(
             {"id": order_id},
-            {"$set": {"translation_status": "ready_for_review", "submission_id": submission_id, "submitted_at": datetime.utcnow(), "submitted_by": user["id"]}}
+            {"$set": order_update}
         )
         logger.info(f"Translation submitted: {submission_id} by {user.get('name', user['id'])}")
         return {"status": "success", "submission_id": submission_id, "message": "Translation submitted for review"}
@@ -12132,6 +12193,21 @@ async def admin_get_single_order(order_id: str, admin_key: str):
         if '_id' in order:
             del order['_id']
 
+        # Check for translated documents in order_documents collection
+        translated_docs = await db.order_documents.find({
+            "order_id": order_id,
+            "source": "translated_document"
+        }).to_list(50)
+
+        # Add flags to indicate translation availability
+        has_translated_docs = len(translated_docs) > 0
+        order["has_translated_documents"] = has_translated_docs
+        order["translated_documents_count"] = len(translated_docs)
+
+        # If there are translated docs but no translated_filename, set it from first doc
+        if has_translated_docs and not order.get("translated_filename"):
+            order["translated_filename"] = translated_docs[0].get("filename")
+
         return {"order": order}
     except HTTPException:
         raise
@@ -13246,6 +13322,35 @@ async def admin_save_translation(order_id: str, data: TranslationData, admin_key
     )
 
     logger.info(f"Translation saved for order {order_id}, sent to {destination}, status: {new_status}")
+
+    # Save translation to order_documents when it's being sent (not just saved as draft)
+    # This ensures the delivery flow can find it via order_documents query
+    if destination != "save" and data.translation_html:
+        try:
+            order_number = order.get("order_number", "Translation")
+            doc_filename = f"{order_number}_Translation.html"
+            doc_base64 = base64.b64encode(data.translation_html.encode('utf-8')).decode('utf-8')
+
+            # Remove any existing translated documents for this order to avoid duplicates
+            await db.order_documents.delete_many({
+                "order_id": order_id,
+                "source": "translated_document"
+            })
+
+            doc_record = {
+                "id": str(uuid.uuid4()),
+                "order_id": order_id,
+                "filename": doc_filename,
+                "data": doc_base64,
+                "file_data": doc_base64,
+                "content_type": "text/html",
+                "source": "translated_document",
+                "uploaded_at": datetime.utcnow()
+            }
+            await db.order_documents.insert_one(doc_record)
+            logger.info(f"Saved workspace translation to order_documents: {doc_filename} for order {order_id}")
+        except Exception as doc_err:
+            logger.error(f"Failed to save workspace translation to order_documents: {str(doc_err)}")
 
     # Send notification to PM when translator sends translation for PM review
     if destination == "pm":
@@ -15200,11 +15305,10 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                             doc_content_type = doc.get("content_type", "application/pdf").lower()
                             doc_filename = doc.get("filename", f"document_{doc_id}.pdf")
 
-                            # Skip translated documents if combined PDF was already generated
-                            # (the translation is already included in the combined PDF)
-                            if has_attachments and doc_source == "translated_document":
-                                logger.info(f"Skipping translated document '{doc_filename}' - already included in combined PDF")
-                                continue
+                            # NOTE: Do NOT skip translated_document source here!
+                            # The combined PDF is generated from workspace HTML (order.translation_html),
+                            # while additional_document_ids are SEPARATE uploaded files that should always be included.
+                            # Previous bug was skipping all uploaded translations when workspace translation was included.
 
                             # Convert HTML files to PDF before attaching
                             if "html" in doc_content_type or doc_filename.lower().endswith(".html"):
@@ -17928,6 +18032,7 @@ For DIPLOMAS / EDUCATIONAL:
 ❌ Download buttons or interface elements
 ❌ Comments about the translation
 ❌ Markdown formatting (use HTML only)
+❌ "PAGE 1", "Page X of Y", or any page number headers/labels (the document should start directly with the translated content)
 
 ═══════════════════════════════════════════════════════════════════
                     FINAL OUTPUT
@@ -18212,7 +18317,8 @@ CRITICAL INSTRUCTIONS:
 5. If you see bordered sections, use CSS borders
 6. Replicate the exact visual appearance of EACH page in HTML format
 7. DO NOT skip any pages - all pages must be translated
-8. IMPORTANT: For multi-page documents, REPEAT the document header/letterhead at the TOP of EACH page, just like in the original document"""
+8. IMPORTANT: For multi-page documents, REPEAT the document header/letterhead at the TOP of EACH page, just like in the original document
+9. Do NOT add "PAGE 1", "Page X of Y", or any page number labels/headers - start each page directly with the translated content"""
                     })
                 else:
                     message_content = user_message
@@ -21228,51 +21334,60 @@ async def send_followup_email(email: str, name: str, quote: dict, reminder_numbe
         intro = f"This is your final reminder! Don't miss out on {discount_percent}% off your translation. This offer expires soon!"
         cta_text = "Get Started Now"
 
-    discount_section = ""
+    discount_html = ""
     if discount_code and discount_percent > 0:
-        discount_section = f"""
-        <div style="background: #fef3c7; padding: 20px; border-radius: 10px; margin: 20px 0; text-align: center;">
-            <p style="margin: 0 0 10px 0; font-size: 14px;">Use code at checkout:</p>
-            <p style="font-size: 24px; font-weight: bold; color: #d97706; margin: 0;">{discount_code}</p>
-            <p style="margin: 10px 0 0 0; font-size: 14px;">for <strong>{discount_percent}% OFF</strong></p>
-            <p style="margin: 10px 0 0 0; font-size: 12px; color: #666;">Was: ${total_price:.2f} | Now: ${discounted_price:.2f}</p>
-        </div>
-        """
+        discount_html = f"""
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #fdf6e3 0%, #fef3c7 100%); border: 1px solid #e6c547; border-radius: 8px; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 25px; text-align: center;">
+                                        <p style="color: #1a2a4a; font-size: 14px; margin: 0 0 10px 0;">Use code at checkout:</p>
+                                        <p style="font-size: 24px; font-weight: 700; color: #c9a227; margin: 0; letter-spacing: 1px;">{discount_code}</p>
+                                        <p style="margin: 10px 0 0 0; font-size: 14px; color: #4a5568;">for <strong>{discount_percent}% OFF</strong></p>
+                                        <p style="margin: 10px 0 0 0; font-size: 12px; color: #64748b;">Was: ${total_price:.2f} | Now: ${discounted_price:.2f}</p>
+                                    </td>
+                                </tr>
+                            </table>"""
 
     content = f"""
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #fff;">
-        <div style="background: linear-gradient(135deg, #0d9488 0%, #0891b2 100%); padding: 20px; border-radius: 10px 10px 0 0;">
-            <img src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png" alt="Legacy Translations" style="max-width: 150px;">
-        </div>
+                            <p style="color: #1a2a4a; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
+                                Hello, {name}
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 25px 0;">
+                                {intro}
+                            </p>
 
-        <div style="padding: 30px;">
-            <h2 style="color: #0d9488; margin-top: 0;">Hello {name}!</h2>
-            <p>{intro}</p>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: #f0f4f8; border: 1px solid #e2e8f0; border-radius: 8px; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 20px;">
+                                        <p style="color: #1a2a4a; font-size: 14px; margin: 0 0 8px 0;"><strong>Service:</strong> <span style="color: #4a5568;">{quote.get('service_type', 'Translation').replace('_', ' ').title()}</span></p>
+                                        <p style="color: #1a2a4a; font-size: 14px; margin: 0 0 8px 0;"><strong>Languages:</strong> <span style="color: #4a5568;">{quote.get('translate_from', 'Source')} → {quote.get('translate_to', 'Target')}</span></p>
+                                        <p style="font-size: 20px; color: #c9a227; font-weight: 700; margin: 15px 0 0 0;">Total: ${total_price:.2f}</p>
+                                    </td>
+                                </tr>
+                            </table>
 
-            <div style="background: #f0fdfa; padding: 20px; border-radius: 10px; margin: 20px 0;">
-                <p><strong>Service:</strong> {quote.get('service_type', 'Translation').replace('_', ' ').title()}</p>
-                <p><strong>Languages:</strong> {quote.get('translate_from', 'Source')} → {quote.get('translate_to', 'Target')}</p>
-                <p style="font-size: 20px; color: #0d9488; font-weight: bold; margin: 10px 0 0 0;">Total: ${total_price:.2f}</p>
-            </div>
+                            {discount_html}
 
-            {discount_section}
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 30px 0;">
+                                <tr>
+                                    <td align="center">
+                                        <a href="{frontend_url}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); color: #ffffff; text-decoration: none; padding: 18px 45px; border-radius: 50px; font-size: 16px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(26, 42, 74, 0.3);">
+                                            {cta_text.upper()}
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
 
-            <div style="text-align: center; margin: 30px 0;">
-                <a href="{frontend_url}" style="display: inline-block; padding: 15px 40px; background: #0d9488; color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">{cta_text}</a>
-            </div>
+                            <p style="color: #64748b; font-size: 13px; line-height: 1.7; margin: 25px 0 0 0;">
+                                If you have any questions, feel free to reply to this email or call us at +1(857)316-7770.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 20px 0;">
+                                Regards,
+                            </p>"""
 
-            <p style="color: #666; font-size: 14px;">If you have any questions, feel free to reply to this email or call us at +1(857)316-7770.</p>
+    full_html = get_email_header() + content + get_email_footer(include_review_button=False)
 
-            <p>Best regards,<br>Legacy Translations Team</p>
-        </div>
-
-        <div style="background: #f3f4f6; padding: 20px; text-align: center; border-radius: 0 0 10px 10px;">
-            <p style="margin: 0; color: #666; font-size: 12px;">Legacy Translations | www.legacytranslations.com</p>
-        </div>
-    </div>
-    """
-
-    await email_service.send_email(email, subject, content)
+    await email_service.send_email(email, subject, full_html)
     logger.info(f"Follow-up email #{reminder_number} sent to {email}")
 
 async def send_quote_order_followup_email(email: str, name: str, order: dict, reminder_number: int, discount_percent: int, discount_code: str = None):
@@ -21295,65 +21410,96 @@ async def send_quote_order_followup_email(email: str, name: str, order: dict, re
         intro = f"This is your last chance to get {discount_percent}% off! Don't miss this special offer."
         cta_text = "Get Started Now"
 
-    discount_section = ""
+    discount_html = ""
     if discount_code and discount_percent > 0:
-        discount_section = f"""
-        <div style="background: #fef3c7; padding: 20px; border-radius: 10px; margin: 20px 0; text-align: center;">
-            <p style="margin: 0 0 10px 0; font-size: 14px;">Use code at checkout:</p>
-            <p style="font-size: 24px; font-weight: bold; color: #d97706; margin: 0;">{discount_code}</p>
-            <p style="margin: 10px 0 0 0; font-size: 14px;">for <strong>{discount_percent}% OFF</strong></p>
-            <p style="margin: 10px 0 0 0; font-size: 12px; color: #666;">Was: ${total_price:.2f} | Now: ${discounted_price:.2f}</p>
-        </div>
-        """
+        discount_html = f"""
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #fdf6e3 0%, #fef3c7 100%); border: 1px solid #e6c547; border-radius: 8px; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 25px; text-align: center;">
+                                        <p style="color: #1a2a4a; font-size: 14px; margin: 0 0 10px 0;">Use code at checkout:</p>
+                                        <p style="font-size: 24px; font-weight: 700; color: #c9a227; margin: 0; letter-spacing: 1px;">{discount_code}</p>
+                                        <p style="margin: 10px 0 0 0; font-size: 14px; color: #4a5568;">for <strong>{discount_percent}% OFF</strong></p>
+                                        <p style="margin: 10px 0 0 0; font-size: 12px; color: #64748b;">Was: ${total_price:.2f} | Now: ${discounted_price:.2f}</p>
+                                    </td>
+                                </tr>
+                            </table>"""
 
     content = f"""
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #fff;">
-        <div style="background: linear-gradient(135deg, #0d9488 0%, #0891b2 100%); padding: 20px; border-radius: 10px 10px 0 0;">
-            <img src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png" alt="Legacy Translations" style="max-width: 150px;">
-        </div>
+                            <p style="color: #1a2a4a; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
+                                Hello, {name}
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 25px 0;">
+                                {intro}
+                            </p>
 
-        <div style="padding: 30px;">
-            <h2 style="color: #0d9488; margin-top: 0;">Hello {name}!</h2>
-            <p>{intro}</p>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: #f0f4f8; border: 1px solid #e2e8f0; border-radius: 8px; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 20px;">
+                                        <p style="color: #1a2a4a; font-size: 14px; margin: 0 0 8px 0;"><strong>Quote #:</strong> <span style="color: #4a5568;">{order_number}</span></p>
+                                        <p style="color: #1a2a4a; font-size: 14px; margin: 0 0 8px 0;"><strong>Service:</strong> <span style="color: #4a5568;">{order.get('service_type', 'Translation').replace('_', ' ').title()}</span></p>
+                                        <p style="color: #1a2a4a; font-size: 14px; margin: 0 0 8px 0;"><strong>Languages:</strong> <span style="color: #4a5568;">{order.get('translate_from', 'Source')} → {order.get('translate_to', 'Target')}</span></p>
+                                        <p style="color: #1a2a4a; font-size: 14px; margin: 0 0 8px 0;"><strong>Pages:</strong> <span style="color: #4a5568;">{order.get('page_count', 1)}</span></p>
+                                        <p style="font-size: 20px; color: #c9a227; font-weight: 700; margin: 15px 0 0 0;">Total: ${total_price:.2f}</p>
+                                    </td>
+                                </tr>
+                            </table>
 
-            <div style="background: #f0fdfa; padding: 20px; border-radius: 10px; margin: 20px 0;">
-                <p><strong>Quote #:</strong> {order_number}</p>
-                <p><strong>Service:</strong> {order.get('service_type', 'Translation').replace('_', ' ').title()}</p>
-                <p><strong>Languages:</strong> {order.get('translate_from', 'Source')} → {order.get('translate_to', 'Target')}</p>
-                <p><strong>Pages:</strong> {order.get('page_count', 1)}</p>
-                <p style="font-size: 20px; color: #0d9488; font-weight: bold; margin: 10px 0 0 0;">Total: ${total_price:.2f}</p>
-            </div>
+                            {discount_html}
 
-            {discount_section}
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 30px 0;">
+                                <tr>
+                                    <td align="center">
+                                        <a href="{frontend_url}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); color: #ffffff; text-decoration: none; padding: 18px 45px; border-radius: 50px; font-size: 16px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(26, 42, 74, 0.3);">
+                                            {cta_text.upper()}
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
 
-            <div style="text-align: center; margin: 30px 0;">
-                <a href="{frontend_url}" style="display: inline-block; padding: 15px 40px; background: #0d9488; color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">{cta_text}</a>
-            </div>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: #f0f4f8; border: 1px solid #e2e8f0; border-radius: 8px; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 20px;">
+                                        <p style="color: #1a2a4a; font-size: 14px; font-weight: 600; margin: 0 0 12px 0;">
+                                            Payment Options
+                                        </p>
+                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                            <tr>
+                                                <td width="50%" style="padding-right: 8px; vertical-align: top;">
+                                                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px;">
+                                                        <tr>
+                                                            <td style="padding: 12px;">
+                                                                <p style="color: #1a2a4a; font-size: 13px; font-weight: 600; margin: 0;">Zelle</p>
+                                                                <p style="color: #64748b; font-size: 13px; margin: 5px 0 0 0;">857-208-1139</p>
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+                                                </td>
+                                                <td width="50%" style="padding-left: 8px; vertical-align: top;">
+                                                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px;">
+                                                        <tr>
+                                                            <td style="padding: 12px;">
+                                                                <p style="color: #1a2a4a; font-size: 13px; font-weight: 600; margin: 0;">Venmo</p>
+                                                                <p style="color: #64748b; font-size: 13px; margin: 5px 0 0 0;">@legacytranslations</p>
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
 
-            <h3 style="color: #0d9488;">Payment Options</h3>
-            <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-                <div style="flex: 1; min-width: 150px; background: #f0fdf4; padding: 15px; border-radius: 8px;">
-                    <p style="margin: 0;"><strong>Zelle</strong></p>
-                    <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">857-208-1139</p>
-                </div>
-                <div style="flex: 1; min-width: 150px; background: #eff6ff; padding: 15px; border-radius: 8px;">
-                    <p style="margin: 0;"><strong>Venmo</strong></p>
-                    <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">@legacytranslations</p>
-                </div>
-            </div>
+                            <p style="color: #64748b; font-size: 13px; line-height: 1.7; margin: 25px 0 0 0;">
+                                If you have any questions, feel free to reply to this email or call us at +1(857)316-7770.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 20px 0;">
+                                Regards,
+                            </p>"""
 
-            <p style="margin-top: 20px; color: #666; font-size: 14px;">Questions? Reply to this email or call +1(857)316-7770.</p>
+    full_html = get_email_header() + content + get_email_footer(include_review_button=False)
 
-            <p>Best regards,<br>Legacy Translations Team</p>
-        </div>
-
-        <div style="background: #f3f4f6; padding: 20px; text-align: center; border-radius: 0 0 10px 10px;">
-            <p style="margin: 0; color: #666; font-size: 12px;">Legacy Translations | www.legacytranslations.com</p>
-        </div>
-    </div>
-    """
-
-    await email_service.send_email(email, subject, content)
+    await email_service.send_email(email, subject, full_html)
     logger.info(f"Quote order follow-up email #{reminder_number} sent to {email} for {order_number}")
 
 @api_router.get("/admin/quotes/followup-status")
@@ -22590,6 +22736,7 @@ Before submitting, verify:
 ☐ All notations included ([signature], [stamp], etc.)
 ☐ HTML is valid and properly formatted
 ☐ No translator notes or comments in output
+☐ No "PAGE 1" or "Page X of Y" headers added - start directly with translated content
 """
 
     return prompt
@@ -22650,7 +22797,7 @@ Orientation: Portrait (unless original is landscape)
 • Add page-break-inside: avoid; to important sections
 • Keep related content together (names, addresses, tables)
 • Avoid orphan/widow lines
-• If multi-page: add page numbers
+• If multi-page: do NOT add "PAGE 1" or "Page X" headers at the top of pages - only add subtle footer page numbers if needed
 
 3️⃣ TABLE FORMATTING
 • Tables must have visible borders: 1px solid #000
@@ -23358,7 +23505,8 @@ async def translate_single_chunk(client, config: dict, system_prompt: str, page_
 
 Produce a complete HTML translation ready for professional printing on US Letter format.
 ⚠️ CRITICAL: Each original page MUST fit on exactly ONE translated page. Scale font sizes and spacing as needed to fit.
-{"Include page breaks between pages using: <div class='page-break' style='page-break-before: always;'></div>" if len(page_images) > 1 else ""}"""
+{"Include page breaks between pages using: <div class='page-break' style='page-break-before: always;'></div>" if len(page_images) > 1 else ""}
+Do NOT add "PAGE 1", "Page X of Y", or any page number labels/headers - start directly with the translated document content."""
         else:
             text_prompt = f"""Translate this {config['document_type']} document from the images{chunk_info}.
 
@@ -23366,7 +23514,8 @@ Look at {'all ' + str(len(page_images)) + ' pages' if len(page_images) > 1 else 
 
 Produce a complete HTML translation ready for professional printing on US Letter format.
 ⚠️ CRITICAL: Each original page MUST fit on exactly ONE translated page. Scale font sizes and spacing as needed to fit.
-{"Include page breaks between pages using: <div class='page-break' style='page-break-before: always;'></div>" if len(page_images) > 1 else ""}"""
+{"Include page breaks between pages using: <div class='page-break' style='page-break-before: always;'></div>" if len(page_images) > 1 else ""}
+Do NOT add "PAGE 1", "Page X of Y", or any page number labels/headers - start directly with the translated document content."""
 
         message_content.append({
             "type": "text",
@@ -28697,6 +28846,91 @@ async def mark_all_notifications_read(token: str = Header(None, alias="salespers
 
     return {"success": True}
 
+# Salesperson messaging
+@api_router.get("/salesperson/messages")
+async def get_salesperson_messages(token: str = Header(None, alias="salesperson-token")):
+    if not token:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    salesperson = await db.salespeople.find_one({"token": token})
+    if not salesperson:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    messages = await db.salesperson_messages.find(
+        {"salesperson_id": salesperson["id"]}
+    ).sort("created_at", -1).to_list(100)
+
+    for msg in messages:
+        msg["_id"] = str(msg["_id"])
+        if msg.get("created_at"):
+            msg["created_at"] = msg["created_at"].isoformat()
+
+    return {"messages": messages}
+
+@api_router.post("/salesperson/messages")
+async def send_salesperson_message(
+    token: str = Header(None, alias="salesperson-token"),
+    subject: str = Form(...),
+    content: str = Form(...)
+):
+    if not token:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    salesperson = await db.salespeople.find_one({"token": token})
+    if not salesperson:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    message_id = str(uuid.uuid4())
+    now = datetime.utcnow()
+
+    message = {
+        "id": message_id,
+        "salesperson_id": salesperson["id"],
+        "salesperson_name": salesperson.get("name", "Salesperson"),
+        "salesperson_email": salesperson.get("email", ""),
+        "subject": subject,
+        "content": content,
+        "to_salesperson": False,
+        "read": False,
+        "created_at": now
+    }
+
+    await db.salesperson_messages.insert_one(message)
+
+    # Create notification for admin
+    notification = {
+        "id": str(uuid.uuid4()),
+        "type": "salesperson_message",
+        "title": f"New message from salesperson {salesperson.get('name', 'Unknown')}",
+        "message": content[:100] + ("..." if len(content) > 100 else ""),
+        "salesperson_id": salesperson["id"],
+        "salesperson_name": salesperson.get("name", "Salesperson"),
+        "is_read": False,
+        "created_at": now
+    }
+    await db.notifications.insert_one(notification)
+
+    return {"status": "success", "message_id": message_id}
+
+@api_router.put("/salesperson/messages/{message_id}/read")
+async def mark_salesperson_message_read(message_id: str, token: str = Header(None, alias="salesperson-token")):
+    if not token:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    salesperson = await db.salespeople.find_one({"token": token})
+    if not salesperson:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    result = await db.salesperson_messages.update_one(
+        {"id": message_id, "salesperson_id": salesperson["id"]},
+        {"$set": {"read": True, "read_at": datetime.utcnow()}}
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    return {"status": "success"}
+
 # Salesperson payment history
 @api_router.get("/salesperson/payment-history")
 async def get_payment_history(token: str = Header(None, alias="salesperson-token")):
@@ -28921,6 +29155,87 @@ async def get_salesperson_ranking(admin_key: str = Header(None)):
         "month": current_month,
         "rankings": rankings
     }
+
+# Admin: View salesperson messages
+@api_router.get("/admin/salesperson-messages")
+async def get_admin_salesperson_messages(admin_key: str = Header(None), limit: int = 50):
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info or user_info.get("role") not in ["admin", "pm", "translator", "contractor", "inhouse"]:
+        raise HTTPException(status_code=401, detail="Invalid admin key or insufficient permissions")
+
+    messages = await db.salesperson_messages.find(
+        {"to_salesperson": False}
+    ).sort("created_at", -1).limit(limit).to_list(limit)
+
+    for msg in messages:
+        msg["_id"] = str(msg["_id"])
+        if msg.get("created_at"):
+            msg["created_at"] = msg["created_at"].isoformat()
+
+    return {"messages": messages}
+
+@api_router.put("/admin/salesperson-messages/{message_id}/read")
+async def admin_mark_salesperson_message_read(message_id: str, admin_key: str = Header(None)):
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info or user_info.get("role") not in ["admin", "pm", "translator", "contractor", "inhouse"]:
+        raise HTTPException(status_code=401, detail="Invalid admin key or insufficient permissions")
+
+    result = await db.salesperson_messages.update_one(
+        {"id": message_id},
+        {"$set": {"read": True, "read_at": datetime.utcnow()}}
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    return {"status": "success"}
+
+@api_router.post("/admin/salesperson-messages/{salesperson_id}/reply")
+async def admin_reply_to_salesperson(
+    salesperson_id: str,
+    admin_key: str = Header(None),
+    subject: str = Form(...),
+    content: str = Form(...)
+):
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info or user_info.get("role") not in ["admin", "pm", "translator", "contractor", "inhouse"]:
+        raise HTTPException(status_code=401, detail="Invalid admin key or insufficient permissions")
+
+    salesperson = await db.salespeople.find_one({"id": salesperson_id})
+    if not salesperson:
+        raise HTTPException(status_code=404, detail="Salesperson not found")
+
+    message_id = str(uuid.uuid4())
+    now = datetime.utcnow()
+
+    message = {
+        "id": message_id,
+        "salesperson_id": salesperson_id,
+        "salesperson_name": salesperson.get("name", "Salesperson"),
+        "subject": subject,
+        "content": content,
+        "to_salesperson": True,
+        "read": False,
+        "from_admin": True,
+        "admin_name": user_info.get("name", "Admin"),
+        "created_at": now
+    }
+
+    await db.salesperson_messages.insert_one(message)
+
+    # Create notification for salesperson
+    notification = {
+        "id": str(uuid.uuid4()),
+        "salesperson_id": salesperson_id,
+        "type": "new_message",
+        "title": "New message from Admin",
+        "message": content[:100] + ("..." if len(content) > 100 else ""),
+        "read": False,
+        "created_at": now.isoformat()
+    }
+    await db.salesperson_notifications.insert_one(notification)
+
+    return {"status": "success", "message_id": message_id}
 
 # Admin: Get pending commissions for payment
 @api_router.get("/admin/pending-commissions")
