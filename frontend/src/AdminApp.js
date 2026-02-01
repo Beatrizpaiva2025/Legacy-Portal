@@ -371,7 +371,7 @@ const sanitizeErrorMessage = (errorMsg) => {
 const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
     @page {
         size: ${pageSizeCSS};
-        margin: 0.7in 0.75in 0.4in 0.75in;
+        margin: 0.5in 0.5in 0.4in 0.5in;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -380,14 +380,62 @@ const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
         line-height: 1.6;
         color: #333;
         background: white;
+        padding: 0.2in 0.25in;
     }
     img { max-width: 100%; height: auto; }
     table { border-collapse: collapse; width: 100%; }
-    td, th { border: 1px solid #333; padding: 5px 6px; font-size: 10pt; }
+    td, th { border: 1px solid #333; padding: 5px 6px; font-size: 10pt; vertical-align: top; }
+    /* Translation content: robust table layout for complex documents (birth certificates, etc.) */
+    .translation-content table {
+        table-layout: fixed;
+        width: 100%;
+        max-width: 100%;
+        border-collapse: collapse;
+        margin: 4px 0;
+        page-break-inside: auto;
+    }
+    .translation-content td,
+    .translation-content th {
+        border: 1px solid #333;
+        padding: 3px 5px;
+        font-size: 9pt;
+        line-height: 1.3;
+        vertical-align: top;
+        text-align: left;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        word-break: normal;
+        overflow: hidden;
+    }
+    .translation-content tr {
+        page-break-inside: avoid;
+    }
+    .translation-content p {
+        margin: 0 0 2px 0;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+    .translation-content td p:last-child,
+    .translation-content th p:last-child {
+        margin-bottom: 0;
+    }
+    .translation-content thead { display: table-header-group; }
+    .translation-content > *:first-child { margin-top: 0 !important; padding-top: 0 !important; }
+    .translation-content > div:first-child > *:first-child { margin-top: 0 !important; padding-top: 0 !important; }
     @media print {
         body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .page-break { page-break-before: always; }
     }
+    /* Paged translation layout - letterhead repeats on every printed page via thead */
+    .paged-translation { width: 100%; border-collapse: collapse; border: none !important; }
+    .paged-translation > thead > tr > td,
+    .paged-translation > tbody > tr > td { border: none !important; padding: 0 !important; }
+    .paged-translation > thead > tr > td { padding: 5px 0 0 0 !important; }
+    .paged-translation > thead { display: table-header-group; }
+    .paged-translation > tbody { display: table-row-group; }
+    /* Avoid breaking inside table rows (bank statements, financial tables) */
+    .translation-content tr { page-break-inside: avoid; }
+    .translation-content table { page-break-inside: auto; }
 `;
 
 // Helper function to generate letterhead HTML with INLINE STYLES (guaranteed to work)
@@ -1426,7 +1474,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               {{LOGO_LEFT}}
             </div>
             <div style="text-align: center; flex: 1; padding: 0 16px;">
-              <div style="font-weight: bold; color: #2563eb; font-size: 14px; font-style: italic;">Legacy Translations</div>
+              <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
               <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
               <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
@@ -4778,7 +4826,16 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         try {
           const arrayBuffer = e.target.result;
           const result = await mammoth.convertToHtml({ arrayBuffer });
-          resolve(result.value);
+          // Post-process: add inline styles to tables for robust rendering
+          // This ensures tables render correctly even if external CSS is overridden
+          let html = result.value;
+          html = html.replace(/<table(?=[>\s])/g,
+            '<table style="table-layout:fixed;width:100%;border-collapse:collapse;"');
+          html = html.replace(/<td(?=[>\s])/g,
+            '<td style="vertical-align:top;word-wrap:break-word;overflow-wrap:break-word;overflow:hidden;padding:3px 5px;"');
+          html = html.replace(/<th(?=[>\s])/g,
+            '<th style="vertical-align:top;word-wrap:break-word;overflow-wrap:break-word;overflow:hidden;padding:3px 5px;font-weight:bold;"');
+          resolve(html);
         } catch (err) {
           reject(err);
         }
@@ -5047,7 +5104,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
         // Add page context to help Claude understand this is part of a multi-page document
         const pageContext = totalPages > 1
-          ? `IMPORTANT: This is PAGE ${pageNumber} of ${totalPages} of a multi-page document. Translate ONLY the content visible in THIS image completely. Do NOT ask for other pages - they will be translated setotely.`
+          ? `IMPORTANT: This is image ${pageNumber} of ${totalPages} of a multi-page document. Translate ONLY the content visible in THIS image completely. Do NOT ask for other pages - they will be translated separately. Do NOT include any "PAGE 1" or "Page X of Y" headers/labels in your translation output - just translate the document content directly.`
           : '';
 
         const response = await axios.post(`${API}/admin/translate?admin_key=${adminKey}`, {
@@ -5200,12 +5257,44 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     return bodyContent;
   };
 
+  // Reconstruct full HTML document by replacing body content while preserving styles/head
+  const reconstructFullHtml = (originalHtml, newBodyContent) => {
+    if (!originalHtml) return newBodyContent;
+
+    // If the original wasn't a full HTML document, just return the new content as-is
+    if (!originalHtml.includes('<body') && !originalHtml.includes('<html')) {
+      return newBodyContent;
+    }
+
+    // Replace body content in the original HTML, preserving <html>, <head>, <style> tags
+    // Use function replacement to avoid issues with $ in content (e.g. $1,598.99)
+    const bodyMatch = originalHtml.match(/(<body[^>]*>)([\s\S]*?)(<\/body>)/i);
+    if (bodyMatch) {
+      return originalHtml.replace(
+        /(<body[^>]*>)([\s\S]*?)(<\/body>)/i,
+        (match, openTag, oldContent, closeTag) => `${openTag}${newBodyContent}${closeTag}`
+      );
+    }
+
+    // Fallback: try to find </head> and wrap content
+    const headEndMatch = originalHtml.match(/([\s\S]*?<\/head>\s*)/i);
+    if (headEndMatch) {
+      return `${headEndMatch[1]}<body>${newBodyContent}</body></html>`;
+    }
+
+    return newBodyContent;
+  };
+
   // Update translation text manually
   const handleTranslationEdit = (newText) => {
     const updatedResults = [...translationResults];
+    const currentResult = updatedResults[selectedResultIndex];
+    // Reconstruct the full HTML document with the edited body content
+    // This preserves <html>, <head>, <style> so Preview mode keeps correct layout
+    const fullHtml = reconstructFullHtml(currentResult?.translatedText, newText);
     updatedResults[selectedResultIndex] = {
-      ...updatedResults[selectedResultIndex],
-      translatedText: newText
+      ...currentResult,
+      translatedText: fullHtml
     };
     setTranslationResults(updatedResults);
     setHasUnsavedChanges(true); // Mark as having unsaved changes
@@ -5551,7 +5640,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>`}
             </div>
             <div style="margin-left: 138px; margin-right: 90px; text-align: center;">
-                <div style="font-weight: bold; color: #2563eb; font-size: 14px; font-style: italic;">Legacy Translations</div>
+                <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
                 <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
                 <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
@@ -5566,10 +5655,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           : '<div style="margin-bottom: 24px;"></div>'}
 
         <!-- Main Title -->
-        <h1 style="text-align: center; font-size: 24px; font-weight: normal; margin-bottom: 30px; color: #1a365d; letter-spacing: 0.5px;">${certTitle}</h1>
+        <h1 style="text-align: center; font-size: 28px; font-weight: normal; margin-bottom: 30px; color: #1a365d; letter-spacing: 0.5px;">${certTitle}</h1>
 
         <!-- Translation of... -->
-        <p style="text-align: center; margin-bottom: 30px; font-size: 14px; line-height: 1.8;">
+        <p style="text-align: center; margin-bottom: 30px; font-size: 14px; line-height: 1.6;">
             Translation of a <strong>${documentType}</strong> from <strong>${sourceLanguage}</strong> to<br/>
             <strong>${targetLanguage}</strong>
         </p>
@@ -5585,7 +5674,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           }
           return templateParagraphs.map(p => {
             const processed = p.replace(/\{\{sourceLanguage\}\}/g, sourceLanguage).replace(/\{\{targetLanguage\}\}/g, targetLanguage);
-            return `<p style="text-align: justify; margin-bottom: 16px; line-height: 1.8; font-size: 12px;">${processed}</p>`;
+            return `<p style="text-align: justify; margin-bottom: 18px; line-height: 1.6; font-size: 13px;">${processed}</p>`;
           }).join('\n        ');
         })()}
 
@@ -5594,10 +5683,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             <div style="float: left; width: 60%;">
                 ${signatureImage
                   ? `<img src="${signatureImage}" alt="Signature" style="max-height: 40px; max-width: 180px; margin-bottom: 4px;" />`
-                  : `<div style="font-family: 'Brush Script MT', cursive; font-size: 24px; color: #1a365d; margin-bottom: 4px;">Beatriz Paiva</div>`}
-                <div style="font-weight: bold; font-size: 12px;">Authorized Representative</div>
-                <div style="font-size: 12px;">Legacy Translations Inc.</div>
-                <div style="font-size: 12px; margin-top: 8px;">Dated: ${translationDate}</div>
+                  : `<div style="font-family: 'Brush Script MT', cursive; font-size: 24px; color: #1a365d; margin-bottom: 4px;">${translatorNameForCert || 'Beatriz Paiva'}</div>`}
+                <div style="font-weight: bold; font-size: 13px;">${translatorNameForCert || 'Beatriz Paiva'}</div>
+                <div style="font-weight: bold; font-size: 13px;">${translator?.title || 'Managing Director'}</div>
+                <div style="font-size: 13px; margin-top: 8px;">Dated: ${translationDate}</div>
             </div>
             <div style="float: right; width: 35%; text-align: right;">
                 ${logoStamp
@@ -5613,7 +5702,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
     // Letterhead for all pages - Same style as cover
     const letterheadHTML = `
-        <div style="width: 100%; margin-bottom: 8px; overflow: hidden;">
+        <div style="width: 100%; margin-bottom: 2px; padding-bottom: 2px; overflow: hidden;">
             <div style="float: left; width: 128px;">
                 ${logoLeft
                   ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
@@ -5625,12 +5714,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span></div>`}
             </div>
             <div style="margin-left: 138px; margin-right: 90px; text-align: center;">
-                <div style="font-weight: bold; color: #2563eb; font-size: 14px; font-style: italic;">Legacy Translations</div>
+                <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
                 <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
                 <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
-        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>`;
+        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 4px;"></div>`;
 
     // Translation pages - supports HTML content OR images (not both to avoid duplication)
     let translationPagesHTML = '';
@@ -5638,36 +5727,47 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     // Filter out files with invalid/missing data to prevent blank pages
     const validTranslationFiles = quickTranslationFiles.filter(file => file.data && file.data.length > 100);
 
-    // Prefer image files if available (from images or PDF conversion) - each page gets its own header
+    // Prefer HTML content to maintain original quality (not converted to image)
+    // For large documents (bank statements etc.), CSS pagination + thead handles multi-page layout
+    // For mildly overflowing content, JS auto-scale still applies (scale >= 0.55)
     // First page doesn't need page-break since cover ends with one
-    if (validTranslationFiles.length > 0) {
-      translationPagesHTML = validTranslationFiles.map((file, idx) => `
-    <div style="${idx > 0 ? 'page-break-before: always;' : ''} padding-top: 5px;">
-        ${includeLetterhead ? letterheadHTML : ''}
-        <div>
-            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Translation page ${idx + 1}" style="width: 100%; max-height: 7in; object-fit: contain; display: block; margin: 0 auto;" />
-        </div>
-    </div>`).join('');
-    }
-    // Otherwise use HTML content (from Word/HTML/TXT)
-    else if (quickTranslationHtml) {
-      translationPagesHTML = `
+    if (quickTranslationHtml) {
+      translationPagesHTML = includeLetterhead ? `
+    <table class="paged-translation">
+        <thead><tr><td style="padding: 5px 0 0 0;">
+            ${letterheadHTML}
+        </td></tr></thead>
+        <tbody><tr><td>
+            <div class="translation-content" style="padding: 0 20px; line-height: 1.5; font-size: 11pt;">
+                ${quickTranslationHtml}
+            </div>
+        </td></tr></tbody>
+    </table>` : `
     <div style="padding-top: 5px;">
-        ${includeLetterhead ? letterheadHTML : ''}
-        <div style="margin-top: 5px; line-height: 1.5; font-size: 11pt;">
+        <div class="translation-content" style="padding: 0 20px; line-height: 1.5; font-size: 11pt;">
             ${quickTranslationHtml}
         </div>
     </div>`;
     }
+    // Fallback to image files if no HTML available
+    else if (validTranslationFiles.length > 0) {
+      translationPagesHTML = validTranslationFiles.map((file, idx) => `
+    <div style="${idx > 0 ? 'page-break-before: always;' : ''} padding-top: 5px;">
+        ${includeLetterhead ? letterheadHTML : ''}
+        <div>
+            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Translation page ${idx + 1}" style="max-width: 100%; max-height: 7in; object-fit: contain; display: block; margin: 0 auto;" />
+        </div>
+    </div>`).join('');
+    }
 
-    // Original document pages
+    // Original document pages - wrapped for auto-scaling like translation pages
     const validOriginalFiles = quickOriginalFiles.filter(file => file.data && file.data.length > 100);
     const originalPagesHTML = (includeOriginal && validOriginalFiles.length > 0) ? validOriginalFiles.map((file, idx) => `
     <div style="page-break-before: always; padding-top: 5px;">
         ${includeLetterhead ? letterheadHTML : ''}
-        ${idx === 0 ? '<div style="font-size: 13px; font-weight: bold; text-align: center; margin: 8px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px;">Original Document</div>' : ''}
+        ${idx === 0 ? '<div style="font-size: 13px; font-weight: bold; text-align: center; margin: 4px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px;">Original Document</div>' : ''}
         <div style="text-align: center;">
-            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Original page ${idx + 1}" style="width: 100%; max-height: 7in; object-fit: contain; display: block; margin: 0 auto;" />
+            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Original page ${idx + 1}" style="max-width: 100%; max-height: 7in; object-fit: contain; display: block; margin: 0 auto;" />
         </div>
     </div>`).join('') : '';
 
@@ -5983,12 +6083,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         ` : ''}
 
         <!-- Main Title -->
-        <h1 style="text-align: center; font-size: 24px; font-weight: normal; margin-bottom: 24px; color: #1a365d;">${certTitle}</h1>
+        <h1 style="text-align: center; font-size: 28px; font-weight: normal; margin-bottom: 24px; color: #1a365d;">${certTitle}</h1>
 
         <!-- Translation of ... -->
-        <p style="text-align: center; margin-bottom: 24px; font-size: 14px;">
-          Translation of <strong>${documentType}</strong> from<br/>
-          <strong>${sourceLanguage}</strong> to <strong>${targetLanguage}</strong>
+        <p style="text-align: center; margin-bottom: 24px; font-size: 14px; line-height: 1.6;">
+          Translation of a <strong>${documentType}</strong> from <strong>${sourceLanguage}</strong> to<br/>
+          <strong>${targetLanguage}</strong>
         </p>
 
         <!-- Body paragraphs -->
@@ -5996,7 +6096,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           const processed = para
             .replace(/\{\{sourceLanguage\}\}/g, sourceLanguage)
             .replace(/\{\{targetLanguage\}\}/g, targetLanguage);
-          return `<p style="text-align: justify; margin-bottom: 16px; font-size: 12px; line-height: 1.6;">${processed}</p>`;
+          return `<p style="text-align: justify; margin-bottom: 18px; font-size: 13px; line-height: 1.6;">${processed}</p>`;
         }).join('')}
 
         <!-- Signature and Stamp Section -->
@@ -6004,11 +6104,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           <div>
             ${signatureImage
               ? `<img src="${signatureImage}" alt="Signature" style="height: 60px; max-width: 200px; margin-bottom: 8px;" />`
-              : `<div style="font-family: cursive; font-size: 28px; color: #1a365d; margin-bottom: 8px;">Beatriz Paiva</div>`}
-            <div style="font-size: 14px; font-style: italic; font-weight: bold; color: #1a365d;">Beatriz Paiva</div>
-            <div style="font-size: 14px; color: #333;">Authorized Representative</div>
-            <div style="font-size: 14px; color: #333;">Legacy Translations Inc.</div>
-            <div style="font-size: 14px; color: #666; margin-top: 4px;">Dated: ${new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York' })}</div>
+              : `<div style="font-family: cursive; font-size: 28px; color: #1a365d; margin-bottom: 8px;">${translator?.name || 'Beatriz Paiva'}</div>`}
+            <div style="font-size: 13px; font-weight: bold;">${translator?.name || 'Beatriz Paiva'}</div>
+            <div style="font-size: 13px; font-weight: bold;">${translator?.title || 'Managing Director'}</div>
+            <div style="font-size: 13px; margin-top: 4px;">Dated: ${new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York' })}</div>
           </div>
           <div style="text-align: center;">
             ${logoStamp
@@ -6089,7 +6188,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>`}
             </div>
             <div style="margin-left: 138px; margin-right: 90px; text-align: center;">
-                <div style="font-weight: bold; color: #2563eb; font-size: 14px; font-style: italic;">Legacy Translations</div>
+                <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
                 <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
                 <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
@@ -6104,10 +6203,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           : '<div style="margin-bottom: 24px;"></div>'}
 
         <!-- Main Title -->
-        <h1 style="text-align: center; font-size: 24px; font-weight: normal; margin-bottom: 30px; color: #1a365d; letter-spacing: 0.5px;">${certTitle}</h1>
+        <h1 style="text-align: center; font-size: 28px; font-weight: normal; margin-bottom: 30px; color: #1a365d; letter-spacing: 0.5px;">${certTitle}</h1>
 
         <!-- Translation of... -->
-        <p style="text-align: center; margin-bottom: 30px; font-size: 14px; line-height: 1.8;">
+        <p style="text-align: center; margin-bottom: 30px; font-size: 14px; line-height: 1.6;">
             Translation of a <strong>${documentType}</strong> from <strong>${sourceLanguage}</strong> to<br/>
             <strong>${targetLanguage}</strong>
         </p>
@@ -6123,7 +6222,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           }
           return templateParagraphs.map(p => {
             const processed = p.replace(/\{\{sourceLanguage\}\}/g, sourceLanguage).replace(/\{\{targetLanguage\}\}/g, targetLanguage);
-            return `<p style="text-align: justify; margin-bottom: 16px; line-height: 1.8; font-size: 12px;">${processed}</p>`;
+            return `<p style="text-align: justify; margin-bottom: 18px; line-height: 1.6; font-size: 13px;">${processed}</p>`;
           }).join('\n        ');
         })()}
 
@@ -6132,10 +6231,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             <div style="float: left; width: 60%;">
                 ${signatureImage
                   ? `<img src="${signatureImage}" alt="Signature" style="max-height: 40px; max-width: 180px; margin-bottom: 4px;" />`
-                  : `<div style="font-family: 'Brush Script MT', cursive; font-size: 24px; color: #1a365d; margin-bottom: 4px;">Beatriz Paiva</div>`}
-                <div style="font-weight: bold; font-size: 12px;">Authorized Representative</div>
-                <div style="font-size: 12px;">Legacy Translations Inc.</div>
-                <div style="font-size: 12px; margin-top: 8px;">Dated: ${translationDate}</div>
+                  : `<div style="font-family: 'Brush Script MT', cursive; font-size: 24px; color: #1a365d; margin-bottom: 4px;">${translatorNameForCert || 'Beatriz Paiva'}</div>`}
+                <div style="font-weight: bold; font-size: 13px;">${translatorNameForCert || 'Beatriz Paiva'}</div>
+                <div style="font-weight: bold; font-size: 13px;">${translator?.title || 'Managing Director'}</div>
+                <div style="font-size: 13px; margin-top: 8px;">Dated: ${translationDate}</div>
             </div>
             <div style="float: right; width: 35%; text-align: right;">
                 ${logoStamp
@@ -6151,7 +6250,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
     // Letterhead for all pages - Same style as cover
     const letterheadHTML = `
-        <div style="width: 100%; margin-bottom: 8px; overflow: hidden;">
+        <div style="width: 100%; margin-bottom: 2px; padding-bottom: 2px; overflow: hidden;">
             <div style="float: left; width: 128px;">
                 ${logoLeft
                   ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
@@ -6163,21 +6262,41 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span></div>`}
             </div>
             <div style="margin-left: 138px; margin-right: 90px; text-align: center;">
-                <div style="font-weight: bold; color: #2563eb; font-size: 14px; font-style: italic;">Legacy Translations</div>
+                <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
                 <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
                 <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
-        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>`;
+        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 4px;"></div>`;
 
     // Translation pages HTML (with or without letterhead)
+    // Content flows naturally across pages; CSS pagination + thead handles multi-page layout
     // First page doesn't need page-break since cover ends with one
-    const translationPagesHTML = translationResults.map((result, index) => `
-    <div style="${index > 0 ? 'page-break-before: always;' : ''} padding-top: 5px;">
-        ${includeLetterhead ? letterheadHTML : ''}
-        <div style="margin-top: 5px; line-height: 1.5; font-size: 11pt;">${result.translatedText}</div>
-    </div>
-    `).join('');
+    // NOTE: extractBodyForEdit strips <html>/<head>/<style>/<body> wrapper from AI output.
+    const translationPagesHTML = translationResults.map((result, index) => {
+      const pageBreak = index > 0 ? 'page-break-before: always;' : '';
+      const content = extractBodyForEdit(result.translatedText);
+      if (includeLetterhead) {
+        return `
+    <table class="paged-translation" style="${pageBreak}">
+        <thead><tr><td style="padding: 5px 0 0 0;">
+            ${letterheadHTML}
+        </td></tr></thead>
+        <tbody><tr><td>
+            <div class="translation-content" style="padding: 0 20px; line-height: 1.5; font-size: 11pt;">
+                ${content}
+            </div>
+        </td></tr></tbody>
+    </table>`;
+      } else {
+        return `
+    <div style="${pageBreak} padding-top: 5px;">
+        <div class="translation-content" style="padding: 0 20px; line-height: 1.5; font-size: 11pt;">
+            ${content}
+        </div>
+    </div>`;
+      }
+    }).join('');
 
     // Certification verification page HTML - ALL INLINE STYLES
     const certificationPageHTML = (includeCertification && certData) ? `
@@ -6234,12 +6353,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     ` : '';
 
     // Original documents pages HTML (each image on separate page, title only on first)
+    // Wrapped in original-wrapper/original-content for auto-scaling like translation pages
     const originalPagesHTML = (includeOriginal && originalImages.length > 0) ? originalImages.map((img, index) => `
     <div style="page-break-before: always; padding-top: 5px;">
         ${includeLetterhead ? letterheadHTML : ''}
-        ${index === 0 ? '<div style="font-size: 13px; font-weight: bold; text-align: center; margin: 8px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px;">Original Document</div>' : ''}
+        ${index === 0 ? '<div style="font-size: 13px; font-weight: bold; text-align: center; margin: 4px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px;">Original Document</div>' : ''}
         <div style="text-align: center;">
-            <img src="${img.data}" alt="${img.filename}" style="width: 100%; max-height: 7in; object-fit: contain; display: block; margin: 0 auto;" />
+            <img src="${img.data}" alt="${img.filename}" style="max-width: 100%; max-height: 7in; object-fit: contain; display: block; margin: 0 auto;" />
         </div>
     </div>
     `).join('') : '';
@@ -6262,7 +6382,82 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 </body>
 </html>`;
 
-    if (format === 'pdf') {
+    if (format === 'preview') {
+      // Open preview window (same approach as Quick Package)
+      try {
+        const screenWidth = window.screen.width;
+        const screenHeight = window.screen.height;
+        const windowWidth = Math.min(1200, screenWidth - 100);
+        const windowHeight = Math.min(900, screenHeight - 100);
+        const left = (screenWidth - windowWidth) / 2;
+        const top = (screenHeight - windowHeight) / 2;
+
+        const previewWindow = window.open('', 'DocumentPreview', `width=${windowWidth},height=${windowHeight},left=${left},top=${top},scrollbars=yes,resizable=yes`);
+
+        if (!previewWindow || previewWindow.closed || typeof previewWindow.closed === 'undefined') {
+          alert('Pop-up blocked! Please allow pop-ups for this site and try again.');
+          return;
+        }
+
+        previewWindow.document.open();
+        previewWindow.document.write(htmlContent);
+        previewWindow.document.close();
+
+        // Wait for content to load
+        await new Promise(resolve => {
+          if (previewWindow.document.readyState === 'complete') {
+            resolve();
+          } else {
+            previewWindow.onload = resolve;
+            setTimeout(resolve, 3000);
+          }
+        });
+
+        // Wait for images to load
+        const images = previewWindow.document.querySelectorAll('img');
+        if (images.length > 0) {
+          await Promise.all(Array.from(images).map(img => {
+            return new Promise((resolve) => {
+              if (img.complete && img.naturalHeight !== 0) {
+                resolve();
+              } else {
+                img.onload = resolve;
+                img.onerror = resolve;
+                setTimeout(resolve, 5000);
+              }
+            });
+          }));
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        previewWindow.focus();
+
+        // Add instruction bar (hidden during print)
+        const instructionDiv = previewWindow.document.createElement('div');
+        instructionDiv.id = 'print-instructions';
+        instructionDiv.innerHTML = `
+          <div style="position: fixed; top: 0; left: 0; right: 0; background: #1e40af; color: white; padding: 12px 20px; z-index: 99999; font-family: sans-serif; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <strong>📄 Document Preview</strong> - Review your document before downloading
+            </div>
+            <div>
+              <button onclick="window.print()" style="background: white; color: #1e40af; border: none; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-right: 10px;">
+                🖨️ Print / Save as PDF
+              </button>
+              <button onclick="document.getElementById('print-instructions').remove()" style="background: transparent; color: white; border: 1px solid white; padding: 8px 16px; border-radius: 6px; cursor: pointer;">
+                ✕ Close Bar
+              </button>
+            </div>
+          </div>
+          <style>@media print { #print-instructions { display: none !important; } }</style>
+        `;
+        previewWindow.document.body.insertBefore(instructionDiv, previewWindow.document.body.firstChild);
+      } catch (err) {
+        console.error('Error opening preview:', err);
+        showToast('Error opening preview. Please try again.');
+      }
+    } else if (format === 'pdf') {
       // Generate PDF with hash tracking for verification
       try {
         const filename = `${orderNumber || 'P0000'}_${documentType.replace(/\s+/g, '_')}_${translationType === 'sworn' ? 'Sworn' : 'Certified'}_Translation.pdf`;
@@ -6492,13 +6687,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       </div>
 
       {/* Sub-tabs */}
-      {/* Translator access: IN_HOUSE = ALL TABS (except REVIEW - merged into TRANSLATION) | CONTRACTOR = START, TRANSLATE, REVIEW, DELIVER */}
+      {/* Translator access: ALL translator types can access TRANSLATE, REVIEW, PROOFREADING, and DELIVER */}
       <div className="flex space-x-1 mb-4 border-b overflow-x-auto">
         {[
           { id: 'start', label: 'START', icon: '📝', roles: ['admin', 'pm', 'translator'] },
           { id: 'translate', label: 'TRANSLATION', icon: '📄', roles: ['admin', 'pm', 'translator'] },
-          { id: 'review', label: 'REVIEW', icon: '📋', roles: ['admin', 'pm', 'translator_contractor'] }, // Hidden for in-house - merged into TRANSLATION
-          { id: 'proofreading', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm', 'translator_inhouse'] },
+          { id: 'review', label: 'REVIEW', icon: '📋', roles: ['admin', 'pm', 'translator_contractor', 'translator_inhouse'] },
+          { id: 'proofreading', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm', 'translator_inhouse', 'translator_contractor'] },
           { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'pm', 'translator_inhouse', 'translator_contractor'] }, // Admin, PM, In-house and Contractor
           { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin', 'pm', 'translator_inhouse'] },
           { id: 'tm', label: 'TM', icon: '🧠', roles: ['admin', 'pm', 'translator_inhouse'] },
@@ -7509,8 +7704,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     ) : (
                       <div className="mb-1" style={{fontFamily: 'Rage Italic, cursive', fontSize: '20px', color: '#1a365d'}}>Beatriz Paiva</div>
                   )}
-                  <div className="text-xs">Authorized Representative</div>
-                  <div className="text-xs">Legacy Translations Inc.</div>
+                  <div className="text-xs font-bold">{selectedTranslator || 'Beatriz Paiva'}</div>
+                  <div className="text-xs font-bold">{TRANSLATORS.find(t => t.name === selectedTranslator)?.title || 'Managing Director'}</div>
                   <div className="text-xs mt-2">
                     Dated:{' '}
                     <input type="text" value={translationDate} onChange={(e) => setTranslationDate(e.target.value)} className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 w-28 focus:outline-none focus:border-blue-600" />
@@ -9457,34 +9652,80 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <div className="grid grid-cols-2 gap-0 bg-gray-100 border-b">
                   <div className="px-3 py-2 border-r flex items-center justify-between">
                     <span className="text-xs font-bold text-gray-700">Original Document</span>
-                    <label className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded cursor-pointer hover:bg-blue-600">
-                      Upload
-                      <input
-                        type="file"
-                        accept="image/*,.pdf"
-                        className="hidden"
-                        onChange={(e) => {
-                          if (e.target.files && e.target.files[0]) {
-                            const file = e.target.files[0];
-                            const reader = new FileReader();
-                            reader.onload = (event) => {
-                              const newOriginalImages = [...originalImages];
-                              newOriginalImages[selectedResultIndex] = {
-                                data: event.target.result,
-                                filename: file.name
+                    <div className="flex items-center gap-1">
+                      <label className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded cursor-pointer hover:bg-blue-600">
+                        Upload
+                        <input
+                          type="file"
+                          accept="image/*,.pdf"
+                          className="hidden"
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              const file = e.target.files[0];
+                              const reader = new FileReader();
+                              reader.onload = (event) => {
+                                const newOriginalImages = [...originalImages];
+                                newOriginalImages[selectedResultIndex] = {
+                                  data: event.target.result,
+                                  filename: file.name
+                                };
+                                setOriginalImages(newOriginalImages);
                               };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      </label>
+                      {originalImages[selectedResultIndex] && (
+                        <button
+                          onClick={() => {
+                            if (window.confirm('Are you sure you want to delete this original page?')) {
+                              const newOriginalImages = [...originalImages];
+                              newOriginalImages[selectedResultIndex] = null;
                               setOriginalImages(newOriginalImages);
-                            };
-                            reader.readAsDataURL(file);
-                          }
-                        }}
-                      />
-                    </label>
+                            }
+                          }}
+                          className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
+                          title="Delete original page"
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className="px-3 py-2 flex items-center justify-between">
                     <span className="text-xs font-bold text-gray-700">
                       Translation ({targetLanguage}) - {reviewViewMode === 'preview' ? 'Preview' : 'Editing'}
                     </span>
+                    <div className="flex items-center gap-1">
+                      {translationResults[selectedResultIndex]?.translatedText && (
+                        <button
+                          onClick={() => {
+                            if (window.confirm('Are you sure you want to delete this translated page?')) {
+                              const updatedResults = [...translationResults];
+                              if (translationResults.length === 1) {
+                                updatedResults[0] = { ...updatedResults[0], translatedText: '', filename: '' };
+                                setTranslationResults(updatedResults);
+                              } else {
+                                updatedResults.splice(selectedResultIndex, 1);
+                                setTranslationResults(updatedResults);
+                                const newOriginalImages = [...originalImages];
+                                newOriginalImages.splice(selectedResultIndex, 1);
+                                setOriginalImages(newOriginalImages);
+                                if (selectedResultIndex >= updatedResults.length) {
+                                  setSelectedResultIndex(Math.max(0, updatedResults.length - 1));
+                                }
+                              }
+                              showToast('Page deleted!');
+                            }
+                          }}
+                          className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
+                          title="Delete translated page"
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
                 {/* Toolbar outside the height-constrained grid */}
@@ -9647,8 +9888,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
       )}
 
-      {/* PROOFREADING TAB - Admin, PM, and In-House Translators */}
-      {activeSubTab === 'proofreading' && (isAdmin || isPM || isInHouseTranslator) && (
+      {/* PROOFREADING TAB - All roles that can see this tab */}
+      {activeSubTab === 'proofreading' && (
         <div className="bg-white rounded shadow p-4">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-sm font-bold">🔍 Proofreading & Quality Assurance</h2>
@@ -9695,29 +9936,46 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <div className="grid grid-cols-2 gap-0 bg-gray-100 border-b">
                   <div className="px-3 py-2 border-r flex items-center justify-between">
                     <span className="text-xs font-bold text-gray-700">Original Document ({sourceLanguage})</span>
-                    <label className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded cursor-pointer hover:bg-blue-600">
-                      Upload
-                      <input
-                        type="file"
-                        accept="image/*,.pdf"
-                        className="hidden"
-                        onChange={(e) => {
-                          if (e.target.files && e.target.files[0]) {
-                            const file = e.target.files[0];
-                            const reader = new FileReader();
-                            reader.onload = (event) => {
-                              const newOriginalImages = [...originalImages];
-                              newOriginalImages[selectedResultIndex] = {
-                                data: event.target.result,
-                                filename: file.name
+                    <div className="flex items-center gap-1">
+                      <label className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded cursor-pointer hover:bg-blue-600">
+                        Upload
+                        <input
+                          type="file"
+                          accept="image/*,.pdf"
+                          className="hidden"
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              const file = e.target.files[0];
+                              const reader = new FileReader();
+                              reader.onload = (event) => {
+                                const newOriginalImages = [...originalImages];
+                                newOriginalImages[selectedResultIndex] = {
+                                  data: event.target.result,
+                                  filename: file.name
+                                };
+                                setOriginalImages(newOriginalImages);
                               };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      </label>
+                      {originalImages[selectedResultIndex] && (
+                        <button
+                          onClick={() => {
+                            if (window.confirm('Are you sure you want to delete this original page?')) {
+                              const newOriginalImages = [...originalImages];
+                              newOriginalImages[selectedResultIndex] = null;
                               setOriginalImages(newOriginalImages);
-                            };
-                            reader.readAsDataURL(file);
-                          }
-                        }}
-                      />
-                    </label>
+                            }
+                          }}
+                          className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
+                          title="Delete original page"
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className="px-3 py-2 flex items-center justify-between">
                     <span className="text-xs font-bold text-gray-700">
@@ -9736,6 +9994,84 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       >
                         Edit
                       </button>
+                      <label className="px-2 py-0.5 text-[10px] rounded bg-green-600 text-white cursor-pointer hover:bg-green-700">
+                        Upload
+                        <input
+                          type="file"
+                          accept=".docx,.doc,.html,.htm,.txt,.pdf,image/*"
+                          className="hidden"
+                          onChange={async (e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              const file = e.target.files[0];
+                              const fileName = file.name.toLowerCase();
+                              try {
+                                let html = '';
+                                if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
+                                  html = await convertWordToHtml(file);
+                                } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
+                                  html = await readHtmlFile(file);
+                                } else if (fileName.endsWith('.txt')) {
+                                  const text = await readTxtFile(file);
+                                  html = `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif; font-size: 12pt;">${text}</div>`;
+                                } else if (fileName.endsWith('.pdf')) {
+                                  const images = await convertPdfToImages(file);
+                                  html = images.map((img, idx) => `<div style="text-align:center;"><img src="data:${img.type};base64,${img.data}" style="max-width:100%; height:auto;" alt="${file.name} page ${idx + 1}" /></div>`).join('');
+                                } else if (file.type.startsWith('image/')) {
+                                  const dataUrl = await new Promise((resolve) => {
+                                    const reader = new FileReader();
+                                    reader.onload = () => resolve(reader.result);
+                                    reader.readAsDataURL(file);
+                                  });
+                                  html = `<div style="text-align:center;"><img src="${dataUrl}" style="max-width:100%; height:auto;" alt="${file.name}" /></div>`;
+                                }
+                                if (html) {
+                                  const updatedResults = [...translationResults];
+                                  updatedResults[selectedResultIndex] = {
+                                    ...updatedResults[selectedResultIndex],
+                                    translatedText: html,
+                                    filename: file.name
+                                  };
+                                  setTranslationResults(updatedResults);
+                                  showToast('Translation page replaced!');
+                                }
+                              } catch (err) {
+                                console.error('Upload error:', err);
+                                showToast('Error uploading file');
+                              }
+                              e.target.value = '';
+                            }
+                          }}
+                        />
+                      </label>
+                      {translationResults[selectedResultIndex]?.translatedText && (
+                        <button
+                          onClick={() => {
+                            if (window.confirm('Are you sure you want to delete this translated page?')) {
+                              const updatedResults = [...translationResults];
+                              if (translationResults.length === 1) {
+                                updatedResults[0] = { ...updatedResults[0], translatedText: '', filename: '' };
+                                setTranslationResults(updatedResults);
+                              } else {
+                                updatedResults.splice(selectedResultIndex, 1);
+                                setTranslationResults(updatedResults);
+                                // Also remove matching original image if exists
+                                const newOriginalImages = [...originalImages];
+                                newOriginalImages.splice(selectedResultIndex, 1);
+                                setOriginalImages(newOriginalImages);
+                                // Adjust selected index
+                                if (selectedResultIndex >= updatedResults.length) {
+                                  setSelectedResultIndex(Math.max(0, updatedResults.length - 1));
+                                }
+                              }
+                              showToast('Page deleted!');
+                            }
+                          }}
+                          className="px-2 py-0.5 text-[10px] rounded bg-red-500 text-white hover:bg-red-600"
+                          title="Delete translated page"
+                        >
+                          Delete
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -11266,6 +11602,14 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   </p>
                 </div>
 
+                {/* Preview Button */}
+                <button
+                  onClick={() => handleDownload('preview')}
+                  className="w-full py-3 mb-2 bg-gradient-to-r from-indigo-600 to-blue-600 text-white text-sm font-bold rounded-lg hover:from-indigo-700 hover:to-blue-700 flex items-center justify-center gap-2"
+                >
+                  👁️ Preview Document
+                </button>
+
                 {/* Download Buttons */}
                 <div className="grid grid-cols-2 gap-2">
                   <button
@@ -11282,7 +11626,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   </button>
                 </div>
                 <p className="text-[10px] text-gray-500 mt-2 text-center">
-                  HTML: Edit in browser before printing | PDF: Opens print dialog
+                  Preview: Review before saving | HTML: Edit in browser | PDF: Direct download
                 </p>
               </div>
 
@@ -13462,8 +13806,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         <div class="footer-section">
           <div class="signature-block">
             <div style="font-family: 'Times New Roman', serif; font-size: 18px; font-style: italic; color: #1a365d; margin-bottom: 2px;">${translatorName}</div>
-            <div class="signature-name">Authorized Representative</div>
-            <div class="signature-title">Legacy Translations Inc.</div>
+            <div class="signature-name">${translatorName}</div>
+            <div class="signature-title">Managing Director</div>
             <div class="signature-date">Dated: ${translationDate}</div>
           </div>
           <div class="stamp-container">
@@ -13483,8 +13827,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       if (orderData.translation_html) {
         translationPagesHTML = `
         <div class="translation-text-page">
-          <div class="running-header">${letterheadHTML}</div>
-          <div class="running-header-spacer"></div>
+          ${letterheadHTML}
           <div class="translation-content translation-text">${orderData.translation_html}</div>
         </div>`;
       }
@@ -13506,10 +13849,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   <meta charset="UTF-8">
   <title>Certified Translation - ${orderData.order_number || 'Document'}</title>
   <style>
-    @page { size: Letter; margin: 0.5in 0.6in 0.6in 0.6in; }
-    @page cover { size: Letter; margin: 0.75in; }
+    @page { size: Letter; margin: 0.5in 0.5in; }
+    @page cover { size: Letter; margin: 0.5in; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Times New Roman', Georgia, serif; font-size: 13px; line-height: 1.5; color: #333; }
+    body { font-family: 'Times New Roman', Georgia, serif; font-size: 13px; line-height: 1.5; color: #333; padding: 0.2in 0.25in; }
     .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; }
     .header-line { height: 3px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 12px; }
     .logo-left { width: 130px; height: 55px; display: flex; align-items: center; }
@@ -13520,9 +13863,9 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     .logo-right { width: 85px; height: 55px; display: flex; align-items: center; justify-content: flex-end; }
     .logo-placeholder-right { width: 85px; height: 55px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #1a365d; background: #fafafa; text-align: center; font-style: italic; }
     .order-number { text-align: right; margin-bottom: 20px; font-size: 12px; margin-top: 5px; }
-    .main-title { text-align: center; font-size: 26px; font-weight: normal; margin-bottom: 20px; color: #1a365d; line-height: 1.2; }
+    .main-title { text-align: center; font-size: 28px; font-weight: normal; margin-bottom: 20px; color: #1a365d; line-height: 1.2; }
     .subtitle { text-align: center; font-size: 13px; margin-bottom: 25px; line-height: 1.5; }
-    .body-text { text-align: justify; margin-bottom: 14px; line-height: 1.6; font-size: 12px; }
+    .body-text { text-align: justify; margin-bottom: 18px; line-height: 1.6; font-size: 13px; }
     .footer-section { display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; padding-top: 20px; }
     .signature-block { line-height: 1.3; }
     .signature-name { font-weight: bold; font-size: 13px; }
@@ -13538,9 +13881,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     .cover-page { page: cover; page-break-after: always; min-height: 100%; display: flex; flex-direction: column; }
     .translation-text-page { page-break-before: always; }
     .translation-content.translation-text { text-align: left; font-family: 'Times New Roman', Georgia, serif; font-size: 11pt; line-height: 1.5; color: #333; }
-    .translation-content.translation-text p { margin-bottom: 10px; text-align: justify; }
-    .translation-content.translation-text table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-    .translation-content.translation-text td, .translation-content.translation-text th { border: 1px solid #333; padding: 6px; font-size: 10pt; }
+    .translation-content.translation-text p { margin-bottom: 10px; text-align: justify; word-wrap: break-word; overflow-wrap: break-word; }
+    .translation-content.translation-text table { width: 100%; max-width: 100%; border-collapse: collapse; margin: 10px 0; table-layout: fixed; page-break-inside: auto; }
+    .translation-content.translation-text td, .translation-content.translation-text th { border: 1px solid #333; padding: 4px 6px; font-size: 9pt; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; overflow: hidden; line-height: 1.3; }
+    .translation-content.translation-text tr { page-break-inside: avoid; }
     .page-title { font-size: 13px; font-weight: bold; text-align: center; margin: 10px 0 8px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
     .original-documents-page { page-break-after: always; page-break-inside: avoid; padding-top: 15px; }
     .original-documents-page:last-of-type { page-break-after: auto; }
@@ -13548,8 +13892,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     .original-image { max-width: 100%; max-height: 630px; border: 1px solid #ddd; object-fit: contain; display: block; margin: 0 auto; }
     @media print {
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      .running-header { position: fixed; top: 0; left: 0; right: 0; background: white; padding: 20px 50px 10px; }
-      .running-header-spacer { height: 100px; }
+      /* running-header styles removed - using inline letterheads instead */
     }
   </style>
 </head>
@@ -25321,6 +25664,9 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   const [pmApprovalStatus, setPmApprovalStatus] = useState(null); // null, 'approved', 'rejected'
   const [processingStatus, setProcessingStatus] = useState('');
 
+  // PM Review edit mode
+  const [pmReviewEditMode, setPmReviewEditMode] = useState(false);
+
   // Translator Assignment Modal state (for email invites)
   const [assigningTranslatorModal, setAssigningTranslatorModal] = useState(null);
   const [assignmentDetails, setAssignmentDetails] = useState({
@@ -25705,8 +26051,8 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         <div class="footer-section">
           <div class="signature-block">
             <div style="font-family: 'Times New Roman', serif; font-size: 18px; font-style: italic; color: #1a365d; margin-bottom: 2px;">${translatorName}</div>
-            <div class="signature-name">Authorized Representative</div>
-            <div class="signature-title">Legacy Translations Inc.</div>
+            <div class="signature-name">${translatorName}</div>
+            <div class="signature-title">Managing Director</div>
             <div class="signature-date">Dated: ${translationDateStr}</div>
           </div>
           <div class="stamp-container">
@@ -25726,8 +26072,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       if (orderData.translation_html) {
         translationPagesHTML = `
         <div class="translation-text-page">
-          <div class="running-header">${letterheadHTML}</div>
-          <div class="running-header-spacer"></div>
+          ${letterheadHTML}
           <div class="translation-content translation-text">${orderData.translation_html}</div>
         </div>`;
       }
@@ -25749,10 +26094,10 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   <meta charset="UTF-8">
   <title>Certified Translation - ${orderData.order_number || 'Document'}</title>
   <style>
-    @page { size: Letter; margin: 0.5in 0.6in 0.6in 0.6in; }
-    @page cover { size: Letter; margin: 0.75in; }
+    @page { size: Letter; margin: 0.5in 0.5in; }
+    @page cover { size: Letter; margin: 0.5in; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Times New Roman', Georgia, serif; font-size: 13px; line-height: 1.5; color: #333; }
+    body { font-family: 'Times New Roman', Georgia, serif; font-size: 13px; line-height: 1.5; color: #333; padding: 0.2in 0.25in; }
     .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; }
     .header-line { height: 3px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 12px; }
     .logo-left { width: 130px; height: 55px; display: flex; align-items: center; }
@@ -25763,9 +26108,9 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     .logo-right { width: 85px; height: 55px; display: flex; align-items: center; justify-content: flex-end; }
     .logo-placeholder-right { width: 85px; height: 55px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #1a365d; background: #fafafa; text-align: center; font-style: italic; }
     .order-number { text-align: right; margin-bottom: 20px; font-size: 12px; margin-top: 5px; }
-    .main-title { text-align: center; font-size: 26px; font-weight: normal; margin-bottom: 20px; color: #1a365d; line-height: 1.2; }
+    .main-title { text-align: center; font-size: 28px; font-weight: normal; margin-bottom: 20px; color: #1a365d; line-height: 1.2; }
     .subtitle { text-align: center; font-size: 13px; margin-bottom: 25px; line-height: 1.5; }
-    .body-text { text-align: justify; margin-bottom: 14px; line-height: 1.6; font-size: 12px; }
+    .body-text { text-align: justify; margin-bottom: 18px; line-height: 1.6; font-size: 13px; }
     .footer-section { display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; padding-top: 20px; }
     .signature-block { line-height: 1.3; }
     .signature-name { font-weight: bold; font-size: 13px; }
@@ -25781,9 +26126,10 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     .cover-page { page: cover; page-break-after: always; min-height: 100%; display: flex; flex-direction: column; }
     .translation-text-page { page-break-before: always; }
     .translation-content.translation-text { text-align: left; font-family: 'Times New Roman', Georgia, serif; font-size: 11pt; line-height: 1.5; color: #333; }
-    .translation-content.translation-text p { margin-bottom: 10px; text-align: justify; }
-    .translation-content.translation-text table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-    .translation-content.translation-text td, .translation-content.translation-text th { border: 1px solid #333; padding: 6px; font-size: 10pt; }
+    .translation-content.translation-text p { margin-bottom: 10px; text-align: justify; word-wrap: break-word; overflow-wrap: break-word; }
+    .translation-content.translation-text table { width: 100%; max-width: 100%; border-collapse: collapse; margin: 10px 0; table-layout: fixed; page-break-inside: auto; }
+    .translation-content.translation-text td, .translation-content.translation-text th { border: 1px solid #333; padding: 4px 6px; font-size: 9pt; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; overflow: hidden; line-height: 1.3; }
+    .translation-content.translation-text tr { page-break-inside: avoid; }
     .page-title { font-size: 13px; font-weight: bold; text-align: center; margin: 10px 0 8px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
     .original-documents-page { page-break-after: always; page-break-inside: avoid; padding-top: 15px; }
     .original-documents-page:last-of-type { page-break-after: auto; }
@@ -25791,8 +26137,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     .original-image { max-width: 100%; max-height: 630px; border: 1px solid #ddd; object-fit: contain; display: block; margin: 0 auto; }
     @media print {
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      .running-header { position: fixed; top: 0; left: 0; right: 0; background: white; padding: 20px 50px 10px; }
-      .running-header-spacer { height: 100px; }
+      /* running-header styles removed - using inline letterheads instead */
     }
   </style>
 </head>
@@ -26187,7 +26532,15 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
           setProcessingStatus(`Converting Word document: ${file.name}`);
           const arrayBuffer = await file.arrayBuffer();
           const result = await mammoth.convertToHtml({ arrayBuffer });
-          htmlContent = result.value;
+          // Post-process: add inline styles to tables for robust rendering
+          let convertedHtml = result.value;
+          convertedHtml = convertedHtml.replace(/<table(?=[>\s])/g,
+            '<table style="table-layout:fixed;width:100%;border-collapse:collapse;"');
+          convertedHtml = convertedHtml.replace(/<td(?=[>\s])/g,
+            '<td style="vertical-align:top;word-wrap:break-word;overflow-wrap:break-word;overflow:hidden;padding:3px 5px;"');
+          convertedHtml = convertedHtml.replace(/<th(?=[>\s])/g,
+            '<th style="vertical-align:top;word-wrap:break-word;overflow-wrap:break-word;overflow:hidden;padding:3px 5px;font-weight:bold;"');
+          htmlContent = convertedHtml;
         } catch (err) {
           console.error('Word conversion error:', err);
           showToast(`Error converting Word document: ${file.name}`);
@@ -26340,8 +26693,8 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 ${signatureImage
                   ? `<img src="${signatureImage}" alt="Signature" style="max-height: 45px; max-width: 210px; object-fit: contain; margin-bottom: 2px;" />`
                   : `<div style="font-family: 'Rage Italic', cursive; font-size: 20px; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>`}
-                <div class="signature-name">Authorized Representative</div>
-                <div class="signature-title">Legacy Translations Inc.</div>
+                <div class="signature-name">${savedTranslatorName || 'Beatriz Paiva'}</div>
+                <div class="signature-title">Managing Director</div>
                 <div class="signature-date">Dated: ${translationDate}</div>
             </div>
             <div class="stamp-container">
@@ -26388,28 +26741,18 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     if (pmTranslationHtml) {
       translationPagesHTML = `
     <div class="translation-text-page">
-        ${includeLetterhead ? `
-        <div class="running-header">
-            ${letterheadHTML}
-        </div>
-        <div class="running-header-spacer"></div>
-        ` : ''}
+        ${includeLetterhead ? letterheadHTML : ''}
         <div class="translation-content translation-text">
             ${pmTranslationHtml}
         </div>
     </div>`;
     }
-    // Priority 2: translatedContent from PM Dashboard (loaded from dattabse)
+    // Priority 2: translatedContent from PM Dashboard (loaded from database)
     else if (translatedContent && pmTranslationFiles.length === 0) {
       const translationHTML = translatedContent.html || translatedContent.data || '';
       translationPagesHTML = `
     <div class="translation-text-page">
-        ${includeLetterhead ? `
-        <div class="running-header">
-            ${letterheadHTML}
-        </div>
-        <div class="running-header-spacer"></div>
-        ` : ''}
+        ${includeLetterhead ? letterheadHTML : ''}
         <div class="translation-content translation-text">
             ${translationHTML}
         </div>
@@ -26420,12 +26763,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       const translationHTML = translationResults.map(r => r.translatedText).join('\n\n');
       translationPagesHTML = `
     <div class="translation-text-page">
-        ${includeLetterhead ? `
-        <div class="running-header">
-            ${letterheadHTML}
-        </div>
-        <div class="running-header-spacer"></div>
-        ` : ''}
+        ${includeLetterhead ? letterheadHTML : ''}
         <div class="translation-content translation-text">
             ${translationHTML}
         </div>
@@ -26681,9 +27019,9 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
             font-size: 9px; color: #1a365d; background: #fafafa; text-align: center; font-style: italic;
         }
         .order-number { text-align: right; margin-bottom: 20px; font-size: 12px; margin-top: 5px; }
-        .main-title { text-align: center; font-size: 26px; font-weight: normal; margin-bottom: 20px; color: #1a365d; line-height: 1.2; }
+        .main-title { text-align: center; font-size: 28px; font-weight: normal; margin-bottom: 20px; color: #1a365d; line-height: 1.2; }
         .subtitle { text-align: center; font-size: 13px; margin-bottom: 25px; line-height: 1.5; }
-        .body-text { text-align: justify; margin-bottom: 14px; line-height: 1.6; font-size: 12px; }
+        .body-text { text-align: justify; margin-bottom: 18px; line-height: 1.6; font-size: 13px; }
         .footer-section { display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; padding-top: 20px; }
         .signature-block { text-align: left; line-height: 1.3; }
         .signature-name { font-size: 13px; font-weight: bold; margin-top: 5px; }
@@ -26715,15 +27053,13 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         .translation-text { font-size: 12px; line-height: 1.6; }
         .translation-text p { margin-bottom: 12px; text-align: justify; orphans: 4; widows: 4; }
         .translation-text table { width: 100%; max-width: 100%; border-collapse: collapse; margin: 15px 0; table-layout: fixed; page-break-inside: auto; }
-        .translation-text td, .translation-text th { border: 1px solid #ccc; padding: 6px 8px; font-size: 11px; word-wrap: break-word; overflow-wrap: break-word; }
+        .translation-text td, .translation-text th { border: 1px solid #ccc; padding: 4px 6px; font-size: 9pt; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; overflow: hidden; line-height: 1.3; }
         .translation-text tr { page-break-inside: avoid; page-break-after: auto; }
         .translation-text thead { display: table-header-group; }
         .page-title { font-size: 13px; font-weight: bold; text-align: center; margin: 15px 0 10px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; page-break-after: avoid; }
         .original-image-container { text-align: center; margin-bottom: 10px; }
         .original-image { width: 100%; height: auto; max-height: none; border: none; object-fit: contain; }
-        .running-header { position: running(header); }
-        .running-header-spacer { height: 80px; }
-        @page { @top-center { content: element(header); } }
+        /* running-header styles removed - using inline letterheads instead */
         /* Verification Page Styles */
         .verification-page { page-break-before: always; padding-top: 20px; }
         .verification-box {
@@ -26758,8 +27094,6 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
             .original-documents-page { page-break-before: always; }
             .verification-page { page-break-before: always; }
             .verification-box { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .running-header { position: fixed; top: 0; left: 0; right: 0; background: white; padding: 20px 50px 10px; }
-            .running-header-spacer { height: 100px; }
         }
     </style>
 </head>
@@ -27104,7 +27438,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
   // Execute automatic proofreading
   const executeProofreading = async () => {
-    if (!selectedReview || !translatedContent) {
+    if (!selectedReview || (!translatedContent && !pmTranslationHtml)) {
       setProofreadingError('No translation selected to review.');
       return;
     }
@@ -27116,12 +27450,17 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
     // Get translated text (extract from HTML if needed)
     let translatedText = '';
-    if (translatedContent.html) {
+    if (pmTranslationHtml) {
+      // PM uploaded HTML content takes priority
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = pmTranslationHtml;
+      translatedText = tempDiv.textContent || tempDiv.innerText || '';
+    } else if (translatedContent && translatedContent.html) {
       // Strip HTML tags for proofreading
       const tempDiv = document.createElement('div');
       tempDiv.innerHTML = translatedContent.html;
       translatedText = tempDiv.textContent || tempDiv.innerText || '';
-    } else if (translatedContent.data) {
+    } else if (translatedContent && translatedContent.data) {
       try {
         translatedText = atob(translatedContent.data);
       } catch (e) {
@@ -27964,7 +28303,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 <div className="flex justify-between items-center mb-2">
                   <div>
                     <button
-                      onClick={() => { setSelectedReview(null); setOriginalContents([]); setTranslatedContent(null); setPmApprovalStatus(null); setProofreadingResult(null); setProofreadingError(''); }}
+                      onClick={() => { setSelectedReview(null); setOriginalContents([]); setTranslatedContent(null); setPmApprovalStatus(null); setProofreadingResult(null); setProofreadingError(''); setPmReviewEditMode(false); }}
                       className="text-gray-500 hover:text-gray-700 text-sm mb-1"
                     >
                       ← Back to queue
@@ -28043,7 +28382,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
               </div>
 
               {/* Side by Side Content */}
-              <div className="grid grid-cols-2 divide-x" style={{ height: 'calc(100vh - 300px)' }}>
+              <div className="grid grid-cols-2 divide-x" style={{ minHeight: 'calc(100vh - 300px)' }}>
                 {/* Original Document(s) */}
                 <div className="p-4 overflow-auto">
                   <div className="sticky top-0 bg-white py-1 z-10">
@@ -28051,16 +28390,37 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                       <h4 className="text-sm font-bold text-gray-700">
                         📄 Original Documents ({originalContents.length})
                       </h4>
-                      <label className="px-2 py-1 bg-blue-500 text-white text-xs rounded cursor-pointer hover:bg-blue-600">
-                        📤 Upload
-                        <input
-                          type="file"
-                          accept="image/*,.pdf"
-                          multiple
-                          onChange={handlePmOriginalUpload}
-                          className="hidden"
-                        />
-                      </label>
+                      <div className="flex items-center gap-1">
+                        <label className="px-2 py-1 bg-blue-500 text-white text-xs rounded cursor-pointer hover:bg-blue-600">
+                          📤 Upload
+                          <input
+                            type="file"
+                            accept="image/*,.pdf"
+                            multiple
+                            onChange={handlePmOriginalUpload}
+                            className="hidden"
+                          />
+                        </label>
+                        {originalContents.length > 0 && originalContents[currentDocIndex] && (
+                          <button
+                            onClick={() => {
+                              if (window.confirm('Delete this original page?')) {
+                                const updated = [...originalContents];
+                                updated.splice(currentDocIndex, 1);
+                                setOriginalContents(updated);
+                                if (currentDocIndex >= updated.length) {
+                                  setCurrentDocIndex(Math.max(0, updated.length - 1));
+                                }
+                                showToast('Original page deleted!');
+                              }
+                            }}
+                            className="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
+                            title="Delete this original page"
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </div>
                     </div>
                     {originalContents.length > 1 && (
                       <div className="flex items-center justify-between mb-2 bg-gray-100 rounded p-2">
@@ -28096,14 +28456,16 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                           ? originalContents[currentDocIndex].data
                           : `data:${originalContents[currentDocIndex].contentType};base64,${originalContents[currentDocIndex].data}`}
                         alt="Original"
-                        className="max-w-full border rounded"
+                        className="w-full border rounded"
+                        style={{ height: 'auto' }}
                       />
                     ) : originalContents[currentDocIndex].contentType?.includes('pdf') ? (
                       <iframe
                         src={originalContents[currentDocIndex].data?.startsWith('data:')
                           ? originalContents[currentDocIndex].data
                           : `data:application/pdf;base64,${originalContents[currentDocIndex].data}`}
-                        className="w-full h-full border rounded"
+                        className="w-full border rounded"
+                        style={{ height: 'calc(100vh - 400px)' }}
                         title="Original PDF"
                       />
                     ) : (
@@ -28130,38 +28492,83 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                           </span>
                         }
                       </h4>
-                      <label className="px-2 py-1 bg-green-500 text-white text-xs rounded cursor-pointer hover:bg-green-600">
-                        📤 Upload Translation
-                        <input
-                          type="file"
-                          accept="image/*,.pdf,.docx,.html,.htm,.txt"
-                          multiple
-                          onChange={handlePmTranslationUpload}
-                          className="hidden"
-                        />
-                      </label>
+                      <div className="flex items-center gap-1">
+                        {(translatedContent?.html || pmTranslationHtml) && (
+                          <button
+                            onClick={() => setPmReviewEditMode(!pmReviewEditMode)}
+                            className={`px-2 py-1 text-xs rounded ${pmReviewEditMode ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                          >
+                            {pmReviewEditMode ? 'Preview' : 'Edit'}
+                          </button>
+                        )}
+                        <label className="px-2 py-1 bg-green-500 text-white text-xs rounded cursor-pointer hover:bg-green-600">
+                          📤 Upload Translation
+                          <input
+                            type="file"
+                            accept="image/*,.pdf,.docx,.html,.htm,.txt"
+                            multiple
+                            onChange={handlePmTranslationUpload}
+                            className="hidden"
+                          />
+                        </label>
+                        {(translatedContent || pmTranslationHtml || pmTranslationFiles.length > 0) && (
+                          <button
+                            onClick={() => {
+                              if (window.confirm('Delete the entire translation?')) {
+                                setTranslatedContent(null);
+                                setPmTranslationHtml('');
+                                setPmTranslationFiles([]);
+                                setPmReviewEditMode(false);
+                                showToast('Translation deleted!');
+                              }
+                            }}
+                            className="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
+                            title="Delete translation"
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                   {translatedContent ? (
                     translatedContent.html ? (
-                      <div
-                        className="border rounded p-4 bg-white pm-translation-preview"
-                        dangerouslySetInnerHTML={{ __html: translatedContent.html }}
-                      />
+                      pmReviewEditMode ? (
+                        <div
+                          contentEditable
+                          suppressContentEditableWarning
+                          dangerouslySetInnerHTML={{ __html: translatedContent.html }}
+                          onBlur={(e) => {
+                            setTranslatedContent({
+                              ...translatedContent,
+                              html: e.target.innerHTML
+                            });
+                          }}
+                          className="border rounded p-4 bg-white pm-translation-preview focus:outline-none min-h-[200px]"
+                          style={{ border: '3px solid #10B981', borderRadius: '4px' }}
+                        />
+                      ) : (
+                        <div
+                          className="border rounded p-4 bg-white pm-translation-preview"
+                          dangerouslySetInnerHTML={{ __html: translatedContent.html }}
+                        />
+                      )
                     ) : translatedContent.contentType?.includes('image') ? (
                       <img
                         src={translatedContent.data?.startsWith('data:')
                           ? translatedContent.data
                           : `data:${translatedContent.contentType};base64,${translatedContent.data}`}
                         alt="Translation"
-                        className="max-w-full border rounded"
+                        className="w-full border rounded"
+                        style={{ height: 'auto' }}
                       />
                     ) : translatedContent.contentType?.includes('pdf') ? (
                       <iframe
                         src={translatedContent.data?.startsWith('data:')
                           ? translatedContent.data
                           : `data:application/pdf;base64,${translatedContent.data}`}
-                        className="w-full h-full border rounded"
+                        className="w-full border rounded"
+                        style={{ height: 'calc(100vh - 400px)' }}
                         title="Translation PDF"
                       />
                     ) : (
@@ -28173,19 +28580,47 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     <div>
                       {/* Show PM uploaded HTML content */}
                       {pmTranslationHtml && (
-                        <div
-                          className="border rounded p-4 bg-white mb-4 pm-translation-preview"
-                          dangerouslySetInnerHTML={{ __html: pmTranslationHtml }}
-                        />
+                        pmReviewEditMode ? (
+                          <div
+                            contentEditable
+                            suppressContentEditableWarning
+                            dangerouslySetInnerHTML={{ __html: pmTranslationHtml }}
+                            onBlur={(e) => {
+                              setPmTranslationHtml(e.target.innerHTML);
+                            }}
+                            className="border rounded p-4 bg-white mb-4 pm-translation-preview focus:outline-none min-h-[200px]"
+                            style={{ border: '3px solid #10B981', borderRadius: '4px' }}
+                          />
+                        ) : (
+                          <div
+                            className="border rounded p-4 bg-white mb-4 pm-translation-preview"
+                            dangerouslySetInnerHTML={{ __html: pmTranslationHtml }}
+                          />
+                        )
                       )}
                       {/* Show PM uploaded images */}
                       {pmTranslationFiles.map((file, idx) => (
                         <div key={idx} className="mb-4">
-                          <p className="text-xs text-gray-500 mb-1">📎 {file.filename}</p>
+                          <div className="flex items-center justify-between mb-1">
+                            <p className="text-xs text-gray-500">📎 {file.filename}</p>
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`Delete "${file.filename}"?`)) {
+                                  const updated = pmTranslationFiles.filter((_, i) => i !== idx);
+                                  setPmTranslationFiles(updated);
+                                  showToast('Translation page deleted!');
+                                }
+                              }}
+                              className="px-1.5 py-0.5 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
+                            >
+                              Delete
+                            </button>
+                          </div>
                           <img
                             src={`data:${file.type || 'image/png'};base64,${file.data}`}
                             alt={`Translation page ${idx + 1}`}
-                            className="max-w-full border rounded"
+                            className="w-full border rounded"
+                            style={{ height: 'auto' }}
                           />
                         </div>
                       ))}
@@ -28229,7 +28664,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   </div>
                   <button
                     onClick={executeProofreading}
-                    disabled={isProofreading || !translatedContent}
+                    disabled={isProofreading || (!translatedContent && !pmTranslationHtml)}
                     className={`px-4 py-2 rounded text-xs flex items-center gap-2 ${
                       !proofreadingResult
                         ? 'bg-yellow-500 text-white hover:bg-yellow-600 animate-pulse'
@@ -29843,16 +30278,16 @@ const SalesControlPage = ({ adminKey }) => {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-2">
-                        {!sp.password_hash && (
+                        {(!sp.password_hash || sp.status === 'pending') && (
                           <button
                             onClick={() => handleInviteSalesperson(sp.id)}
                             className="p-1 text-purple-500 hover:bg-purple-50 rounded"
-                            title="Send Invite"
+                            title={sp.password_hash ? "Resend Invite" : "Send Invite"}
                           >
                             📧
                           </button>
                         )}
-                        {sp.password_hash && (
+                        {sp.password_hash && sp.status === 'active' && (
                           <span className="p-1 text-green-500" title="Account Active">
                             ✅
                           </span>
