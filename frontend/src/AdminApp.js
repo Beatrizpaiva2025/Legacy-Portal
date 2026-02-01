@@ -371,7 +371,7 @@ const sanitizeErrorMessage = (errorMsg) => {
 const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
     @page {
         size: ${pageSizeCSS};
-        margin: 0.7in 0.75in 0.7in 0.75in;
+        margin: 0.7in 0.75in 0.4in 0.75in;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -5645,7 +5645,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     <div style="${idx > 0 ? 'page-break-before: always;' : ''} padding-top: 5px;">
         ${includeLetterhead ? letterheadHTML : ''}
         <div>
-            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Translation page ${idx + 1}" style="width: 100%; max-height: 8.5in; object-fit: contain; display: block; margin: 0 auto;" />
+            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Translation page ${idx + 1}" style="width: 100%; max-height: 7in; object-fit: contain; display: block; margin: 0 auto;" />
         </div>
     </div>`).join('');
     }
@@ -5667,7 +5667,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         ${includeLetterhead ? letterheadHTML : ''}
         ${idx === 0 ? '<div style="font-size: 13px; font-weight: bold; text-align: center; margin: 8px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px;">Original Document</div>' : ''}
         <div style="text-align: center;">
-            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Original page ${idx + 1}" style="width: 100%; max-height: 8.5in; object-fit: contain; display: block; margin: 0 auto;" />
+            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Original page ${idx + 1}" style="width: 100%; max-height: 7in; object-fit: contain; display: block; margin: 0 auto;" />
         </div>
     </div>`).join('') : '';
 
@@ -6239,7 +6239,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         ${includeLetterhead ? letterheadHTML : ''}
         ${index === 0 ? '<div style="font-size: 13px; font-weight: bold; text-align: center; margin: 8px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px;">Original Document</div>' : ''}
         <div style="text-align: center;">
-            <img src="${img.data}" alt="${img.filename}" style="width: 100%; max-height: 8.5in; object-fit: contain; display: block; margin: 0 auto;" />
+            <img src="${img.data}" alt="${img.filename}" style="width: 100%; max-height: 7in; object-fit: contain; display: block; margin: 0 auto;" />
         </div>
     </div>
     `).join('') : '';
