@@ -27854,6 +27854,10 @@ class PartnerAcquisition(BaseModel):
     salesperson_id: str
     partner_id: str
     partner_name: str
+    partner_email: str = ""
+    partner_phone: str = ""
+    partner_contact_name: str = ""
+    partner_website: str = ""
     partner_tier: str = "bronze"  # bronze, silver, gold, platinum
     acquisition_date: str = None
     commission_paid: float = 0
@@ -28388,6 +28392,56 @@ async def update_acquisition_status(acquisition_id: str, status: str, admin_key:
         raise HTTPException(status_code=404, detail="Acquisition not found")
 
     return {"success": True}
+
+# Update acquisition details
+@api_router.put("/admin/partner-acquisitions/{acquisition_id}")
+async def update_acquisition(acquisition_id: str, request: Request, admin_key: str = Header(None)):
+    if not admin_key:
+        raise HTTPException(status_code=401, detail="Admin key required")
+
+    body = await request.json()
+    allowed_fields = [
+        "partner_name", "partner_email", "partner_phone",
+        "partner_contact_name", "partner_website", "partner_id",
+        "partner_tier", "notes"
+    ]
+    update_data = {k: v for k, v in body.items() if k in allowed_fields}
+
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No valid fields to update")
+
+    # Recalculate commission if tier changed
+    if "partner_tier" in update_data:
+        tier_commissions = {
+            "bronze": 50,
+            "silver": 75,
+            "gold": 100,
+            "platinum": 150
+        }
+        acq = await db.partner_acquisitions.find_one({"id": acquisition_id})
+        if acq:
+            sp = await db.salespeople.find_one({"id": acq["salesperson_id"]})
+            if sp and sp.get("commission_type") == "fixed":
+                pass  # Keep fixed commission
+            else:
+                update_data["commission_paid"] = tier_commissions.get(update_data["partner_tier"], 50)
+
+    result = await db.partner_acquisitions.update_one(
+        {"id": acquisition_id},
+        {"$set": update_data}
+    )
+
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Acquisition not found")
+
+    # Return updated acquisition
+    updated = await db.partner_acquisitions.find_one({"id": acquisition_id})
+    if updated:
+        updated["_id"] = str(updated["_id"])
+        sp = await db.salespeople.find_one({"id": updated["salesperson_id"]})
+        updated["salesperson_name"] = sp["name"] if sp else "Unknown"
+
+    return {"success": True, "acquisition": updated}
 
 # Get sales dashboard stats
 @api_router.get("/admin/sales-dashboard")

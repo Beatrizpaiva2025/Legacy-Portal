@@ -29816,8 +29816,11 @@ const SalesControlPage = ({ adminKey }) => {
   });
   const [createdSalesperson, setCreatedSalesperson] = useState(null); // For success modal with referral link
   const [newAcquisition, setNewAcquisition] = useState({
-    salesperson_id: '', partner_id: '', partner_name: '', partner_tier: 'bronze', notes: ''
+    salesperson_id: '', partner_id: '', partner_name: '', partner_email: '', partner_phone: '', partner_contact_name: '', partner_website: '', partner_tier: 'bronze', notes: ''
   });
+  const [viewingAcquisition, setViewingAcquisition] = useState(null);
+  const [editingAcquisition, setEditingAcquisition] = useState(null);
+  const [editAcquisitionForm, setEditAcquisitionForm] = useState({});
   const [newGoal, setNewGoal] = useState({
     salesperson_id: '', month: new Date().toISOString().slice(0, 7), target_partners: 10, target_revenue: 5000
   });
@@ -29997,11 +30000,47 @@ const SalesControlPage = ({ adminKey }) => {
       });
       if (res.ok) {
         setShowAddAcquisition(false);
-        setNewAcquisition({ salesperson_id: '', partner_id: '', partner_name: '', partner_tier: 'bronze', notes: '' });
+        setNewAcquisition({ salesperson_id: '', partner_id: '', partner_name: '', partner_email: '', partner_phone: '', partner_contact_name: '', partner_website: '', partner_tier: 'bronze', notes: '' });
         fetchAllData();
       }
     } catch (error) {
       console.error('Error adding acquisition:', error);
+    }
+  };
+
+  const handleEditAcquisition = (acq) => {
+    setEditingAcquisition(acq);
+    setEditAcquisitionForm({
+      partner_name: acq.partner_name || '',
+      partner_email: acq.partner_email || '',
+      partner_phone: acq.partner_phone || '',
+      partner_contact_name: acq.partner_contact_name || '',
+      partner_website: acq.partner_website || '',
+      partner_id: acq.partner_id || '',
+      partner_tier: acq.partner_tier || 'bronze',
+      notes: acq.notes || ''
+    });
+  };
+
+  const handleUpdateAcquisition = async () => {
+    if (!editingAcquisition) return;
+    try {
+      const res = await fetch(`${API_URL}/api/admin/partner-acquisitions/${editingAcquisition.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'admin-key': adminKey },
+        body: JSON.stringify(editAcquisitionForm)
+      });
+      if (res.ok) {
+        showToast('Aquisição atualizada com sucesso!');
+        setEditingAcquisition(null);
+        setEditAcquisitionForm({});
+        fetchAllData();
+      } else {
+        showToast('Erro ao atualizar aquisição');
+      }
+    } catch (error) {
+      console.error('Error updating acquisition:', error);
+      showToast('Erro ao atualizar aquisição');
     }
   };
 
@@ -30412,7 +30451,23 @@ const SalesControlPage = ({ adminKey }) => {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex gap-1">
+                      <div className="flex gap-1 flex-wrap">
+                        <button
+                          onClick={() => setViewingAcquisition(acq)}
+                          className="px-2 py-1 bg-gray-500 text-white text-xs rounded hover:bg-gray-600"
+                          title="Ver detalhes do parceiro"
+                        >
+                          Ver Detalhes
+                        </button>
+                        {acq.commission_status === 'pending' && (
+                          <button
+                            onClick={() => handleEditAcquisition(acq)}
+                            className="px-2 py-1 bg-orange-500 text-white text-xs rounded hover:bg-orange-600"
+                            title="Editar dados da aquisição"
+                          >
+                            Editar
+                          </button>
+                        )}
                         {acq.commission_status === 'pending' && (
                           <button
                             onClick={() => handleApproveCommission(acq.id)}
@@ -31146,9 +31201,9 @@ const SalesControlPage = ({ adminKey }) => {
       {/* Add Acquisition Modal */}
       {showAddAcquisition && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <span>🤝</span> Record Partner Acquisition
+              <span>🤝</span> Registrar Aquisição de Parceiro
             </h3>
             <div className="space-y-4">
               <div>
@@ -31165,7 +31220,7 @@ const SalesControlPage = ({ adminKey }) => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Partner Name *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Parceiro *</label>
                 <input
                   type="text"
                   value={newAcquisition.partner_name}
@@ -31175,13 +31230,53 @@ const SalesControlPage = ({ adminKey }) => {
                 />
               </div>
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Contato</label>
+                <input
+                  type="text"
+                  value={newAcquisition.partner_contact_name}
+                  onChange={(e) => setNewAcquisition({...newAcquisition, partner_contact_name: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="Nome da pessoa de contato"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email do Parceiro</label>
+                <input
+                  type="email"
+                  value={newAcquisition.partner_email}
+                  onChange={(e) => setNewAcquisition({...newAcquisition, partner_email: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="contato@parceiro.com"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Telefone do Parceiro</label>
+                <input
+                  type="tel"
+                  value={newAcquisition.partner_phone}
+                  onChange={(e) => setNewAcquisition({...newAcquisition, partner_phone: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="+1 (555) 123-4567"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
+                <input
+                  type="url"
+                  value={newAcquisition.partner_website}
+                  onChange={(e) => setNewAcquisition({...newAcquisition, partner_website: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="https://www.parceiro.com"
+                />
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Partner ID</label>
                 <input
                   type="text"
                   value={newAcquisition.partner_id}
                   onChange={(e) => setNewAcquisition({...newAcquisition, partner_id: e.target.value})}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="Optional - Partner system ID"
+                  placeholder="Opcional - ID do parceiro no sistema"
                 />
               </div>
               <div>
@@ -31221,6 +31316,226 @@ const SalesControlPage = ({ adminKey }) => {
                 className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50"
               >
                 Record Acquisition
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Acquisition Details Modal */}
+      {viewingAcquisition && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-start mb-4">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                Detalhes da Aquisição
+              </h3>
+              <span className={`px-3 py-1 rounded-full text-white text-xs font-medium ${tierColors[viewingAcquisition.partner_tier]}`}>
+                {viewingAcquisition.partner_tier === 'platinum' ? '💎' : viewingAcquisition.partner_tier === 'gold' ? '🥇' : viewingAcquisition.partner_tier === 'silver' ? '🥈' : '🥉'} {viewingAcquisition.partner_tier}
+              </span>
+            </div>
+
+            <div className="space-y-4">
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="text-sm font-semibold text-gray-500 uppercase mb-3">Dados do Parceiro</h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-500">Nome da Empresa:</span>
+                    <span className="text-sm font-medium text-gray-800">{viewingAcquisition.partner_name}</span>
+                  </div>
+                  {viewingAcquisition.partner_contact_name && (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-500">Nome do Contato:</span>
+                      <span className="text-sm font-medium text-gray-800">{viewingAcquisition.partner_contact_name}</span>
+                    </div>
+                  )}
+                  {viewingAcquisition.partner_email && (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-500">Email:</span>
+                      <a href={`mailto:${viewingAcquisition.partner_email}`} className="text-sm font-medium text-blue-600 hover:underline">{viewingAcquisition.partner_email}</a>
+                    </div>
+                  )}
+                  {viewingAcquisition.partner_phone && (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-500">Telefone:</span>
+                      <a href={`tel:${viewingAcquisition.partner_phone}`} className="text-sm font-medium text-blue-600 hover:underline">{viewingAcquisition.partner_phone}</a>
+                    </div>
+                  )}
+                  {viewingAcquisition.partner_website && (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-500">Website:</span>
+                      <a href={viewingAcquisition.partner_website} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-blue-600 hover:underline">{viewingAcquisition.partner_website}</a>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-500">Partner ID:</span>
+                    <span className="text-sm font-medium text-gray-800">{viewingAcquisition.partner_id || 'N/A'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {(!viewingAcquisition.partner_email && !viewingAcquisition.partner_phone) && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                  <p className="text-sm text-yellow-700">Nenhum dado de contato cadastrado. Clique em "Editar" para adicionar email e telefone do parceiro.</p>
+                </div>
+              )}
+
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="text-sm font-semibold text-gray-500 uppercase mb-3">Informações da Aquisição</h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-500">Data:</span>
+                    <span className="text-sm font-medium text-gray-800">{viewingAcquisition.acquisition_date}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-500">Vendedor:</span>
+                    <span className="text-sm font-medium text-gray-800">{viewingAcquisition.salesperson_name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-500">Comissão:</span>
+                    <span className="text-sm font-semibold text-green-600">${viewingAcquisition.commission_paid}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-500">Status:</span>
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${statusColors[viewingAcquisition.commission_status]}`}>
+                      {viewingAcquisition.commission_status === 'pending' ? 'Pendente' : viewingAcquisition.commission_status === 'approved' ? 'Aprovado' : 'Pago'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {viewingAcquisition.notes && (
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h4 className="text-sm font-semibold text-gray-500 uppercase mb-2">Notas</h4>
+                  <p className="text-sm text-gray-700">{viewingAcquisition.notes}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              {viewingAcquisition.commission_status === 'pending' && (
+                <button
+                  onClick={() => { handleEditAcquisition(viewingAcquisition); setViewingAcquisition(null); }}
+                  className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
+                >
+                  Editar
+                </button>
+              )}
+              <button
+                onClick={() => setViewingAcquisition(null)}
+                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Acquisition Modal */}
+      {editingAcquisition && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              Editar Aquisição - {editingAcquisition.partner_name}
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Parceiro *</label>
+                <input
+                  type="text"
+                  value={editAcquisitionForm.partner_name}
+                  onChange={(e) => setEditAcquisitionForm({...editAcquisitionForm, partner_name: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Contato</label>
+                <input
+                  type="text"
+                  value={editAcquisitionForm.partner_contact_name}
+                  onChange={(e) => setEditAcquisitionForm({...editAcquisitionForm, partner_contact_name: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="Nome da pessoa de contato"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email do Parceiro</label>
+                <input
+                  type="email"
+                  value={editAcquisitionForm.partner_email}
+                  onChange={(e) => setEditAcquisitionForm({...editAcquisitionForm, partner_email: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="contato@parceiro.com"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Telefone do Parceiro</label>
+                <input
+                  type="tel"
+                  value={editAcquisitionForm.partner_phone}
+                  onChange={(e) => setEditAcquisitionForm({...editAcquisitionForm, partner_phone: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="+1 (555) 123-4567"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
+                <input
+                  type="url"
+                  value={editAcquisitionForm.partner_website}
+                  onChange={(e) => setEditAcquisitionForm({...editAcquisitionForm, partner_website: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="https://www.parceiro.com"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Partner ID</label>
+                <input
+                  type="text"
+                  value={editAcquisitionForm.partner_id}
+                  onChange={(e) => setEditAcquisitionForm({...editAcquisitionForm, partner_id: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="ID do parceiro no sistema"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tier do Parceiro *</label>
+                <select
+                  value={editAcquisitionForm.partner_tier}
+                  onChange={(e) => setEditAcquisitionForm({...editAcquisitionForm, partner_tier: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="bronze">Bronze (10-29 pages/month) - $50</option>
+                  <option value="silver">Silver (30-59 pages/month) - $75</option>
+                  <option value="gold">Gold (60-99 pages/month) - $100</option>
+                  <option value="platinum">Platinum (100+ pages/month) - $150</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notas</label>
+                <textarea
+                  value={editAcquisitionForm.notes}
+                  onChange={(e) => setEditAcquisitionForm({...editAcquisitionForm, notes: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  rows={3}
+                  placeholder="Notas sobre a aquisição..."
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => { setEditingAcquisition(null); setEditAcquisitionForm({}); }}
+                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleUpdateAcquisition}
+                disabled={!editAcquisitionForm.partner_name}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+              >
+                Salvar Alterações
               </button>
             </div>
           </div>
