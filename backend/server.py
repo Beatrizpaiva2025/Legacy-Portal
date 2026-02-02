@@ -7042,14 +7042,19 @@ async def register_admin_user(user_data: AdminUserCreate, admin_key: str):
         raise HTTPException(status_code=403, detail="Project Managers can only register translators")
 
     try:
-        # Check if email already exists
-        existing = await db.admin_users.find_one({"email": user_data.email})
+        # Normalize email to lowercase for consistent case-insensitive matching
+        normalized_email = user_data.email.strip().lower()
+
+        # Check if email already exists (case-insensitive)
+        existing = await db.admin_users.find_one({"email": normalized_email})
+        if not existing:
+            existing = await db.admin_users.find_one({"email": {"$regex": f"^{re.escape(normalized_email)}$", "$options": "i"}})
         if existing:
             raise HTTPException(status_code=400, detail="Email already registered")
 
         # Create user without password (pending invitation)
         user = AdminUser(
-            email=user_data.email,
+            email=normalized_email,
             password_hash="",  # No password yet - user will set via invitation
             name=user_data.name,
             role=user_data.role,
@@ -7073,10 +7078,10 @@ async def register_admin_user(user_data: AdminUserCreate, admin_key: str):
         expires = datetime.utcnow() + timedelta(days=7)  # 7 days to accept invitation
 
         # Store token in MongoDB (persistent storage) instead of in-memory
-        await db.admin_invitation_tokens.delete_many({"email": user_data.email})  # Remove any existing tokens
+        await db.admin_invitation_tokens.delete_many({"email": normalized_email})  # Remove any existing tokens
         await db.admin_invitation_tokens.insert_one({
             "token": invite_token,
-            "email": user_data.email,
+            "email": normalized_email,
             "user_id": user.id,
             "expires": expires,
             "created_at": datetime.utcnow()
@@ -7113,8 +7118,8 @@ async def register_admin_user(user_data: AdminUserCreate, admin_key: str):
 
         email_sent = False
         try:
-            await email_service.send_email(user_data.email, subject, content)
-            logger.info(f"Invitation email sent to {user_data.email}")
+            await email_service.send_email(normalized_email, subject, content)
+            logger.info(f"Invitation email sent to {normalized_email}")
             email_sent = True
         except Exception as e:
             logger.error(f"Failed to send invitation email: {str(e)}")
@@ -7142,12 +7147,16 @@ async def login_admin_user(login_data: AdminUserLogin, request: Request):
         client_ip = request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or request.client.host
         user_agent = request.headers.get("User-Agent", "Unknown")
 
-        # Find user by email
-        user = await db.admin_users.find_one({"email": login_data.email})
+        # Find user by email (case-insensitive to handle case mismatches between registration and login)
+        login_email = login_data.email.strip().lower()
+        user = await db.admin_users.find_one({"email": login_email})
+        if not user:
+            # Fallback: try case-insensitive regex match for legacy users with mixed-case emails
+            user = await db.admin_users.find_one({"email": {"$regex": f"^{re.escape(login_email)}$", "$options": "i"}})
         if not user:
             # Log failed attempt
             await db.login_attempts.insert_one({
-                "email": login_data.email,
+                "email": login_email,
                 "ip_address": client_ip,
                 "user_agent": user_agent,
                 "timestamp": datetime.utcnow(),
@@ -7155,6 +7164,14 @@ async def login_admin_user(login_data: AdminUserLogin, request: Request):
                 "reason": "invalid_email"
             })
             raise HTTPException(status_code=401, detail="Invalid email or password")
+
+        # Check if invitation is pending (before password check, since pending users have no password set)
+        if user.get("invitation_pending", False):
+            raise HTTPException(status_code=401, detail="Please complete your registration using the invitation link sent to your email")
+
+        # Check if active
+        if not user.get("is_active", True):
+            raise HTTPException(status_code=401, detail="Account is deactivated")
 
         # Verify password
         if not verify_password(login_data.password, user["password_hash"]):
@@ -7169,14 +7186,6 @@ async def login_admin_user(login_data: AdminUserLogin, request: Request):
                 "reason": "invalid_password"
             })
             raise HTTPException(status_code=401, detail="Invalid email or password")
-
-        # Check if invitation is pending
-        if user.get("invitation_pending", False):
-            raise HTTPException(status_code=401, detail="Please complete your registration using the invitation link sent to your email")
-
-        # Check if active
-        if not user.get("is_active", True):
-            raise HTTPException(status_code=401, detail="Account is deactivated")
 
         # Log successful login with IP tracking
         login_record = {

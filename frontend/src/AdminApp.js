@@ -31500,9 +31500,10 @@ function AdminApp() {
   const inviteToken = urlParams.get('invite_token');
   const resetToken = urlParams.get('reset_token');
 
-  // Clear URL tometers after reading, but keep the #/admin hash
+  // Clear URL parameters after reading, then reload to show login page
   const clearUrlParams = () => {
     window.history.replaceState({}, document.title, window.location.pathname + '#/admin');
+    window.location.reload();
   };
 
   // Get current path
