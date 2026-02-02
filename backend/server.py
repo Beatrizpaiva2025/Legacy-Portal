@@ -5115,7 +5115,7 @@ async def create_zelle_order(request: ZelleOrderRequest, background_tasks: Backg
             # Get the document/file URL
             doc = await db.documents.find_one({"id": request.zelle_receipt_id})
             if doc:
-                backend_url = os.environ.get("BACKEND_URL", "https://legacy-portal-backend.onrender.com")
+                backend_url = os.environ.get("BACKEND_URL", "https://legacy-portal-cont-backend.onrender.com")
                 receipt_url = f"{backend_url}/api/download-document/{request.zelle_receipt_id}"
 
         # Create order with pending_zelle status
@@ -8833,7 +8833,7 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
         # Get Zelle receipt URL if available
         zelle_receipt_url = None
         if order_data.zelle_receipt_id:
-            backend_url = os.environ.get("BACKEND_URL", "https://legacy-portal-backend.onrender.com")
+            backend_url = os.environ.get("BACKEND_URL", "https://legacy-portal-cont-backend.onrender.com")
             zelle_receipt_url = f"{backend_url}/api/download-document/{order_data.zelle_receipt_id}"
 
         # Create order with automatic client deadline (2 business days for partner portal)
@@ -11617,7 +11617,7 @@ async def submit_invoice_zelle_payment(invoice_id: str, request: PartnerInvoiceP
         if request.zelle_receipt_id:
             doc = await db.documents.find_one({"id": request.zelle_receipt_id})
             if doc:
-                backend_url = os.environ.get("BACKEND_URL", "https://legacy-portal-backend.onrender.com")
+                backend_url = os.environ.get("BACKEND_URL", "https://legacy-portal-cont-backend.onrender.com")
                 receipt_url = f"{backend_url}/api/download-document/{request.zelle_receipt_id}"
 
         # Update invoice with Zelle receipt (pending verification)
@@ -12973,7 +12973,7 @@ async def upload_payment_proof(
 
         # Send email notification to contact with View Receipt link
         try:
-            api_url = os.environ.get("API_URL", "https://legacy-portal-backend.onrender.com")
+            api_url = os.environ.get("API_URL", "https://legacy-portal-cont-backend.onrender.com")
             admin_url = os.environ.get("ADMIN_URL", "https://legacy-portal-frontend.onrender.com/#/admin")
             view_receipt_url = f"{api_url}/api/payment-proofs/view/{payment_proof.id}"
 
@@ -22272,6 +22272,109 @@ async def recover_orphaned_zelle_orders(admin_key: str):
     except Exception as e:
         logger.error(f"Error recovering Zelle orders: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to recover Zelle orders")
+
+
+@api_router.get("/admin/fix-zelle-documents")
+async def fix_zelle_order_documents(admin_key: str):
+    """
+    Re-link documents for all Zelle orders. Fixes orders where documents were uploaded
+    but never linked (order_id was not set on the document records).
+    """
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        # Find all Zelle orders in both collections
+        zelle_orders = await db.orders.find({"payment_method": "zelle"}).to_list(500)
+        zelle_translation_orders = await db.translation_orders.find({"payment_method": "zelle"}).to_list(500)
+
+        # Merge both, dedup by id
+        all_orders = {}
+        for o in zelle_orders:
+            all_orders[o.get("id")] = o
+        for o in zelle_translation_orders:
+            if o.get("id") not in all_orders:
+                all_orders[o.get("id")] = o
+
+        fixed = []
+        skipped = []
+        errors = []
+
+        for order_id, order in all_orders.items():
+            try:
+                order_number = order.get("order_number", "N/A")
+                quote_id = order.get("quote_id")
+                document_ids = order.get("document_ids", [])
+
+                # If no document_ids in order, try to get them from the quote
+                if not document_ids and quote_id:
+                    quote = await db.translation_quotes.find_one({"id": quote_id})
+                    if quote:
+                        document_ids = quote.get("document_ids", [])
+
+                if not document_ids:
+                    skipped.append({
+                        "order_number": order_number,
+                        "reason": "No document_ids found in order or quote"
+                    })
+                    continue
+
+                # Check how many documents are already linked
+                already_linked = await db.documents.count_documents({
+                    "id": {"$in": document_ids},
+                    "order_id": order_id
+                })
+
+                if already_linked == len(document_ids):
+                    skipped.append({
+                        "order_number": order_number,
+                        "reason": f"All {already_linked} documents already linked"
+                    })
+                    continue
+
+                # Link documents to this order
+                result = await db.documents.update_many(
+                    {"id": {"$in": document_ids}},
+                    {"$set": {"order_id": order_id, "order_number": order_number}}
+                )
+
+                # Also update translation_orders to include document_ids if missing
+                await db.translation_orders.update_one(
+                    {"id": order_id, "document_ids": {"$exists": False}},
+                    {"$set": {"document_ids": document_ids}}
+                )
+                await db.translation_orders.update_one(
+                    {"id": order_id, "document_ids": []},
+                    {"$set": {"document_ids": document_ids}}
+                )
+
+                fixed.append({
+                    "order_number": order_number,
+                    "documents_linked": result.modified_count,
+                    "total_document_ids": len(document_ids)
+                })
+
+                logger.info(f"Fixed {result.modified_count} documents for Zelle order {order_number}")
+
+            except Exception as e:
+                errors.append({
+                    "order_number": order.get("order_number", "N/A"),
+                    "error": str(e)
+                })
+
+        return {
+            "status": "success",
+            "fixed_count": len(fixed),
+            "skipped_count": len(skipped),
+            "error_count": len(errors),
+            "fixed_orders": fixed,
+            "skipped": skipped,
+            "errors": errors
+        }
+
+    except Exception as e:
+        logger.error(f"Error fixing Zelle documents: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fix Zelle documents")
 
 
 # ==================== DISCOUNT CODES ====================
