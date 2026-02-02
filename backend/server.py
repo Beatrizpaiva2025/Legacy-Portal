@@ -5115,7 +5115,7 @@ async def create_zelle_order(request: ZelleOrderRequest, background_tasks: Backg
             # Get the document/file URL
             doc = await db.documents.find_one({"id": request.zelle_receipt_id})
             if doc:
-                backend_url = os.environ.get("BACKEND_URL", "https://legacy-portal-backend.onrender.com")
+                backend_url = os.environ.get("BACKEND_URL", "https://legacy-portal-cont-backend.onrender.com")
                 receipt_url = f"{backend_url}/api/download-document/{request.zelle_receipt_id}"
 
         # Create order with pending_zelle status
@@ -8833,7 +8833,7 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
         # Get Zelle receipt URL if available
         zelle_receipt_url = None
         if order_data.zelle_receipt_id:
-            backend_url = os.environ.get("BACKEND_URL", "https://legacy-portal-backend.onrender.com")
+            backend_url = os.environ.get("BACKEND_URL", "https://legacy-portal-cont-backend.onrender.com")
             zelle_receipt_url = f"{backend_url}/api/download-document/{order_data.zelle_receipt_id}"
 
         # Create order with automatic client deadline (2 business days for partner portal)
@@ -11617,7 +11617,7 @@ async def submit_invoice_zelle_payment(invoice_id: str, request: PartnerInvoiceP
         if request.zelle_receipt_id:
             doc = await db.documents.find_one({"id": request.zelle_receipt_id})
             if doc:
-                backend_url = os.environ.get("BACKEND_URL", "https://legacy-portal-backend.onrender.com")
+                backend_url = os.environ.get("BACKEND_URL", "https://legacy-portal-cont-backend.onrender.com")
                 receipt_url = f"{backend_url}/api/download-document/{request.zelle_receipt_id}"
 
         # Update invoice with Zelle receipt (pending verification)
@@ -12973,7 +12973,7 @@ async def upload_payment_proof(
 
         # Send email notification to contact with View Receipt link
         try:
-            api_url = os.environ.get("API_URL", "https://legacy-portal-backend.onrender.com")
+            api_url = os.environ.get("API_URL", "https://legacy-portal-cont-backend.onrender.com")
             admin_url = os.environ.get("ADMIN_URL", "https://legacy-portal-frontend.onrender.com/#/admin")
             view_receipt_url = f"{api_url}/api/payment-proofs/view/{payment_proof.id}"
 
