@@ -5292,37 +5292,52 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const savedSelection = useRef(null);
 
   const saveSelection = () => {
-    const sel = window.getSelection();
-    if (sel.rangeCount > 0) {
-      savedSelection.current = sel.getRangeAt(0);
-    }
+    const el = editableRef.current;
+    const isIframe = el && el.tagName === 'IFRAME';
+    const targetWin = isIframe ? el.contentWindow : window;
+    try {
+      const sel = targetWin.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        savedSelection.current = sel.getRangeAt(0);
+      }
+    } catch (e) { /* iframe may not be ready */ }
   };
 
   const restoreSelection = () => {
     if (savedSelection.current) {
-      const sel = window.getSelection();
-      sel.removeAllRanges();
-      sel.addRange(savedSelection.current);
+      const el = editableRef.current;
+      const isIframe = el && el.tagName === 'IFRAME';
+      const targetWin = isIframe ? el.contentWindow : window;
+      try {
+        const sel = targetWin.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(savedSelection.current);
+      } catch (e) { /* iframe may not be ready */ }
     }
   };
 
-  // Execute formatting command and maintain focus on contentEditable
+  // Execute formatting command and maintain focus on contentEditable or iframe
   const execFormatCommand = (command, value = null) => {
+    const el = editableRef.current;
+    const isIframe = el && el.tagName === 'IFRAME';
+    const targetWin = isIframe ? el.contentWindow : window;
+    const targetDoc = isIframe ? el.contentDocument : document;
+
     restoreSelection();
 
     // Handle font size increase/decrease
     if (command === 'increaseFontSize' || command === 'decreaseFontSize') {
-      const selection = window.getSelection();
+      const selection = targetWin.getSelection();
       if (selection.rangeCount > 0 && !selection.isCollapsed) {
         const range = selection.getRangeAt(0);
-        const span = document.createElement('span');
+        const span = targetDoc.createElement('span');
 
         // Get current font size from selection or default to 12pt
         // Note: computedStyle.fontSize returns pixels, so we convert to points (px * 0.75 = pt)
         let currentSizePt = 12;
         const parentElement = range.commonAncestorContainer.parentElement;
         if (parentElement) {
-          const computedStyle = window.getComputedStyle(parentElement);
+          const computedStyle = targetWin.getComputedStyle(parentElement);
           const fontSizePx = parseFloat(computedStyle.fontSize) || 16;
           currentSizePt = Math.round(fontSizePx * 0.75); // Convert px to pt
         }
@@ -5337,7 +5352,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           span.appendChild(range.extractContents());
           range.insertNode(span);
           selection.removeAllRanges();
-          const newRange = document.createRange();
+          const newRange = targetDoc.createRange();
           newRange.selectNodeContents(span);
           selection.addRange(newRange);
         } catch (e) {
@@ -5347,10 +5362,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
     // Handle fontSize and fontName specially since execCommand doesn't work well for these
     else if (command === 'fontSize' || command === 'fontName') {
-      const selection = window.getSelection();
+      const selection = targetWin.getSelection();
       if (selection.rangeCount > 0 && !selection.isCollapsed) {
         const range = selection.getRangeAt(0);
-        const span = document.createElement('span');
+        const span = targetDoc.createElement('span');
 
         if (command === 'fontSize') {
           // Map values 1-7 to actual pt sizes
@@ -5365,7 +5380,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           range.insertNode(span);
           // Select the new span content
           selection.removeAllRanges();
-          const newRange = document.createRange();
+          const newRange = targetDoc.createRange();
           newRange.selectNodeContents(span);
           selection.addRange(newRange);
         } catch (e) {
@@ -5375,13 +5390,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
     // Handle line spacing
     else if (command === 'increaseLineHeight' || command === 'decreaseLineHeight') {
-      const selection = window.getSelection();
+      const selection = targetWin.getSelection();
       if (selection.rangeCount > 0) {
         // Get the editable container
-        const container = editableRef.current;
+        const container = isIframe ? targetDoc.body : editableRef.current;
         if (container) {
           // Get current line height
-          const computedStyle = window.getComputedStyle(container);
+          const computedStyle = targetWin.getComputedStyle(container);
           let currentLineHeight = parseFloat(computedStyle.lineHeight);
           if (isNaN(currentLineHeight)) currentLineHeight = 1.5;
           else currentLineHeight = currentLineHeight / parseFloat(computedStyle.fontSize);
@@ -5395,10 +5410,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         }
       }
     } else {
-      document.execCommand(command, false, value);
+      targetDoc.execCommand(command, false, value);
     }
 
-    if (editableRef.current) {
+    if (isIframe) {
+      el.contentWindow.focus();
+    } else if (editableRef.current) {
       editableRef.current.focus();
     }
     // Save selection after command for next operation
@@ -6682,7 +6699,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           { id: 'translate', label: 'TRANSLATION', icon: '📄', roles: ['admin', 'pm', 'translator'] },
           { id: 'review', label: 'REVIEW', icon: '📋', roles: ['admin', 'pm', 'translator_contractor', 'translator_inhouse'] },
           { id: 'proofreading', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm', 'translator_inhouse'] },
-          { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'pm', 'translator_inhouse', 'translator_contractor'] }, // Admin, PM, In-house and Contractor
+          { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'pm'] },
           { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin', 'pm', 'translator_inhouse'] },
           { id: 'tm', label: 'TM', icon: '🧠', roles: ['admin', 'pm', 'translator_inhouse'] },
           { id: 'instructions', label: 'INSTRUCTIONS', icon: '📋', roles: ['admin', 'pm', 'translator_inhouse'] }
@@ -7321,10 +7338,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           <div className="bg-blue-50 border border-blue-200 rounded px-3 py-1.5">
             <p className="text-[10px] text-blue-700">
               <strong>Workflow:</strong> {isInHouseTranslator
-                ? 'START → TRANSLATE (edit) → PROOFREADING → DELIVER'
+                ? 'START → TRANSLATE (edit) → PROOFREADING'
                 : isAdmin || isPM
                   ? 'START → TRANSLATE → REVIEW → PROOFREADING → DELIVER'
-                  : 'START → TRANSLATE → REVIEW → DELIVER'}
+                  : 'START → TRANSLATE → REVIEW → SEND TO PM'}
             </p>
           </div>
 
@@ -8072,6 +8089,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <span className="mr-2">📝</span>
                 <span className="text-sm font-medium">OCR (CAT Tool)</span>
               </label>
+              {!isContractor && (
               <label className={`flex items-center px-3 py-2 rounded-lg cursor-pointer transition-all ${workflowMode === 'template' ? 'bg-purple-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
                 <input
                   type="radio"
@@ -8084,6 +8102,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <span className="mr-2">📋</span>
                 <span className="text-sm font-medium">Fill Template</span>
               </label>
+              )}
             </div>
             <p className="text-[10px] text-gray-500 text-center mt-2">
               {workflowMode === 'ai' ? 'Upload document and translate with AI' : workflowMode === 'external' ? 'Upload original + existing translation for review' : workflowMode === 'ocr' ? 'Extract text for external CAT tools (SDL Trados, MemoQ, etc.)' : 'Fill document template with original for reference'}
@@ -9634,6 +9653,49 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 >
                   Download
                 </button>
+                {isContractor && (
+                  <button
+                    onClick={async () => {
+                      const content = translationResults[selectedResultIndex]?.translatedText || '';
+                      if (!content) {
+                        showToast('No translation to download');
+                        return;
+                      }
+                      try {
+                        const fullHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{font-family:'Times New Roman',serif;font-size:12pt;margin:20mm;}</style></head><body>${content}</body></html>`;
+                        const container = document.createElement('div');
+                        container.innerHTML = fullHtml;
+                        container.style.position = 'absolute';
+                        container.style.left = '-9999px';
+                        container.style.width = '210mm';
+                        document.body.appendChild(container);
+                        const pdfBlob = await html2pdf()
+                          .set({
+                            margin: [10, 10, 10, 10],
+                            filename: `translation_${orderNumber || 'document'}.pdf`,
+                            image: { type: 'jpeg', quality: 0.98 },
+                            html2canvas: { scale: 2, useCORS: true },
+                            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                          })
+                          .from(container)
+                          .outputPdf('blob');
+                        document.body.removeChild(container);
+                        const url = URL.createObjectURL(pdfBlob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `translation_${orderNumber || 'document'}.pdf`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      } catch (err) {
+                        console.error('PDF download error:', err);
+                        showToast('Error generating PDF');
+                      }
+                    }}
+                    className="px-3 py-1 text-xs font-medium bg-red-600 text-white rounded hover:bg-red-700"
+                  >
+                    Download PDF
+                  </button>
+                )}
               </div>
 
               {/* Side by side view: Original | Translation */}
@@ -9810,16 +9872,26 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         className="w-full h-full border-0"
                       />
                     ) : (
-                      <div
+                      <iframe
                         ref={editableRef}
-                        contentEditable
-                        suppressContentEditableWarning
-                        dangerouslySetInnerHTML={{ __html: extractBodyForEdit(translationResults[selectedResultIndex]?.translatedText) }}
-                        onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
-                        onMouseUp={saveSelection}
-                        onKeyUp={saveSelection}
-                        className="p-3 text-xs focus:outline-none"
-                        style={{width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px', overflow: 'auto', height: '100%', maxHeight: '100%', wordBreak: 'break-word'}}
+                        srcDoc={translationResults[selectedResultIndex]?.translatedText || '<!DOCTYPE html><html><head></head><body><p>No translation</p></body></html>'}
+                        title="Translation Edit"
+                        className="w-full border-0"
+                        style={{width: '100%', height: '100%', border: '3px solid #10B981', borderRadius: '4px'}}
+                        onLoad={(e) => {
+                          const iframeDoc = e.target.contentDocument;
+                          if (iframeDoc) {
+                            iframeDoc.designMode = 'on';
+                            iframeDoc.body.style.outline = 'none';
+                            iframeDoc.body.style.padding = '12px';
+                            iframeDoc.body.style.margin = '0';
+                            iframeDoc.addEventListener('input', () => {
+                              handleTranslationEdit(iframeDoc.body.innerHTML);
+                            });
+                            iframeDoc.addEventListener('mouseup', saveSelection);
+                            iframeDoc.addEventListener('keyup', saveSelection);
+                          }
+                        }}
                       />
                     )}
                   </div>
