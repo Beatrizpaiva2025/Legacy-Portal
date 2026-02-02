@@ -371,7 +371,7 @@ const sanitizeErrorMessage = (errorMsg) => {
 const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
     @page {
         size: ${pageSizeCSS};
-        margin: 0.5in 0.5in 0.4in 0.5in;
+        margin: 0.5in 0.5in;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -1384,6 +1384,52 @@ const LANGUAGE_TO_CURRENCY = {
 
 const getCurrencyFromLanguage = (language) => {
   return LANGUAGE_TO_CURRENCY[language] || 'USD';
+};
+
+// ==================== HTML EDIT UTILITIES (module-level, shared by all components) ====================
+// Extract body content from full HTML document for contentEditable rendering.
+// Strips <style> tags to prevent them from applying globally to the page DOM.
+const extractBodyForEdit = (html) => {
+  if (!html) return '<p>No translation</p>';
+  if (!html.includes('<body') && !html.includes('<html')) {
+    return html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+  }
+  let bodyContent = html;
+  const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  if (bodyMatch) {
+    bodyContent = bodyMatch[1];
+  } else {
+    const headEndMatch = html.match(/<\/head>\s*([\s\S]*?)<\/html>/i);
+    if (headEndMatch) {
+      bodyContent = headEndMatch[1];
+    }
+  }
+  bodyContent = bodyContent.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+  return bodyContent;
+};
+
+// Reconstruct full HTML document by replacing body content while preserving styles/head.
+const reconstructFullHtml = (originalHtml, newBodyContent) => {
+  if (!originalHtml) return newBodyContent;
+  if (!originalHtml.includes('<body') && !originalHtml.includes('<html')) {
+    const styleMatches = originalHtml.match(/<style[^>]*>[\s\S]*?<\/style>/gi);
+    if (styleMatches && styleMatches.length > 0) {
+      return styleMatches.join('\n') + '\n' + newBodyContent;
+    }
+    return newBodyContent;
+  }
+  const bodyMatch = originalHtml.match(/(<body[^>]*>)([\s\S]*?)(<\/body>)/i);
+  if (bodyMatch) {
+    return originalHtml.replace(
+      /(<body[^>]*>)([\s\S]*?)(<\/body>)/i,
+      (match, openTag, oldContent, closeTag) => `${openTag}${newBodyContent}${closeTag}`
+    );
+  }
+  const headEndMatch = originalHtml.match(/([\s\S]*?<\/head>\s*)/i);
+  if (headEndMatch) {
+    return `${headEndMatch[1]}<body>${newBodyContent}</body></html>`;
+  }
+  return newBodyContent;
 };
 
 // ==================== TRANSLATION WORKSPACE ====================
@@ -3534,6 +3580,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         const isTranslator = user?.role === 'translator';
 
         if (destination === 'save') {
+          showToast('✅ Translation saved successfully!');
           setProcessingStatus(`✅ Translation saved successfully!`);
           // Clear status after 3 seconds for save action
           setTimeout(() => setProcessingStatus(''), 3000);
@@ -5224,66 +5271,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
   };
 
-  // Extract body content from full HTML document for contentEditable rendering
-  // This fixes the "shrink" issue when editing full HTML documents in a div
-  // NOTE: <style> tags are NOT included because they apply globally to the page DOM
-  // (unlike an iframe which sandboxes styles). This prevents document CSS rules like
-  // body { width: 8.5in } from shrinking the entire workspace page.
-  // Inline styles on elements are preserved. For exact rendering, use Preview (iframe).
-  const extractBodyForEdit = (html) => {
-    if (!html) return '<p>No translation</p>';
-
-    // If it's not a full HTML document, return as-is (but strip any style tags)
-    if (!html.includes('<body') && !html.includes('<html')) {
-      return html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
-    }
-
-    // Extract body content only (no style tags)
-    let bodyContent = html;
-    const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-    if (bodyMatch) {
-      bodyContent = bodyMatch[1];
-    } else {
-      // Try to extract content after </head> or after <html>
-      const headEndMatch = html.match(/<\/head>\s*([\s\S]*?)<\/html>/i);
-      if (headEndMatch) {
-        bodyContent = headEndMatch[1];
-      }
-    }
-
-    // Remove any remaining style tags from the body content
-    bodyContent = bodyContent.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
-
-    return bodyContent;
-  };
-
-  // Reconstruct full HTML document by replacing body content while preserving styles/head
-  const reconstructFullHtml = (originalHtml, newBodyContent) => {
-    if (!originalHtml) return newBodyContent;
-
-    // If the original wasn't a full HTML document, just return the new content as-is
-    if (!originalHtml.includes('<body') && !originalHtml.includes('<html')) {
-      return newBodyContent;
-    }
-
-    // Replace body content in the original HTML, preserving <html>, <head>, <style> tags
-    // Use function replacement to avoid issues with $ in content (e.g. $1,598.99)
-    const bodyMatch = originalHtml.match(/(<body[^>]*>)([\s\S]*?)(<\/body>)/i);
-    if (bodyMatch) {
-      return originalHtml.replace(
-        /(<body[^>]*>)([\s\S]*?)(<\/body>)/i,
-        (match, openTag, oldContent, closeTag) => `${openTag}${newBodyContent}${closeTag}`
-      );
-    }
-
-    // Fallback: try to find </head> and wrap content
-    const headEndMatch = originalHtml.match(/([\s\S]*?<\/head>\s*)/i);
-    if (headEndMatch) {
-      return `${headEndMatch[1]}<body>${newBodyContent}</body></html>`;
-    }
-
-    return newBodyContent;
-  };
+  // extractBodyForEdit and reconstructFullHtml are defined at module level (above)
 
   // Update translation text manually
   const handleTranslationEdit = (newText) => {
@@ -8446,9 +8434,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           style={{width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
                           dangerouslySetInnerHTML={{ __html: extractBodyForEdit(translationResults[0]?.translatedText) }}
                           onBlur={(e) => {
-                            // Save edits back to translationResults
+                            // Save edits back to translationResults, preserving original styles
                             const newResults = [...translationResults];
-                            newResults[0] = { ...newResults[0], translatedText: e.target.innerHTML };
+                            const fullHtml = reconstructFullHtml(newResults[0]?.translatedText, e.target.innerHTML);
+                            newResults[0] = { ...newResults[0], translatedText: fullHtml };
                             setTranslationResults(newResults);
                           }}
                         />
@@ -9798,11 +9787,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     Back: Translation
                   </button>
                   <button
-                    onClick={() => sendToProjects('save')}
+                    onClick={async () => {
+                      await sendToProjects('save');
+                    }}
                     disabled={sendingToProjects || translationResults.length === 0}
                     className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 disabled:bg-gray-300"
                   >
-                    Save
+                    {sendingToProjects ? 'Saving...' : 'Save'}
                   </button>
                 </div>
                 <div className="flex gap-2">
@@ -20620,7 +20611,7 @@ const ReviewPage = ({ adminKey, user }) => {
                 contentEditable
                 className="min-h-full p-6 outline-none prose max-w-none"
                 dangerouslySetInnerHTML={{ __html: extractBodyForEdit(editedTranslation) }}
-                onBlur={(e) => setEditedTranslation(e.target.innerHTML)}
+                onBlur={(e) => setEditedTranslation(reconstructFullHtml(editedTranslation, e.target.innerHTML))}
                 style={{ minHeight: '100%' }}
               />
             </div>
