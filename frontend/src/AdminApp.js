@@ -6681,7 +6681,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           { id: 'start', label: 'START', icon: '📝', roles: ['admin', 'pm', 'translator'] },
           { id: 'translate', label: 'TRANSLATION', icon: '📄', roles: ['admin', 'pm', 'translator'] },
           { id: 'review', label: 'REVIEW', icon: '📋', roles: ['admin', 'pm', 'translator_contractor', 'translator_inhouse'] },
-          { id: 'proofreading', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm', 'translator_inhouse', 'translator_contractor'] },
+          { id: 'proofreading', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm', 'translator_inhouse'] },
           { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'pm', 'translator_inhouse', 'translator_contractor'] }, // Admin, PM, In-house and Contractor
           { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin', 'pm', 'translator_inhouse'] },
           { id: 'tm', label: 'TM', icon: '🧠', roles: ['admin', 'pm', 'translator_inhouse'] },
@@ -9687,6 +9687,55 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       Translation ({targetLanguage}) - {reviewViewMode === 'preview' ? 'Preview' : 'Editing'}
                     </span>
                     <div className="flex items-center gap-1">
+                      <label className="px-2 py-1 bg-green-600 text-white text-[10px] rounded cursor-pointer hover:bg-green-700">
+                        Upload
+                        <input
+                          type="file"
+                          accept=".docx,.doc,.html,.htm,.txt,.pdf,image/*"
+                          className="hidden"
+                          onChange={async (e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              const file = e.target.files[0];
+                              const fileName = file.name.toLowerCase();
+                              try {
+                                let html = '';
+                                if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
+                                  html = await convertWordToHtml(file);
+                                } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
+                                  html = await readHtmlFile(file);
+                                } else if (fileName.endsWith('.txt')) {
+                                  const text = await readTxtFile(file);
+                                  html = `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif; font-size: 12pt;">${text}</div>`;
+                                } else if (fileName.endsWith('.pdf')) {
+                                  const images = await convertPdfToImages(file);
+                                  html = images.map((img, idx) => `<div style="text-align:center;"><img src="data:${img.type};base64,${img.data}" style="max-width:100%; height:auto;" alt="${file.name} page ${idx + 1}" /></div>`).join('');
+                                } else if (file.type.startsWith('image/')) {
+                                  const dataUrl = await new Promise((resolve) => {
+                                    const reader = new FileReader();
+                                    reader.onload = () => resolve(reader.result);
+                                    reader.readAsDataURL(file);
+                                  });
+                                  html = `<div style="text-align:center;"><img src="${dataUrl}" style="max-width:100%; height:auto;" alt="${file.name}" /></div>`;
+                                }
+                                if (html) {
+                                  const updatedResults = [...translationResults];
+                                  updatedResults[selectedResultIndex] = {
+                                    ...updatedResults[selectedResultIndex],
+                                    translatedText: html,
+                                    filename: file.name
+                                  };
+                                  setTranslationResults(updatedResults);
+                                  showToast('Translation page replaced!');
+                                }
+                              } catch (err) {
+                                console.error('Upload error:', err);
+                                showToast('Error uploading file');
+                              }
+                              e.target.value = '';
+                            }
+                          }}
+                        />
+                      </label>
                       {translationResults[selectedResultIndex]?.translatedText && (
                         <button
                           onClick={() => {
@@ -9753,7 +9802,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     )}
                   </div>
                   {/* Right: Translation */}
-                  <div className="overflow-hidden bg-white flex flex-col h-full" ref={translatedTextRef} onScroll={() => handleScroll('translated')}>
+                  <div className="overflow-hidden bg-white flex flex-col" ref={translatedTextRef} onScroll={() => handleScroll('translated')} style={{minHeight: 0, height: '100%'}}>
                     {reviewViewMode === 'preview' ? (
                       <iframe
                         srcDoc={translationResults[selectedResultIndex]?.translatedText || '<p>No translation</p>'}
@@ -9769,8 +9818,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
                         onMouseUp={saveSelection}
                         onKeyUp={saveSelection}
-                        className="p-3 text-xs focus:outline-none overflow-auto h-full"
-                        style={{width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
+                        className="p-3 text-xs focus:outline-none"
+                        style={{width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px', overflow: 'auto', height: '100%', maxHeight: '100%', wordBreak: 'break-word'}}
                       />
                     )}
                   </div>
