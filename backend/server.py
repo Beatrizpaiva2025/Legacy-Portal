@@ -5148,6 +5148,50 @@ async def create_zelle_order(request: ZelleOrderRequest, background_tasks: Backg
 
         await db.orders.insert_one(order)
 
+        # Also insert into translation_orders so it appears in the admin panel Projects
+        translation_order = {
+            "id": order["id"],
+            "order_number": order_number,
+            "quote_id": request.quote_id,
+            "partner_id": "website",
+            "client_name": request.customer_name,
+            "client_email": request.customer_email or "",
+            "document_type": quote.get("reference", "Document"),
+            "service_type": quote.get("service_type", "translation"),
+            "translate_from": quote.get("translate_from", ""),
+            "translate_to": quote.get("translate_to", ""),
+            "word_count": quote.get("word_count", 0),
+            "page_count": max(1, math.ceil(quote.get("word_count", 0) / 250)),
+            "urgency": quote.get("urgency", "no"),
+            "notes": order.get("notes") or "Website order - Zelle payment (pending verification)",
+            "base_price": quote.get("base_price"),
+            "urgency_fee": quote.get("urgency_fee"),
+            "total_price": request.total_price,
+            "discount_amount": quote.get("discount_amount", 0),
+            "discount_code": quote.get("discount_code"),
+            "payment_status": "pending_zelle",
+            "payment_method": "zelle",
+            "zelle_receipt_id": request.zelle_receipt_id,
+            "zelle_receipt_url": receipt_url,
+            "translation_status": "Received",
+            "source": "website",
+            "revenue_source": "website",
+            "document_ids": quote.get("document_ids", []),
+            "shipping_address": request.shipping_address,
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
+        }
+        await db.translation_orders.insert_one(translation_order)
+        logger.info(f"Created Zelle order {order_number} in both orders and translation_orders collections")
+
+        # Link documents to the order
+        document_ids = quote.get("document_ids", [])
+        if document_ids:
+            await db.documents.update_many(
+                {"id": {"$in": document_ids}},
+                {"$set": {"order_id": order["id"], "order_number": order_number}}
+            )
+
         # Update quote status
         await db.translation_quotes.update_one(
             {"id": request.quote_id},
@@ -5210,21 +5254,34 @@ async def confirm_zelle_payment(order_id: str, background_tasks: BackgroundTasks
     """Admin endpoint to confirm a Zelle payment and start the translation"""
 
     try:
-        # Get order
+        # Get order from either collection
         order = await db.orders.find_one({"id": order_id})
+        if not order:
+            order = await db.translation_orders.find_one({"id": order_id})
         if not order:
             raise HTTPException(status_code=404, detail="Order not found")
 
         if order.get("payment_status") != "pending_zelle":
             raise HTTPException(status_code=400, detail="Order is not pending Zelle payment")
 
-        # Update order status
-        await db.orders.update_one(
+        # Update order status in both collections
+        confirmed_update = {
+            "$set": {
+                "payment_status": "paid",
+                "status": "in_progress",
+                "payment_confirmed_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            }
+        }
+        await db.orders.update_one({"id": order_id}, confirmed_update)
+
+        # Also update translation_orders (admin-visible collection)
+        await db.translation_orders.update_one(
             {"id": order_id},
             {
                 "$set": {
                     "payment_status": "paid",
-                    "status": "in_progress",
+                    "translation_status": "In Progress",
                     "payment_confirmed_at": datetime.utcnow(),
                     "updated_at": datetime.utcnow()
                 }
@@ -22086,6 +22143,135 @@ async def recover_all_orphaned_orders(admin_key: str):
     except Exception as e:
         logger.error(f"Error recovering all orders: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to recover orders")
+
+
+@api_router.get("/admin/recover-zelle-orders")
+async def recover_orphaned_zelle_orders(admin_key: str):
+    """
+    Recover orphaned Zelle orders that exist in db.orders but not in db.translation_orders.
+    This fixes the bug where Zelle orders were only inserted into db.orders but the admin
+    panel reads from db.translation_orders, making them invisible.
+    """
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        # Find all Zelle orders in the orders collection
+        zelle_orders = await db.orders.find({
+            "payment_method": "zelle"
+        }).sort("created_at", -1).to_list(500)
+
+        recovered = []
+        skipped = []
+        errors = []
+
+        for zelle_order in zelle_orders:
+            try:
+                order_id = zelle_order.get("id")
+
+                # Check if order already exists in translation_orders
+                existing = await db.translation_orders.find_one({
+                    "$or": [
+                        {"id": order_id},
+                        {"order_number": zelle_order.get("order_number")},
+                        {"quote_id": zelle_order.get("quote_id")}
+                    ]
+                })
+
+                if existing:
+                    skipped.append({
+                        "order_number": zelle_order.get("order_number"),
+                        "reason": f"Already exists in translation_orders: {existing.get('order_number')}"
+                    })
+                    continue
+
+                # Get quote details for additional fields
+                quote = None
+                if zelle_order.get("quote_id"):
+                    quote = await db.translation_quotes.find_one({"id": zelle_order["quote_id"]})
+
+                # Determine translation_status based on payment_status
+                payment_status = zelle_order.get("payment_status", "pending_zelle")
+                if payment_status == "paid":
+                    translation_status = "In Progress"
+                else:
+                    translation_status = "Received"
+
+                # Create the translation_order entry
+                translation_order = {
+                    "id": order_id,
+                    "order_number": zelle_order.get("order_number"),
+                    "quote_id": zelle_order.get("quote_id"),
+                    "partner_id": "website",
+                    "client_name": zelle_order.get("customer_name") or zelle_order.get("client_name", "Customer"),
+                    "client_email": zelle_order.get("customer_email") or "",
+                    "document_type": (quote or {}).get("reference", "Document") if quote else "Document",
+                    "service_type": zelle_order.get("service_type", "translation"),
+                    "translate_from": zelle_order.get("translate_from", ""),
+                    "translate_to": zelle_order.get("translate_to", ""),
+                    "word_count": zelle_order.get("word_count", 0),
+                    "page_count": max(1, math.ceil(zelle_order.get("word_count", 0) / 250)),
+                    "urgency": zelle_order.get("urgency", "no"),
+                    "notes": zelle_order.get("notes") or "Recovered Zelle order",
+                    "base_price": (quote or {}).get("base_price") if quote else None,
+                    "urgency_fee": (quote or {}).get("urgency_fee") if quote else None,
+                    "total_price": zelle_order.get("total_price"),
+                    "discount_amount": (quote or {}).get("discount_amount", 0) if quote else 0,
+                    "discount_code": (quote or {}).get("discount_code") if quote else None,
+                    "payment_status": payment_status,
+                    "payment_method": "zelle",
+                    "zelle_receipt_id": zelle_order.get("zelle_receipt_id"),
+                    "zelle_receipt_url": zelle_order.get("zelle_receipt_url"),
+                    "translation_status": translation_status,
+                    "source": "website",
+                    "revenue_source": "website",
+                    "document_ids": zelle_order.get("document_ids", []),
+                    "shipping_address": zelle_order.get("shipping_address"),
+                    "recovered_order": True,
+                    "created_at": zelle_order.get("created_at", datetime.utcnow()),
+                    "updated_at": datetime.utcnow()
+                }
+
+                await db.translation_orders.insert_one(translation_order)
+
+                # Link documents to the order
+                document_ids = zelle_order.get("document_ids", [])
+                if document_ids:
+                    await db.documents.update_many(
+                        {"id": {"$in": document_ids}},
+                        {"$set": {"order_id": order_id, "order_number": zelle_order.get("order_number")}}
+                    )
+
+                recovered.append({
+                    "order_number": zelle_order.get("order_number"),
+                    "customer_email": zelle_order.get("customer_email"),
+                    "customer_name": zelle_order.get("customer_name") or zelle_order.get("client_name"),
+                    "amount": zelle_order.get("total_price"),
+                    "payment_status": payment_status,
+                    "documents_count": len(document_ids)
+                })
+
+                logger.info(f"Recovered Zelle order {zelle_order.get('order_number')} into translation_orders")
+
+            except Exception as e:
+                errors.append({
+                    "order_number": zelle_order.get("order_number"),
+                    "error": str(e)
+                })
+
+        return {
+            "status": "success",
+            "recovered_count": len(recovered),
+            "skipped_count": len(skipped),
+            "error_count": len(errors),
+            "recovered_orders": recovered,
+            "skipped": skipped,
+            "errors": errors
+        }
+
+    except Exception as e:
+        logger.error(f"Error recovering Zelle orders: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to recover Zelle orders")
 
 
 # ==================== DISCOUNT CODES ====================
