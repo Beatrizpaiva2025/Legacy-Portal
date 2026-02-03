@@ -459,7 +459,7 @@ const getLetterheadHTML = (logoLeft, logoRight) => `
         </td>
     </tr>
 </table>
-<div style="width: 100%; height: 2px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 12px;"></div>`;
+<div style="width: 100%; height: 2px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 4px;"></div>`;
 
 // ==================== CONSTANTS ====================
 const STATUS_COLORS = {
@@ -519,7 +519,7 @@ const LANGUAGES = [
 
 const TRANSLATORS = [
   { name: "Admin (Self)", title: "Administrator", isAdmin: true },
-  { name: "Beatriz Paiva", title: "Managing Director" },
+  { name: "Beatriz Paiva", title: "Legal Representative" },
   { name: "Ana Clara", title: "Project Manager" },
   { name: "Yasmin Costa", title: "Certified Translator" },
   { name: "Noemi Santos", title: "Senior Translator" }
@@ -527,7 +527,7 @@ const TRANSLATORS = [
 
 const PROJECT_MANAGERS = [
   { name: "Ana Clara", title: "Project Manager" },
-  { name: "Beatriz Paiva", title: "Managing Director" }
+  { name: "Beatriz Paiva", title: "Legal Representative" }
 ];
 
 // Document Types for translation projects
@@ -5746,9 +5746,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             <div style="float: left; width: 60%;">
                 ${signatureImage
                   ? `<img src="${signatureImage}" alt="Signature" style="max-height: 40px; max-width: 180px; margin-bottom: 4px;" />`
-                  : `<div style="font-family: 'Brush Script MT', cursive; font-size: 24px; color: #1a365d; margin-bottom: 4px;">${translatorNameForCert || 'Beatriz Paiva'}</div>`}
-                <div style="font-weight: bold; font-size: 13px;">${translatorNameForCert || 'Beatriz Paiva'}</div>
-                <div style="font-weight: bold; font-size: 13px;">${translator?.title || 'Managing Director'}</div>
+                  : `<div style="font-family: 'Brush Script MT', cursive; font-size: 24px; color: #1a365d; margin-bottom: 4px;">Beatriz Paiva</div>`}
+                <div style="font-weight: bold; font-size: 13px;">Beatriz Paiva</div>
+                <div style="font-weight: bold; font-size: 13px;">Legal Representative</div>
+                <div style="font-size: 13px;">Legacy Translations Inc</div>
                 <div style="font-size: 13px; margin-top: 8px;">Dated: ${translationDate}</div>
             </div>
             <div style="float: right; width: 35%; text-align: right;">
@@ -5782,7 +5783,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
-        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 12px;"></div>`;
+        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 4px;"></div>`;
 
     // Translation pages - supports HTML content OR images (not both to avoid duplication)
     let translationPagesHTML = '';
@@ -5818,7 +5819,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     <div style="${idx > 0 ? 'page-break-before: always;' : ''} padding-top: 15px;">
         ${includeLetterhead ? letterheadHTML : ''}
         <div>
-            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Translation page ${idx + 1}" style="max-width: 100%; max-height: 7in; object-fit: contain; display: block; margin: 0 auto;" />
+            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Translation page ${idx + 1}" style="width: 100%; height: auto; max-height: none; border: none; object-fit: contain; display: block; margin: 0 auto;" />
         </div>
     </div>`).join('');
     }
@@ -6167,9 +6168,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           <div>
             ${signatureImage
               ? `<img src="${signatureImage}" alt="Signature" style="height: 60px; max-width: 200px; margin-bottom: 8px;" />`
-              : `<div style="font-family: cursive; font-size: 28px; color: #1a365d; margin-bottom: 8px;">${translator?.name || 'Beatriz Paiva'}</div>`}
-            <div style="font-size: 13px; font-weight: bold;">${translator?.name || 'Beatriz Paiva'}</div>
-            <div style="font-size: 13px; font-weight: bold;">${translator?.title || 'Managing Director'}</div>
+              : `<div style="font-family: cursive; font-size: 28px; color: #1a365d; margin-bottom: 8px;">Beatriz Paiva</div>`}
+            <div style="font-size: 13px; font-weight: bold;">Beatriz Paiva</div>
+            <div style="font-size: 13px; font-weight: bold;">Legal Representative</div>
+            <div style="font-size: 13px;">Legacy Translations Inc</div>
             <div style="font-size: 13px; margin-top: 4px;">Dated: ${new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York' })}</div>
           </div>
           <div style="text-align: center;">
@@ -6294,9 +6296,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             <div style="float: left; width: 60%;">
                 ${signatureImage
                   ? `<img src="${signatureImage}" alt="Signature" style="max-height: 40px; max-width: 180px; margin-bottom: 4px;" />`
-                  : `<div style="font-family: 'Brush Script MT', cursive; font-size: 24px; color: #1a365d; margin-bottom: 4px;">${translatorNameForCert || 'Beatriz Paiva'}</div>`}
-                <div style="font-weight: bold; font-size: 13px;">${translatorNameForCert || 'Beatriz Paiva'}</div>
-                <div style="font-weight: bold; font-size: 13px;">${translator?.title || 'Managing Director'}</div>
+                  : `<div style="font-family: 'Brush Script MT', cursive; font-size: 24px; color: #1a365d; margin-bottom: 4px;">Beatriz Paiva</div>`}
+                <div style="font-weight: bold; font-size: 13px;">Beatriz Paiva</div>
+                <div style="font-weight: bold; font-size: 13px;">Legal Representative</div>
+                <div style="font-size: 13px;">Legacy Translations Inc</div>
                 <div style="font-size: 13px; margin-top: 8px;">Dated: ${translationDate}</div>
             </div>
             <div style="float: right; width: 35%; text-align: right;">
@@ -6330,7 +6333,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
-        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 12px;"></div>`;
+        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 4px;"></div>`;
 
     // Translation pages HTML (with or without letterhead)
     // Content flows naturally across pages; CSS pagination + thead handles multi-page layout
@@ -7767,8 +7770,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     ) : (
                       <div className="mb-1" style={{fontFamily: 'Rage Italic, cursive', fontSize: '20px', color: '#1a365d'}}>Beatriz Paiva</div>
                   )}
-                  <div className="text-xs font-bold">{selectedTranslator || 'Beatriz Paiva'}</div>
-                  <div className="text-xs font-bold">{TRANSLATORS.find(t => t.name === selectedTranslator)?.title || 'Managing Director'}</div>
+                  <div className="text-xs font-bold">Beatriz Paiva</div>
+                  <div className="text-xs font-bold">Legal Representative</div>
+                  <div className="text-xs">Legacy Translations Inc</div>
                   <div className="text-xs mt-2">
                     Dated:{' '}
                     <input type="text" value={translationDate} onChange={(e) => setTranslationDate(e.target.value)} className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 w-28 focus:outline-none focus:border-blue-600" />
@@ -14026,9 +14030,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         <p class="body-text">This certification is valid for official use, including immigration, legal, and academic purposes.</p>
         <div class="footer-section">
           <div class="signature-block">
-            <div style="font-family: 'Times New Roman', serif; font-size: 18px; font-style: italic; color: #1a365d; margin-bottom: 2px;">${translatorName}</div>
-            <div class="signature-name">${translatorName}</div>
-            <div class="signature-title">Managing Director</div>
+            <div style="font-family: 'Times New Roman', serif; font-size: 18px; font-style: italic; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>
+            <div class="signature-name">Beatriz Paiva</div>
+            <div class="signature-title">Legal Representative</div>
+            <div style="font-size: 12px;">Legacy Translations Inc</div>
             <div class="signature-date">Dated: ${translationDate}</div>
           </div>
           <div class="stamp-container">
@@ -14075,7 +14080,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Times New Roman', Georgia, serif; font-size: 13px; line-height: 1.5; color: #333; padding: 0.2in 0.25in; }
     .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; }
-    .header-line { height: 3px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 12px; }
+    .header-line { height: 3px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 4px; }
     .logo-left { width: 130px; height: 55px; display: flex; align-items: center; }
     .logo-placeholder { width: 130px; height: 55px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #999; background: #fafafa; }
     .header-center { text-align: center; flex: 1; padding: 0 15px; }
@@ -26366,9 +26371,10 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         <p class="body-text">This certification is valid for official use, including immigration, legal, and academic purposes.</p>
         <div class="footer-section">
           <div class="signature-block">
-            <div style="font-family: 'Times New Roman', serif; font-size: 18px; font-style: italic; color: #1a365d; margin-bottom: 2px;">${translatorName}</div>
-            <div class="signature-name">${translatorName}</div>
-            <div class="signature-title">Managing Director</div>
+            <div style="font-family: 'Times New Roman', serif; font-size: 18px; font-style: italic; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>
+            <div class="signature-name">Beatriz Paiva</div>
+            <div class="signature-title">Legal Representative</div>
+            <div style="font-size: 12px;">Legacy Translations Inc</div>
             <div class="signature-date">Dated: ${translationDateStr}</div>
           </div>
           <div class="stamp-container">
@@ -26415,7 +26421,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Times New Roman', Georgia, serif; font-size: 13px; line-height: 1.5; color: #333; padding: 0.2in 0.25in; }
     .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; }
-    .header-line { height: 3px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 12px; }
+    .header-line { height: 3px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 4px; }
     .logo-left { width: 130px; height: 55px; display: flex; align-items: center; }
     .logo-placeholder { width: 130px; height: 55px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #999; background: #fafafa; }
     .header-center { text-align: center; flex: 1; padding: 0 15px; }
@@ -27009,8 +27015,9 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 ${signatureImage
                   ? `<img src="${signatureImage}" alt="Signature" style="max-height: 45px; max-width: 210px; object-fit: contain; margin-bottom: 2px;" />`
                   : `<div style="font-family: 'Rage Italic', cursive; font-size: 20px; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>`}
-                <div class="signature-name">${savedTranslatorName || 'Beatriz Paiva'}</div>
-                <div class="signature-title">Managing Director</div>
+                <div class="signature-name">Beatriz Paiva</div>
+                <div class="signature-title">Legal Representative</div>
+                <div style="font-size: 12px;">Legacy Translations Inc</div>
                 <div class="signature-date">Dated: ${translationDate}</div>
             </div>
             <div class="stamp-container">
@@ -27314,7 +27321,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         .header-line {
             height: 3px;
             background: linear-gradient(to right, #3B82F6, #60A5FA);
-            margin-bottom: 12px;
+            margin-bottom: 4px;
             border: none;
         }
         .logo-left { width: 130px; height: 55px; display: flex; align-items: center; }
