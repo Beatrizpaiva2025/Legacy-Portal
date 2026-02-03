@@ -25873,6 +25873,13 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   // PM Review edit mode
   const [pmReviewEditMode, setPmReviewEditMode] = useState(false);
 
+  // PM Proofreading error highlight state
+  const [highlightedPmErrorIndex, setHighlightedPmErrorIndex] = useState(null);
+
+  const handlePmErrorRowClick = (errorIndex, foundText) => {
+    setHighlightedPmErrorIndex(errorIndex === highlightedPmErrorIndex ? null : errorIndex);
+  };
+
   // Translator Assignment Modal state (for email invites)
   const [assigningTranslatorModal, setAssigningTranslatorModal] = useState(null);
   const [assignmentDetails, setAssignmentDetails] = useState({
@@ -28991,14 +28998,18 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     )}
 
                     {/* Observations */}
-                    {proofreadingResult.observacoes && proofreadingResult.observacoes.length > 0 && (
+                    {proofreadingResult.observacoes && (typeof proofreadingResult.observacoes === 'string' ? proofreadingResult.observacoes.length > 0 : proofreadingResult.observacoes.length > 0) && (
                       <div className="p-3 bg-blue-50 border border-blue-200 rounded">
                         <h5 className="text-xs font-bold text-blue-700 mb-2">📌 Observações:</h5>
-                        <ul className="text-[10px] text-gray-700 space-y-1">
-                          {proofreadingResult.observacoes.map((obs, idx) => (
-                            <li key={idx}>• {obs}</li>
-                          ))}
-                        </ul>
+                        {typeof proofreadingResult.observacoes === 'string' ? (
+                          <p className="text-[10px] text-gray-700">{proofreadingResult.observacoes}</p>
+                        ) : (
+                          <ul className="text-[10px] text-gray-700 space-y-1">
+                            {proofreadingResult.observacoes.map((obs, idx) => (
+                              <li key={idx}>• {typeof obs === 'string' ? obs : obs.texto || obs.observacao || JSON.stringify(obs)}</li>
+                            ))}
+                          </ul>
+                        )}
                       </div>
                     )}
 
