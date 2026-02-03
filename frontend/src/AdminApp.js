@@ -6750,14 +6750,14 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       </div>
 
       {/* Sub-tabs */}
-      {/* Translator access: ALL translator types can access TRANSLATE, REVIEW, PROOFREADING, and DELIVER */}
+      {/* Translator access: ALL translator types can access TRANSLATE, REVIEW; In-house also gets PROOFREADING, DELIVER, GLOSSARIES, TM, INSTRUCTIONS */}
       <div className="flex space-x-1 mb-4 border-b overflow-x-auto">
         {[
           { id: 'start', label: 'START', icon: '📝', roles: ['admin', 'pm', 'translator'] },
           { id: 'translate', label: 'TRANSLATION', icon: '📄', roles: ['admin', 'pm', 'translator'] },
           { id: 'review', label: 'REVIEW', icon: '📋', roles: ['admin', 'pm', 'translator_contractor', 'translator_inhouse'] },
           { id: 'proofreading', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm', 'translator_inhouse'] },
-          { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'pm'] },
+          { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'pm', 'translator_inhouse'] },
           { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin', 'pm', 'translator_inhouse'] },
           { id: 'tm', label: 'TM', icon: '🧠', roles: ['admin', 'pm', 'translator_inhouse'] },
           { id: 'instructions', label: 'INSTRUCTIONS', icon: '📋', roles: ['admin', 'pm', 'translator_inhouse'] }
