@@ -27971,6 +27971,15 @@ class PartnerAcquisition(BaseModel):
     approved_at: str = None
     paid_at: str = None
 
+class OutreachEmail(BaseModel):
+    id: str = None
+    acquisition_id: str
+    partner_name: str
+    partner_email: str
+    email_type: str = "first_contact"  # first_contact, followup_1, followup_2, followup_3
+    sent_at: str = None
+    sent_by: str = "admin"
+
 class SalespersonNotification(BaseModel):
     id: str = None
     salesperson_id: str
@@ -29743,6 +29752,374 @@ async def get_admin_payment_history(admin_key: str = Header(None)):
         "payments": payments,
         "total_paid": total_paid
     }
+
+# ============================================================
+# PARTNER OUTREACH EMAIL SYSTEM
+# ============================================================
+
+def get_outreach_first_contact_template() -> str:
+    """First contact email for partner prospecting"""
+    content = '''
+                            <p style="color: #1a2a4a; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
+                                Hello,
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                <strong style="color: #1a2a4a;">Legacy Translations</strong> is a certified translation company based in
+                                <strong style="color: #1a2a4a;">Boston, MA</strong>, with over <strong style="color: #1a2a4a;">15 years of experience</strong>
+                                specializing in Portuguese and Spanish, plus over 50 additional languages. We serve law firms, agencies,
+                                universities, and institutions handling immigration and legal documentation across the United States.
+                            </p>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #f8f6ef 0%, #faf7ed 100%); border-left: 4px solid #c9a227; border-radius: 0 8px 8px 0; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 20px 25px;">
+                                        <p style="color: #1a2a4a; font-size: 15px; font-weight: 600; margin: 0 0 8px 0;">
+                                            What sets us apart:
+                                        </p>
+                                        <p style="color: #4a5568; font-size: 14px; line-height: 1.6; margin: 0;">
+                                            We are the <strong style="color: #1a2a4a;">only translation company offering digital QR Code verification</strong>
+                                            &ndash; allowing any institution to instantly verify document authenticity.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                            <p style="color: #1a2a4a; font-size: 16px; font-weight: 600; margin: 25px 0 15px 0;">
+                                Benefits include:
+                            </p>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                <tr><td style="padding: 8px 0;"><table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr><td style="vertical-align: top; padding-right: 12px;"><span style="color: #c9a227; font-size: 16px; font-weight: bold;">&#10003;</span></td><td style="color: #4a5568; font-size: 14px; line-height: 1.6;"><strong style="color: #1a2a4a;">100% USCIS acceptance rate</strong></td></tr></table></td></tr>
+                                <tr><td style="padding: 8px 0;"><table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr><td style="vertical-align: top; padding-right: 12px;"><span style="color: #c9a227; font-size: 16px; font-weight: bold;">&#10003;</span></td><td style="color: #4a5568; font-size: 14px; line-height: 1.6;"><strong style="color: #1a2a4a;">24-hour priority turnaround</strong></td></tr></table></td></tr>
+                                <tr><td style="padding: 8px 0;"><table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr><td style="vertical-align: top; padding-right: 12px;"><span style="color: #c9a227; font-size: 16px; font-weight: bold;">&#10003;</span></td><td style="color: #4a5568; font-size: 14px; line-height: 1.6;"><strong style="color: #1a2a4a;">$16.24 to $24.99/page</strong>, depending on monthly volume</td></tr></table></td></tr>
+                                <tr><td style="padding: 8px 0;"><table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr><td style="vertical-align: top; padding-right: 12px;"><span style="color: #c9a227; font-size: 16px; font-weight: bold;">&#10003;</span></td><td style="color: #4a5568; font-size: 14px; line-height: 1.6;"><strong style="color: #1a2a4a;">Net 15/30 invoicing</strong> (after qualification)</td></tr></table></td></tr>
+                                <tr><td style="padding: 8px 0;"><table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr><td style="vertical-align: top; padding-right: 12px;"><span style="color: #c9a227; font-size: 16px; font-weight: bold;">&#10003;</span></td><td style="color: #4a5568; font-size: 14px; line-height: 1.6;"><strong style="color: #1a2a4a;">Dedicated online portal</strong> for order tracking</td></tr></table></td></tr>
+                                <tr><td style="padding: 8px 0;"><table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr><td style="vertical-align: top; padding-right: 12px;"><span style="color: #c9a227; font-size: 16px; font-weight: bold;">&#10003;</span></td><td style="color: #4a5568; font-size: 14px; line-height: 1.6;"><strong style="color: #1a2a4a;">Support in Portuguese, Spanish, and English</strong></td></tr></table></td></tr>
+                            </table>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 25px 0 30px 0;">
+                                I'd welcome the opportunity to discuss how we can support your translation needs.
+                            </p>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                <tr><td align="center" style="padding-bottom: 12px;">
+                                    <a href="https://portal.legacytranslations.com/partner" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #c9a227 0%, #d4af37 100%); color: #1a2a4a; text-decoration: none; padding: 16px 40px; border-radius: 50px; font-size: 15px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(201, 162, 39, 0.4); width: 280px; text-align: center;">REGISTER FOR ACCESS</a>
+                                </td></tr>
+                                <tr><td align="center" style="padding-top: 8px;">
+                                    <a href="https://calendly.com/legacytranslations/30min" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); color: #ffffff; text-decoration: none; padding: 14px 40px; border-radius: 50px; font-size: 14px; font-weight: 600; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(26, 42, 74, 0.3); width: 280px; text-align: center;">SCHEDULE A BRIEF CALL</a>
+                                </td></tr>
+                            </table>'''
+    signature = get_outreach_signature()
+    return get_email_header() + content + signature + get_email_footer()
+
+
+def get_outreach_followup1_template(partner_name: str) -> str:
+    """Follow-up 1 (Day 3): Free trial translation offer"""
+    content = f'''
+                            <p style="color: #1a2a4a; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
+                                Hello,
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                I recently reached out about how <strong style="color: #1a2a4a;">Legacy Translations</strong> can support
+                                <strong style="color: #1a2a4a;">{partner_name}</strong> with certified translation services. I wanted to follow up
+                                with a special opportunity.
+                            </p>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #f0faf0 0%, #e8f5e8 100%); border-left: 4px solid #22c55e; border-radius: 0 8px 8px 0; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 25px;">
+                                        <p style="color: #1a2a4a; font-size: 16px; font-weight: 700; margin: 0 0 10px 0;">
+                                            Try us &mdash; Your first translation is on us!
+                                        </p>
+                                        <p style="color: #4a5568; font-size: 14px; line-height: 1.6; margin: 0;">
+                                            We'd love for you to experience our quality firsthand. Register on our portal and submit your
+                                            first document &mdash; <strong style="color: #22c55e;">completely free of charge</strong>.
+                                            See our turnaround time, QR code verification, and professional formatting before committing
+                                            to any partnership.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                            <p style="color: #1a2a4a; font-size: 16px; font-weight: 600; margin: 25px 0 15px 0;">
+                                What you'll experience:
+                            </p>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                <tr><td style="padding: 6px 0;"><span style="color: #c9a227; margin-right: 10px;">&#9654;</span><span style="color: #4a5568; font-size: 14px;">Fast, professional certified translation</span></td></tr>
+                                <tr><td style="padding: 6px 0;"><span style="color: #c9a227; margin-right: 10px;">&#9654;</span><span style="color: #4a5568; font-size: 14px;">Digital QR code for instant document verification</span></td></tr>
+                                <tr><td style="padding: 6px 0;"><span style="color: #c9a227; margin-right: 10px;">&#9654;</span><span style="color: #4a5568; font-size: 14px;">Dedicated partner portal for tracking orders</span></td></tr>
+                                <tr><td style="padding: 6px 0;"><span style="color: #c9a227; margin-right: 10px;">&#9654;</span><span style="color: #4a5568; font-size: 14px;">Support in Portuguese, Spanish, and English</span></td></tr>
+                            </table>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 25px 0 30px 0;">
+                                No commitment required &mdash; just a chance to see our work quality for yourself.
+                            </p>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                <tr><td align="center">
+                                    <a href="https://portal.legacytranslations.com/partner" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 50px; font-size: 15px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(34, 197, 94, 0.4); width: 280px; text-align: center;">CLAIM YOUR FREE TRANSLATION</a>
+                                </td></tr>
+                            </table>'''
+    signature = get_outreach_signature()
+    return get_email_header() + content + signature + get_email_footer()
+
+
+def get_outreach_followup2_template(partner_name: str) -> str:
+    """Follow-up 2 (Day 7): Social proof + reminder"""
+    content = f'''
+                            <p style="color: #1a2a4a; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
+                                Hello,
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                I wanted to share some quick numbers that show why firms like <strong style="color: #1a2a4a;">{partner_name}</strong>
+                                trust Legacy Translations for their certified translation needs.
+                            </p>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 25px 0;">
+                                <tr>
+                                    <td style="background: #1a2a4a; border-radius: 8px; padding: 25px; text-align: center;" width="33%">
+                                        <p style="color: #c9a227; font-size: 28px; font-weight: 700; margin: 0;">15+</p>
+                                        <p style="color: #a0aec0; font-size: 12px; margin: 5px 0 0;">Years of Experience</p>
+                                    </td>
+                                    <td width="10"></td>
+                                    <td style="background: #1a2a4a; border-radius: 8px; padding: 25px; text-align: center;" width="33%">
+                                        <p style="color: #c9a227; font-size: 28px; font-weight: 700; margin: 0;">100%</p>
+                                        <p style="color: #a0aec0; font-size: 12px; margin: 5px 0 0;">USCIS Acceptance</p>
+                                    </td>
+                                    <td width="10"></td>
+                                    <td style="background: #1a2a4a; border-radius: 8px; padding: 25px; text-align: center;" width="33%">
+                                        <p style="color: #c9a227; font-size: 28px; font-weight: 700; margin: 0;">50+</p>
+                                        <p style="color: #a0aec0; font-size: 12px; margin: 5px 0 0;">Languages</p>
+                                    </td>
+                                </tr>
+                            </table>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: #f8fafc; border-radius: 8px; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 20px 25px;">
+                                        <p style="color: #64748b; font-size: 14px; font-style: italic; line-height: 1.6; margin: 0 0 10px 0;">
+                                            "Legacy Translations has been an incredible partner for our firm. Their QR code verification
+                                            gives our clients confidence, and their turnaround time is unmatched."
+                                        </p>
+                                        <p style="color: #1a2a4a; font-size: 13px; font-weight: 600; margin: 0;">
+                                            &mdash; Immigration Law Firm, Boston MA
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 20px 0;">
+                                Your <strong style="color: #22c55e;">free trial translation</strong> offer is still available. Register and submit one document
+                                &mdash; no cost, no commitment. See why our partners stay with us.
+                            </p>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                <tr><td align="center" style="padding-bottom: 12px;">
+                                    <a href="https://portal.legacytranslations.com/partner" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #c9a227 0%, #d4af37 100%); color: #1a2a4a; text-decoration: none; padding: 16px 40px; border-radius: 50px; font-size: 15px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(201, 162, 39, 0.4); width: 280px; text-align: center;">START YOUR FREE TRIAL</a>
+                                </td></tr>
+                                <tr><td align="center" style="padding-top: 8px;">
+                                    <a href="https://calendly.com/legacytranslations/30min" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); color: #ffffff; text-decoration: none; padding: 14px 40px; border-radius: 50px; font-size: 14px; font-weight: 600; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(26, 42, 74, 0.3); width: 280px; text-align: center;">SCHEDULE A QUICK CALL</a>
+                                </td></tr>
+                            </table>'''
+    signature = get_outreach_signature()
+    return get_email_header() + content + signature + get_email_footer()
+
+
+def get_outreach_followup3_template(partner_name: str) -> str:
+    """Follow-up 3 (Day 14): Last approach + urgency"""
+    content = f'''
+                            <p style="color: #1a2a4a; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
+                                Hello,
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                I don't want to take up too much of your time, so this will be my last follow-up regarding our translation
+                                services for <strong style="color: #1a2a4a;">{partner_name}</strong>.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                I understand timing is everything. Whenever you're ready to explore a translation partner that offers
+                                <strong style="color: #1a2a4a;">digital QR verification</strong>, <strong style="color: #1a2a4a;">100% USCIS acceptance</strong>,
+                                and <strong style="color: #1a2a4a;">24-hour turnaround</strong>, we'll be here.
+                            </p>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #fef3c7 0%, #fef9c3 100%); border-left: 4px solid #f59e0b; border-radius: 0 8px 8px 0; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 20px 25px;">
+                                        <p style="color: #1a2a4a; font-size: 15px; font-weight: 600; margin: 0 0 8px 0;">
+                                            Your free translation offer remains open
+                                        </p>
+                                        <p style="color: #4a5568; font-size: 14px; line-height: 1.6; margin: 0;">
+                                            Register on our portal, submit one document, and experience our quality firsthand &mdash;
+                                            <strong>completely free</strong>. No strings attached.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 20px 0 30px 0;">
+                                Feel free to reach out anytime. I'm always happy to help.
+                            </p>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                <tr><td align="center">
+                                    <a href="https://portal.legacytranslations.com/partner" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #c9a227 0%, #d4af37 100%); color: #1a2a4a; text-decoration: none; padding: 16px 40px; border-radius: 50px; font-size: 15px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(201, 162, 39, 0.4); width: 280px; text-align: center;">REGISTER FOR FREE TRIAL</a>
+                                </td></tr>
+                            </table>'''
+    signature = get_outreach_signature()
+    return get_email_header() + content + signature + get_email_footer()
+
+
+def get_outreach_signature() -> str:
+    """Beatriz Paiva signature for outreach emails"""
+    return '''
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 35px 0 0;">
+                                <tr>
+                                    <td style="border-top: 1px solid #e2e8f0; padding-top: 25px;">
+                                        <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 5px 0;">Best regards,</p>
+                                        <p style="color: #1a2a4a; font-size: 15px; font-weight: 700; margin: 0 0 2px 0;">Beatriz Paiva</p>
+                                        <p style="color: #64748b; font-size: 13px; margin: 0 0 2px 0;">Founder &amp; CEO</p>
+                                        <p style="color: #64748b; font-size: 13px; margin: 0 0 8px 0;">Legacy Translations Inc. &middot; Boston, MA</p>
+                                        <p style="color: #64748b; font-size: 13px; margin: 0;">
+                                            <a href="tel:+18572081139" style="color: #1a2a4a; text-decoration: none;">+1 857-208-1139</a>
+                                            &nbsp;|&nbsp;
+                                            <a href="mailto:contact@legacytranslations.com" style="color: #c9a227; text-decoration: none;">contact@legacytranslations.com</a>
+                                        </p>
+                                        <p style="color: #64748b; font-size: 13px; margin: 4px 0 0;">
+                                            <a href="https://www.legacytranslations.com" style="color: #c9a227; text-decoration: none;">www.legacytranslations.com</a>
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>'''
+
+
+# Outreach: Send email to partner
+@api_router.post("/admin/outreach/send")
+async def send_outreach_email(request: Request, admin_key: str = Header(None)):
+    if not admin_key:
+        raise HTTPException(status_code=401, detail="Admin key required")
+    data = await request.json()
+    acquisition_id = data.get("acquisition_id")
+    email_type = data.get("email_type", "first_contact")
+    partner_email = data.get("partner_email")
+    partner_name = data.get("partner_name")
+
+    if not partner_email:
+        raise HTTPException(status_code=400, detail="Partner email is required")
+
+    # Check if this email type was already sent for this acquisition
+    existing = await db.outreach_emails.find_one({
+        "acquisition_id": acquisition_id,
+        "email_type": email_type
+    })
+    if existing:
+        raise HTTPException(status_code=400, detail=f"Email '{email_type}' already sent to this partner")
+
+    # Generate appropriate template
+    subjects = {
+        "first_contact": "Certified Translation Services with Digital Verification",
+        "followup_1": f"A free translation for {partner_name} — try us risk-free",
+        "followup_2": f"Why firms trust Legacy Translations — plus your free trial",
+        "followup_3": f"Last follow-up — your free translation offer for {partner_name}"
+    }
+    templates = {
+        "first_contact": get_outreach_first_contact_template,
+        "followup_1": lambda: get_outreach_followup1_template(partner_name),
+        "followup_2": lambda: get_outreach_followup2_template(partner_name),
+        "followup_3": lambda: get_outreach_followup3_template(partner_name),
+    }
+
+    subject = subjects.get(email_type, subjects["first_contact"])
+    template_fn = templates.get(email_type, templates["first_contact"])
+    html_content = template_fn() if callable(template_fn) and email_type != "first_contact" else template_fn()
+
+    # Send via Resend
+    try:
+        email_service = EmailService()
+        await email_service.send_email(partner_email, subject, html_content)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
+
+    # Record in database
+    now = datetime.now().isoformat()
+    record = {
+        "id": secrets.token_hex(4),
+        "acquisition_id": acquisition_id,
+        "partner_name": partner_name,
+        "partner_email": partner_email,
+        "email_type": email_type,
+        "sent_at": now,
+        "sent_by": "admin"
+    }
+    await db.outreach_emails.insert_one(record)
+
+    return {"success": True, "message": f"Email '{email_type}' sent to {partner_email}"}
+
+
+# Outreach: Send bulk first contact emails
+@api_router.post("/admin/outreach/send-bulk")
+async def send_bulk_outreach_email(request: Request, admin_key: str = Header(None)):
+    if not admin_key:
+        raise HTTPException(status_code=401, detail="Admin key required")
+    data = await request.json()
+    partners = data.get("partners", [])
+    email_type = data.get("email_type", "first_contact")
+
+    results = {"sent": 0, "skipped": 0, "failed": 0, "details": []}
+    email_service = EmailService()
+
+    subjects = {
+        "first_contact": "Certified Translation Services with Digital Verification",
+        "followup_1": "A free translation for your firm — try us risk-free",
+        "followup_2": "Why firms trust Legacy Translations — plus your free trial",
+        "followup_3": "Last follow-up — your free translation offer"
+    }
+
+    for partner in partners:
+        acq_id = partner.get("acquisition_id")
+        p_email = partner.get("partner_email")
+        p_name = partner.get("partner_name")
+
+        if not p_email:
+            results["skipped"] += 1
+            results["details"].append({"partner": p_name, "status": "skipped", "reason": "No email"})
+            continue
+
+        # Check if already sent
+        existing = await db.outreach_emails.find_one({"acquisition_id": acq_id, "email_type": email_type})
+        if existing:
+            results["skipped"] += 1
+            results["details"].append({"partner": p_name, "status": "skipped", "reason": "Already sent"})
+            continue
+
+        # Generate template
+        if email_type == "first_contact":
+            html_content = get_outreach_first_contact_template()
+        elif email_type == "followup_1":
+            html_content = get_outreach_followup1_template(p_name)
+        elif email_type == "followup_2":
+            html_content = get_outreach_followup2_template(p_name)
+        else:
+            html_content = get_outreach_followup3_template(p_name)
+
+        subject = subjects.get(email_type, subjects["first_contact"])
+        if email_type != "first_contact":
+            subject = subject.replace("your firm", p_name).replace("your", p_name + "'s")
+
+        try:
+            await email_service.send_email(p_email, subject, html_content)
+            now = datetime.now().isoformat()
+            record = {
+                "id": secrets.token_hex(4),
+                "acquisition_id": acq_id,
+                "partner_name": p_name,
+                "partner_email": p_email,
+                "email_type": email_type,
+                "sent_at": now,
+                "sent_by": "admin"
+            }
+            await db.outreach_emails.insert_one(record)
+            results["sent"] += 1
+            results["details"].append({"partner": p_name, "status": "sent"})
+        except Exception as e:
+            results["failed"] += 1
+            results["details"].append({"partner": p_name, "status": "failed", "reason": str(e)})
+
+    return results
+
+
+# Outreach: Get outreach status for all acquisitions
+@api_router.get("/admin/outreach/status")
+async def get_outreach_status(admin_key: str = Header(None)):
+    if not admin_key:
+        raise HTTPException(status_code=401, detail="Admin key required")
+    emails = await db.outreach_emails.find().sort("sent_at", -1).to_list(1000)
+    for e in emails:
+        e["_id"] = str(e["_id"])
+    return emails
+
 
 # Include the router in the main app - MUST be after all api_router routes are defined
 app.include_router(api_router)
