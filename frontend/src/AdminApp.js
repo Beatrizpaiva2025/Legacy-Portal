@@ -19114,6 +19114,7 @@ const FollowupsPage = ({ adminKey }) => {
   const [error, setError] = useState('');
   const [selectedStage, setSelectedStage] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [togglingAuto, setTogglingAuto] = useState(false);
 
   const fetchFollowupStatus = async () => {
     setLoading(true);
@@ -19131,7 +19132,7 @@ const FollowupsPage = ({ adminKey }) => {
   const processFollowups = async () => {
     setProcessing(true);
     try {
-      const response = await axios.post(`${API}/admin/quotes/process-followups?admin_key=${adminKey}`);
+      const response = await axios.post(`${API}/admin/quotes/run-followups-now?admin_key=${adminKey}`);
       const result = response.data;
       const errorDetails = result.errors?.length > 0
         ? `\n\nErrors (${result.errors.length}):\n${result.errors.slice(0, 5).join('\n')}${result.errors.length > 5 ? `\n... and ${result.errors.length - 5} more` : ''}`
@@ -19149,8 +19150,24 @@ const FollowupsPage = ({ adminKey }) => {
     }
   };
 
+  const toggleAutoFollowup = async () => {
+    const currentEnabled = followupData?.auto_followup?.enabled !== false;
+    const newEnabled = !currentEnabled;
+    setTogglingAuto(true);
+    try {
+      await axios.post(`${API}/admin/quotes/toggle-auto-followup?admin_key=${adminKey}&enabled=${newEnabled}`);
+      showToast(`Follow-up automatico ${newEnabled ? 'ativado' : 'desativado'}`);
+      fetchFollowupStatus();
+    } catch (err) {
+      showToast('Erro ao alterar follow-up automatico');
+      console.error(err);
+    } finally {
+      setTogglingAuto(false);
+    }
+  };
+
   const excludeFromFollowup = async (quoteId, quoteType) => {
-    if (!window.confirm('Tem certeza que deseja remover este cliente do follow-up automático?')) {
+    if (!window.confirm('Tem certeza que deseja remover este cliente do follow-up automatico?')) {
       return;
     }
     try {
@@ -19184,6 +19201,20 @@ const FollowupsPage = ({ adminKey }) => {
     lost: { title: 'Marked Lost', color: 'gray' }
   };
 
+  const formatTimeAgo = (isoString) => {
+    if (!isoString) return 'Never';
+    const date = new Date(isoString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return `${diffDays}d ago`;
+  };
+
   useEffect(() => {
     fetchFollowupStatus();
   }, []);
@@ -19196,41 +19227,84 @@ const FollowupsPage = ({ adminKey }) => {
     );
   }
 
+  const autoEnabled = followupData?.auto_followup?.enabled !== false;
+  const lastRunAt = followupData?.auto_followup?.last_run_at;
+  const lastRunResult = followupData?.auto_followup?.last_run_result;
+  const summary = followupData?.summary || {};
+  const convertedViaFollowup = summary.converted_via_followup || 0;
+  const totalConverted = summary.total_converted || 0;
+  const followupRevenue = summary.followup_conversion_revenue || 0;
+  const totalActive = (summary.total_pending || 0) + (summary.needs_first_reminder || 0) + (summary.needs_second_reminder || 0) + (summary.needs_third_reminder || 0);
+  const conversionRate = (totalActive + convertedViaFollowup + (summary.marked_lost || 0)) > 0
+    ? Math.round((convertedViaFollowup / (totalActive + convertedViaFollowup + (summary.marked_lost || 0))) * 100)
+    : 0;
+
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto">
+        {/* Header with Auto Status */}
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-800">Quote Follow-up System</h1>
             <p className="text-gray-600 text-sm">Automated reminders for unconverted quotes</p>
           </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={processFollowups}
+              disabled={processing}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 flex items-center gap-2 text-sm"
+            >
+              {processing ? (
+                <>
+                  <span className="animate-spin">&#9203;</span>
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <span>&#9889;</span>
+                  Run Now
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Auto Follow-up Status Bar */}
+        <div className={`rounded-lg p-4 mb-6 flex items-center justify-between ${autoEnabled ? 'bg-green-50 border border-green-200' : 'bg-gray-100 border border-gray-300'}`}>
+          <div className="flex items-center gap-3">
+            <div className={`w-3 h-3 rounded-full ${autoEnabled ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+            <div>
+              <span className={`font-semibold text-sm ${autoEnabled ? 'text-green-800' : 'text-gray-600'}`}>
+                Auto Follow-up: {autoEnabled ? 'ACTIVE' : 'DISABLED'}
+              </span>
+              <span className="text-xs text-gray-500 ml-3">
+                Runs every 6 hours
+                {lastRunAt && ` | Last run: ${formatTimeAgo(lastRunAt)}`}
+                {lastRunResult && ` (${lastRunResult.reminders_sent} sent, ${lastRunResult.marked_lost} lost${lastRunResult.error_count > 0 ? `, ${lastRunResult.error_count} errors` : ''})`}
+              </span>
+            </div>
+          </div>
           <button
-            onClick={processFollowups}
-            disabled={processing}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 flex items-center gap-2"
+            onClick={toggleAutoFollowup}
+            disabled={togglingAuto}
+            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              autoEnabled
+                ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                : 'bg-green-100 text-green-700 hover:bg-green-200'
+            } disabled:opacity-50`}
           >
-            {processing ? (
-              <>
-                <span className="animate-spin">⏳</span>
-                Processing...
-              </>
-            ) : (
-              <>
-                <span>🚀</span>
-                Process Follow-ups Now
-              </>
-            )}
+            {togglingAuto ? '...' : autoEnabled ? 'Disable' : 'Enable'}
           </button>
         </div>
 
-        {/* Summary Cards - Clickable */}
+        {/* Summary Cards - 7 columns with Converted */}
         {followupData?.summary && (
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-7 gap-3 mb-6">
             <div
               onClick={() => openStageModal('pending')}
               className="bg-white rounded-lg shadow p-4 text-center cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-gray-300"
             >
-              <div className="text-3xl font-bold text-gray-600">{followupData.summary.total_pending}</div>
+              <div className="text-3xl font-bold text-gray-600">{summary.total_pending}</div>
               <div className="text-xs text-gray-500">Pending (0-3 days)</div>
               <div className="text-xs text-gray-400 mt-1">Click to view</div>
             </div>
@@ -19238,7 +19312,7 @@ const FollowupsPage = ({ adminKey }) => {
               onClick={() => openStageModal('first')}
               className="bg-yellow-50 rounded-lg shadow p-4 text-center border border-yellow-200 cursor-pointer hover:shadow-lg transition-shadow hover:border-yellow-400"
             >
-              <div className="text-3xl font-bold text-yellow-600">{followupData.summary.needs_first_reminder}</div>
+              <div className="text-3xl font-bold text-yellow-600">{summary.needs_first_reminder}</div>
               <div className="text-xs text-yellow-700">Need 1st Reminder</div>
               <div className="text-xs text-yellow-500 mt-1">Click to view</div>
             </div>
@@ -19246,7 +19320,7 @@ const FollowupsPage = ({ adminKey }) => {
               onClick={() => openStageModal('second')}
               className="bg-blue-50 rounded-lg shadow p-4 text-center border border-blue-200 cursor-pointer hover:shadow-lg transition-shadow hover:border-blue-400"
             >
-              <div className="text-3xl font-bold text-blue-600">{followupData.summary.needs_second_reminder}</div>
+              <div className="text-3xl font-bold text-blue-600">{summary.needs_second_reminder}</div>
               <div className="text-xs text-blue-700">Need 2nd Reminder (10%)</div>
               <div className="text-xs text-blue-500 mt-1">Click to view</div>
             </div>
@@ -19254,17 +19328,31 @@ const FollowupsPage = ({ adminKey }) => {
               onClick={() => openStageModal('third')}
               className="bg-red-50 rounded-lg shadow p-4 text-center border border-red-200 cursor-pointer hover:shadow-lg transition-shadow hover:border-red-400"
             >
-              <div className="text-3xl font-bold text-red-600">{followupData.summary.needs_third_reminder}</div>
+              <div className="text-3xl font-bold text-red-600">{summary.needs_third_reminder}</div>
               <div className="text-xs text-red-700">Need 3rd Reminder (15%)</div>
               <div className="text-xs text-red-500 mt-1">Click to view</div>
+            </div>
+            <div
+              className="bg-green-50 rounded-lg shadow p-4 text-center border border-green-200"
+            >
+              <div className="text-3xl font-bold text-green-600">{convertedViaFollowup}</div>
+              <div className="text-xs text-green-700">Converted via Follow-up</div>
+              <div className="text-xs text-green-500 mt-1">${followupRevenue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
             </div>
             <div
               onClick={() => openStageModal('lost')}
               className="bg-gray-100 rounded-lg shadow p-4 text-center cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-gray-400"
             >
-              <div className="text-3xl font-bold text-gray-500">{followupData.summary.marked_lost}</div>
+              <div className="text-3xl font-bold text-gray-500">{summary.marked_lost}</div>
               <div className="text-xs text-gray-500">Marked Lost</div>
               <div className="text-xs text-gray-400 mt-1">Click to view</div>
+            </div>
+            <div
+              className="bg-teal-50 rounded-lg shadow p-4 text-center border border-teal-200"
+            >
+              <div className="text-3xl font-bold text-teal-600">{conversionRate}%</div>
+              <div className="text-xs text-teal-700">Conversion Rate</div>
+              <div className="text-xs text-teal-500 mt-1">{totalConverted} total recovered</div>
             </div>
           </div>
         )}
@@ -19344,10 +19432,10 @@ const FollowupsPage = ({ adminKey }) => {
         )}
 
         {/* Abandoned Quotes Table */}
-        {followupData?.tabndoned_quotes?.length > 0 && (
-          <div className="bg-white rounded-lg shadow">
+        {followupData?.abandoned_quotes?.length > 0 && (
+          <div className="bg-white rounded-lg shadow mb-6">
             <div className="px-4 py-3 border-b bg-gray-50">
-              <h3 className="font-semibold text-gray-800">Abandoned Quotes ({followupData.tabndoned_quotes.length})</h3>
+              <h3 className="font-semibold text-gray-800">Abandoned Quotes ({followupData.abandoned_quotes.length})</h3>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -19363,7 +19451,7 @@ const FollowupsPage = ({ adminKey }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {followupData.tabndoned_quotes.map((quote, idx) => (
+                  {followupData.abandoned_quotes.map((quote, idx) => (
                     <tr key={idx} className="border-t hover:bg-gray-50">
                       <td className="px-4 py-2 font-medium">{quote.name}</td>
                       <td className="px-4 py-2 text-gray-600">{quote.email}</td>
@@ -19376,7 +19464,7 @@ const FollowupsPage = ({ adminKey }) => {
                           quote.status === 'recovered' ? 'bg-green-100 text-green-700' :
                           'bg-yellow-100 text-yellow-700'
                         }`}>
-                          {quote.status || 'tabndoned'}
+                          {quote.status || 'abandoned'}
                         </span>
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-600">{quote.next_action}</td>
@@ -19388,9 +19476,9 @@ const FollowupsPage = ({ adminKey }) => {
           </div>
         )}
 
-        {(!followupData?.quote_orders?.length && !followupData?.tabndoned_quotes?.length) && (
+        {(!followupData?.quote_orders?.length && !followupData?.abandoned_quotes?.length) && (
           <div className="bg-white rounded-lg shadow p-8 text-center">
-            <div className="text-6xl mb-4">✅</div>
+            <div className="text-6xl mb-4">&#9989;</div>
             <h3 className="text-lg font-semibold text-gray-700">All caught up!</h3>
             <p className="text-gray-500">No quotes requiring follow-up at this time.</p>
           </div>
@@ -19413,7 +19501,7 @@ const FollowupsPage = ({ adminKey }) => {
                   onClick={() => setShowModal(false)}
                   className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
                 >
-                  ×
+                  x
                 </button>
               </div>
               <div className="p-6 overflow-y-auto max-h-[60vh]">
@@ -19428,7 +19516,7 @@ const FollowupsPage = ({ adminKey }) => {
                         <th className="px-4 py-2 text-right">Valor</th>
                         <th className="px-4 py-2 text-center">Dias</th>
                         <th className="px-4 py-2 text-center">Reminders</th>
-                        <th className="px-4 py-2 text-center">Ações</th>
+                        <th className="px-4 py-2 text-center">Acoes</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -19448,7 +19536,7 @@ const FollowupsPage = ({ adminKey }) => {
                             <button
                               onClick={() => excludeFromFollowup(client.id, client.type)}
                               className="px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 text-xs font-medium"
-                              title="Remover do follow-up automático"
+                              title="Remover do follow-up automatico"
                             >
                               Excluir
                             </button>
