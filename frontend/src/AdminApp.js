@@ -519,7 +519,7 @@ const LANGUAGES = [
 
 const TRANSLATORS = [
   { name: "Admin (Self)", title: "Administrator", isAdmin: true },
-  { name: "Beatriz Paiva", title: "Legal Representative" },
+  { name: "Beatriz Paiva", title: "Authorized Representative" },
   { name: "Ana Clara", title: "Project Manager" },
   { name: "Yasmin Costa", title: "Certified Translator" },
   { name: "Noemi Santos", title: "Senior Translator" }
@@ -527,7 +527,7 @@ const TRANSLATORS = [
 
 const PROJECT_MANAGERS = [
   { name: "Ana Clara", title: "Project Manager" },
-  { name: "Beatriz Paiva", title: "Legal Representative" }
+  { name: "Beatriz Paiva", title: "Authorized Representative" }
 ];
 
 // Document Types for translation projects
@@ -5655,7 +5655,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           page_count: quickTranslationFiles.length || 1,
           document_content: translationContent,
           certifier_name: translator?.name || 'Beatriz Paiva',
-          certifier_title: 'Legal Representative',
+          certifier_title: 'Authorized Representative',
           certifier_credentials: 'ATA Member # 275993',
           company_name: certCompanyName || 'Legacy Translations Inc.',
           company_address: certCompanyAddress || '867 Boylston Street, 5th Floor, #2073, Boston, MA 02116',
@@ -5748,8 +5748,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   ? `<img src="${signatureImage}" alt="Signature" style="max-height: 40px; max-width: 180px; margin-bottom: 4px;" />`
                   : `<div style="font-family: 'Brush Script MT', cursive; font-size: 24px; color: #1a365d; margin-bottom: 4px;">Beatriz Paiva</div>`}
                 <div style="font-weight: bold; font-size: 13px;">Beatriz Paiva</div>
-                <div style="font-weight: bold; font-size: 13px;">Legal Representative</div>
-                <div style="font-size: 13px;">Legacy Translations Inc</div>
+                <div style="font-weight: bold; font-size: 13px;">Authorized Representative</div>
+                <div style="font-size: 13px;">Legacy Translations Inc.</div>
                 <div style="font-size: 13px; margin-top: 8px;">Dated: ${translationDate}</div>
             </div>
             <div style="float: right; width: 35%; text-align: right;">
@@ -6079,7 +6079,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         page_count: translationResults.length,
         document_content: translationContent,
         certifier_name: translator?.name || 'Beatriz Paiva',
-        certifier_title: 'Legal Representative',
+        certifier_title: 'Authorized Representative',
         certifier_credentials: 'ATA Member # 275993',
         company_name: certCompanyName || 'Legacy Translations Inc.',
         company_address: certCompanyAddress || '867 Boylston Street, 5th Floor, #2073, Boston, MA 02116',
@@ -6170,8 +6170,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               ? `<img src="${signatureImage}" alt="Signature" style="height: 60px; max-width: 200px; margin-bottom: 8px;" />`
               : `<div style="font-family: cursive; font-size: 28px; color: #1a365d; margin-bottom: 8px;">Beatriz Paiva</div>`}
             <div style="font-size: 13px; font-weight: bold;">Beatriz Paiva</div>
-            <div style="font-size: 13px; font-weight: bold;">Legal Representative</div>
-            <div style="font-size: 13px;">Legacy Translations Inc</div>
+            <div style="font-size: 13px; font-weight: bold;">Authorized Representative</div>
+            <div style="font-size: 13px;">Legacy Translations Inc.</div>
             <div style="font-size: 13px; margin-top: 4px;">Dated: ${new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York' })}</div>
           </div>
           <div style="text-align: center;">
@@ -6298,8 +6298,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   ? `<img src="${signatureImage}" alt="Signature" style="max-height: 40px; max-width: 180px; margin-bottom: 4px;" />`
                   : `<div style="font-family: 'Brush Script MT', cursive; font-size: 24px; color: #1a365d; margin-bottom: 4px;">Beatriz Paiva</div>`}
                 <div style="font-weight: bold; font-size: 13px;">Beatriz Paiva</div>
-                <div style="font-weight: bold; font-size: 13px;">Legal Representative</div>
-                <div style="font-size: 13px;">Legacy Translations Inc</div>
+                <div style="font-weight: bold; font-size: 13px;">Authorized Representative</div>
+                <div style="font-size: 13px;">Legacy Translations Inc.</div>
                 <div style="font-size: 13px; margin-top: 8px;">Dated: ${translationDate}</div>
             </div>
             <div style="float: right; width: 35%; text-align: right;">
@@ -7771,8 +7771,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       <div className="mb-1" style={{fontFamily: 'Rage Italic, cursive', fontSize: '20px', color: '#1a365d'}}>Beatriz Paiva</div>
                   )}
                   <div className="text-xs font-bold">Beatriz Paiva</div>
-                  <div className="text-xs font-bold">Legal Representative</div>
-                  <div className="text-xs">Legacy Translations Inc</div>
+                  <div className="text-xs font-bold">Authorized Representative</div>
+                  <div className="text-xs">Legacy Translations Inc.</div>
                   <div className="text-xs mt-2">
                     Dated:{' '}
                     <input type="text" value={translationDate} onChange={(e) => setTranslationDate(e.target.value)} className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 w-28 focus:outline-none focus:border-blue-600" />
@@ -14032,8 +14032,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
           <div class="signature-block">
             <div style="font-family: 'Times New Roman', serif; font-size: 18px; font-style: italic; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>
             <div class="signature-name">Beatriz Paiva</div>
-            <div class="signature-title">Legal Representative</div>
-            <div style="font-size: 12px;">Legacy Translations Inc</div>
+            <div class="signature-title">Authorized Representative</div>
+            <div style="font-size: 12px;">Legacy Translations Inc.</div>
             <div class="signature-date">Dated: ${translationDate}</div>
           </div>
           <div class="stamp-container">
@@ -26373,8 +26373,8 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
           <div class="signature-block">
             <div style="font-family: 'Times New Roman', serif; font-size: 18px; font-style: italic; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>
             <div class="signature-name">Beatriz Paiva</div>
-            <div class="signature-title">Legal Representative</div>
-            <div style="font-size: 12px;">Legacy Translations Inc</div>
+            <div class="signature-title">Authorized Representative</div>
+            <div style="font-size: 12px;">Legacy Translations Inc.</div>
             <div class="signature-date">Dated: ${translationDateStr}</div>
           </div>
           <div class="stamp-container">
@@ -27016,8 +27016,8 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   ? `<img src="${signatureImage}" alt="Signature" style="max-height: 45px; max-width: 210px; object-fit: contain; margin-bottom: 2px;" />`
                   : `<div style="font-family: 'Rage Italic', cursive; font-size: 20px; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>`}
                 <div class="signature-name">Beatriz Paiva</div>
-                <div class="signature-title">Legal Representative</div>
-                <div style="font-size: 12px;">Legacy Translations Inc</div>
+                <div class="signature-title">Authorized Representative</div>
+                <div style="font-size: 12px;">Legacy Translations Inc.</div>
                 <div class="signature-date">Dated: ${translationDate}</div>
             </div>
             <div class="stamp-container">
