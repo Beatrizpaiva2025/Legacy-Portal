@@ -10330,15 +10330,30 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         className="w-full h-full border-0 translation-preview-iframe"
                       />
                     ) : (
-                      <div
-                        contentEditable
-                        suppressContentEditableWarning
-                        dangerouslySetInnerHTML={{ __html: extractBodyForEdit(translationResults[selectedResultIndex]?.translatedText) }}
-                        onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
-                        onMouseUp={saveSelection}
-                        onKeyUp={saveSelection}
-                        className="p-3 text-xs focus:outline-none overflow-auto h-full"
-                        style={{width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
+                      <iframe
+                        ref={editableRef}
+                        srcDoc={(() => {
+                          const content = translationResults[selectedResultIndex]?.translatedText || '<p>No translation</p>';
+                          // Inject contenteditable into existing body tag, or wrap in editable body
+                          if (content.match(/<body/i)) {
+                            return content.replace(/<body([^>]*)>/i, '<body$1 contenteditable="true" style="outline:none; padding:12px; margin:0;">');
+                          }
+                          return `<!DOCTYPE html><html><head></head><body contenteditable="true" style="outline:none; padding:12px; margin:0;">${content}</body></html>`;
+                        })()}
+                        title="Translation Edit"
+                        className="w-full border-0"
+                        style={{width: '100%', height: '100%', border: '3px solid #10B981', borderRadius: '4px'}}
+                        onLoad={(e) => {
+                          const iframeDoc = e.target.contentDocument;
+                          if (iframeDoc && iframeDoc.body) {
+                            iframeDoc.body.contentEditable = 'true';
+                            iframeDoc.body.addEventListener('blur', () => {
+                              handleTranslationEdit(iframeDoc.body.innerHTML);
+                            });
+                            iframeDoc.addEventListener('mouseup', saveSelection);
+                            iframeDoc.addEventListener('keyup', saveSelection);
+                          }
+                        }}
                       />
                     )}
                   </div>
