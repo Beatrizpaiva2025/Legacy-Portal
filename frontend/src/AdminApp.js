@@ -2487,6 +2487,64 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const externalOriginalInputRef = useRef(null);
   const externalTranslationInputRef = useRef(null);
 
+  // Tooltip state for review tab buttons - persisted in localStorage
+  const [dismissedTooltips, setDismissedTooltips] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('review_dismissed_tooltips') || '{}');
+    } catch { return {}; }
+  });
+  const [activeTooltip, setActiveTooltip] = useState(null);
+  const tooltipTimerRef = useRef(null);
+
+  const dismissTooltip = (key) => {
+    const updated = { ...dismissedTooltips, [key]: true };
+    setDismissedTooltips(updated);
+    localStorage.setItem('review_dismissed_tooltips', JSON.stringify(updated));
+    setActiveTooltip(null);
+  };
+
+  const handleTooltipEnter = (key) => {
+    if (dismissedTooltips[key]) return;
+    tooltipTimerRef.current = setTimeout(() => setActiveTooltip(key), 400);
+  };
+
+  const handleTooltipLeave = () => {
+    if (tooltipTimerRef.current) clearTimeout(tooltipTimerRef.current);
+    setActiveTooltip(null);
+  };
+
+  const reviewTooltips = {
+    preview: 'View the translation with its original formatting preserved.',
+    edit: 'Edit the translation text directly. Use the toolbar for formatting.',
+    download: 'Download the translation as an HTML file to your computer.',
+    upload_translation: 'Upload a new translation file (Word, HTML, TXT, PDF or image).',
+    delete_translation: 'Delete the current translated page.',
+    upload_original: 'Upload the original document (image or PDF) for side-by-side comparison.',
+    delete_original: 'Delete the current original document page.'
+  };
+
+  // Tooltip component for review buttons
+  const ReviewTooltip = ({ id, children }) => (
+    <div className="relative inline-block"
+      onMouseEnter={() => handleTooltipEnter(id)}
+      onMouseLeave={handleTooltipLeave}
+    >
+      {children}
+      {activeTooltip === id && (
+        <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 bg-gray-900 text-white text-[10px] rounded-lg shadow-lg p-2.5" style={{pointerEvents: 'auto'}}>
+          <p className="mb-1.5 leading-relaxed">{reviewTooltips[id]}</p>
+          <label className="flex items-center gap-1.5 cursor-pointer text-gray-300 hover:text-white"
+            onClick={(e) => { e.stopPropagation(); dismissTooltip(id); }}
+          >
+            <input type="checkbox" className="rounded" style={{width: '10px', height: '10px'}} readOnly checked={false} />
+            <span>Don't show again</span>
+          </label>
+          <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-gray-900"></div>
+        </div>
+      )}
+    </div>
+  );
+
   // OCR Editor state
   const [ocrFontFamily, setOcrFontFamily] = useState('monospace');
   const [ocrFontSize, setOcrFontSize] = useState('12px');
@@ -9614,133 +9672,52 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 </div>
               )}
 
-              {/* View Mode Toggle + Download */}
-              <div className="flex items-center gap-2 mb-2">
-                <div className="inline-flex rounded-md shadow-sm" role="group">
-                  <button
-                    onClick={() => setReviewViewMode('preview')}
-                    className={`px-3 py-1 text-xs font-medium rounded-l-md border ${
-                      reviewViewMode === 'preview'
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                    }`}
-                  >
-                    Preview
-                  </button>
-                  <button
-                    onClick={() => setReviewViewMode('edit')}
-                    className={`px-3 py-1 text-xs font-medium rounded-r-md border-t border-b border-r ${
-                      reviewViewMode === 'edit'
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                    }`}
-                  >
-                    Edit
-                  </button>
-                </div>
-                <button
-                  onClick={() => {
-                    const content = translationResults[selectedResultIndex]?.translatedText || '';
-                    const blob = new Blob([`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Translation</title></head><body>${content}</body></html>`], { type: 'text/html' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `translation_${orderNumber || 'document'}.html`;
-                    a.click();
-                    URL.revokeObjectURL(url);
-                  }}
-                  className="px-3 py-1 text-xs font-medium bg-green-600 text-white rounded hover:bg-green-700"
-                >
-                  Download
-                </button>
-                {isContractor && (
-                  <button
-                    onClick={async () => {
-                      const content = translationResults[selectedResultIndex]?.translatedText || '';
-                      if (!content) {
-                        showToast('No translation to download');
-                        return;
-                      }
-                      try {
-                        const fullHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{font-family:'Times New Roman',serif;font-size:12pt;margin:20mm;}</style></head><body>${content}</body></html>`;
-                        const container = document.createElement('div');
-                        container.innerHTML = fullHtml;
-                        container.style.position = 'absolute';
-                        container.style.left = '-9999px';
-                        container.style.width = '210mm';
-                        document.body.appendChild(container);
-                        const pdfBlob = await html2pdf()
-                          .set({
-                            margin: [10, 10, 10, 10],
-                            filename: `translation_${orderNumber || 'document'}.pdf`,
-                            image: { type: 'jpeg', quality: 0.98 },
-                            html2canvas: { scale: 2, useCORS: true },
-                            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-                          })
-                          .from(container)
-                          .outputPdf('blob');
-                        document.body.removeChild(container);
-                        const url = URL.createObjectURL(pdfBlob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = `translation_${orderNumber || 'document'}.pdf`;
-                        a.click();
-                        URL.revokeObjectURL(url);
-                      } catch (err) {
-                        console.error('PDF download error:', err);
-                        showToast('Error generating PDF');
-                      }
-                    }}
-                    className="px-3 py-1 text-xs font-medium bg-red-600 text-white rounded hover:bg-red-700"
-                  >
-                    Download PDF
-                  </button>
-                )}
-              </div>
-
               {/* Side by side view: Original | Translation */}
               <div className="border rounded mb-4">
                 <div className="grid grid-cols-2 gap-0 bg-gray-100 border-b">
                   <div className="px-3 py-2 border-r flex items-center justify-between">
                     <span className="text-xs font-bold text-gray-700">Original Document</span>
                     <div className="flex items-center gap-1">
-                      <label className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded cursor-pointer hover:bg-blue-600">
-                        Upload
-                        <input
-                          type="file"
-                          accept="image/*,.pdf"
-                          className="hidden"
-                          onChange={(e) => {
-                            if (e.target.files && e.target.files[0]) {
-                              const file = e.target.files[0];
-                              const reader = new FileReader();
-                              reader.onload = (event) => {
-                                const newOriginalImages = [...originalImages];
-                                newOriginalImages[selectedResultIndex] = {
-                                  data: event.target.result,
-                                  filename: file.name
+                      <ReviewTooltip id="upload_original">
+                        <label className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded cursor-pointer hover:bg-blue-600">
+                          Upload
+                          <input
+                            type="file"
+                            accept="image/*,.pdf"
+                            className="hidden"
+                            onChange={(e) => {
+                              if (e.target.files && e.target.files[0]) {
+                                const file = e.target.files[0];
+                                const reader = new FileReader();
+                                reader.onload = (event) => {
+                                  const newOriginalImages = [...originalImages];
+                                  newOriginalImages[selectedResultIndex] = {
+                                    data: event.target.result,
+                                    filename: file.name
+                                  };
+                                  setOriginalImages(newOriginalImages);
                                 };
-                                setOriginalImages(newOriginalImages);
-                              };
-                              reader.readAsDataURL(file);
-                            }
-                          }}
-                        />
-                      </label>
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          />
+                        </label>
+                      </ReviewTooltip>
                       {originalImages[selectedResultIndex] && (
-                        <button
-                          onClick={() => {
-                            if (window.confirm('Are you sure you want to delete this original page?')) {
-                              const newOriginalImages = [...originalImages];
-                              newOriginalImages[selectedResultIndex] = null;
-                              setOriginalImages(newOriginalImages);
-                            }
-                          }}
-                          className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
-                          title="Delete original page"
-                        >
-                          Delete
-                        </button>
+                        <ReviewTooltip id="delete_original">
+                          <button
+                            onClick={() => {
+                              if (window.confirm('Are you sure you want to delete this original page?')) {
+                                const newOriginalImages = [...originalImages];
+                                newOriginalImages[selectedResultIndex] = null;
+                                setOriginalImages(newOriginalImages);
+                              }
+                            }}
+                            className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
+                          >
+                            Delete
+                          </button>
+                        </ReviewTooltip>
                       )}
                     </div>
                   </div>
@@ -9749,81 +9726,125 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       Translation ({targetLanguage}) - {reviewViewMode === 'preview' ? 'Preview' : 'Editing'}
                     </span>
                     <div className="flex items-center gap-1">
-                      <label className="px-2 py-1 bg-green-600 text-white text-[10px] rounded cursor-pointer hover:bg-green-700">
-                        Upload
-                        <input
-                          type="file"
-                          accept=".docx,.doc,.html,.htm,.txt,.pdf,image/*"
-                          className="hidden"
-                          onChange={async (e) => {
-                            if (e.target.files && e.target.files[0]) {
-                              const file = e.target.files[0];
-                              const fileName = file.name.toLowerCase();
-                              try {
-                                let html = '';
-                                if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
-                                  html = await convertWordToHtml(file);
-                                } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
-                                  html = await readHtmlFile(file);
-                                } else if (fileName.endsWith('.txt')) {
-                                  const text = await readTxtFile(file);
-                                  html = `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif; font-size: 12pt;">${text}</div>`;
-                                } else if (fileName.endsWith('.pdf')) {
-                                  const images = await convertPdfToImages(file);
-                                  html = images.map((img, idx) => `<div style="text-align:center;"><img src="data:${img.type};base64,${img.data}" style="max-width:100%; height:auto;" alt="${file.name} page ${idx + 1}" /></div>`).join('');
-                                } else if (file.type.startsWith('image/')) {
-                                  const dataUrl = await new Promise((resolve) => {
-                                    const reader = new FileReader();
-                                    reader.onload = () => resolve(reader.result);
-                                    reader.readAsDataURL(file);
-                                  });
-                                  html = `<div style="text-align:center;"><img src="${dataUrl}" style="max-width:100%; height:auto;" alt="${file.name}" /></div>`;
-                                }
-                                if (html) {
-                                  const updatedResults = [...translationResults];
-                                  updatedResults[selectedResultIndex] = {
-                                    ...updatedResults[selectedResultIndex],
-                                    translatedText: html,
-                                    filename: file.name
-                                  };
-                                  setTranslationResults(updatedResults);
-                                  showToast('Translation page replaced!');
-                                }
-                              } catch (err) {
-                                console.error('Upload error:', err);
-                                showToast('Error uploading file');
-                              }
-                              e.target.value = '';
-                            }
-                          }}
-                        />
-                      </label>
-                      {translationResults[selectedResultIndex]?.translatedText && (
+                      <ReviewTooltip id="preview">
+                        <button
+                          onClick={() => setReviewViewMode('preview')}
+                          className={`px-2 py-1 text-[10px] font-medium rounded ${
+                            reviewViewMode === 'preview'
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          Preview
+                        </button>
+                      </ReviewTooltip>
+                      <ReviewTooltip id="edit">
+                        <button
+                          onClick={() => setReviewViewMode('edit')}
+                          className={`px-2 py-1 text-[10px] font-medium rounded ${
+                            reviewViewMode === 'edit'
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          Edit
+                        </button>
+                      </ReviewTooltip>
+                      <ReviewTooltip id="download">
                         <button
                           onClick={() => {
-                            if (window.confirm('Are you sure you want to delete this translated page?')) {
-                              const updatedResults = [...translationResults];
-                              if (translationResults.length === 1) {
-                                updatedResults[0] = { ...updatedResults[0], translatedText: '', filename: '' };
-                                setTranslationResults(updatedResults);
-                              } else {
-                                updatedResults.splice(selectedResultIndex, 1);
-                                setTranslationResults(updatedResults);
-                                const newOriginalImages = [...originalImages];
-                                newOriginalImages.splice(selectedResultIndex, 1);
-                                setOriginalImages(newOriginalImages);
-                                if (selectedResultIndex >= updatedResults.length) {
-                                  setSelectedResultIndex(Math.max(0, updatedResults.length - 1));
-                                }
-                              }
-                              showToast('Page deleted!');
-                            }
+                            const content = translationResults[selectedResultIndex]?.translatedText || '';
+                            const blob = new Blob([`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Translation</title></head><body>${content}</body></html>`], { type: 'text/html' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `translation_${orderNumber || 'document'}.html`;
+                            a.click();
+                            URL.revokeObjectURL(url);
                           }}
-                          className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
-                          title="Delete translated page"
+                          className="px-2 py-1 bg-green-600 text-white text-[10px] rounded hover:bg-green-700"
                         >
-                          Delete
+                          Download
                         </button>
+                      </ReviewTooltip>
+                      <ReviewTooltip id="upload_translation">
+                        <label className="px-2 py-1 bg-green-600 text-white text-[10px] rounded cursor-pointer hover:bg-green-700">
+                          Upload
+                          <input
+                            type="file"
+                            accept=".docx,.doc,.html,.htm,.txt,.pdf,image/*"
+                            className="hidden"
+                            onChange={async (e) => {
+                              if (e.target.files && e.target.files[0]) {
+                                const file = e.target.files[0];
+                                const fileName = file.name.toLowerCase();
+                                try {
+                                  let html = '';
+                                  if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
+                                    html = await convertWordToHtml(file);
+                                  } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
+                                    html = await readHtmlFile(file);
+                                  } else if (fileName.endsWith('.txt')) {
+                                    const text = await readTxtFile(file);
+                                    html = `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif; font-size: 12pt;">${text}</div>`;
+                                  } else if (fileName.endsWith('.pdf')) {
+                                    const images = await convertPdfToImages(file);
+                                    html = images.map((img, idx) => `<div style="text-align:center;"><img src="data:${img.type};base64,${img.data}" style="max-width:100%; height:auto;" alt="${file.name} page ${idx + 1}" /></div>`).join('');
+                                  } else if (file.type.startsWith('image/')) {
+                                    const dataUrl = await new Promise((resolve) => {
+                                      const reader = new FileReader();
+                                      reader.onload = () => resolve(reader.result);
+                                      reader.readAsDataURL(file);
+                                    });
+                                    html = `<div style="text-align:center;"><img src="${dataUrl}" style="max-width:100%; height:auto;" alt="${file.name}" /></div>`;
+                                  }
+                                  if (html) {
+                                    const updatedResults = [...translationResults];
+                                    updatedResults[selectedResultIndex] = {
+                                      ...updatedResults[selectedResultIndex],
+                                      translatedText: html,
+                                      filename: file.name
+                                    };
+                                    setTranslationResults(updatedResults);
+                                    showToast('Translation page replaced!');
+                                  }
+                                } catch (err) {
+                                  console.error('Upload error:', err);
+                                  showToast('Error uploading file');
+                                }
+                                e.target.value = '';
+                              }
+                            }}
+                          />
+                        </label>
+                      </ReviewTooltip>
+                      {translationResults[selectedResultIndex]?.translatedText && (
+                        <ReviewTooltip id="delete_translation">
+                          <button
+                            onClick={() => {
+                              if (window.confirm('Are you sure you want to delete this translated page?')) {
+                                const updatedResults = [...translationResults];
+                                if (translationResults.length === 1) {
+                                  updatedResults[0] = { ...updatedResults[0], translatedText: '', filename: '' };
+                                  setTranslationResults(updatedResults);
+                                } else {
+                                  updatedResults.splice(selectedResultIndex, 1);
+                                  setTranslationResults(updatedResults);
+                                  const newOriginalImages = [...originalImages];
+                                  newOriginalImages.splice(selectedResultIndex, 1);
+                                  setOriginalImages(newOriginalImages);
+                                  if (selectedResultIndex >= updatedResults.length) {
+                                    setSelectedResultIndex(Math.max(0, updatedResults.length - 1));
+                                  }
+                                }
+                                showToast('Page deleted!');
+                              }
+                            }}
+                            className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
+                          >
+                            Delete
+                          </button>
+                        </ReviewTooltip>
                       )}
                     </div>
                   </div>
