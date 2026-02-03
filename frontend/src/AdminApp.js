@@ -30613,6 +30613,7 @@ const SalesControlPage = ({ adminKey }) => {
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Data</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Parceiro</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Email</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Tier</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Vendedor</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Comissão</th>
@@ -30627,6 +30628,17 @@ const SalesControlPage = ({ adminKey }) => {
                     <td className="px-4 py-3">
                       <p className="font-medium text-gray-800">{acq.partner_name}</p>
                       <p className="text-xs text-gray-400">ID: {acq.partner_id}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      {acq.partner_email ? (
+                        <a href={`mailto:${acq.partner_email}`} className="text-sm text-blue-600 hover:underline" title={acq.partner_email}>
+                          {acq.partner_email.length > 25 ? acq.partner_email.substring(0, 25) + '...' : acq.partner_email}
+                        </a>
+                      ) : (
+                        <span className="text-xs text-red-500 bg-red-50 px-2 py-1 rounded cursor-pointer" onClick={() => handleEditAcquisition(acq)} title="Clique para adicionar email">
+                          Sem email
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`px-3 py-1 rounded-full text-white text-xs font-medium ${tierColors[acq.partner_tier]}`}>
