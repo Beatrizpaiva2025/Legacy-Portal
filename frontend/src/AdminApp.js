@@ -9979,7 +9979,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           const iframeDoc = e.target.contentDocument;
                           if (iframeDoc && iframeDoc.body) {
                             iframeDoc.body.contentEditable = 'true';
-                            iframeDoc.addEventListener('input', () => {
+                            iframeDoc.body.addEventListener('blur', () => {
                               handleTranslationEdit(iframeDoc.body.innerHTML);
                             });
                             iframeDoc.addEventListener('mouseup', saveSelection);
