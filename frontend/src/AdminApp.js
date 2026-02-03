@@ -9609,14 +9609,49 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         const html = `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif; font-size: 12pt;">${text}</div>`;
                         setTranslationResults(prev => [...prev, { translatedText: html, originalText: '', filename: file.name }]);
                       } else if (fileName.endsWith('.pdf')) {
-                        setProcessingStatus(`Converting PDF: ${file.name}...`);
-                        const images = await convertPdfToImages(file, (page, total) => {
-                          setProcessingStatus(`Converting PDF page ${page}/${total}`);
+                        setProcessingStatus(`Extracting text from PDF: ${file.name}...`);
+                        const pdfData = await new Promise((resolve, reject) => {
+                          const reader = new FileReader();
+                          reader.onload = () => resolve(new Uint8Array(reader.result));
+                          reader.onerror = reject;
+                          reader.readAsArrayBuffer(file);
                         });
-                        images.forEach((img, idx) => {
-                          const imgHtml = `<div style="text-align:center;"><img src="data:${img.type};base64,${img.data}" style="max-width:100%; height:auto;" alt="${file.name} page ${idx + 1}" /></div>`;
-                          setTranslationResults(prev => [...prev, { translatedText: imgHtml, originalText: '', filename: `${file.name} - Page ${idx + 1}` }]);
-                        });
+                        const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
+                        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                          setProcessingStatus(`Extracting text: page ${pageNum}/${pdf.numPages}`);
+                          const page = await pdf.getPage(pageNum);
+                          const textContent = await page.getTextContent();
+                          const viewport = page.getViewport({ scale: 1 });
+                          let pageHtml = '';
+                          let lastY = null;
+                          let currentLine = '';
+                          textContent.items.forEach(item => {
+                            const y = Math.round(viewport.height - item.transform[5]);
+                            if (lastY !== null && Math.abs(y - lastY) > 5) {
+                              pageHtml += `<p style="margin:2px 0; font-family:'Times New Roman',serif; font-size:12pt;">${currentLine}</p>\n`;
+                              currentLine = '';
+                            }
+                            currentLine += item.str;
+                            lastY = y;
+                          });
+                          if (currentLine) {
+                            pageHtml += `<p style="margin:2px 0; font-family:'Times New Roman',serif; font-size:12pt;">${currentLine}</p>\n`;
+                          }
+                          if (!pageHtml.trim()) {
+                            // Fallback to image if no text found
+                            const scale = 3;
+                            const imgViewport = page.getViewport({ scale });
+                            const canvas = document.createElement('canvas');
+                            const ctx = canvas.getContext('2d');
+                            canvas.width = imgViewport.width;
+                            canvas.height = imgViewport.height;
+                            await page.render({ canvasContext: ctx, viewport: imgViewport }).promise;
+                            const dataUrl = canvas.toDataURL('image/png');
+                            pageHtml = `<div style="text-align:center;"><img src="${dataUrl}" style="max-width:100%; height:auto;" alt="${file.name} page ${pageNum}" /></div>`;
+                          }
+                          const wrappedHtml = `<div style="padding:10px;">${pageHtml}</div>`;
+                          setTranslationResults(prev => [...prev, { translatedText: wrappedHtml, originalText: '', filename: `${file.name} - Page ${pageNum}` }]);
+                        }
                       } else if (file.type.startsWith('image/')) {
                         const dataUrl = await new Promise((resolve) => {
                           const reader = new FileReader();
@@ -9788,8 +9823,42 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                     const text = await readTxtFile(file);
                                     html = `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif; font-size: 12pt;">${text}</div>`;
                                   } else if (fileName.endsWith('.pdf')) {
-                                    const images = await convertPdfToImages(file);
-                                    html = images.map((img, idx) => `<div style="text-align:center;"><img src="data:${img.type};base64,${img.data}" style="max-width:100%; height:auto;" alt="${file.name} page ${idx + 1}" /></div>`).join('');
+                                    const pdfData = await new Promise((resolve, reject) => {
+                                      const reader = new FileReader();
+                                      reader.onload = () => resolve(new Uint8Array(reader.result));
+                                      reader.onerror = reject;
+                                      reader.readAsArrayBuffer(file);
+                                    });
+                                    const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
+                                    let allPagesHtml = '';
+                                    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                                      const page = await pdf.getPage(pageNum);
+                                      const textContent = await page.getTextContent();
+                                      const viewport = page.getViewport({ scale: 1 });
+                                      let lastY = null;
+                                      let currentLine = '';
+                                      textContent.items.forEach(item => {
+                                        const y = Math.round(viewport.height - item.transform[5]);
+                                        if (lastY !== null && Math.abs(y - lastY) > 5) {
+                                          allPagesHtml += `<p style="margin:2px 0; font-family:'Times New Roman',serif; font-size:12pt;">${currentLine}</p>\n`;
+                                          currentLine = '';
+                                        }
+                                        currentLine += item.str;
+                                        lastY = y;
+                                      });
+                                      if (currentLine) {
+                                        allPagesHtml += `<p style="margin:2px 0; font-family:'Times New Roman',serif; font-size:12pt;">${currentLine}</p>\n`;
+                                      }
+                                      if (pageNum < pdf.numPages) {
+                                        allPagesHtml += '<hr style="margin:15px 0; border-top:1px dashed #ccc;" />\n';
+                                      }
+                                    }
+                                    if (!allPagesHtml.trim()) {
+                                      // Fallback to image if no text found
+                                      const images = await convertPdfToImages(file);
+                                      allPagesHtml = images.map((img, idx) => `<div style="text-align:center;"><img src="data:${img.type};base64,${img.data}" style="max-width:100%; height:auto;" alt="${file.name} page ${idx + 1}" /></div>`).join('');
+                                    }
+                                    html = `<div style="padding:10px;">${allPagesHtml}</div>`;
                                   } else if (file.type.startsWith('image/')) {
                                     const dataUrl = await new Promise((resolve) => {
                                       const reader = new FileReader();
