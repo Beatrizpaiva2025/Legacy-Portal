@@ -30013,6 +30013,9 @@ const SalesControlPage = ({ adminKey }) => {
   const [viewingAcquisition, setViewingAcquisition] = useState(null);
   const [editingAcquisition, setEditingAcquisition] = useState(null);
   const [editAcquisitionForm, setEditAcquisitionForm] = useState({});
+  const [outreachEmails, setOutreachEmails] = useState([]);
+  const [sendingOutreach, setSendingOutreach] = useState(null);
+  const [outreachResult, setOutreachResult] = useState(null);
   const [newGoal, setNewGoal] = useState({
     salesperson_id: '', month: new Date().toISOString().slice(0, 7), target_partners: 10, target_revenue: 5000
   });
@@ -30027,18 +30030,20 @@ const SalesControlPage = ({ adminKey }) => {
   const fetchAllData = async () => {
     setLoading(true);
     try {
-      const [spRes, acqRes, goalsRes, dashRes, rankRes, pendingRes, historyRes] = await Promise.all([
+      const [spRes, acqRes, goalsRes, dashRes, rankRes, pendingRes, historyRes, outreachRes] = await Promise.all([
         fetch(`${API_URL}/api/admin/salespeople`, { headers: { 'admin-key': adminKey } }),
         fetch(`${API_URL}/api/admin/partner-acquisitions`, { headers: { 'admin-key': adminKey } }),
         fetch(`${API_URL}/api/admin/sales-goals`, { headers: { 'admin-key': adminKey } }),
         fetch(`${API_URL}/api/admin/sales-dashboard`, { headers: { 'admin-key': adminKey } }),
         fetch(`${API_URL}/api/admin/salesperson-ranking`, { headers: { 'admin-key': adminKey } }),
         fetch(`${API_URL}/api/admin/pending-commissions`, { headers: { 'admin-key': adminKey } }),
-        fetch(`${API_URL}/api/admin/payment-history`, { headers: { 'admin-key': adminKey } })
+        fetch(`${API_URL}/api/admin/payment-history`, { headers: { 'admin-key': adminKey } }),
+        fetch(`${API_URL}/api/admin/outreach/status`, { headers: { 'admin-key': adminKey } })
       ]);
 
       if (spRes.ok) setSalespeople(await spRes.json());
       if (acqRes.ok) setAcquisitions(await acqRes.json());
+      if (outreachRes.ok) setOutreachEmails(await outreachRes.json());
       if (goalsRes.ok) setGoals(await goalsRes.json());
       if (dashRes.ok) setDashboard(await dashRes.json());
       if (rankRes.ok) {
@@ -30234,6 +30239,103 @@ const SalesControlPage = ({ adminKey }) => {
       console.error('Error updating acquisition:', error);
       showToast('Erro ao atualizar aquisição');
     }
+  };
+
+  // Outreach helpers
+  const getOutreachStatus = (acqId) => {
+    const sent = outreachEmails.filter(e => e.acquisition_id === acqId);
+    if (sent.find(e => e.email_type === 'followup_3')) return 'followup_3';
+    if (sent.find(e => e.email_type === 'followup_2')) return 'followup_2';
+    if (sent.find(e => e.email_type === 'followup_1')) return 'followup_1';
+    if (sent.find(e => e.email_type === 'first_contact')) return 'first_contact';
+    return 'not_contacted';
+  };
+
+  const getNextOutreachStep = (acqId) => {
+    const status = getOutreachStatus(acqId);
+    if (status === 'not_contacted') return 'first_contact';
+    if (status === 'first_contact') return 'followup_1';
+    if (status === 'followup_1') return 'followup_2';
+    if (status === 'followup_2') return 'followup_3';
+    return null; // all done
+  };
+
+  const outreachLabels = {
+    'not_contacted': { label: 'Não contatado', color: 'bg-gray-100 text-gray-600', dot: 'bg-gray-400' },
+    'first_contact': { label: '1o Contato enviado', color: 'bg-blue-100 text-blue-700', dot: 'bg-blue-500' },
+    'followup_1': { label: 'Follow-up 1 enviado', color: 'bg-yellow-100 text-yellow-700', dot: 'bg-yellow-500' },
+    'followup_2': { label: 'Follow-up 2 enviado', color: 'bg-orange-100 text-orange-700', dot: 'bg-orange-500' },
+    'followup_3': { label: 'Sequência completa', color: 'bg-green-100 text-green-700', dot: 'bg-green-500' }
+  };
+
+  const nextStepLabels = {
+    'first_contact': 'Enviar 1o Contato',
+    'followup_1': 'Enviar Follow-up 1 (Dia 3)',
+    'followup_2': 'Enviar Follow-up 2 (Dia 7)',
+    'followup_3': 'Enviar Follow-up 3 (Dia 14)'
+  };
+
+  const handleSendOutreach = async (acq, emailType) => {
+    if (!acq.partner_email) {
+      showToast('Este parceiro não tem email cadastrado. Edite para adicionar.');
+      return;
+    }
+    setSendingOutreach(acq.id + '_' + emailType);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/outreach/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'admin-key': adminKey },
+        body: JSON.stringify({
+          acquisition_id: acq.id,
+          email_type: emailType,
+          partner_email: acq.partner_email,
+          partner_name: acq.partner_name
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(`Email enviado para ${acq.partner_name}!`);
+        fetchAllData();
+      } else {
+        showToast(data.detail || 'Erro ao enviar email');
+      }
+    } catch (error) {
+      showToast('Erro ao enviar email');
+    }
+    setSendingOutreach(null);
+  };
+
+  const handleSendBulkOutreach = async (emailType) => {
+    const eligible = acquisitions.filter(acq => {
+      if (!acq.partner_email) return false;
+      const nextStep = getNextOutreachStep(acq.id);
+      return nextStep === emailType;
+    });
+    if (eligible.length === 0) {
+      showToast('Nenhum parceiro elegível para este envio.');
+      return;
+    }
+    if (!window.confirm(`Enviar "${nextStepLabels[emailType]}" para ${eligible.length} parceiro(s)?`)) return;
+    setSendingOutreach('bulk_' + emailType);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/outreach/send-bulk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'admin-key': adminKey },
+        body: JSON.stringify({
+          email_type: emailType,
+          partners: eligible.map(a => ({ acquisition_id: a.id, partner_email: a.partner_email, partner_name: a.partner_name }))
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setOutreachResult(data);
+        showToast(`Enviados: ${data.sent} | Ignorados: ${data.skipped} | Falhas: ${data.failed}`);
+        fetchAllData();
+      }
+    } catch (error) {
+      showToast('Erro ao enviar emails em lote');
+    }
+    setSendingOutreach(null);
   };
 
   const handleSetGoal = async () => {
@@ -30618,6 +30720,7 @@ const SalesControlPage = ({ adminKey }) => {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Vendedor</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Comissão</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Outreach</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Ações</th>
                 </tr>
               </thead>
@@ -30653,6 +30756,31 @@ const SalesControlPage = ({ adminKey }) => {
                       <span className={`px-2 py-1 rounded text-xs font-medium ${statusColors[acq.commission_status]}`}>
                         {acq.commission_status === 'pending' ? 'Pendente' : acq.commission_status === 'approved' ? 'Aprovado' : 'Pago'}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {(() => {
+                        const status = getOutreachStatus(acq.id);
+                        const info = outreachLabels[status];
+                        const nextStep = getNextOutreachStep(acq.id);
+                        return (
+                          <div className="flex flex-col gap-1">
+                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${info.color}`}>
+                              <span className={`w-2 h-2 rounded-full ${info.dot}`}></span>
+                              {info.label}
+                            </span>
+                            {nextStep && acq.partner_email && (
+                              <button
+                                onClick={() => handleSendOutreach(acq, nextStep)}
+                                disabled={sendingOutreach === acq.id + '_' + nextStep}
+                                className="px-2 py-1 bg-indigo-500 text-white text-xs rounded hover:bg-indigo-600 disabled:opacity-50"
+                                title={nextStepLabels[nextStep]}
+                              >
+                                {sendingOutreach === acq.id + '_' + nextStep ? 'Enviando...' : nextStepLabels[nextStep]}
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-1 flex-wrap">
@@ -30704,6 +30832,104 @@ const SalesControlPage = ({ adminKey }) => {
               </div>
             )}
           </div>
+
+          {/* Outreach Control Panel */}
+          {acquisitions.length > 0 && (
+            <div className="mt-6 bg-white rounded-xl shadow-sm p-6">
+              <h4 className="font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                <span>📧</span> Painel de Outreach
+              </h4>
+
+              {/* Stats */}
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+                {Object.entries(outreachLabels).map(([key, info]) => {
+                  const count = acquisitions.filter(a => getOutreachStatus(a.id) === key).length;
+                  return (
+                    <div key={key} className={`${info.color} rounded-lg p-3 text-center`}>
+                      <p className="text-2xl font-bold">{count}</p>
+                      <p className="text-xs mt-1">{info.label}</p>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Bulk Actions */}
+              <div className="border-t pt-4">
+                <p className="text-sm text-gray-500 mb-3">Envio em lote (apenas parceiros com email cadastrado e elegíveis para o próximo passo):</p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => handleSendBulkOutreach('first_contact')}
+                    disabled={sendingOutreach === 'bulk_first_contact'}
+                    className="px-4 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 disabled:opacity-50 transition-colors"
+                  >
+                    {sendingOutreach === 'bulk_first_contact' ? 'Enviando...' : `Enviar 1o Contato (${acquisitions.filter(a => a.partner_email && getNextOutreachStep(a.id) === 'first_contact').length})`}
+                  </button>
+                  <button
+                    onClick={() => handleSendBulkOutreach('followup_1')}
+                    disabled={sendingOutreach === 'bulk_followup_1'}
+                    className="px-4 py-2 bg-yellow-500 text-white text-sm rounded-lg hover:bg-yellow-600 disabled:opacity-50 transition-colors"
+                  >
+                    {sendingOutreach === 'bulk_followup_1' ? 'Enviando...' : `Follow-up 1 (${acquisitions.filter(a => a.partner_email && getNextOutreachStep(a.id) === 'followup_1').length})`}
+                  </button>
+                  <button
+                    onClick={() => handleSendBulkOutreach('followup_2')}
+                    disabled={sendingOutreach === 'bulk_followup_2'}
+                    className="px-4 py-2 bg-orange-500 text-white text-sm rounded-lg hover:bg-orange-600 disabled:opacity-50 transition-colors"
+                  >
+                    {sendingOutreach === 'bulk_followup_2' ? 'Enviando...' : `Follow-up 2 (${acquisitions.filter(a => a.partner_email && getNextOutreachStep(a.id) === 'followup_2').length})`}
+                  </button>
+                  <button
+                    onClick={() => handleSendBulkOutreach('followup_3')}
+                    disabled={sendingOutreach === 'bulk_followup_3'}
+                    className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                  >
+                    {sendingOutreach === 'bulk_followup_3' ? 'Enviando...' : `Follow-up 3 (${acquisitions.filter(a => a.partner_email && getNextOutreachStep(a.id) === 'followup_3').length})`}
+                  </button>
+                </div>
+              </div>
+
+              {/* Bulk Result */}
+              {outreachResult && (
+                <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                  <div className="flex justify-between items-center mb-2">
+                    <h5 className="font-medium text-gray-700">Resultado do envio em lote</h5>
+                    <button onClick={() => setOutreachResult(null)} className="text-gray-400 hover:text-gray-600 text-sm">Fechar</button>
+                  </div>
+                  <div className="flex gap-4 text-sm mb-2">
+                    <span className="text-green-600 font-medium">Enviados: {outreachResult.sent}</span>
+                    <span className="text-gray-500">Ignorados: {outreachResult.skipped}</span>
+                    <span className="text-red-500">Falhas: {outreachResult.failed}</span>
+                  </div>
+                  {outreachResult.details && outreachResult.details.length > 0 && (
+                    <div className="max-h-40 overflow-y-auto text-xs text-gray-500">
+                      {outreachResult.details.map((d, i) => (
+                        <div key={i} className="flex gap-2 py-1 border-b border-gray-100">
+                          <span className="font-medium">{d.partner}</span>
+                          <span className={d.status === 'sent' ? 'text-green-600' : d.status === 'skipped' ? 'text-yellow-600' : 'text-red-600'}>
+                            {d.status === 'sent' ? 'Enviado' : d.status === 'skipped' ? `Ignorado (${d.reason})` : `Falha (${d.reason})`}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Recommended Sequence */}
+              <div className="mt-4 p-4 bg-indigo-50 rounded-lg">
+                <p className="text-sm font-medium text-indigo-700 mb-2">Sequência recomendada:</p>
+                <div className="flex items-center gap-2 text-xs text-indigo-600">
+                  <span className="bg-blue-200 px-2 py-1 rounded">Dia 0: 1o Contato</span>
+                  <span>→</span>
+                  <span className="bg-yellow-200 px-2 py-1 rounded">Dia 3: Follow-up 1</span>
+                  <span>→</span>
+                  <span className="bg-orange-200 px-2 py-1 rounded">Dia 7: Follow-up 2</span>
+                  <span>→</span>
+                  <span className="bg-green-200 px-2 py-1 rounded">Dia 14: Follow-up 3</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
