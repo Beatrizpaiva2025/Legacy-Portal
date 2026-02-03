@@ -25,6 +25,7 @@ import re
 import math
 import httpx
 from contextlib import asynccontextmanager
+import asyncio
 import stripe
 import json
 import hashlib
@@ -21171,212 +21172,237 @@ async def send_abandoned_quote_reminder(quote_id: str, admin_key: str, include_d
 
 # ==================== AUTOMATED FOLLOW-UP SYSTEM ====================
 
-@api_router.post("/admin/quotes/process-followups")
-async def process_quote_followups(admin_key: str):
+async def _execute_followup_processing():
     """
-    Automated follow-up system for unconverted quotes.
+    Core follow-up processing logic. Called by both the auto-scheduler and manual trigger.
     Follow-up schedule:
     - Day 3: First reminder (no discount)
     - Day 7: Second reminder (10% discount)
     - Day 14: Third reminder (15% discount)
     - Day 21: Mark as "lost"
     """
+    now = datetime.utcnow()
+    results = {
+        "reminders_sent": 0,
+        "marked_lost": 0,
+        "errors": [],
+        "processed_at": now.isoformat()
+    }
+
+    # Get all abandoned quotes that need follow-up
+    abandoned_quotes = await db.abandoned_quotes.find({
+        "status": {"$in": ["abandoned", "pending"]}
+    }).to_list(1000)
+
+    # Also get quotes from translation_orders with status "Quote" that haven't converted
+    quote_orders = await db.translation_orders.find({
+        "translation_status": "Quote",
+        "payment_status": "pending"
+    }).to_list(1000)
+
+    # Process abandoned quotes
+    for quote in abandoned_quotes:
+        try:
+            created_at = quote.get("created_at", now)
+            if isinstance(created_at, str):
+                created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+
+            days_since = (now - created_at).days
+            reminder_count = quote.get("reminder_sent", 0)
+            last_reminder = quote.get("last_reminder_at")
+
+            # Determine what action to take
+            should_remind = False
+            discount_percent = 0
+
+            if days_since >= 21 and quote.get("status") != "lost":
+                # Mark as lost
+                await db.abandoned_quotes.update_one(
+                    {"id": quote["id"]},
+                    {"$set": {"status": "lost", "marked_lost_at": now}}
+                )
+                results["marked_lost"] += 1
+                continue
+
+            elif days_since >= 14 and reminder_count < 3:
+                # Third reminder with 15% discount
+                should_remind = True
+                discount_percent = 15
+
+            elif days_since >= 7 and reminder_count < 2:
+                # Second reminder with 10% discount
+                should_remind = True
+                discount_percent = 10
+
+            elif days_since >= 3 and reminder_count < 1:
+                # First reminder, no discount
+                should_remind = True
+                discount_percent = 0
+
+            if should_remind:
+                # Check if we sent a reminder recently (within 24 hours)
+                if last_reminder:
+                    if isinstance(last_reminder, str):
+                        last_reminder = datetime.fromisoformat(last_reminder.replace('Z', '+00:00'))
+                    hours_since_last = (now - last_reminder).total_seconds() / 3600
+                    if hours_since_last < 24:
+                        continue
+
+                # Generate discount code if needed
+                discount_code = None
+                if discount_percent > 0:
+                    discount_code = f"FOLLOWUP{discount_percent}-{quote['id'][:6].upper()}"
+                    await db.discount_codes.insert_one({
+                        "id": str(uuid.uuid4()),
+                        "code": discount_code,
+                        "type": "percentage",
+                        "value": discount_percent,
+                        "max_uses": 1,
+                        "uses": 0,
+                        "abandoned_quote_id": quote["id"],
+                        "expires_at": now + timedelta(days=7),
+                        "created_at": now,
+                        "is_active": True
+                    })
+
+                # Send reminder email
+                await send_followup_email(
+                    quote["email"],
+                    quote.get("name", "Customer"),
+                    quote,
+                    reminder_count + 1,
+                    discount_percent,
+                    discount_code
+                )
+
+                # Update quote
+                await db.abandoned_quotes.update_one(
+                    {"id": quote["id"]},
+                    {
+                        "$set": {"last_reminder_at": now},
+                        "$inc": {"reminder_sent": 1}
+                    }
+                )
+                results["reminders_sent"] += 1
+
+        except Exception as e:
+            results["errors"].append(f"Quote {quote.get('id', 'unknown')}: {str(e)}")
+
+    # Process quote orders
+    for order in quote_orders:
+        try:
+            created_at = order.get("created_at", now)
+            if isinstance(created_at, str):
+                created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+
+            days_since = (now - created_at).days
+            reminder_count = order.get("followup_count", 0)
+            last_reminder = order.get("last_followup_at")
+
+            should_remind = False
+            discount_percent = 0
+
+            if days_since >= 21:
+                # Mark quote as expired/lost
+                await db.translation_orders.update_one(
+                    {"id": order["id"]},
+                    {"$set": {"translation_status": "Quote - Lost", "updated_at": now}}
+                )
+                results["marked_lost"] += 1
+                continue
+
+            elif days_since >= 14 and reminder_count < 3:
+                should_remind = True
+                discount_percent = 15
+
+            elif days_since >= 7 and reminder_count < 2:
+                should_remind = True
+                discount_percent = 10
+
+            elif days_since >= 3 and reminder_count < 1:
+                should_remind = True
+                discount_percent = 0
+
+            if should_remind:
+                if last_reminder:
+                    if isinstance(last_reminder, str):
+                        last_reminder = datetime.fromisoformat(last_reminder.replace('Z', '+00:00'))
+                    hours_since_last = (now - last_reminder).total_seconds() / 3600
+                    if hours_since_last < 24:
+                        continue
+
+                # Generate discount code if needed
+                discount_code = None
+                if discount_percent > 0:
+                    discount_code = f"QUOTE{discount_percent}-{order['order_number']}"
+                    await db.discount_codes.insert_one({
+                        "id": str(uuid.uuid4()),
+                        "code": discount_code,
+                        "type": "percentage",
+                        "value": discount_percent,
+                        "max_uses": 1,
+                        "uses": 0,
+                        "order_id": order["id"],
+                        "expires_at": now + timedelta(days=7),
+                        "created_at": now,
+                        "is_active": True
+                    })
+
+                # Send reminder email for quote order
+                await send_quote_order_followup_email(
+                    order.get("client_email"),
+                    order.get("client_name", "Customer"),
+                    order,
+                    reminder_count + 1,
+                    discount_percent,
+                    discount_code
+                )
+
+                # Update order
+                await db.translation_orders.update_one(
+                    {"id": order["id"]},
+                    {
+                        "$set": {"last_followup_at": now, "updated_at": now},
+                        "$inc": {"followup_count": 1}
+                    }
+                )
+                results["reminders_sent"] += 1
+
+        except Exception as e:
+            results["errors"].append(f"Order {order.get('order_number', 'unknown')}: {str(e)}")
+
+    # Log the run in followup_settings
+    await db.followup_settings.update_one(
+        {"id": "auto_followup_config"},
+        {
+            "$set": {
+                "last_run_at": now,
+                "last_run_result": {
+                    "reminders_sent": results["reminders_sent"],
+                    "marked_lost": results["marked_lost"],
+                    "error_count": len(results["errors"])
+                }
+            }
+        },
+        upsert=True
+    )
+
+    logger.info(f"Follow-up processing complete: {results}")
+    return results
+
+
+@api_router.post("/admin/quotes/process-followups")
+async def process_quote_followups(admin_key: str):
+    """
+    Automated follow-up system for unconverted quotes (legacy endpoint).
+    Now delegates to _execute_followup_processing().
+    """
     if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
     try:
-        now = datetime.utcnow()
-        results = {
-            "reminders_sent": 0,
-            "marked_lost": 0,
-            "errors": []
-        }
-
-        # Get all abandoned quotes that need follow-up
-        abandoned_quotes = await db.abandoned_quotes.find({
-            "status": {"$in": ["abandoned", "pending"]}
-        }).to_list(1000)
-
-        # Also get quotes from translation_orders with status "Quote" that haven't converted
-        quote_orders = await db.translation_orders.find({
-            "translation_status": "Quote",
-            "payment_status": "pending"
-        }).to_list(1000)
-
-        # Process abandoned quotes
-        for quote in abandoned_quotes:
-            try:
-                created_at = quote.get("created_at", now)
-                if isinstance(created_at, str):
-                    created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
-
-                days_since = (now - created_at).days
-                reminder_count = quote.get("reminder_sent", 0)
-                last_reminder = quote.get("last_reminder_at")
-
-                # Determine what action to take
-                should_remind = False
-                discount_percent = 0
-
-                if days_since >= 21 and quote.get("status") != "lost":
-                    # Mark as lost
-                    await db.abandoned_quotes.update_one(
-                        {"id": quote["id"]},
-                        {"$set": {"status": "lost", "marked_lost_at": now}}
-                    )
-                    results["marked_lost"] += 1
-                    continue
-
-                elif days_since >= 14 and reminder_count < 3:
-                    # Third reminder with 15% discount
-                    should_remind = True
-                    discount_percent = 15
-
-                elif days_since >= 7 and reminder_count < 2:
-                    # Second reminder with 10% discount
-                    should_remind = True
-                    discount_percent = 10
-
-                elif days_since >= 3 and reminder_count < 1:
-                    # First reminder, no discount
-                    should_remind = True
-                    discount_percent = 0
-
-                if should_remind:
-                    # Check if we sent a reminder recently (within 24 hours)
-                    if last_reminder:
-                        if isinstance(last_reminder, str):
-                            last_reminder = datetime.fromisoformat(last_reminder.replace('Z', '+00:00'))
-                        hours_since_last = (now - last_reminder).total_seconds() / 3600
-                        if hours_since_last < 24:
-                            continue
-
-                    # Generate discount code if needed
-                    discount_code = None
-                    if discount_percent > 0:
-                        discount_code = f"FOLLOWUP{discount_percent}-{quote['id'][:6].upper()}"
-                        await db.discount_codes.insert_one({
-                            "id": str(uuid.uuid4()),
-                            "code": discount_code,
-                            "type": "percentage",
-                            "value": discount_percent,
-                            "max_uses": 1,
-                            "uses": 0,
-                            "abandoned_quote_id": quote["id"],
-                            "expires_at": now + timedelta(days=7),
-                            "created_at": now,
-                            "is_active": True
-                        })
-
-                    # Send reminder email
-                    await send_followup_email(
-                        quote["email"],
-                        quote.get("name", "Customer"),
-                        quote,
-                        reminder_count + 1,
-                        discount_percent,
-                        discount_code
-                    )
-
-                    # Update quote
-                    await db.abandoned_quotes.update_one(
-                        {"id": quote["id"]},
-                        {
-                            "$set": {"last_reminder_at": now},
-                            "$inc": {"reminder_sent": 1}
-                        }
-                    )
-                    results["reminders_sent"] += 1
-
-            except Exception as e:
-                results["errors"].append(f"Quote {quote.get('id', 'unknown')}: {str(e)}")
-
-        # Process quote orders
-        for order in quote_orders:
-            try:
-                created_at = order.get("created_at", now)
-                if isinstance(created_at, str):
-                    created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
-
-                days_since = (now - created_at).days
-                reminder_count = order.get("followup_count", 0)
-                last_reminder = order.get("last_followup_at")
-
-                should_remind = False
-                discount_percent = 0
-
-                if days_since >= 21:
-                    # Mark quote as expired/lost
-                    await db.translation_orders.update_one(
-                        {"id": order["id"]},
-                        {"$set": {"translation_status": "Quote - Lost", "updated_at": now}}
-                    )
-                    results["marked_lost"] += 1
-                    continue
-
-                elif days_since >= 14 and reminder_count < 3:
-                    should_remind = True
-                    discount_percent = 15
-
-                elif days_since >= 7 and reminder_count < 2:
-                    should_remind = True
-                    discount_percent = 10
-
-                elif days_since >= 3 and reminder_count < 1:
-                    should_remind = True
-                    discount_percent = 0
-
-                if should_remind:
-                    if last_reminder:
-                        if isinstance(last_reminder, str):
-                            last_reminder = datetime.fromisoformat(last_reminder.replace('Z', '+00:00'))
-                        hours_since_last = (now - last_reminder).total_seconds() / 3600
-                        if hours_since_last < 24:
-                            continue
-
-                    # Generate discount code if needed
-                    discount_code = None
-                    if discount_percent > 0:
-                        discount_code = f"QUOTE{discount_percent}-{order['order_number']}"
-                        await db.discount_codes.insert_one({
-                            "id": str(uuid.uuid4()),
-                            "code": discount_code,
-                            "type": "percentage",
-                            "value": discount_percent,
-                            "max_uses": 1,
-                            "uses": 0,
-                            "order_id": order["id"],
-                            "expires_at": now + timedelta(days=7),
-                            "created_at": now,
-                            "is_active": True
-                        })
-
-                    # Send reminder email for quote order
-                    await send_quote_order_followup_email(
-                        order.get("client_email"),
-                        order.get("client_name", "Customer"),
-                        order,
-                        reminder_count + 1,
-                        discount_percent,
-                        discount_code
-                    )
-
-                    # Update order
-                    await db.translation_orders.update_one(
-                        {"id": order["id"]},
-                        {
-                            "$set": {"last_followup_at": now, "updated_at": now},
-                            "$inc": {"followup_count": 1}
-                        }
-                    )
-                    results["reminders_sent"] += 1
-
-            except Exception as e:
-                results["errors"].append(f"Order {order.get('order_number', 'unknown')}: {str(e)}")
-
-        logger.info(f"Follow-up processing complete: {results}")
+        results = await _execute_followup_processing()
         return results
-
     except Exception as e:
         logger.error(f"Error processing follow-ups: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to process follow-ups: {str(e)}")
@@ -21570,7 +21596,7 @@ async def send_quote_order_followup_email(email: str, name: str, order: dict, re
 
 @api_router.get("/admin/quotes/followup-status")
 async def get_followup_status(admin_key: str):
-    """Get status of all quotes and their follow-up progress"""
+    """Get status of all quotes and their follow-up progress, including conversion tracking"""
     if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
@@ -21592,6 +21618,42 @@ async def get_followup_status(admin_key: str):
             ]
         }).sort("created_at", -1).to_list(500)
 
+        # --- Conversion tracking: count recovered quotes that had follow-up reminders ---
+        # Abandoned quotes that were recovered after receiving at least 1 reminder
+        recovered_abandoned = await db.abandoned_quotes.find({
+            "status": "recovered",
+            "reminder_sent": {"$gte": 1}
+        }).to_list(1000)
+
+        # Orders that were recovered (originally quotes that converted) with follow-up
+        recovered_orders = await db.translation_orders.find({
+            "recovered_order": True,
+            "followup_count": {"$gte": 1}
+        }).to_list(1000)
+
+        # Also count total recovered (with or without follow-up) for rate calculation
+        total_recovered_abandoned = await db.abandoned_quotes.count_documents({"status": "recovered"})
+        total_recovered_orders = await db.translation_orders.count_documents({"recovered_order": True})
+
+        # Calculate conversion revenue from follow-ups
+        followup_conversion_revenue = 0
+        for r in recovered_abandoned:
+            followup_conversion_revenue += r.get("total_price", 0)
+        for r in recovered_orders:
+            followup_conversion_revenue += r.get("total_price", r.get("base_price", 0))
+
+        # Get auto-followup settings
+        auto_settings = await db.followup_settings.find_one({"id": "auto_followup_config"})
+        last_auto_run = None
+        last_auto_result = None
+        auto_enabled = True  # Default to enabled
+        if auto_settings:
+            last_auto_run = auto_settings.get("last_run_at")
+            last_auto_result = auto_settings.get("last_run_result")
+            auto_enabled = auto_settings.get("enabled", True)
+            if last_auto_run and isinstance(last_auto_run, datetime):
+                last_auto_run = last_auto_run.isoformat()
+
         result = {
             "abandoned_quotes": [],
             "quote_orders": [],
@@ -21600,7 +21662,16 @@ async def get_followup_status(admin_key: str):
                 "needs_first_reminder": 0,
                 "needs_second_reminder": 0,
                 "needs_third_reminder": 0,
-                "marked_lost": 0
+                "marked_lost": 0,
+                "converted_via_followup": len(recovered_abandoned) + len(recovered_orders),
+                "total_converted": total_recovered_abandoned + total_recovered_orders,
+                "followup_conversion_revenue": round(followup_conversion_revenue, 2)
+            },
+            "auto_followup": {
+                "enabled": auto_enabled,
+                "last_run_at": last_auto_run,
+                "last_run_result": last_auto_result,
+                "interval_hours": 6
             }
         }
 
@@ -21736,6 +21807,38 @@ async def exclude_from_followup(admin_key: str, quote_id: str, quote_type: str =
     except Exception as e:
         logger.error(f"Error excluding quote from follow-ups: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to exclude quote")
+
+@api_router.post("/admin/quotes/toggle-auto-followup")
+async def toggle_auto_followup(admin_key: str, enabled: bool = True):
+    """Enable or disable automatic follow-up processing"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        await db.followup_settings.update_one(
+            {"id": "auto_followup_config"},
+            {"$set": {"enabled": enabled, "updated_at": datetime.utcnow()}},
+            upsert=True
+        )
+        status = "enabled" if enabled else "disabled"
+        logger.info(f"Auto follow-up {status}")
+        return {"success": True, "enabled": enabled, "message": f"Auto follow-up {status}"}
+    except Exception as e:
+        logger.error(f"Error toggling auto follow-up: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to toggle auto follow-up")
+
+@api_router.post("/admin/quotes/run-followups-now")
+async def run_followups_now(admin_key: str):
+    """Manually trigger follow-up processing (same as auto but on-demand)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        results = await _execute_followup_processing()
+        return results
+    except Exception as e:
+        logger.error(f"Error running manual follow-ups: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to process follow-ups: {str(e)}")
 
 
 @api_router.get("/admin/quotes/search")
@@ -29644,6 +29747,35 @@ async def get_admin_payment_history(admin_key: str = Header(None)):
 # Include the router in the main app - MUST be after all api_router routes are defined
 app.include_router(api_router)
 
+# ==================== AUTO FOLLOW-UP BACKGROUND SCHEDULER ====================
+
+async def _auto_followup_scheduler():
+    """Background task that runs follow-up processing every 6 hours automatically."""
+    INTERVAL_SECONDS = 6 * 60 * 60  # 6 hours
+    # Wait 60 seconds after startup before first run to let the app initialize
+    await asyncio.sleep(60)
+    logger.info("Auto follow-up scheduler started (interval: 6 hours)")
+
+    while True:
+        try:
+            # Check if auto-followup is enabled
+            settings = await db.followup_settings.find_one({"id": "auto_followup_config"})
+            enabled = True  # Default to enabled
+            if settings:
+                enabled = settings.get("enabled", True)
+
+            if enabled:
+                logger.info("Auto follow-up: starting scheduled processing...")
+                results = await _execute_followup_processing()
+                logger.info(f"Auto follow-up completed: sent={results['reminders_sent']}, lost={results['marked_lost']}, errors={len(results['errors'])}")
+            else:
+                logger.info("Auto follow-up: disabled, skipping this cycle")
+        except Exception as e:
+            logger.error(f"Auto follow-up scheduler error: {str(e)}")
+
+        await asyncio.sleep(INTERVAL_SECONDS)
+
+
 @app.on_event("startup")
 async def create_default_partner():
     """Create default partner from environment variables if set"""
@@ -29668,6 +29800,11 @@ async def create_default_partner():
                 logger.info(f"Default partner already exists: {default_email}")
         except Exception as e:
             logger.error(f"Error creating default partner: {str(e)}")
+
+@app.on_event("startup")
+async def start_auto_followup_scheduler():
+    """Launch the auto follow-up background scheduler"""
+    asyncio.create_task(_auto_followup_scheduler())
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
