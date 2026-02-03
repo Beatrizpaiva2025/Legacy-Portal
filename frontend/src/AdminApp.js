@@ -29821,6 +29821,9 @@ const SalesControlPage = ({ adminKey }) => {
   const [viewingAcquisition, setViewingAcquisition] = useState(null);
   const [editingAcquisition, setEditingAcquisition] = useState(null);
   const [editAcquisitionForm, setEditAcquisitionForm] = useState({});
+  const [showEmailCompose, setShowEmailCompose] = useState(false);
+  const [emailForm, setEmailForm] = useState({ subject: '', message: '' });
+  const [sendingEmail, setSendingEmail] = useState(false);
   const [newGoal, setNewGoal] = useState({
     salesperson_id: '', month: new Date().toISOString().slice(0, 7), target_partners: 10, target_revenue: 5000
   });
@@ -30042,6 +30045,31 @@ const SalesControlPage = ({ adminKey }) => {
       console.error('Error updating acquisition:', error);
       showToast('Erro ao atualizar aquisição');
     }
+  };
+
+  const handleSendPartnerEmail = async () => {
+    if (!viewingAcquisition || !emailForm.subject || !emailForm.message) return;
+    setSendingEmail(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/partner-acquisitions/${viewingAcquisition.id}/send-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'admin-key': adminKey },
+        body: JSON.stringify(emailForm)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(`Email enviado para ${viewingAcquisition.partner_email}!`);
+        setShowEmailCompose(false);
+        setEmailForm({ subject: '', message: '' });
+        fetchAllData();
+      } else {
+        showToast(data.detail || 'Erro ao enviar email');
+      }
+    } catch (error) {
+      console.error('Error sending email:', error);
+      showToast('Erro ao enviar email');
+    }
+    setSendingEmail(false);
   };
 
   const handleSetGoal = async () => {
@@ -31330,43 +31358,51 @@ const SalesControlPage = ({ adminKey }) => {
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 Detalhes da Aquisição
               </h3>
-              <span className={`px-3 py-1 rounded-full text-white text-xs font-medium ${tierColors[viewingAcquisition.partner_tier]}`}>
-                {viewingAcquisition.partner_tier === 'platinum' ? '💎' : viewingAcquisition.partner_tier === 'gold' ? '🥇' : viewingAcquisition.partner_tier === 'silver' ? '🥈' : '🥉'} {viewingAcquisition.partner_tier}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className={`px-3 py-1 rounded-full text-white text-xs font-medium ${tierColors[viewingAcquisition.partner_tier]}`}>
+                  {viewingAcquisition.partner_tier === 'platinum' ? '💎' : viewingAcquisition.partner_tier === 'gold' ? '🥇' : viewingAcquisition.partner_tier === 'silver' ? '🥈' : '🥉'} {viewingAcquisition.partner_tier}
+                </span>
+                <button onClick={() => { setViewingAcquisition(null); setShowEmailCompose(false); }} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+              </div>
             </div>
 
             <div className="space-y-4">
+              {/* Partner Data Section */}
               <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="text-sm font-semibold text-gray-500 uppercase mb-3">Dados do Parceiro</h4>
+                <h4 className="text-sm font-semibold text-gray-500 uppercase mb-3">DADOS DO PARCEIRO</h4>
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-500">Nome da Empresa:</span>
                     <span className="text-sm font-medium text-gray-800">{viewingAcquisition.partner_name}</span>
                   </div>
-                  {viewingAcquisition.partner_contact_name && (
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-500">Nome do Contato:</span>
-                      <span className="text-sm font-medium text-gray-800">{viewingAcquisition.partner_contact_name}</span>
-                    </div>
-                  )}
-                  {viewingAcquisition.partner_email && (
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-500">Email:</span>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-500">Nome do Contato:</span>
+                    <span className="text-sm font-medium text-gray-800">{viewingAcquisition.partner_contact_name || <span className="text-gray-400 italic">Não informado</span>}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-500">Email:</span>
+                    {viewingAcquisition.partner_email ? (
                       <a href={`mailto:${viewingAcquisition.partner_email}`} className="text-sm font-medium text-blue-600 hover:underline">{viewingAcquisition.partner_email}</a>
-                    </div>
-                  )}
-                  {viewingAcquisition.partner_phone && (
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-500">Telefone:</span>
+                    ) : (
+                      <span className="text-sm text-red-400 italic">Não informado</span>
+                    )}
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-500">Telefone:</span>
+                    {viewingAcquisition.partner_phone ? (
                       <a href={`tel:${viewingAcquisition.partner_phone}`} className="text-sm font-medium text-blue-600 hover:underline">{viewingAcquisition.partner_phone}</a>
-                    </div>
-                  )}
-                  {viewingAcquisition.partner_website && (
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-500">Website:</span>
+                    ) : (
+                      <span className="text-sm text-red-400 italic">Não informado</span>
+                    )}
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-500">Website:</span>
+                    {viewingAcquisition.partner_website ? (
                       <a href={viewingAcquisition.partner_website} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-blue-600 hover:underline">{viewingAcquisition.partner_website}</a>
-                    </div>
-                  )}
+                    ) : (
+                      <span className="text-sm text-gray-400 italic">Não informado</span>
+                    )}
+                  </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-500">Partner ID:</span>
                     <span className="text-sm font-medium text-gray-800">{viewingAcquisition.partner_id || 'N/A'}</span>
@@ -31374,14 +31410,25 @@ const SalesControlPage = ({ adminKey }) => {
                 </div>
               </div>
 
+              {/* Warning when no contact data */}
               {(!viewingAcquisition.partner_email && !viewingAcquisition.partner_phone) && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                  <p className="text-sm text-yellow-700">Nenhum dado de contato cadastrado. Clique em "Editar" para adicionar email e telefone do parceiro.</p>
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-sm text-red-700 font-medium mb-2">Dados de contato ausentes!</p>
+                  <p className="text-sm text-red-600 mb-3">O finder não cadastrou email e telefone do parceiro. Clique em "Editar" para adicionar os dados de contato antes de enviar email.</p>
+                  {viewingAcquisition.commission_status === 'pending' && (
+                    <button
+                      onClick={() => { handleEditAcquisition(viewingAcquisition); setViewingAcquisition(null); }}
+                      className="px-3 py-1.5 bg-orange-500 text-white text-sm rounded hover:bg-orange-600"
+                    >
+                      Adicionar Dados de Contato
+                    </button>
+                  )}
                 </div>
               )}
 
+              {/* Acquisition Info Section */}
               <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="text-sm font-semibold text-gray-500 uppercase mb-3">Informações da Aquisição</h4>
+                <h4 className="text-sm font-semibold text-gray-500 uppercase mb-3">INFORMAÇÕES DA AQUISIÇÃO</h4>
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-500">Data:</span>
@@ -31404,26 +31451,83 @@ const SalesControlPage = ({ adminKey }) => {
                 </div>
               </div>
 
+              {/* Notes Section */}
               {viewingAcquisition.notes && (
                 <div className="bg-gray-50 rounded-lg p-4">
-                  <h4 className="text-sm font-semibold text-gray-500 uppercase mb-2">Notas</h4>
-                  <p className="text-sm text-gray-700">{viewingAcquisition.notes}</p>
+                  <h4 className="text-sm font-semibold text-gray-500 uppercase mb-2">NOTAS / HISTÓRICO</h4>
+                  <p className="text-sm text-gray-700 whitespace-pre-line">{viewingAcquisition.notes}</p>
+                </div>
+              )}
+
+              {/* Email Compose Section */}
+              {showEmailCompose && viewingAcquisition.partner_email && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h4 className="text-sm font-semibold text-blue-700 uppercase mb-3">ENVIAR EMAIL PARA {viewingAcquisition.partner_name}</h4>
+                  <p className="text-xs text-blue-600 mb-3">Para: {viewingAcquisition.partner_email}</p>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Assunto *</label>
+                      <input
+                        type="text"
+                        value={emailForm.subject}
+                        onChange={(e) => setEmailForm({...emailForm, subject: e.target.value})}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                        placeholder="Partnership Opportunity - Legacy Translations"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Mensagem *</label>
+                      <textarea
+                        value={emailForm.message}
+                        onChange={(e) => setEmailForm({...emailForm, message: e.target.value})}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                        rows={6}
+                        placeholder="Escreva a mensagem para o parceiro..."
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => { setShowEmailCompose(false); setEmailForm({ subject: '', message: '' }); }}
+                        className="px-3 py-1.5 text-gray-600 hover:bg-gray-100 rounded text-sm"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={handleSendPartnerEmail}
+                        disabled={!emailForm.subject || !emailForm.message || sendingEmail}
+                        className="px-4 py-1.5 bg-green-500 text-white text-sm rounded hover:bg-green-600 disabled:opacity-50"
+                      >
+                        {sendingEmail ? 'Enviando...' : 'Enviar Email'}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
 
-            <div className="flex justify-end gap-3 mt-6">
-              {viewingAcquisition.commission_status === 'pending' && (
-                <button
-                  onClick={() => { handleEditAcquisition(viewingAcquisition); setViewingAcquisition(null); }}
-                  className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
-                >
-                  Editar
-                </button>
-              )}
+            {/* Action Buttons */}
+            <div className="flex justify-between items-center gap-3 mt-6 pt-4 border-t">
+              <div className="flex gap-2">
+                {viewingAcquisition.partner_email && !showEmailCompose && (
+                  <button
+                    onClick={() => setShowEmailCompose(true)}
+                    className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 text-sm font-medium"
+                  >
+                    Enviar Email
+                  </button>
+                )}
+                {viewingAcquisition.commission_status === 'pending' && (
+                  <button
+                    onClick={() => { handleEditAcquisition(viewingAcquisition); setViewingAcquisition(null); setShowEmailCompose(false); }}
+                    className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm font-medium"
+                  >
+                    Editar
+                  </button>
+                )}
+              </div>
               <button
-                onClick={() => setViewingAcquisition(null)}
-                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                onClick={() => { setViewingAcquisition(null); setShowEmailCompose(false); setEmailForm({ subject: '', message: '' }); }}
+                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm"
               >
                 Fechar
               </button>

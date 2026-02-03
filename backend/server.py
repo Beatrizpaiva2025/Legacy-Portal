@@ -28443,6 +28443,54 @@ async def update_acquisition(acquisition_id: str, request: Request, admin_key: s
 
     return {"success": True, "acquisition": updated}
 
+# Send outreach email to prospective partner
+@api_router.post("/admin/partner-acquisitions/{acquisition_id}/send-email")
+async def send_partner_outreach_email(acquisition_id: str, request: Request, admin_key: str = Header(None)):
+    if not admin_key:
+        raise HTTPException(status_code=401, detail="Admin key required")
+
+    body = await request.json()
+    subject = body.get("subject", "")
+    message = body.get("message", "")
+
+    if not subject or not message:
+        raise HTTPException(status_code=400, detail="Subject and message are required")
+
+    acq = await db.partner_acquisitions.find_one({"id": acquisition_id})
+    if not acq:
+        raise HTTPException(status_code=404, detail="Acquisition not found")
+
+    partner_email = acq.get("partner_email", "")
+    if not partner_email:
+        raise HTTPException(status_code=400, detail="Partner email not set. Please edit the acquisition and add an email first.")
+
+    partner_name = acq.get("partner_contact_name") or acq.get("partner_name", "Partner")
+
+    # Build professional email using existing template
+    email_html = get_simple_client_email_template(partner_name, message.replace('\n', '<br>'))
+
+    try:
+        await email_service.send_email(
+            to=partner_email,
+            subject=subject,
+            content=email_html
+        )
+
+        # Log email sent in acquisition notes
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+        existing_notes = acq.get("notes", "")
+        email_log = f"[{timestamp}] Email enviado: {subject}"
+        new_notes = f"{existing_notes}\n{email_log}" if existing_notes else email_log
+        await db.partner_acquisitions.update_one(
+            {"id": acquisition_id},
+            {"$set": {"notes": new_notes}}
+        )
+
+        return {"success": True, "message": f"Email sent to {partner_email}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
+
 # Get sales dashboard stats
 @api_router.get("/admin/sales-dashboard")
 async def get_sales_dashboard(admin_key: str = Header(None)):
