@@ -9964,17 +9964,21 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     ) : (
                       <iframe
                         ref={editableRef}
-                        srcDoc={translationResults[selectedResultIndex]?.translatedText || '<!DOCTYPE html><html><head></head><body><p>No translation</p></body></html>'}
+                        srcDoc={(() => {
+                          const content = translationResults[selectedResultIndex]?.translatedText || '<p>No translation</p>';
+                          // Inject contenteditable into existing body tag, or wrap in editable body
+                          if (content.match(/<body/i)) {
+                            return content.replace(/<body([^>]*)>/i, '<body$1 contenteditable="true" style="outline:none; padding:12px; margin:0;">');
+                          }
+                          return `<!DOCTYPE html><html><head></head><body contenteditable="true" style="outline:none; padding:12px; margin:0;">${content}</body></html>`;
+                        })()}
                         title="Translation Edit"
                         className="w-full border-0"
                         style={{width: '100%', height: '100%', border: '3px solid #10B981', borderRadius: '4px'}}
                         onLoad={(e) => {
                           const iframeDoc = e.target.contentDocument;
-                          if (iframeDoc) {
-                            iframeDoc.designMode = 'on';
-                            iframeDoc.body.style.outline = 'none';
-                            iframeDoc.body.style.padding = '12px';
-                            iframeDoc.body.style.margin = '0';
+                          if (iframeDoc && iframeDoc.body) {
+                            iframeDoc.body.contentEditable = 'true';
                             iframeDoc.addEventListener('input', () => {
                               handleTranslationEdit(iframeDoc.body.innerHTML);
                             });
