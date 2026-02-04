@@ -5848,13 +5848,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             ${letterheadHTML}
         </td></tr></thead>
         <tbody><tr><td>
-            <div class="translation-content" style="padding: 0 20px; line-height: 1.5; font-size: 11pt;">
+            <div class="translation-content" style="padding: 0; line-height: 1.5; font-size: 11pt;">
                 ${quickTranslationHtml}
             </div>
         </td></tr></tbody>
     </table>` : `
     <div style="padding-top: 5px;">
-        <div class="translation-content" style="padding: 0 20px; line-height: 1.5; font-size: 11pt;">
+        <div class="translation-content" style="padding: 0; line-height: 1.5; font-size: 11pt;">
             ${quickTranslationHtml}
         </div>
     </div>`;
@@ -6404,7 +6404,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             ${letterheadHTML}
         </td></tr></thead>
         <tbody><tr><td>
-            <div class="translation-content" style="padding: 0 20px; line-height: 1.5; font-size: 11pt;">
+            <div class="translation-content" style="padding: 0; line-height: 1.5; font-size: 11pt;">
                 ${content}
             </div>
         </td></tr></tbody>
@@ -6412,7 +6412,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       } else {
         return `
     <div style="${pageBreak} padding-top: 5px;">
-        <div class="translation-content" style="padding: 0 20px; line-height: 1.5; font-size: 11pt;">
+        <div class="translation-content" style="padding: 0; line-height: 1.5; font-size: 11pt;">
             ${content}
         </div>
     </div>`;
