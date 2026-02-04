@@ -1416,6 +1416,33 @@ const extractStylesFromHtml = (html) => {
   return styleMatches.join('\n');
 };
 
+// Scope extracted translation styles to .translation-content to prevent them from
+// overriding letterhead, cover page, or other layout elements outside the translation area.
+// AI-generated translation HTML often contains global CSS selectors (body, table, td, div)
+// that can break the float-based letterhead layout when injected into the document <head>.
+const scopeTranslationStyles = (stylesHtml) => {
+  if (!stylesHtml) return '';
+  return stylesHtml.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, (match, cssText) => {
+    // Prefix each CSS selector with .translation-content
+    const scopedCss = cssText.replace(/([^{}]+)\{/g, (ruleMatch, selectorPart) => {
+      const trimmed = selectorPart.trim();
+      // Skip @-rules (@media, @page, @font-face, etc.) and comments
+      if (!trimmed || trimmed.startsWith('@') || trimmed.startsWith('/*')) return ruleMatch;
+      // Scope each comma-separated selector
+      const scopedSelectors = trimmed.split(',').map(s => {
+        const sel = s.trim();
+        if (!sel) return sel;
+        // Replace body/html selectors with .translation-content
+        if (/^(html|body)$/i.test(sel)) return '.translation-content';
+        if (/^(html|body)\s+/i.test(sel)) return sel.replace(/^(html|body)\s+/i, '.translation-content ');
+        return `.translation-content ${sel}`;
+      }).join(', ');
+      return `${scopedSelectors} {`;
+    });
+    return `<style>\n${scopedCss}\n</style>`;
+  });
+};
+
 // Reconstruct full HTML document by replacing body content while preserving styles/head.
 const reconstructFullHtml = (originalHtml, newBodyContent) => {
   if (!originalHtml) return newBodyContent;
@@ -6347,8 +6374,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
         <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 12px;"></div>`;
 
-    // Extract translation styles to include in print document (preserves formatting)
-    const translationStyles = translationResults.map(r => extractStylesFromHtml(r.translatedText)).filter(Boolean).join('\n');
+    // Extract translation styles and SCOPE them to .translation-content to prevent
+    // AI-generated global CSS from breaking letterhead/cover layout
+    const translationStyles = scopeTranslationStyles(
+      translationResults.map(r => extractStylesFromHtml(r.translatedText)).filter(Boolean).join('\n')
+    );
 
     // Translation pages HTML (with or without letterhead)
     // Content flows naturally across pages; CSS pagination + thead handles multi-page layout
@@ -6450,7 +6480,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>${orderNumber || 'P0000'}_${documentType.replace(/\s+/g, '_')}_${translationType === 'sworn' ? 'Sworn' : 'Certified'}_Translation</title>
+    <title>${orderNumber || 'P0000'}_${documentType}</title>
     <style>
         ${getUnifiedPdfStyles(pageSizeCSS)}
     </style>
