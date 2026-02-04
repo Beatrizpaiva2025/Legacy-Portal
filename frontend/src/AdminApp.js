@@ -26278,6 +26278,12 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   const [sendingCompleteProject, setSendingCompleteProject] = useState(false);
   const [projectTrDeadline, setProjectTrDeadline] = useState({ date: '', time: '17:00' });
 
+  // PM Upload Translation state
+  const [projectModalTab, setProjectModalTab] = useState('files'); // 'files' or 'upload'
+  const [pmUploadFile, setPmUploadFile] = useState(null);
+  const [pmUploadLoading, setPmUploadLoading] = useState(false);
+  const [pmAcceptLoading, setPmAcceptLoading] = useState(false);
+
   const [newMessage, setNewMessage] = useState('');
   const [selectedTranslator, setSelectedTranslator] = useState(null);
   const [reviewQueue, setReviewQueue] = useState([]);
@@ -26856,6 +26862,62 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     } finally {
       setLoadingProjectDocs(false);
     }
+  };
+
+  // PM Upload Translation functions
+  const uploadPmTranslationPM = async (orderId) => {
+    if (!pmUploadFile || !orderId) return;
+    setPmUploadLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('order_id', orderId);
+      formData.append('admin_key', adminKey);
+      formData.append('file', pmUploadFile);
+      await axios.post(`${API}/admin/upload-pm-translation`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      showToast('Translation uploaded successfully! Status set to READY.');
+      setPmUploadFile(null);
+      // Refresh the order data in selectedProject
+      try {
+        const resp = await axios.get(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`);
+        if (resp.data.order) setSelectedProject(resp.data.order);
+      } catch(e) {}
+      fetchDashboardData();
+    } catch (err) {
+      console.error('PM upload failed:', err);
+      showToast('Upload failed: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setPmUploadLoading(false);
+    }
+  };
+
+  const acceptPmUploadPM = async (orderId) => {
+    if (!orderId) return;
+    if (!confirm('Accept this translation and send to client? This will set the status to FINAL.')) return;
+    setPmAcceptLoading(true);
+    try {
+      await axios.post(`${API}/admin/accept-pm-upload`, {
+        order_id: orderId,
+        admin_key: adminKey
+      });
+      showToast('Translation accepted and sent to client! Status set to FINAL.');
+      // Refresh the order data in selectedProject
+      try {
+        const resp = await axios.get(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`);
+        if (resp.data.order) setSelectedProject(resp.data.order);
+      } catch(e) {}
+      fetchDashboardData();
+    } catch (err) {
+      console.error('Accept PM upload failed:', err);
+      showToast('Accept failed: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setPmAcceptLoading(false);
+    }
+  };
+
+  const downloadPmTranslationPM = (orderId) => {
+    window.open(`${API}/admin/orders/${orderId}/pm-translation-download?admin_key=${adminKey}`, '_blank');
   };
 
   // Assign translator to specific document
@@ -30211,11 +30273,189 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 <h3 className="font-bold">📁 Project Files {selectedProject.order_number}</h3>
                 <p className="text-xs opacity-80">{selectedProject.client_name} • {selectedProject.translate_from} → {selectedProject.translate_to}</p>
               </div>
-              <button onClick={() => { setSelectedProject(null); setProjectTrDeadline({ date: '', time: '17:00' }); }} className="text-white hover:text-gray-200 text-xl">×</button>
+              <button onClick={() => { setSelectedProject(null); setProjectTrDeadline({ date: '', time: '17:00' }); setProjectModalTab('files'); setPmUploadFile(null); }} className="text-white hover:text-gray-200 text-xl">×</button>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex border-b bg-gray-50">
+              <button
+                onClick={() => setProjectModalTab('files')}
+                className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${
+                  projectModalTab === 'files'
+                    ? 'text-teal-700 border-b-2 border-teal-600 bg-white'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                📁 Assign Files
+              </button>
+              <button
+                onClick={() => setProjectModalTab('upload')}
+                className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${
+                  projectModalTab === 'upload'
+                    ? 'text-orange-700 border-b-2 border-orange-600 bg-white'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                📤 Upload Translation
+                {selectedProject?.translation_status === 'pm_upload_ready' && (
+                  <span className="ml-1.5 inline-block w-2 h-2 bg-emerald-500 rounded-full"></span>
+                )}
+                {selectedProject?.translation_status === 'final' && (
+                  <span className="ml-1.5 text-[10px] bg-emerald-200 text-emerald-800 px-1.5 py-0.5 rounded font-bold">FINAL</span>
+                )}
+              </button>
             </div>
 
             {/* Content */}
             <div className="p-4 overflow-y-auto flex-1">
+
+              {/* ===== UPLOAD TRANSLATION TAB ===== */}
+              {projectModalTab === 'upload' && (
+                <div className="space-y-4">
+                  {/* FINAL status */}
+                  {selectedProject.translation_status === 'final' && (
+                    <div className="bg-emerald-50 border-2 border-emerald-300 rounded-lg p-6 text-center">
+                      <div className="text-5xl mb-3">🏁</div>
+                      <div className="text-xl font-bold text-emerald-800 mb-1">FINAL</div>
+                      <p className="text-sm text-emerald-600">This translation has been approved and delivered to the client.</p>
+                      {selectedProject.completed_at && (
+                        <p className="text-xs text-emerald-500 mt-2">Completed: {new Date(selectedProject.completed_at).toLocaleString()}</p>
+                      )}
+                      {selectedProject.pm_upload_filename && (
+                        <div className="mt-4">
+                          <button
+                            onClick={() => downloadPmTranslationPM(selectedProject.id)}
+                            className="px-4 py-2 bg-emerald-600 text-white text-sm rounded hover:bg-emerald-700"
+                          >
+                            Download Final File ({selectedProject.pm_upload_filename})
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* READY status - review/accept */}
+                  {selectedProject.translation_status === 'pm_upload_ready' && selectedProject.pm_upload_filename && (
+                    <div className="bg-emerald-50 border border-emerald-300 rounded-lg p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white text-sm">✓</div>
+                        <div>
+                          <div className="text-sm font-bold text-emerald-800">Translation Uploaded - READY</div>
+                          <div className="text-xs text-emerald-600">Waiting for admin review and approval</div>
+                        </div>
+                      </div>
+                      <div className="bg-white rounded p-3 border mb-3">
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div><span className="font-bold text-gray-600">File:</span> {selectedProject.pm_upload_filename}</div>
+                          <div><span className="font-bold text-gray-600">Size:</span> {selectedProject.pm_upload_file_size ? `${(selectedProject.pm_upload_file_size / 1024).toFixed(1)} KB` : 'N/A'}</div>
+                          <div className="col-span-2"><span className="font-bold text-gray-600">Uploaded:</span> {selectedProject.pm_uploaded_at ? new Date(selectedProject.pm_uploaded_at).toLocaleString() : 'N/A'}</div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => downloadPmTranslationPM(selectedProject.id)}
+                          className="flex-1 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700"
+                        >
+                          Open & Review File
+                        </button>
+                        <button
+                          onClick={() => acceptPmUploadPM(selectedProject.id)}
+                          disabled={pmAcceptLoading}
+                          className="flex-1 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded hover:bg-emerald-700 disabled:opacity-50"
+                        >
+                          {pmAcceptLoading ? 'Sending...' : 'Accept & Send to Client'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Upload area */}
+                  {selectedProject.translation_status !== 'final' && (
+                    <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-lg p-4">
+                      <h3 className="text-xs font-bold text-orange-800 mb-3">
+                        {selectedProject.pm_upload_filename ? 'Re-upload Translation File' : 'Upload External Translation'}
+                      </h3>
+                      <p className="text-xs text-orange-600 mb-3">Upload the final translated file (PDF, DOCX, TXT, XLSX). Max 20MB.</p>
+                      <div
+                        className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                          pmUploadFile ? 'border-orange-400 bg-orange-100' : 'border-orange-300 hover:border-orange-500 cursor-pointer'
+                        }`}
+                        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const files = e.dataTransfer.files;
+                          if (files.length > 0) {
+                            const file = files[0];
+                            if (file.size > 20 * 1024 * 1024) {
+                              showToast('File too large. Maximum size is 20MB.');
+                              return;
+                            }
+                            setPmUploadFile(file);
+                          }
+                        }}
+                        onClick={() => { if (!pmUploadFile) document.getElementById('pm-upload-input-modal').click(); }}
+                      >
+                        {pmUploadFile ? (
+                          <div>
+                            <div className="text-3xl mb-2">📎</div>
+                            <div className="text-sm font-medium text-orange-800">{pmUploadFile.name}</div>
+                            <div className="text-xs text-orange-600 mt-1">{(pmUploadFile.size / 1024).toFixed(1)} KB</div>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setPmUploadFile(null); }}
+                              className="mt-2 text-xs text-red-500 hover:text-red-700 underline"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ) : (
+                          <div>
+                            <div className="text-3xl mb-2">📤</div>
+                            <p className="text-sm text-orange-700 mb-1">Drag & drop your translation file here</p>
+                            <p className="text-xs text-orange-500">or click to browse</p>
+                          </div>
+                        )}
+                        <input
+                          type="file"
+                          accept=".pdf,.docx,.doc,.txt,.xlsx,.xls,.pptx,.rtf"
+                          onChange={(e) => {
+                            const file = e.target.files[0];
+                            if (file) {
+                              if (file.size > 20 * 1024 * 1024) {
+                                showToast('File too large. Maximum size is 20MB.');
+                                return;
+                              }
+                              setPmUploadFile(file);
+                            }
+                          }}
+                          className="hidden"
+                          id="pm-upload-input-modal"
+                        />
+                      </div>
+
+                      {pmUploadFile && (
+                        <button
+                          onClick={() => uploadPmTranslationPM(selectedProject.id)}
+                          disabled={pmUploadLoading}
+                          className="mt-3 w-full px-4 py-2.5 bg-orange-600 text-white text-sm font-bold rounded hover:bg-orange-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                          {pmUploadLoading ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                              Uploading...
+                            </>
+                          ) : (
+                            'Upload & Send to Admin'
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ===== ASSIGN FILES TAB ===== */}
+              {projectModalTab === 'files' && (<>
               {/* SEND COMPLETE PROJECT - Single invitation for all files */}
               {!loadingProjectDocs && projectDocuments.length > 0 && (
                 <div className="mb-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg">
@@ -30376,12 +30616,13 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   <p className="text-sm">No file found in this project</p>
                 </div>
               )}
+              </>)}
             </div>
 
             {/* Footer */}
             <div className="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end">
               <button
-                onClick={() => { setSelectedProject(null); setProjectTrDeadline({ date: '', time: '17:00' }); }}
+                onClick={() => { setSelectedProject(null); setProjectTrDeadline({ date: '', time: '17:00' }); setProjectModalTab('files'); setPmUploadFile(null); }}
                 className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
               >
                 Fechar
