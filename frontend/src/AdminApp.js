@@ -1408,6 +1408,14 @@ const extractBodyForEdit = (html) => {
   return bodyContent;
 };
 
+// Extract <style> blocks from translation HTML so they can be included in print documents
+const extractStylesFromHtml = (html) => {
+  if (!html) return '';
+  const styleMatches = html.match(/<style[^>]*>[\s\S]*?<\/style>/gi);
+  if (!styleMatches || styleMatches.length === 0) return '';
+  return styleMatches.join('\n');
+};
+
 // Reconstruct full HTML document by replacing body content while preserving styles/head.
 const reconstructFullHtml = (originalHtml, newBodyContent) => {
   if (!originalHtml) return newBodyContent;
@@ -5785,6 +5793,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
         <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 12px;"></div>`;
 
+    // Extract translation styles to include in print document (preserves formatting)
+    const quickTranslationStyles = extractStylesFromHtml(quickTranslationHtml);
+
     // Translation pages - supports HTML content OR images (not both to avoid duplication)
     let translationPagesHTML = '';
 
@@ -5898,6 +5909,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     <style>
         ${getUnifiedPdfStyles(pageSizeCSS)}
     </style>
+    ${quickTranslationStyles}
 </head>
 <body>
     ${includeCover ? coverLetterHTML : ''}
@@ -6335,6 +6347,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
         <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 12px;"></div>`;
 
+    // Extract translation styles to include in print document (preserves formatting)
+    const translationStyles = translationResults.map(r => extractStylesFromHtml(r.translatedText)).filter(Boolean).join('\n');
+
     // Translation pages HTML (with or without letterhead)
     // Content flows naturally across pages; CSS pagination + thead handles multi-page layout
     // First page doesn't need page-break since cover ends with one
@@ -6439,6 +6454,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     <style>
         ${getUnifiedPdfStyles(pageSizeCSS)}
     </style>
+    ${translationStyles}
 </head>
 <body>
     ${includeCover ? coverLetterHTML : ''}
