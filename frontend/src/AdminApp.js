@@ -1421,21 +1421,29 @@ const extractStylesFromHtml = (html) => {
 // overriding letterhead, cover page, or other layout elements outside the translation area.
 // AI-generated translation HTML often contains global CSS selectors (body, table, td, div)
 // that can break the float-based letterhead layout when injected into the document <head>.
+// Also strips !important from translation CSS so it can never override layout !important rules.
 const scopeTranslationStyles = (stylesHtml) => {
   if (!stylesHtml) return '';
   return stylesHtml.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, (match, cssText) => {
+    // Strip !important from translation CSS to prevent overriding layout styles
+    let css = cssText.replace(/\s*!important/gi, '');
     // Prefix each CSS selector with .translation-content
-    const scopedCss = cssText.replace(/([^{}]+)\{/g, (ruleMatch, selectorPart) => {
+    const scopedCss = css.replace(/([^{}]+)\{/g, (ruleMatch, selectorPart) => {
       const trimmed = selectorPart.trim();
-      // Skip @-rules (@media, @page, @font-face, etc.) and comments
-      if (!trimmed || trimmed.startsWith('@') || trimmed.startsWith('/*')) return ruleMatch;
+      // Skip @-rules (@media, @page, @font-face, etc.)
+      if (!trimmed || trimmed.startsWith('@')) return ruleMatch;
+      // Handle comments before selectors: strip comment, scope the selector after it
+      const withoutComments = trimmed.replace(/\/\*[\s\S]*?\*\//g, '').trim();
+      if (!withoutComments) return ruleMatch;
       // Scope each comma-separated selector
-      const scopedSelectors = trimmed.split(',').map(s => {
+      const scopedSelectors = withoutComments.split(',').map(s => {
         const sel = s.trim();
         if (!sel) return sel;
         // Replace body/html selectors with .translation-content
         if (/^(html|body)$/i.test(sel)) return '.translation-content';
         if (/^(html|body)\s+/i.test(sel)) return sel.replace(/^(html|body)\s+/i, '.translation-content ');
+        // Skip * selector (universal reset) - too dangerous even when scoped
+        if (sel === '*') return '.translation-content *';
         return `.translation-content ${sel}`;
       }).join(', ');
       return `${scopedSelectors} {`;
@@ -5846,13 +5854,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             ${letterheadHTML}
         </td></tr></thead>
         <tbody><tr><td>
-            <div class="translation-content" style="padding: 0 20px; line-height: 1.5; font-size: 11pt;">
+            <div class="translation-content" style="padding: 0; line-height: 1.5; font-size: 11pt;">
                 ${quickTranslationHtml}
             </div>
         </td></tr></tbody>
     </table>` : `
     <div style="padding-top: 5px;">
-        <div class="translation-content" style="padding: 0 20px; line-height: 1.5; font-size: 11pt;">
+        <div class="translation-content" style="padding: 0; line-height: 1.5; font-size: 11pt;">
             ${quickTranslationHtml}
         </div>
     </div>`;
@@ -6279,6 +6287,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     const isFormTemplate = CERTIFICATE_TEMPLATES[selectedCertificateTemplate]?.isForm;
 
     // Cover Letter HTML - MATCHING START PREVIEW EXACTLY
+    // Uses !important on critical float/layout properties to prevent AI translation CSS from breaking layout
     const coverLetterHTML = isFormTemplate ? `
     <div style="font-family: Georgia, 'Times New Roman', serif; padding: 20px; page-break-after: always;">
         ${CERTIFICATE_TEMPLATES[selectedCertificateTemplate].formHTML}
@@ -6286,18 +6295,18 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     <div style="font-family: Georgia, 'Times New Roman', serif; font-size: 12px; line-height: 1.6; max-width: 100%; padding: 0; page-break-after: always;">
 
         <!-- HEADER - Using fixed widths like START preview -->
-        <div style="width: 100%; margin-bottom: 8px; overflow: hidden;">
-            <div style="float: left; width: 128px;">
+        <div style="width: 100% !important; margin-bottom: 8px; overflow: hidden !important;">
+            <div style="float: left !important; width: 128px !important;">
                 ${logoLeft
                   ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
                   : `<div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>`}
             </div>
-            <div style="float: right; width: 80px; text-align: right;">
+            <div style="float: right !important; width: 80px !important; text-align: right !important;">
                 ${logoRight
                   ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px; max-width: 75px;" />`
                   : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>`}
             </div>
-            <div style="margin-left: 138px; margin-right: 90px; text-align: center;">
+            <div style="margin-left: 138px !important; margin-right: 90px !important; text-align: center !important;">
                 <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
                 <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
                 <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
@@ -6305,7 +6314,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
 
         <!-- Blue line -->
-        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>
+        <div style="clear: both !important; width: 100% !important; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>
 
         <!-- Order Number -->
         ${orderNumber && !orderNumber.toLowerCase().includes('order0') && orderNumber !== 'P0000'
@@ -6337,8 +6346,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         })()}
 
         <!-- Signature Section -->
-        <div style="margin-top: 60px; overflow: hidden;">
-            <div style="float: left; width: 60%;">
+        <div style="margin-top: 60px; overflow: hidden !important;">
+            <div style="float: left !important; width: 60% !important;">
                 ${signatureImage
                   ? `<img src="${signatureImage}" alt="Signature" style="max-height: 40px; max-width: 180px; margin-bottom: 4px;" />`
                   : `<div style="font-family: 'Brush Script MT', cursive; font-size: 24px; color: #1a365d; margin-bottom: 4px;">Beatriz Paiva</div>`}
@@ -6347,7 +6356,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <div style="font-size: 13px;">Legacy Translations Inc.</div>
                 <div style="font-size: 13px; margin-top: 8px;">Dated: ${translationDate}</div>
             </div>
-            <div style="float: right; width: 35%; text-align: right;">
+            <div style="float: right !important; width: 35% !important; text-align: right !important;">
                 ${logoStamp
                   ? `<img src="${logoStamp}" alt="Stamp" style="width: 120px; height: 120px; object-fit: contain;" />`
                   : `<div style="width: 120px; height: 120px; border: 4px double #2563eb; border-radius: 50%; margin-left: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px;">
@@ -6360,25 +6369,26 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     </div>`;
 
     // Letterhead for all pages - Same style as cover
+    // Uses !important on critical float/layout properties to prevent AI translation CSS from breaking layout
     const letterheadHTML = `
-        <div style="width: 100%; margin-bottom: 2px; padding-bottom: 2px; overflow: hidden;">
-            <div style="float: left; width: 128px;">
+        <div style="width: 100% !important; margin-bottom: 2px; padding-bottom: 2px; overflow: hidden !important; position: relative !important;">
+            <div style="float: left !important; width: 128px !important;">
                 ${logoLeft
                   ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
                   : `<div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>`}
             </div>
-            <div style="float: right; width: 80px; text-align: right;">
+            <div style="float: right !important; width: 80px !important; text-align: right !important;">
                 ${logoRight
                   ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px; max-width: 75px;" />`
                   : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span></div>`}
             </div>
-            <div style="margin-left: 138px; margin-right: 90px; text-align: center;">
+            <div style="margin-left: 138px !important; margin-right: 90px !important; text-align: center !important;">
                 <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
                 <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
                 <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
-        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 12px;"></div>`;
+        <div style="clear: both !important; width: 100% !important; height: 2px; background: #93c5fd; margin-bottom: 12px;"></div>`;
 
     // Extract translation styles and SCOPE them to .translation-content to prevent
     // AI-generated global CSS from breaking letterhead/cover layout
@@ -6400,7 +6410,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             ${letterheadHTML}
         </td></tr></thead>
         <tbody><tr><td>
-            <div class="translation-content" style="padding: 0 20px; line-height: 1.5; font-size: 11pt;">
+            <div class="translation-content" style="padding: 0; line-height: 1.5; font-size: 11pt;">
                 ${content}
             </div>
         </td></tr></tbody>
@@ -6408,7 +6418,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       } else {
         return `
     <div style="${pageBreak} padding-top: 5px;">
-        <div class="translation-content" style="padding: 0 20px; line-height: 1.5; font-size: 11pt;">
+        <div class="translation-content" style="padding: 0; line-height: 1.5; font-size: 11pt;">
             ${content}
         </div>
     </div>`;
