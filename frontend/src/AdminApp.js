@@ -459,7 +459,7 @@ const getLetterheadHTML = (logoLeft, logoRight) => `
         </td>
     </tr>
 </table>
-<div style="width: 100%; height: 2px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 20px;"></div>`;
+<div style="width: 100%; height: 2px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 12px;"></div>`;
 
 // ==================== CONSTANTS ====================
 const STATUS_COLORS = {
@@ -5783,7 +5783,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
-        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 4px;"></div>`;
+        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 12px;"></div>`;
 
     // Translation pages - supports HTML content OR images (not both to avoid duplication)
     let translationPagesHTML = '';
@@ -6333,7 +6333,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
-        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 4px;"></div>`;
+        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 12px;"></div>`;
 
     // Translation pages HTML (with or without letterhead)
     // Content flows naturally across pages; CSS pagination + thead handles multi-page layout
