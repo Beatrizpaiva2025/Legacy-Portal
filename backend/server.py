@@ -9243,6 +9243,7 @@ async def admin_get_all_orders(
             'received': ['received', 'Received', 'RECEIVED', 'Quote', 'quote', 'QUOTE'],
             'client_review': ['client_review', 'Client Review', 'CLIENT_REVIEW', 'client review'],
             'delivered': ['delivered', 'Delivered', 'DELIVERED'],
+            'pm_upload_ready': ['pm_upload_ready', 'PM_UPLOAD_READY'],
             'final': ['final', 'Final', 'FINAL']
         }
         if status in status_mappings:
@@ -9359,8 +9360,8 @@ async def get_my_projects(token: str, admin_key: str):
     # Calculate summary
     total_pending = sum(1 for o in orders if o.get("payment_status") == "pending")
     total_paid = sum(1 for o in orders if o.get("payment_status") == "paid")
-    in_translation = sum(1 for o in orders if o.get("translation_status") == "in_translation")
-    completed = sum(1 for o in orders if o.get("translation_status") in ["ready", "delivered"])
+    in_translation = sum(1 for o in orders if o.get("translation_status") in ["in_translation", "pm_upload_ready"])
+    completed = sum(1 for o in orders if o.get("translation_status") in ["ready", "delivered", "final"])
 
     return {
         "orders": orders,
@@ -9373,6 +9374,268 @@ async def get_my_projects(token: str, admin_key: str):
             "completed": completed
         }
     }
+
+# ==================== PM UPLOAD TRANSLATION ENDPOINTS ====================
+
+@api_router.post("/admin/upload-pm-translation")
+async def upload_pm_translation(
+    order_id: str = Form(...),
+    admin_key: str = Form(...),
+    file: UploadFile = File(...)
+):
+    """PM uploads an external translation file. Status becomes pm_upload_ready."""
+    # Validate admin key or user token (admin/pm)
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin", "pm"]:
+            is_valid = True
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    # Find order
+    order = await db.translation_orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    try:
+        # Read file content
+        file_content = await file.read()
+        file_size = len(file_content)
+
+        # Max 20MB
+        if file_size > 20 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="File too large. Maximum size is 20MB.")
+
+        # Store in GridFS
+        file_metadata = {
+            "filename": file.filename,
+            "content_type": file.content_type or "application/octet-stream",
+            "uploaded_at": datetime.utcnow(),
+            "order_id": order_id,
+            "source": "pm_upload_translation"
+        }
+        file_id = await fs_bucket.upload_from_stream(
+            file.filename,
+            io.BytesIO(file_content),
+            metadata=file_metadata
+        )
+
+        # Update order with PM upload info
+        now = datetime.utcnow()
+        await db.translation_orders.update_one(
+            {"id": order_id},
+            {"$set": {
+                "pm_upload_file_id": str(file_id),
+                "pm_upload_filename": file.filename,
+                "pm_upload_content_type": file.content_type or "application/octet-stream",
+                "pm_upload_file_size": file_size,
+                "pm_uploaded_at": now.isoformat(),
+                "translation_status": "pm_upload_ready"
+            }}
+        )
+
+        # Send email to admin notifying about READY translation
+        try:
+            admin_email = os.environ.get("ADMIN_EMAIL", "contact@legacytranslations.com")
+            order_number = order.get("order_number", order_id)
+            client_name = order.get("client_name", "Unknown")
+            email_html = f"""
+            {get_email_header()}
+            <div style="padding: 30px;">
+                <h2 style="color: #10b981;">Translation Ready for Review</h2>
+                <p>A PM has uploaded an external translation for project <strong>{order_number}</strong>.</p>
+                <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+                    <tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Project:</td><td style="padding: 8px; border-bottom: 1px solid #eee;">{order_number}</td></tr>
+                    <tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Client:</td><td style="padding: 8px; border-bottom: 1px solid #eee;">{client_name}</td></tr>
+                    <tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">File:</td><td style="padding: 8px; border-bottom: 1px solid #eee;">{file.filename}</td></tr>
+                    <tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Size:</td><td style="padding: 8px; border-bottom: 1px solid #eee;">{file_size / 1024:.1f} KB</td></tr>
+                </table>
+                <p>Please log in to the admin panel to review and approve this translation.</p>
+            </div>
+            {get_email_footer()}
+            """
+            await email_service.send_email(admin_email, f"Translation READY - {order_number}", email_html)
+            logger.info(f"PM upload notification sent to admin for order {order_id}")
+        except Exception as e:
+            logger.error(f"Failed to send PM upload notification email: {str(e)}")
+
+        return {
+            "success": True,
+            "message": "Translation uploaded successfully. Status set to READY.",
+            "pm_upload_filename": file.filename,
+            "pm_upload_file_size": file_size,
+            "pm_uploaded_at": now.isoformat(),
+            "translation_status": "pm_upload_ready"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error uploading PM translation for order {order_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
+
+@api_router.post("/admin/accept-pm-upload")
+async def accept_pm_upload(data: dict = Body(...), admin_key: str = ""):
+    """Admin accepts PM upload and sends to client. Status becomes final."""
+    order_id = data.get("order_id")
+    admin_key = data.get("admin_key", admin_key)
+
+    if not order_id:
+        raise HTTPException(status_code=400, detail="order_id is required")
+
+    # Validate admin key or user token (admin only for acceptance)
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin", "pm"]:
+            is_valid = True
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    # Find order
+    order = await db.translation_orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    pm_file_id = order.get("pm_upload_file_id")
+    if not pm_file_id:
+        raise HTTPException(status_code=400, detail="No PM upload file found for this order")
+
+    try:
+        # Update order to final
+        now = datetime.utcnow()
+        await db.translation_orders.update_one(
+            {"id": order_id},
+            {"$set": {
+                "translation_status": "final",
+                "pm_approved": True,
+                "client_approved": True,
+                "completed_at": now.isoformat()
+            }}
+        )
+
+        # Send email to client with attachment
+        client_email = order.get("client_email")
+        order_number = order.get("order_number", order_id)
+        client_name = order.get("client_name", "Valued Customer")
+        pm_filename = order.get("pm_upload_filename", "translation")
+
+        email_sent_with_attachment = False
+
+        if client_email:
+            try:
+                # Retrieve file from GridFS
+                from bson import ObjectId
+                grid_out = await fs_bucket.open_download_stream(ObjectId(pm_file_id))
+                file_bytes = await grid_out.read()
+                file_base64 = base64.b64encode(file_bytes).decode('utf-8')
+
+                email_html = f"""
+                {get_email_header()}
+                <div style="padding: 30px;">
+                    <h2 style="color: #065f46;">Your Translation is Ready!</h2>
+                    <p>Dear {client_name},</p>
+                    <p>Your translation for project <strong>{order_number}</strong> has been completed and is attached to this email.</p>
+                    <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+                        <tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Project:</td><td style="padding: 8px; border-bottom: 1px solid #eee;">{order_number}</td></tr>
+                        <tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">File:</td><td style="padding: 8px; border-bottom: 1px solid #eee;">{pm_filename}</td></tr>
+                    </table>
+                    <p>If you have any questions, please don't hesitate to contact us.</p>
+                    <p>Thank you for choosing Legacy Translations!</p>
+                </div>
+                {get_email_footer()}
+                """
+
+                content_type = order.get("pm_upload_content_type", "application/octet-stream")
+                await email_service.send_email_with_attachment(
+                    client_email,
+                    f"Your Translation is Ready - {order_number}",
+                    email_html,
+                    file_base64,
+                    pm_filename,
+                    content_type
+                )
+                email_sent_with_attachment = True
+                logger.info(f"Translation delivered to client {client_email} with attachment for order {order_id}")
+            except Exception as e:
+                logger.error(f"Failed to send email with attachment for order {order_id}: {str(e)}")
+                # Fallback: send email without attachment
+                try:
+                    fallback_html = f"""
+                    {get_email_header()}
+                    <div style="padding: 30px;">
+                        <h2 style="color: #065f46;">Your Translation is Ready!</h2>
+                        <p>Dear {client_name},</p>
+                        <p>Your translation for project <strong>{order_number}</strong> has been completed.</p>
+                        <p>Please log in to your account or contact us to receive your translated document.</p>
+                        <p>Thank you for choosing Legacy Translations!</p>
+                    </div>
+                    {get_email_footer()}
+                    """
+                    await email_service.send_email(
+                        client_email,
+                        f"Your Translation is Ready - {order_number}",
+                        fallback_html
+                    )
+                    logger.info(f"Fallback email (no attachment) sent to {client_email} for order {order_id}")
+                except Exception as e2:
+                    logger.error(f"Failed to send fallback email for order {order_id}: {str(e2)}")
+
+        return {
+            "success": True,
+            "message": "Translation accepted and sent to client. Status set to FINAL.",
+            "translation_status": "final",
+            "email_sent_with_attachment": email_sent_with_attachment
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error accepting PM upload for order {order_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Accept failed: {str(e)}")
+
+
+@api_router.get("/admin/orders/{order_id}/pm-translation-download")
+async def download_pm_translation(order_id: str, admin_key: str):
+    """Download the PM-uploaded translation file for review."""
+    # Validate admin key or user token
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin", "pm"]:
+            is_valid = True
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    # Find order
+    order = await db.translation_orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    pm_file_id = order.get("pm_upload_file_id")
+    if not pm_file_id:
+        raise HTTPException(status_code=404, detail="No PM upload file found for this order")
+
+    try:
+        from bson import ObjectId
+        grid_out = await fs_bucket.open_download_stream(ObjectId(pm_file_id))
+        file_bytes = await grid_out.read()
+
+        filename = order.get("pm_upload_filename", "translation")
+        content_type = order.get("pm_upload_content_type", "application/octet-stream")
+
+        return StreamingResponse(
+            io.BytesIO(file_bytes),
+            media_type=content_type,
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Length": str(len(file_bytes))
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error downloading PM translation for order {order_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Download failed: {str(e)}")
+
 
 @api_router.post("/admin/orders/manual")
 async def admin_create_manual_order(project_data: ManualProjectCreate, admin_key: str):

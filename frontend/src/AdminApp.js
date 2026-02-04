@@ -479,7 +479,8 @@ const STATUS_COLORS = {
   'client_review': 'bg-sky-100 text-sky-700',
   'ready': 'bg-green-100 text-green-700',
   'delivered': 'bg-blue-100 text-blue-700',
-  'final': 'bg-indigo-100 text-indigo-700'
+  'pm_upload_ready': 'bg-emerald-100 text-emerald-700',
+  'final': 'bg-emerald-200 text-emerald-900'
 };
 
 const PAYMENT_COLORS = {
@@ -1500,6 +1501,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [sendingTranslatorMessage, setSendingTranslatorMessage] = useState(false);
   const [adminPmList, setAdminPmList] = useState([]);
   const [selectedAdminPm, setSelectedAdminPm] = useState('');
+  // PM Upload Translation state
+  const [pmUploadFile, setPmUploadFile] = useState(null);
+  const [pmUploadLoading, setPmUploadLoading] = useState(false);
+  const [pmAcceptLoading, setPmAcceptLoading] = useState(false);
+
   const [selectedCoverLetter, setSelectedCoverLetter] = useState('default');
   const [customCoverLetters, setCustomCoverLetters] = useState(() => {
     const saved = localStorage.getItem('custom_cover_letters');
@@ -6617,6 +6623,54 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
   };
 
+  // ==================== PM UPLOAD TRANSLATION FUNCTIONS ====================
+  const uploadPmTranslation = async (orderId) => {
+    if (!pmUploadFile || !orderId) return;
+    setPmUploadLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('order_id', orderId);
+      formData.append('admin_key', adminKey);
+      formData.append('file', pmUploadFile);
+      const response = await axios.post(`${API}/admin/upload-pm-translation`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      showToast('Translation uploaded successfully! Status set to READY.');
+      setPmUploadFile(null);
+      // Refresh order data
+      fetchAssignedOrders();
+    } catch (err) {
+      console.error('PM upload failed:', err);
+      showToast('Error uploading translation: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setPmUploadLoading(false);
+    }
+  };
+
+  const acceptPmUpload = async (orderId) => {
+    if (!orderId) return;
+    if (!confirm('Accept this translation and send to client? This will set the status to FINAL.')) return;
+    setPmAcceptLoading(true);
+    try {
+      await axios.post(`${API}/admin/accept-pm-upload`, {
+        order_id: orderId,
+        admin_key: adminKey
+      });
+      showToast('Translation accepted and sent to client! Status set to FINAL.');
+      // Refresh order data
+      fetchAssignedOrders();
+    } catch (err) {
+      console.error('Accept PM upload failed:', err);
+      showToast('Error accepting translation: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setPmAcceptLoading(false);
+    }
+  };
+
+  const downloadPmTranslation = (orderId) => {
+    window.open(`${API}/admin/orders/${orderId}/pm-translation-download?admin_key=${adminKey}`, '_blank');
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
       {/* Top header bar */}
@@ -6804,6 +6858,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         {[
           { id: 'start', label: 'START', icon: '📝', roles: ['admin', 'pm', 'translator'] },
           { id: 'translate', label: 'TRANSLATION', icon: '📄', roles: ['admin', 'pm', 'translator'] },
+          { id: 'upload-translation', label: 'UPLOAD TRANSLATION', icon: '📤', roles: ['admin', 'pm'] },
           { id: 'review', label: 'REVIEW', icon: '📋', roles: ['admin', 'pm', 'translator_contractor', 'translator_inhouse'] },
           { id: 'proofreading', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm', 'translator_inhouse'] },
           { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'pm', 'translator_inhouse'] },
@@ -9535,6 +9590,33 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             </div>
           ) : (
             <>
+              {/* PM Upload status hints */}
+              {(() => {
+                const currentOrder = assignedOrders.find(o => o.id === selectedOrderId);
+                if (currentOrder?.translation_status === 'pm_upload_ready') {
+                  return (
+                    <div className="mb-4 p-3 bg-emerald-50 border border-emerald-300 rounded-lg flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-emerald-600 text-lg">📤</span>
+                        <span className="text-sm text-emerald-700">A PM has uploaded an external translation. Switch to the <strong>Upload Translation</strong> tab to review.</span>
+                      </div>
+                      <button onClick={() => setActiveSubTab('upload-translation')} className="px-3 py-1 bg-emerald-600 text-white text-xs rounded hover:bg-emerald-700">
+                        Go to Upload Translation
+                      </button>
+                    </div>
+                  );
+                }
+                if (currentOrder?.translation_status === 'final') {
+                  return (
+                    <div className="mb-4 p-4 bg-emerald-50 border-2 border-emerald-300 rounded-lg text-center">
+                      <div className="text-3xl mb-2">🏁</div>
+                      <div className="text-lg font-bold text-emerald-800">FINAL</div>
+                      <p className="text-sm text-emerald-600">This translation has been approved and delivered to the client.</p>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
               {/* Project Files Section - Load documents here */}
               <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4 mb-4">
                 <h3 className="text-xs font-bold text-blue-800 mb-3">📁 Project Documents - Select to Load</h3>
@@ -9625,6 +9707,199 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               )}
             </>
           )}
+        </div>
+      )}
+
+      {/* UPLOAD TRANSLATION TAB - PM uploads external translation */}
+      {activeSubTab === 'upload-translation' && (
+        <div className="bg-white rounded shadow p-4">
+          <h2 className="text-sm font-bold mb-4">📤 Upload Translation (External)</h2>
+
+          {!selectedOrderId ? (
+            <div className="text-center py-8 text-gray-500">
+              <div className="text-4xl mb-3">📋</div>
+              <p>Please select an order from the START tab first</p>
+              <button
+                onClick={() => setActiveSubTab('start')}
+                className="mt-3 px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+              >
+                Go to START
+              </button>
+            </div>
+          ) : (() => {
+            const currentOrder = assignedOrders.find(o => o.id === selectedOrderId);
+            const orderStatus = currentOrder?.translation_status;
+            const hasPmUpload = currentOrder?.pm_upload_filename;
+
+            return (
+              <div className="space-y-4">
+                {/* Order info */}
+                <div className="bg-gray-50 rounded-lg p-3 border">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-gray-700">Project: </span>
+                      <span className="text-sm font-medium">{currentOrder?.order_number || selectedOrderId}</span>
+                    </div>
+                    {orderStatus && (
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        orderStatus === 'pm_upload_ready' ? 'bg-emerald-100 text-emerald-700' :
+                        orderStatus === 'final' ? 'bg-emerald-200 text-emerald-900' :
+                        'bg-gray-100 text-gray-600'
+                      }`}>
+                        {orderStatus === 'pm_upload_ready' ? 'READY' : orderStatus === 'final' ? 'FINAL' : orderStatus}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* FINAL status badge */}
+                {orderStatus === 'final' && (
+                  <div className="bg-emerald-50 border-2 border-emerald-300 rounded-lg p-6 text-center">
+                    <div className="text-5xl mb-3">🏁</div>
+                    <div className="text-xl font-bold text-emerald-800 mb-1">FINAL</div>
+                    <p className="text-sm text-emerald-600">This translation has been approved and delivered to the client.</p>
+                    {currentOrder?.completed_at && (
+                      <p className="text-xs text-emerald-500 mt-2">Completed: {new Date(currentOrder.completed_at).toLocaleString()}</p>
+                    )}
+                    {hasPmUpload && (
+                      <div className="mt-4">
+                        <button
+                          onClick={() => downloadPmTranslation(selectedOrderId)}
+                          className="px-4 py-2 bg-emerald-600 text-white text-sm rounded hover:bg-emerald-700"
+                        >
+                          Download Final File ({currentOrder.pm_upload_filename})
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* READY status - show file info + review/accept buttons */}
+                {orderStatus === 'pm_upload_ready' && hasPmUpload && (
+                  <div className="bg-emerald-50 border border-emerald-300 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white text-sm">✓</div>
+                      <div>
+                        <div className="text-sm font-bold text-emerald-800">Translation Uploaded - READY</div>
+                        <div className="text-xs text-emerald-600">Waiting for admin review and approval</div>
+                      </div>
+                    </div>
+                    <div className="bg-white rounded p-3 border mb-3">
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div><span className="font-bold text-gray-600">File:</span> {currentOrder.pm_upload_filename}</div>
+                        <div><span className="font-bold text-gray-600">Size:</span> {currentOrder.pm_upload_file_size ? `${(currentOrder.pm_upload_file_size / 1024).toFixed(1)} KB` : 'N/A'}</div>
+                        <div><span className="font-bold text-gray-600">Uploaded:</span> {currentOrder.pm_uploaded_at ? new Date(currentOrder.pm_uploaded_at).toLocaleString() : 'N/A'}</div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => downloadPmTranslation(selectedOrderId)}
+                        className="flex-1 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 flex items-center justify-center gap-2"
+                      >
+                        Open & Review File
+                      </button>
+                      <button
+                        onClick={() => acceptPmUpload(selectedOrderId)}
+                        disabled={pmAcceptLoading}
+                        className="flex-1 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded hover:bg-emerald-700 flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        {pmAcceptLoading ? 'Sending...' : 'Accept & Send to Client'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Upload area - show when not final and not ready, OR allow re-upload when ready */}
+                {orderStatus !== 'final' && (
+                  <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-lg p-4">
+                    <h3 className="text-xs font-bold text-orange-800 mb-3">
+                      {hasPmUpload ? 'Re-upload Translation File' : 'Upload External Translation'}
+                    </h3>
+                    <div
+                      className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                        pmUploadFile ? 'border-orange-400 bg-orange-100' : 'border-orange-300 hover:border-orange-500'
+                      }`}
+                      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const files = e.dataTransfer.files;
+                        if (files.length > 0) {
+                          const file = files[0];
+                          if (file.size > 20 * 1024 * 1024) {
+                            showToast('File too large. Maximum size is 20MB.');
+                            return;
+                          }
+                          setPmUploadFile(file);
+                        }
+                      }}
+                    >
+                      {pmUploadFile ? (
+                        <div>
+                          <div className="text-3xl mb-2">📎</div>
+                          <div className="text-sm font-medium text-orange-800">{pmUploadFile.name}</div>
+                          <div className="text-xs text-orange-600 mt-1">{(pmUploadFile.size / 1024).toFixed(1)} KB</div>
+                          <button
+                            onClick={() => setPmUploadFile(null)}
+                            className="mt-2 text-xs text-red-500 hover:text-red-700 underline"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ) : (
+                        <div>
+                          <div className="text-3xl mb-2">📤</div>
+                          <p className="text-sm text-orange-700 mb-1">Drag & drop your translation file here</p>
+                          <p className="text-xs text-orange-500">PDF, DOCX, TXT, XLSX (max 20MB)</p>
+                        </div>
+                      )}
+                      <input
+                        type="file"
+                        accept=".pdf,.docx,.doc,.txt,.xlsx,.xls,.pptx,.rtf"
+                        onChange={(e) => {
+                          const file = e.target.files[0];
+                          if (file) {
+                            if (file.size > 20 * 1024 * 1024) {
+                              showToast('File too large. Maximum size is 20MB.');
+                              return;
+                            }
+                            setPmUploadFile(file);
+                          }
+                        }}
+                        className="hidden"
+                        id="pm-upload-input"
+                      />
+                      {!pmUploadFile && (
+                        <label
+                          htmlFor="pm-upload-input"
+                          className="mt-3 inline-block px-4 py-2 bg-orange-500 text-white text-sm rounded cursor-pointer hover:bg-orange-600 transition"
+                        >
+                          Choose File
+                        </label>
+                      )}
+                    </div>
+
+                    {pmUploadFile && (
+                      <button
+                        onClick={() => uploadPmTranslation(selectedOrderId)}
+                        disabled={pmUploadLoading}
+                        className="mt-3 w-full px-4 py-2.5 bg-orange-600 text-white text-sm font-bold rounded hover:bg-orange-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {pmUploadLoading ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            Uploading...
+                          </>
+                        ) : (
+                          'Upload & Send to Admin'
+                        )}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -15457,7 +15732,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       'client_review': 'Client Review',
       'ready': 'Ready',
       'delivered': 'Delivered',
-      'final': 'Final'
+      'pm_upload_ready': 'READY',
+      'final': 'FINAL'
     };
     return labels[status] || status;
   };
@@ -16036,7 +16312,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
             </button>
           )}
           <div className="flex space-x-1">
-            {['all', 'received', 'review', 'client_review', 'ready', 'delivered', 'final'].map((s) => (
+            {['all', 'received', 'review', 'client_review', 'ready', 'delivered', 'pm_upload_ready', 'final'].map((s) => (
               <button key={s} onClick={() => setStatusFilter(s)}
                 className={`px-2 py-1 text-[10px] rounded ${statusFilter === s ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
                 {s === 'all' ? 'All' : getStatusLabel(s)}
@@ -17245,6 +17521,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             <option value="client_review">Client Review</option>
                             <option value="ready">Ready</option>
                             <option value="delivered">Delivered</option>
+                            <option value="pm_upload_ready">READY (PM Upload)</option>
+                            <option value="final">FINAL</option>
                           </select>
                         </div>
                       </div>
