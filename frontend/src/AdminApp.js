@@ -459,7 +459,7 @@ const getLetterheadHTML = (logoLeft, logoRight) => `
         </td>
     </tr>
 </table>
-<div style="width: 100%; height: 2px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 4px;"></div>`;
+<div style="width: 100%; height: 2px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 12px;"></div>`;
 
 // ==================== CONSTANTS ====================
 const STATUS_COLORS = {
@@ -1406,6 +1406,14 @@ const extractBodyForEdit = (html) => {
   }
   bodyContent = bodyContent.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
   return bodyContent;
+};
+
+// Extract <style> blocks from translation HTML so they can be included in print documents
+const extractStylesFromHtml = (html) => {
+  if (!html) return '';
+  const styleMatches = html.match(/<style[^>]*>[\s\S]*?<\/style>/gi);
+  if (!styleMatches || styleMatches.length === 0) return '';
+  return styleMatches.join('\n');
 };
 
 // Reconstruct full HTML document by replacing body content while preserving styles/head.
@@ -5783,7 +5791,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
-        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 4px;"></div>`;
+        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 12px;"></div>`;
+
+    // Extract translation styles to include in print document (preserves formatting)
+    const quickTranslationStyles = extractStylesFromHtml(quickTranslationHtml);
 
     // Translation pages - supports HTML content OR images (not both to avoid duplication)
     let translationPagesHTML = '';
@@ -5816,10 +5827,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     // Fallback to image files if no HTML available
     else if (validTranslationFiles.length > 0) {
       translationPagesHTML = validTranslationFiles.map((file, idx) => `
-    <div style="${idx > 0 ? 'page-break-before: always;' : ''} padding-top: 15px;">
+    <div style="${idx > 0 ? 'page-break-before: always;' : ''} padding-top: 5px;">
         ${includeLetterhead ? letterheadHTML : ''}
         <div>
-            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Translation page ${idx + 1}" style="width: 100%; height: auto; max-height: none; border: none; object-fit: contain; display: block; margin: 0 auto;" />
+            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Translation page ${idx + 1}" style="max-width: 100%; max-height: 7in; object-fit: contain; display: block; margin: 0 auto;" />
         </div>
     </div>`).join('');
     }
@@ -5827,11 +5838,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     // Original document pages - wrapped for auto-scaling like translation pages
     const validOriginalFiles = quickOriginalFiles.filter(file => file.data && file.data.length > 100);
     const originalPagesHTML = (includeOriginal && validOriginalFiles.length > 0) ? validOriginalFiles.map((file, idx) => `
-    <div style="page-break-before: always; padding-top: 15px;">
+    <div style="page-break-before: always; padding-top: 5px;">
         ${includeLetterhead ? letterheadHTML : ''}
         ${idx === 0 ? '<div style="font-size: 13px; font-weight: bold; text-align: center; margin: 4px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px;">Original Document</div>' : ''}
         <div style="text-align: center;">
-            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Original page ${idx + 1}" style="width: 100%; height: auto; max-height: none; border: none; object-fit: contain; display: block; margin: 0 auto;" />
+            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Original page ${idx + 1}" style="max-width: 100%; max-height: 7in; object-fit: contain; display: block; margin: 0 auto;" />
         </div>
     </div>`).join('') : '';
 
@@ -5898,6 +5909,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     <style>
         ${getUnifiedPdfStyles(pageSizeCSS)}
     </style>
+    ${quickTranslationStyles}
 </head>
 <body>
     ${includeCover ? coverLetterHTML : ''}
@@ -6333,7 +6345,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
-        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 4px;"></div>`;
+        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 12px;"></div>`;
+
+    // Extract translation styles to include in print document (preserves formatting)
+    const translationStyles = translationResults.map(r => extractStylesFromHtml(r.translatedText)).filter(Boolean).join('\n');
 
     // Translation pages HTML (with or without letterhead)
     // Content flows naturally across pages; CSS pagination + thead handles multi-page layout
@@ -6421,11 +6436,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     // Original documents pages HTML (each image on separate page, title only on first)
     // Wrapped in original-wrapper/original-content for auto-scaling like translation pages
     const originalPagesHTML = (includeOriginal && originalImages.length > 0) ? originalImages.map((img, index) => `
-    <div style="page-break-before: always; padding-top: 15px;">
+    <div style="page-break-before: always; padding-top: 5px;">
         ${includeLetterhead ? letterheadHTML : ''}
         ${index === 0 ? '<div style="font-size: 13px; font-weight: bold; text-align: center; margin: 4px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px;">Original Document</div>' : ''}
         <div style="text-align: center;">
-            <img src="${img.data}" alt="${img.filename}" style="width: 100%; height: auto; max-height: none; border: none; object-fit: contain; display: block; margin: 0 auto;" />
+            <img src="${img.data}" alt="${img.filename}" style="max-width: 100%; max-height: 7in; object-fit: contain; display: block; margin: 0 auto;" />
         </div>
     </div>
     `).join('') : '';
@@ -6439,6 +6454,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     <style>
         ${getUnifiedPdfStyles(pageSizeCSS)}
     </style>
+    ${translationStyles}
 </head>
 <body>
     ${includeCover ? coverLetterHTML : ''}
@@ -14080,7 +14096,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Times New Roman', Georgia, serif; font-size: 13px; line-height: 1.5; color: #333; padding: 0.2in 0.25in; }
     .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; }
-    .header-line { height: 3px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 4px; }
+    .header-line { height: 3px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 12px; }
     .logo-left { width: 130px; height: 55px; display: flex; align-items: center; }
     .logo-placeholder { width: 130px; height: 55px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #999; background: #fafafa; }
     .header-center { text-align: center; flex: 1; padding: 0 15px; }
@@ -14115,7 +14131,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     .original-documents-page { page-break-after: always; page-break-inside: avoid; padding-top: 15px; }
     .original-documents-page:last-of-type { page-break-after: auto; }
     .original-image-container { text-align: center; margin-bottom: 5px; }
-    .original-image { width: 100%; height: auto; max-height: none; border: none; object-fit: contain; display: block; margin: 0 auto; }
+    .original-image { max-width: 100%; max-height: 630px; border: 1px solid #ddd; object-fit: contain; display: block; margin: 0 auto; }
     @media print {
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       /* running-header styles removed - using inline letterheads instead */
@@ -26421,7 +26437,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Times New Roman', Georgia, serif; font-size: 13px; line-height: 1.5; color: #333; padding: 0.2in 0.25in; }
     .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; }
-    .header-line { height: 3px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 4px; }
+    .header-line { height: 3px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 12px; }
     .logo-left { width: 130px; height: 55px; display: flex; align-items: center; }
     .logo-placeholder { width: 130px; height: 55px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #999; background: #fafafa; }
     .header-center { text-align: center; flex: 1; padding: 0 15px; }
@@ -26456,7 +26472,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     .original-documents-page { page-break-after: always; page-break-inside: avoid; padding-top: 15px; }
     .original-documents-page:last-of-type { page-break-after: auto; }
     .original-image-container { text-align: center; margin-bottom: 5px; }
-    .original-image { width: 100%; height: auto; max-height: none; border: none; object-fit: contain; display: block; margin: 0 auto; }
+    .original-image { max-width: 100%; max-height: 630px; border: 1px solid #ddd; object-fit: contain; display: block; margin: 0 auto; }
     @media print {
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       /* running-header styles removed - using inline letterheads instead */
@@ -27321,7 +27337,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         .header-line {
             height: 3px;
             background: linear-gradient(to right, #3B82F6, #60A5FA);
-            margin-bottom: 4px;
+            margin-bottom: 12px;
             border: none;
         }
         .logo-left { width: 130px; height: 55px; display: flex; align-items: center; }
