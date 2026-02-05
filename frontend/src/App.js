@@ -3606,7 +3606,7 @@ const InvoicesPage = ({ token, t, currency, lang }) => {
                   <div>
                     <div className="font-mono font-bold text-lg">{invoice.invoice_number}</div>
                     <div className="text-sm text-gray-500">
-                      {t?.dueDate || 'Due Date'}: {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : '-'}
+                      {t?.dueDate || 'Due Date'}: {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString('en-US', { timeZone: 'America/New_York' }) : '-'}
                     </div>
                   </div>
                   <div className="flex items-center space-x-4">
@@ -3619,7 +3619,7 @@ const InvoicesPage = ({ token, t, currency, lang }) => {
 
                 <div className="text-sm text-gray-500 mb-4">
                   {invoice.order_ids?.length || 0} {t?.ordersIncluded || 'orders'} |
-                  {t?.invoiceNumber || 'Created'}: {new Date(invoice.created_at).toLocaleDateString()}
+                  {t?.invoiceNumber || 'Created'}: {new Date(invoice.created_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
                 </div>
 
                 <div className="flex items-center justify-between">
@@ -3662,7 +3662,7 @@ const InvoicesPage = ({ token, t, currency, lang }) => {
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div>
                   <div className="text-sm text-gray-500">{t?.dueDate || 'Due Date'}</div>
-                  <div className="font-medium">{selectedInvoice.due_date ? new Date(selectedInvoice.due_date).toLocaleDateString() : '-'}</div>
+                  <div className="font-medium">{selectedInvoice.due_date ? new Date(selectedInvoice.due_date).toLocaleDateString('en-US', { timeZone: 'America/New_York' }) : '-'}</div>
                 </div>
                 <div>
                   <div className="text-sm text-gray-500">{t?.amount || 'Amount'}</div>
@@ -3680,7 +3680,7 @@ const InvoicesPage = ({ token, t, currency, lang }) => {
                         <div className="text-sm text-gray-500">
                           {order.client_name} - {order.translate_from} to {order.translate_to}
                         </div>
-                        <div className="text-xs text-gray-400">{new Date(order.created_at).toLocaleDateString()}</div>
+                        <div className="text-xs text-gray-400">{new Date(order.created_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}</div>
                       </div>
                       <div className="font-medium">{formatCurrency(order.total_price)}</div>
                     </div>

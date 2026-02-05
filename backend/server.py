@@ -3832,9 +3832,9 @@ def calculate_price_with_tier(word_count: int, service_type: str, urgency: str, 
 
 
 def get_estimated_delivery(urgency: str) -> str:
-    """Calculate estimated delivery date"""
-    today = datetime.now()
-    
+    """Calculate estimated delivery date in NY timezone"""
+    today = datetime.now(NY_TIMEZONE)
+
     if urgency == "urgent":
         delivery_date = today + timedelta(hours=12)
         days_text = "12 hours"
@@ -3844,9 +3844,9 @@ def get_estimated_delivery(urgency: str) -> str:
     else:
         delivery_date = today + timedelta(days=2)
         days_text = "2 days"
-    
+
     formatted_date = delivery_date.strftime("%A, %B %d")
-    return f"{formatted_date} ({days_text})"
+    return f"{formatted_date} ({days_text}) EST"
 
 def extract_tables_from_textract(blocks: list) -> list:
     """
@@ -12689,12 +12689,16 @@ async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate,
                                 deadline = current_order.get("translator_deadline") or current_order.get("deadline")
                                 if deadline:
                                     if isinstance(deadline, datetime):
-                                        deadline_str = deadline.strftime("%B %d, %Y at %I:%M %p")
+                                        # Convert UTC to NY timezone for display
+                                        ny_deadline = deadline.replace(tzinfo=ZoneInfo("UTC")).astimezone(NY_TIMEZONE) if deadline.tzinfo is None else deadline.astimezone(NY_TIMEZONE)
+                                        deadline_str = ny_deadline.strftime("%B %d, %Y at %I:%M %p") + " (EST)"
                                     elif isinstance(deadline, str):
                                         try:
                                             from dateutil import parser
                                             parsed = parser.parse(deadline)
-                                            deadline_str = parsed.strftime("%B %d, %Y at %I:%M %p")
+                                            # Treat naive datetime as UTC
+                                            ny_parsed = parsed.replace(tzinfo=ZoneInfo("UTC")).astimezone(NY_TIMEZONE) if parsed.tzinfo is None else parsed.astimezone(NY_TIMEZONE)
+                                            deadline_str = ny_parsed.strftime("%B %d, %Y at %I:%M %p") + " (EST)"
                                         except:
                                             deadline_str = str(deadline)
                                     else:

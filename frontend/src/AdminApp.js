@@ -15171,7 +15171,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     try {
       let newDeadline = null;
       if (tempModalDeadline.date) {
-        newDeadline = `${tempModalDeadline.date}T${tempModalDeadline.time || '17:00'}:00`;
+        newDeadline = convertNYToUTC(tempModalDeadline.date, tempModalDeadline.time || '17:00');
       }
       await axios.put(`${API}/admin/orders/${viewingOrder.id}?admin_key=${adminKey}`, {
         deadline: newDeadline
@@ -15190,7 +15190,13 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     if (!viewingOrder || !editFormData) return;
     setSavingProject(true);
     try {
-      await axios.put(`${API}/admin/orders/${viewingOrder.id}?admin_key=${adminKey}`, editFormData);
+      // Convert deadline from NY timezone to UTC before sending
+      const dataToSend = { ...editFormData };
+      if (dataToSend.deadline) {
+        const [datePart, timePart] = dataToSend.deadline.split('T');
+        dataToSend.deadline = convertNYToUTC(datePart, timePart || '17:00');
+      }
+      await axios.put(`${API}/admin/orders/${viewingOrder.id}?admin_key=${adminKey}`, dataToSend);
 
       // Update viewing order locally
       const updatedOrder = { ...viewingOrder, ...editFormData };
@@ -15226,7 +15232,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       service_type: viewingOrder.service_type || 'certified',
       page_count: viewingOrder.page_count || 1,
       urgency: viewingOrder.urgency || 'no',
-      deadline: viewingOrder.deadline ? new Date(viewingOrder.deadline).toISOString().slice(0, 16) : '',
+      deadline: viewingOrder.deadline ? (() => { const { date, time } = getDateTimePartsInNY(viewingOrder.deadline); return `${date}T${time}`; })() : '',
       document_type: viewingOrder.document_type || '',
       notes: viewingOrder.notes || '',
       internal_notes: viewingOrder.internal_notes || '',
@@ -16734,8 +16740,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               {/* PM column - Admin only */}
               {isAdmin && <th className="px-3 py-3 text-left font-semibold text-gray-700">PM</th>}
               <th className="px-3 py-3 text-left font-semibold text-gray-700">Translator</th>
-              <th className="px-3 py-3 text-left font-semibold text-gray-700" title="Prazo do Tradutor - Data de retorno da tradução">TR Deadline</th>
-              <th className="px-3 py-3 text-left font-semibold text-gray-700" title="Prazo do Cliente - Data de entrega ao cliente">Client Deadline</th>
+              <th className="px-3 py-3 text-left font-semibold text-gray-700" title="Prazo do Tradutor - Data de retorno da tradução (EST)">TR Deadline <span className="text-xs font-normal text-gray-400">(EST)</span></th>
+              <th className="px-3 py-3 text-left font-semibold text-gray-700" title="Prazo do Cliente - Data de entrega ao cliente (EST)">Client Deadline <span className="text-xs font-normal text-gray-400">(EST)</span></th>
               <th className="px-3 py-3 text-left font-semibold text-gray-700">Status</th>
               {/* Translation Ready column - shows when translation is complete */}
               <th className="px-3 py-3 text-center font-semibold text-gray-700">Translation</th>
@@ -17491,7 +17497,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             />
                           </div>
                           <div className="col-span-2">
-                            <label className="block text-xs font-medium text-gray-600 mb-1">Deadline</label>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Deadline <span className="text-gray-400">(EST)</span></label>
                             <input
                               type="datetime-local"
                               value={editFormData.deadline || ''}
@@ -17631,14 +17637,14 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             </tr>
                             <tr className="border-b">
                               <td className="py-2 font-medium text-gray-600">Created</td>
-                              <td className="py-2">{formatDateTimeLocal(viewingOrder.created_at)}</td>
+                              <td className="py-2">{formatDateTimeLocal(viewingOrder.created_at)} <span className="text-xs text-gray-400">(EST)</span></td>
                             </tr>
                             <tr className="border-b">
                               <td className="py-2 font-medium text-gray-600">Deadline</td>
                               <td className="py-2">
                                 {editingModalDeadline ? (
                                   <div className="flex flex-col gap-2">
-                                    <div className="flex gap-2">
+                                    <div className="flex gap-2 items-center">
                                       <input
                                         type="date"
                                         value={tempModalDeadline.date}
@@ -17651,6 +17657,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                         onChange={(e) => setTempModalDeadline(prev => ({ ...prev, time: e.target.value }))}
                                         className="px-2 py-1 border rounded text-xs"
                                       />
+                                      <span className="text-xs text-gray-400">(EST)</span>
                                     </div>
                                     <div className="flex gap-1">
                                       <button
@@ -17671,7 +17678,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                   <div className="flex items-center gap-2">
                                     {viewingOrder.deadline ? (
                                       <span className="text-blue-600 font-medium">
-                                        {formatDateTimeLocal(viewingOrder.deadline)}
+                                        {formatDateTimeLocal(viewingOrder.deadline)} <span className="text-xs text-gray-400">(EST)</span>
                                       </span>
                                     ) : (
                                       <span className="text-gray-400">Not set</span>
@@ -17679,11 +17686,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                     {(isAdmin || isPM) && (
                                       <button
                                         onClick={() => {
-                                          const deadline = viewingOrder.deadline ? new Date(viewingOrder.deadline) : null;
-                                          setTempModalDeadline({
-                                            date: deadline ? deadline.toISOString().split('T')[0] : '',
-                                            time: deadline ? deadline.toTimeString().slice(0, 5) : '17:00'
-                                          });
+                                          const { date, time } = getDateTimePartsInNY(viewingOrder.deadline);
+                                          setTempModalDeadline({ date, time });
                                           setEditingModalDeadline(true);
                                         }}
                                         className="px-2 py-0.5 bg-blue-100 text-blue-600 rounded text-[10px] hover:bg-blue-200"
@@ -28159,7 +28163,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
     setSavingTrDeadline(true);
     try {
-      const translatorDeadline = `${tempTrDeadline.date}T${tempTrDeadline.time || '17:00'}:00`;
+      const translatorDeadline = convertNYToUTC(tempTrDeadline.date, tempTrDeadline.time || '17:00');
 
       await axios.put(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`, {
         translator_deadline: translatorDeadline
@@ -29788,25 +29792,23 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                             onClick={() => {
                               setEditingTrDeadline(order.id);
                               if (order.translator_deadline) {
-                                const dt = new Date(order.translator_deadline);
-                                setTempTrDeadline({
-                                  date: dt.toISOString().split('T')[0],
-                                  time: dt.toTimeString().slice(0, 5)
-                                });
+                                const { date, time } = getDateTimePartsInNY(order.translator_deadline);
+                                setTempTrDeadline({ date, time });
                               } else {
                                 // Default to 2 days before client deadline if set, otherwise tomorrow at 5pm
                                 if (order.deadline) {
-                                  const clientDeadline = new Date(order.deadline);
-                                  clientDeadline.setDate(clientDeadline.getDate() - 2);
-                                  setTempTrDeadline({
-                                    date: clientDeadline.toISOString().split('T')[0],
-                                    time: '17:00'
-                                  });
+                                  const { date, time } = getDateTimePartsInNY(order.deadline);
+                                  const d = new Date(date);
+                                  d.setDate(d.getDate() - 2);
+                                  const adjustedDate = d.toISOString().split('T')[0];
+                                  setTempTrDeadline({ date: adjustedDate, time: time || '17:00' });
                                 } else {
-                                  const tomorrow = new Date();
-                                  tomorrow.setDate(tomorrow.getDate() + 1);
+                                  const { date } = getDateTimePartsInNY(null);
+                                  const d = new Date(date);
+                                  d.setDate(d.getDate() + 1);
+                                  const tomorrowDate = d.toISOString().split('T')[0];
                                   setTempTrDeadline({
-                                    date: tomorrow.toISOString().split('T')[0],
+                                    date: tomorrowDate,
                                     time: '17:00'
                                   });
                                 }
