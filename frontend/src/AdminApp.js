@@ -7263,7 +7263,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             ⏰ Due: {new Date(file.translator_deadline || file.deadline).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
                           </div>
                         )}
-                        {file.internal_notes && (
+                        {isAdmin && file.internal_notes && (
                           <div className="text-[10px] text-sky-600 mt-1">
                             📝 Has instructions
                           </div>
@@ -7394,7 +7394,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                               ⏰ Due: {new Date(order.translator_deadline || order.deadline).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
                             </div>
                           )}
-                          {order.internal_notes && (
+                          {isAdmin && order.internal_notes && (
                             <div className="text-[10px] text-sky-600 mt-1">
                               📝 Has instructions from PM
                             </div>
@@ -7417,8 +7417,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             </div>
           )}
 
-          {/* PM Instructions - Show when project is selected and has internal notes */}
-          {selectedOrderId && assignedOrders.find(o => o.id === selectedOrderId)?.internal_notes && (
+          {/* Internal Notes - Admin only */}
+          {isAdmin && selectedOrderId && assignedOrders.find(o => o.id === selectedOrderId)?.internal_notes && (
             <div className="bg-sky-50 border border-sky-300 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <div className="text-2xl">📝</div>
@@ -17424,6 +17424,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                               placeholder="Notes visible to client..."
                             />
                           </div>
+                          {isAdmin && (
                           <div>
                             <label className="block text-xs font-medium text-gray-600 mb-1">Internal Notes (Admin only)</label>
                             <textarea
@@ -17434,6 +17435,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                               placeholder="Internal notes..."
                             />
                           </div>
+                          )}
                         </div>
                       </div>
                     </>
@@ -17631,7 +17633,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         ) : (
                           <div className="p-2 bg-gray-50 rounded border text-xs text-gray-400">No client notes</div>
                         )}
-                        {(isAdmin || isPM) && (
+                        {isAdmin && (
                           viewingOrder.internal_notes ? (
                             <div className="p-2 bg-yellow-50 rounded border border-yellow-200">
                               <div className="text-[10px] font-medium text-yellow-600 mb-1">📝 Internal Note:</div>

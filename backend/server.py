@@ -1490,6 +1490,9 @@ def get_order_confirmation_email_template(client_name: str, order_details: dict)
                                                 <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('estimated_delivery', 'N/A')}</td>
                                             </tr>
                                         </table>
+                                        <p style="color: #94a3b8; font-size: 11px; margin: 10px 0 0 0; font-style: italic;">
+                                            * Business days = Monday through Friday, excluding weekends.
+                                        </p>
                                     </td>
                                 </tr>
                             </table>
@@ -3238,48 +3241,46 @@ def format_date_ny(dt, fmt="%m/%d/%Y"):
 
 def calculate_client_deadline(source_type: str = "website", created_at: datetime = None) -> datetime:
     """
-    Calculate client deadline based on source type using business days (excluding weekends).
+    Calculate client deadline based on source type.
 
     Args:
         source_type: "website", "whatsapp", or "partner"
         created_at: Order creation time (UTC). If None, uses current time.
 
     Returns:
-        Deadline datetime in UTC (but calculated based on NY timezone business days)
+        Deadline datetime in UTC
 
-    Business days:
-        - Website/WhatsApp: 3 business days
-        - Partner Portal: 2 business days
+    Standard deadlines:
+        - Website/WhatsApp: 3 business days (excluding weekends)
+        - Partner Portal: 48 hours (calendar hours)
     """
     if created_at is None:
         created_at = datetime.utcnow()
 
-    # Convert to New York timezone for business day calculation
+    # Convert to New York timezone for calculation
     ny_time = created_at.replace(tzinfo=ZoneInfo("UTC")).astimezone(NY_TIMEZONE)
 
-    # Determine number of business days based on source
     if source_type == "partner":
-        business_days = 2
-    else:  # website, whatsapp, or other
-        business_days = 3
+        # Partner portal standard: 48 hours (calendar hours, not business days)
+        deadline_ny = ny_time + timedelta(hours=48)
+    else:
+        # Website/WhatsApp: 3 business days (skip weekends)
+        deadline_ny = ny_time
+        days_added = 0
 
-    # Calculate deadline by adding business days (skip weekends)
-    deadline_ny = ny_time
-    days_added = 0
+        while days_added < 3:
+            deadline_ny += timedelta(days=1)
+            # Monday = 0, Sunday = 6; skip Saturday (5) and Sunday (6)
+            if deadline_ny.weekday() < 5:  # It's a weekday
+                days_added += 1
 
-    while days_added < business_days:
-        deadline_ny += timedelta(days=1)
-        # Monday = 0, Sunday = 6; skip Saturday (5) and Sunday (6)
-        if deadline_ny.weekday() < 5:  # It's a weekday
-            days_added += 1
-
-    # Keep the same time as the original request
-    deadline_ny = deadline_ny.replace(
-        hour=ny_time.hour,
-        minute=ny_time.minute,
-        second=ny_time.second,
-        microsecond=0
-    )
+        # Keep the same time as the original request
+        deadline_ny = deadline_ny.replace(
+            hour=ny_time.hour,
+            minute=ny_time.minute,
+            second=ny_time.second,
+            microsecond=0
+        )
 
     # Convert back to UTC for storage
     deadline_utc = deadline_ny.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
@@ -3831,8 +3832,13 @@ def calculate_price_with_tier(word_count: int, service_type: str, urgency: str, 
     return base_price, urgency_fee, total_price, discount_amount
 
 
-def get_estimated_delivery(urgency: str) -> str:
-    """Calculate estimated delivery date in NY timezone"""
+def get_estimated_delivery(urgency: str, source_type: str = "website") -> str:
+    """Calculate estimated delivery date in NY timezone.
+
+    Standard deadlines:
+        - Website/Customer: 3 business days
+        - Partner Portal: 48 hours (2 days)
+    """
     today = datetime.now(NY_TIMEZONE)
 
     if urgency == "urgent":
@@ -3842,8 +3848,19 @@ def get_estimated_delivery(urgency: str) -> str:
         delivery_date = today + timedelta(days=1)
         days_text = "24 hours"
     else:
-        delivery_date = today + timedelta(days=2)
-        days_text = "2 days"
+        if source_type == "partner":
+            # Partner portal standard: 48 hours (2 days)
+            delivery_date = today + timedelta(hours=48)
+            days_text = "2 days"
+        else:
+            # Website/Customer standard: 3 business days
+            delivery_date = today
+            bdays = 0
+            while bdays < 3:
+                delivery_date += timedelta(days=1)
+                if delivery_date.weekday() < 5:  # Monday-Friday
+                    bdays += 1
+            days_text = "3 business days"
 
     formatted_date = delivery_date.strftime("%A, %B %d")
     return f"{formatted_date} ({days_text}) EST"
@@ -8917,7 +8934,7 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
                 "service_type": order.service_type,
                 "urgency": order.urgency,
                 "total_price": order.total_price,
-                "estimated_delivery": get_estimated_delivery(order.urgency)
+                "estimated_delivery": get_estimated_delivery(order.urgency, "partner")
             }
             protemos_response = await protemos_client.create_project(protemos_data)
 
@@ -8940,7 +8957,7 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
                 "translate_to": order.translate_to,
                 "word_count": order.word_count,
                 "urgency": order.urgency,
-                "estimated_delivery": get_estimated_delivery(order.urgency),
+                "estimated_delivery": get_estimated_delivery(order.urgency, "partner"),
                 "base_price": order.base_price,
                 "urgency_fee": order.urgency_fee,
                 "total_price": order.total_price,
@@ -9217,7 +9234,7 @@ async def admin_get_all_orders(
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
     # Get user info for role-based filtering
-    user_role = None
+    user_role = "admin" if admin_key == expected_key else None
     user_id = None
     user_name = None
     if admin_key != expected_key:
@@ -9323,6 +9340,11 @@ async def admin_get_all_orders(
     # Calculate total pages
     total_pages = (total_count + limit - 1) // limit
 
+    # Strip internal_notes for non-admin users (admin only)
+    if user_role != "admin":
+        for order in orders:
+            order.pop("internal_notes", None)
+
     return {
         "orders": orders,
         "pagination": {
@@ -9396,6 +9418,11 @@ async def get_my_projects(token: str, admin_key: str):
     for order in orders:
         if '_id' in order:
             del order['_id']
+
+    # Strip internal_notes for non-admin users (admin only)
+    if user_role != "admin":
+        for order in orders:
+            order.pop("internal_notes", None)
 
     # Calculate summary
     total_pending = sum(1 for o in orders if o.get("payment_status") == "pending")
@@ -9746,7 +9773,7 @@ async def admin_create_manual_order(project_data: ManualProjectCreate, admin_key
         if deadline is None:
             source_type = project_data.revenue_source or "website"
             if source_type == "partner":
-                deadline = calculate_client_deadline("partner", created_at)  # 2 business days
+                deadline = calculate_client_deadline("partner", created_at)  # 48 hours
             elif source_type == "whatsapp":
                 deadline = calculate_client_deadline("whatsapp", created_at)  # 3 business days
             else:
