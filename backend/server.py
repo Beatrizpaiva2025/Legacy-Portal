@@ -6177,6 +6177,9 @@ async def register_partner(partner_data: PartnerCreate):
                         "salesperson_id": salesperson["id"],
                         "partner_id": partner.id,
                         "partner_name": partner.company_name,
+                        "partner_email": partner.email or "",
+                        "partner_phone": partner.phone or "",
+                        "partner_contact_name": partner.contact_name or "",
                         "partner_tier": "bronze",  # New partners start as bronze
                         "acquisition_date": datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d"),
                         "commission_paid": 0,
@@ -28705,6 +28708,26 @@ async def get_partner_acquisitions(admin_key: str = Header(None), salesperson_id
         sp = await db.salespeople.find_one({"id": acq["salesperson_id"]})
         acq["salesperson_name"] = sp["name"] if sp else "Unknown"
 
+        # Backfill missing email/phone/contact from partner record
+        if not acq.get("partner_email") and acq.get("partner_id"):
+            partner = await db.partners.find_one({"id": acq["partner_id"]})
+            if partner:
+                update_fields = {}
+                if partner.get("email"):
+                    update_fields["partner_email"] = partner["email"]
+                    acq["partner_email"] = partner["email"]
+                if partner.get("phone") and not acq.get("partner_phone"):
+                    update_fields["partner_phone"] = partner["phone"]
+                    acq["partner_phone"] = partner["phone"]
+                if partner.get("contact_name") and not acq.get("partner_contact_name"):
+                    update_fields["partner_contact_name"] = partner["contact_name"]
+                    acq["partner_contact_name"] = partner["contact_name"]
+                if update_fields:
+                    await db.partner_acquisitions.update_one(
+                        {"id": acq["id"]},
+                        {"$set": update_fields}
+                    )
+
     return acquisitions
 
 # Record partner acquisition
@@ -29378,6 +29401,9 @@ async def salesperson_register_partner(
         salesperson_id=salesperson["id"],
         partner_id=partner_id,
         partner_name=company_name,
+        partner_email=email.lower().strip(),
+        partner_phone=phone,
+        partner_contact_name=contact_name,
         partner_tier=partner_tier,
         acquisition_date=datetime.now().strftime("%Y-%m-%d"),
         commission_paid=tier_commissions.get(partner_tier, 50),
