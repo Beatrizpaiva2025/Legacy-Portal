@@ -477,10 +477,10 @@ const STATUS_COLORS = {
   'pending_admin_review': 'bg-indigo-100 text-indigo-700',
   'finalized_pending_admin': 'bg-purple-100 text-purple-700',
   'client_review': 'bg-sky-100 text-sky-700',
-  'ready': 'bg-green-100 text-green-700',
+  'ready': 'bg-green-200 text-green-800',
   'delivered': 'bg-blue-100 text-blue-700',
-  'pm_upload_ready': 'bg-emerald-100 text-emerald-700',
-  'final': 'bg-emerald-200 text-emerald-900'
+  'pm_upload_ready': 'bg-green-200 text-green-800',
+  'final': 'bg-blue-100 text-blue-700'
 };
 
 const PAYMENT_COLORS = {
@@ -9625,12 +9625,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 const currentOrder = assignedOrders.find(o => o.id === selectedOrderId);
                 if (currentOrder?.translation_status === 'pm_upload_ready') {
                   return (
-                    <div className="mb-4 p-3 bg-emerald-50 border border-emerald-300 rounded-lg flex items-center justify-between">
+                    <div className="mb-4 p-3 bg-green-100 border border-green-400 rounded-lg flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="text-emerald-600 text-lg">📤</span>
-                        <span className="text-sm text-emerald-700">A PM has uploaded an external translation. Switch to the <strong>Upload Translation</strong> tab to review.</span>
+                        <span className="text-green-700 text-lg">📤</span>
+                        <span className="text-sm text-green-800">A PM has uploaded an external translation. Switch to the <strong>Upload Translation</strong> tab to review.</span>
                       </div>
-                      <button onClick={() => setActiveSubTab('upload-translation')} className="px-3 py-1 bg-emerald-600 text-white text-xs rounded hover:bg-emerald-700">
+                      <button onClick={() => setActiveSubTab('upload-translation')} className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700">
                         Go to Upload Translation
                       </button>
                     </div>
@@ -9638,10 +9638,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 }
                 if (currentOrder?.translation_status === 'final') {
                   return (
-                    <div className="mb-4 p-4 bg-emerald-50 border-2 border-emerald-300 rounded-lg text-center">
+                    <div className="mb-4 p-4 bg-blue-50 border-2 border-blue-300 rounded-lg text-center">
                       <div className="text-3xl mb-2">🏁</div>
-                      <div className="text-lg font-bold text-emerald-800">FINAL</div>
-                      <p className="text-sm text-emerald-600">This translation has been approved and delivered to the client.</p>
+                      <div className="text-lg font-bold text-blue-800">FINAL</div>
+                      <p className="text-sm text-blue-600">This translation has been approved and delivered to the client.</p>
                     </div>
                   );
                 }
@@ -9772,8 +9772,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     </div>
                     {orderStatus && (
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        orderStatus === 'pm_upload_ready' ? 'bg-emerald-100 text-emerald-700' :
-                        orderStatus === 'final' ? 'bg-emerald-200 text-emerald-900' :
+                        orderStatus === 'pm_upload_ready' ? 'bg-green-200 text-green-800' :
+                        orderStatus === 'final' ? 'bg-blue-100 text-blue-700' :
                         'bg-gray-100 text-gray-600'
                       }`}>
                         {orderStatus === 'pm_upload_ready' ? 'READY' : orderStatus === 'final' ? 'FINAL' : orderStatus}
@@ -9784,18 +9784,18 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
                 {/* FINAL status badge */}
                 {orderStatus === 'final' && (
-                  <div className="bg-emerald-50 border-2 border-emerald-300 rounded-lg p-6 text-center">
+                  <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-6 text-center">
                     <div className="text-5xl mb-3">🏁</div>
-                    <div className="text-xl font-bold text-emerald-800 mb-1">FINAL</div>
-                    <p className="text-sm text-emerald-600">This translation has been approved and delivered to the client.</p>
+                    <div className="text-xl font-bold text-blue-800 mb-1">FINAL</div>
+                    <p className="text-sm text-blue-600">This translation has been approved and delivered to the client.</p>
                     {currentOrder?.completed_at && (
-                      <p className="text-xs text-emerald-500 mt-2">Completed: {new Date(currentOrder.completed_at).toLocaleString()}</p>
+                      <p className="text-xs text-blue-500 mt-2">Completed: {new Date(currentOrder.completed_at).toLocaleString()}</p>
                     )}
                     {hasPmUpload && (
                       <div className="mt-4">
                         <button
                           onClick={() => downloadPmTranslation(selectedOrderId)}
-                          className="px-4 py-2 bg-emerald-600 text-white text-sm rounded hover:bg-emerald-700"
+                          className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
                         >
                           Download Final File ({currentOrder.pm_upload_filename})
                         </button>
@@ -9806,12 +9806,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
                 {/* READY status - show file info + review/accept buttons */}
                 {orderStatus === 'pm_upload_ready' && hasPmUpload && (
-                  <div className="bg-emerald-50 border border-emerald-300 rounded-lg p-4">
+                  <div className="bg-green-100 border border-green-400 rounded-lg p-4">
                     <div className="flex items-center gap-2 mb-3">
-                      <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white text-sm">✓</div>
+                      <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white text-sm">✓</div>
                       <div>
-                        <div className="text-sm font-bold text-emerald-800">Translation Uploaded - READY</div>
-                        <div className="text-xs text-emerald-600">Waiting for admin review and approval</div>
+                        <div className="text-sm font-bold text-green-800">Translation Uploaded - READY</div>
+                        <div className="text-xs text-green-700">Waiting for admin review and approval</div>
                       </div>
                     </div>
                     <div className="bg-white rounded p-3 border mb-3">
@@ -9831,7 +9831,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       <button
                         onClick={() => acceptPmUpload(selectedOrderId)}
                         disabled={pmAcceptLoading}
-                        className="flex-1 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded hover:bg-emerald-700 flex items-center justify-center gap-2 disabled:opacity-50"
+                        className="flex-1 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded hover:bg-green-700 flex items-center justify-center gap-2 disabled:opacity-50"
                       >
                         {pmAcceptLoading ? 'Sending...' : 'Accept & Send to Client'}
                       </button>
@@ -17876,17 +17876,17 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
                       {/* FINAL badge */}
                       {viewingOrder.translation_status === 'final' && viewingOrder.pm_upload_filename && (
-                        <div className="p-4 bg-emerald-50 border-2 border-emerald-300 rounded-lg">
+                        <div className="p-4 bg-blue-50 border-2 border-blue-300 rounded-lg">
                           <div className="flex items-center gap-3 mb-2">
                             <span className="text-2xl">🏁</span>
                             <div>
-                              <div className="text-sm font-bold text-emerald-800">FINAL - Delivered to Client</div>
+                              <div className="text-sm font-bold text-blue-800">FINAL - Delivered to Client</div>
                               {viewingOrder.completed_at && (
-                                <div className="text-[10px] text-emerald-600">Completed: {new Date(viewingOrder.completed_at).toLocaleString()}</div>
+                                <div className="text-[10px] text-blue-600">Completed: {new Date(viewingOrder.completed_at).toLocaleString()}</div>
                               )}
                             </div>
                           </div>
-                          <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-emerald-200">
+                          <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-blue-200">
                             <div className="flex items-center gap-2">
                               <span className="text-xl">📎</span>
                               <div>
@@ -17899,7 +17899,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             </div>
                             <button
                               onClick={() => downloadPmTranslationAdmin(viewingOrder.id)}
-                              className="px-3 py-1.5 bg-emerald-600 text-white rounded text-xs hover:bg-emerald-700"
+                              className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
                             >
                               ⬇️ Download
                             </button>
@@ -17909,15 +17909,15 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
                       {/* READY - waiting for review */}
                       {viewingOrder.translation_status === 'pm_upload_ready' && viewingOrder.pm_upload_filename && (
-                        <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-lg">
+                        <div className="p-4 bg-green-100 border border-green-400 rounded-lg">
                           <div className="flex items-center gap-3 mb-3">
-                            <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white text-sm">✓</div>
+                            <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white text-sm">✓</div>
                             <div>
-                              <div className="text-sm font-bold text-emerald-800">Translation READY - Awaiting Review</div>
-                              <div className="text-[10px] text-emerald-600">PM has uploaded an external translation for this project</div>
+                              <div className="text-sm font-bold text-green-800">Translation READY - Awaiting Review</div>
+                              <div className="text-[10px] text-green-700">PM has uploaded an external translation for this project</div>
                             </div>
                           </div>
-                          <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-emerald-200 mb-3">
+                          <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-green-300 mb-3">
                             <div className="flex items-center gap-2">
                               <span className="text-xl">📎</span>
                               <div>
@@ -17937,7 +17937,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           </div>
                           <button
                             onClick={() => acceptPmUploadAdmin(viewingOrder.id)}
-                            className="w-full px-4 py-2.5 bg-emerald-600 text-white text-sm font-bold rounded hover:bg-emerald-700 flex items-center justify-center gap-2"
+                            className="w-full px-4 py-2.5 bg-green-600 text-white text-sm font-bold rounded hover:bg-green-700 flex items-center justify-center gap-2"
                           >
                             ✅ Accept & Send to Client
                           </button>
@@ -30261,10 +30261,10 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
               >
                 📤 Upload Translation
                 {selectedProject?.translation_status === 'pm_upload_ready' && (
-                  <span className="ml-1.5 inline-block w-2 h-2 bg-emerald-500 rounded-full"></span>
+                  <span className="ml-1.5 inline-block w-2 h-2 bg-green-600 rounded-full"></span>
                 )}
                 {selectedProject?.translation_status === 'final' && (
-                  <span className="ml-1.5 text-[10px] bg-emerald-200 text-emerald-800 px-1.5 py-0.5 rounded font-bold">FINAL</span>
+                  <span className="ml-1.5 text-[10px] bg-blue-200 text-blue-800 px-1.5 py-0.5 rounded font-bold">FINAL</span>
                 )}
               </button>
             </div>
@@ -30277,18 +30277,18 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 <div className="space-y-4">
                   {/* FINAL status */}
                   {selectedProject.translation_status === 'final' && (
-                    <div className="bg-emerald-50 border-2 border-emerald-300 rounded-lg p-6 text-center">
+                    <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-6 text-center">
                       <div className="text-5xl mb-3">🏁</div>
-                      <div className="text-xl font-bold text-emerald-800 mb-1">FINAL</div>
-                      <p className="text-sm text-emerald-600">Esta tradução foi aprovada pelo admin e entregue ao cliente.</p>
+                      <div className="text-xl font-bold text-blue-800 mb-1">FINAL</div>
+                      <p className="text-sm text-blue-600">Esta tradução foi aprovada pelo admin e entregue ao cliente.</p>
                       {selectedProject.completed_at && (
-                        <p className="text-xs text-emerald-500 mt-2">Completed: {new Date(selectedProject.completed_at).toLocaleString()}</p>
+                        <p className="text-xs text-blue-500 mt-2">Completed: {new Date(selectedProject.completed_at).toLocaleString()}</p>
                       )}
                       {selectedProject.pm_upload_filename && (
                         <div className="mt-4">
                           <button
                             onClick={() => downloadPmTranslationPM(selectedProject.id)}
-                            className="px-4 py-2 bg-emerald-600 text-white text-sm rounded hover:bg-emerald-700"
+                            className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
                           >
                             Download Final File ({selectedProject.pm_upload_filename})
                           </button>
@@ -30299,12 +30299,12 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
                   {/* READY status - review/accept */}
                   {selectedProject.translation_status === 'pm_upload_ready' && selectedProject.pm_upload_filename && (
-                    <div className="bg-emerald-50 border border-emerald-300 rounded-lg p-4">
+                    <div className="bg-green-100 border border-green-400 rounded-lg p-4">
                       <div className="flex items-center gap-2 mb-3">
-                        <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white text-sm">✓</div>
+                        <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white text-sm">✓</div>
                         <div>
-                          <div className="text-sm font-bold text-emerald-800">Translation Uploaded - READY</div>
-                          <div className="text-xs text-emerald-600">Waiting for admin review and approval</div>
+                          <div className="text-sm font-bold text-green-800">Translation Uploaded - READY</div>
+                          <div className="text-xs text-green-700">Waiting for admin review and approval</div>
                         </div>
                       </div>
                       <div className="bg-white rounded p-3 border mb-3">
@@ -30324,7 +30324,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         <button
                           onClick={() => acceptPmUploadPM(selectedProject.id)}
                           disabled={pmAcceptLoading}
-                          className="flex-1 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded hover:bg-emerald-700 disabled:opacity-50"
+                          className="flex-1 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded hover:bg-green-700 disabled:opacity-50"
                         >
                           {pmAcceptLoading ? 'Sending...' : 'Accept & Send to Admin'}
                         </button>
