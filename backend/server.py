@@ -3832,9 +3832,9 @@ def calculate_price_with_tier(word_count: int, service_type: str, urgency: str, 
 
 
 def get_estimated_delivery(urgency: str) -> str:
-    """Calculate estimated delivery date"""
-    today = datetime.now()
-    
+    """Calculate estimated delivery date in NY timezone"""
+    today = datetime.now(NY_TIMEZONE)
+
     if urgency == "urgent":
         delivery_date = today + timedelta(hours=12)
         days_text = "12 hours"
@@ -3844,9 +3844,9 @@ def get_estimated_delivery(urgency: str) -> str:
     else:
         delivery_date = today + timedelta(days=2)
         days_text = "2 days"
-    
+
     formatted_date = delivery_date.strftime("%A, %B %d")
-    return f"{formatted_date} ({days_text})"
+    return f"{formatted_date} ({days_text}) EST"
 
 def extract_tables_from_textract(blocks: list) -> list:
     """
