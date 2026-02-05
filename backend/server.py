@@ -12689,12 +12689,16 @@ async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate,
                                 deadline = current_order.get("translator_deadline") or current_order.get("deadline")
                                 if deadline:
                                     if isinstance(deadline, datetime):
-                                        deadline_str = deadline.strftime("%B %d, %Y at %I:%M %p")
+                                        # Convert UTC to NY timezone for display
+                                        ny_deadline = deadline.replace(tzinfo=ZoneInfo("UTC")).astimezone(NY_TIMEZONE) if deadline.tzinfo is None else deadline.astimezone(NY_TIMEZONE)
+                                        deadline_str = ny_deadline.strftime("%B %d, %Y at %I:%M %p") + " (EST)"
                                     elif isinstance(deadline, str):
                                         try:
                                             from dateutil import parser
                                             parsed = parser.parse(deadline)
-                                            deadline_str = parsed.strftime("%B %d, %Y at %I:%M %p")
+                                            # Treat naive datetime as UTC
+                                            ny_parsed = parsed.replace(tzinfo=ZoneInfo("UTC")).astimezone(NY_TIMEZONE) if parsed.tzinfo is None else parsed.astimezone(NY_TIMEZONE)
+                                            deadline_str = ny_parsed.strftime("%B %d, %Y at %I:%M %p") + " (EST)"
                                         except:
                                             deadline_str = str(deadline)
                                     else:
