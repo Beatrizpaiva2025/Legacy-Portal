@@ -3033,44 +3033,43 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     if (!user?.id) return;
     setLoadingAssigned(true);
     try {
-      const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
-      // Filter orders assigned to this user (as translator or PM) or with pending review
-      const myOrders = (response.data.orders || []).filter(order => {
-        // For translators: check if assigned to them
-        if (user.role === 'translator') {
-          return (
-            order.assigned_translator_id === user.id ||
-            order.assigned_translator === user.name ||
-            order.assigned_translator_name === user.name ||
-            (order.file_translator_ids && order.file_translator_ids.includes(user.id))
-          );
-        }
-        // For PM: check if assigned to them or ready for review
-        if (user.role === 'pm') {
-          return (
-            order.assigned_pm_id === user.id ||
-            order.assigned_pm_name === user.name ||
-            order.translation_ready ||
-            order.translation_html
-          );
-        }
-        // For admin: only show orders where Admin is the assigned translator
-        // Admin only sees projects in workspace when acting as translator (not as approver - that's PM's role)
-        if (user.role === 'admin') {
-          return (
-            order.assigned_translator === 'Admin (Self)' ||
-            order.assigned_translator === 'Admin' ||
-            order.assigned_translator_name === 'Admin (Self)' ||
-            order.assigned_translator_name === 'Admin'
-          );
-        }
-        // Fallback: show all orders with translation
-        return order.translation_ready || order.translation_html;
-      }).filter(order =>
-        // Include most statuses for translators to see their work
-        ['pending', 'quote', 'received', 'in_translation', 'review', 'pending_review', 'pending_pm_review', 'client_review', 'ready'].includes(order.translation_status) ||
-        order.translation_ready
-      );
+      let myOrders = [];
+
+      if (user.role === 'translator') {
+        // For translators: use dedicated endpoint with server-side filtering
+        // This correctly handles both order-level and file-level assignments
+        const response = await axios.get(`${API}/admin/orders/my-projects?admin_key=${adminKey}&token=${adminKey}`);
+        myOrders = (response.data.orders || []).filter(order =>
+          // Show all active statuses
+          !['delivered', 'final', 'cancelled'].includes(order.translation_status)
+        );
+      } else {
+        // For admins/PMs: use general orders endpoint with client-side filtering
+        const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
+        myOrders = (response.data.orders || []).filter(order => {
+          if (user.role === 'pm') {
+            return (
+              order.assigned_pm_id === user.id ||
+              order.assigned_pm_name === user.name ||
+              order.translation_ready ||
+              order.translation_html
+            );
+          }
+          if (user.role === 'admin') {
+            return (
+              order.assigned_translator === 'Admin (Self)' ||
+              order.assigned_translator === 'Admin' ||
+              order.assigned_translator_name === 'Admin (Self)' ||
+              order.assigned_translator_name === 'Admin'
+            );
+          }
+          return order.translation_ready || order.translation_html;
+        }).filter(order =>
+          ['pending', 'quote', 'received', 'in_translation', 'review', 'pending_review', 'pending_pm_review', 'client_review', 'ready'].includes(order.translation_status) ||
+          order.translation_ready
+        );
+      }
+
       setAssignedOrders(myOrders);
 
       // Fetch files for all projects to create individual file view
