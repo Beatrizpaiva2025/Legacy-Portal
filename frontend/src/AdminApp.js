@@ -26852,14 +26852,14 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
   const acceptPmUploadPM = async (orderId) => {
     if (!orderId) return;
-    if (!confirm('Accept this translation and send to client? This will set the status to FINAL.')) return;
+    if (!confirm('Aceitar esta tradução e enviar para o admin? O status será alterado para READY.')) return;
     setPmAcceptLoading(true);
     try {
       await axios.post(`${API}/admin/accept-pm-upload`, {
         order_id: orderId,
         admin_key: adminKey
       });
-      showToast('Translation accepted and sent to client! Status set to FINAL.');
+      showToast('Tradução aceita e enviada para o admin!');
       // Refresh the order data in selectedProject
       try {
         const resp = await axios.get(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`);
@@ -30278,7 +30278,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     <div className="bg-emerald-50 border-2 border-emerald-300 rounded-lg p-6 text-center">
                       <div className="text-5xl mb-3">🏁</div>
                       <div className="text-xl font-bold text-emerald-800 mb-1">FINAL</div>
-                      <p className="text-sm text-emerald-600">This translation has been approved and delivered to the client.</p>
+                      <p className="text-sm text-emerald-600">Esta tradução foi aprovada pelo admin e entregue ao cliente.</p>
                       {selectedProject.completed_at && (
                         <p className="text-xs text-emerald-500 mt-2">Completed: {new Date(selectedProject.completed_at).toLocaleString()}</p>
                       )}
@@ -30324,15 +30324,14 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                           disabled={pmAcceptLoading}
                           className="flex-1 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded hover:bg-emerald-700 disabled:opacity-50"
                         >
-                          {pmAcceptLoading ? 'Sending...' : 'Accept & Send to Client'}
+                          {pmAcceptLoading ? 'Sending...' : 'Accept & Send to Admin'}
                         </button>
                       </div>
                     </div>
                   )}
 
-                  {/* Upload area */}
-                  {selectedProject.translation_status !== 'final' && (
-                    <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-lg p-4">
+                  {/* Upload area - always visible so PM can upload/re-upload and send to admin */}
+                  <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-lg p-4">
                       <h3 className="text-xs font-bold text-orange-800 mb-3">
                         {selectedProject.pm_upload_filename ? 'Re-upload Translation File' : 'Upload External Translation'}
                       </h3>
@@ -30411,7 +30410,6 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         </button>
                       )}
                     </div>
-                  )}
                 </div>
               )}
 
