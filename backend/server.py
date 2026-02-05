@@ -16948,6 +16948,17 @@ async def send_file_assignment_email(admin_key: str, request: dict = Body(...)):
                 {"$set": doc_update}
             )
 
+    # Track this translator on the order so their portal shows the project
+    # Uses $addToSet to avoid duplicates when same translator gets multiple files
+    if order_id and translator_id:
+        await db.translation_orders.update_one(
+            {"id": order_id},
+            {"$addToSet": {
+                "file_translator_ids": translator_id,
+                "file_translator_names": translator_name
+            }}
+        )
+
     # Build accept/decline URLs
     api_base = os.environ.get("API_URL", "https://legacy-portal-cont-backend.onrender.com")
     accept_url = f"{api_base}/api/translator/assignment/{assignment_token}/accept"
