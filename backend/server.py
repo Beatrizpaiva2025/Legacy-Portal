@@ -3834,7 +3834,7 @@ def get_estimated_delivery(urgency: str, source_type: str = "website") -> str:
 
     Standard deadlines:
         - Website/Customer: 3 business days
-        - Partner Portal: 48 hours
+        - Partner Portal: 48 hours (2 days)
     """
     today = datetime.now(NY_TIMEZONE)
 
@@ -3846,9 +3846,9 @@ def get_estimated_delivery(urgency: str, source_type: str = "website") -> str:
         days_text = "24 hours"
     else:
         if source_type == "partner":
-            # Partner portal standard: 48 hours
+            # Partner portal standard: 48 hours (2 days)
             delivery_date = today + timedelta(hours=48)
-            days_text = "48 hours"
+            days_text = "2 days"
         else:
             # Website/Customer standard: 3 business days
             delivery_date = today
