@@ -9234,7 +9234,7 @@ async def admin_get_all_orders(
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
     # Get user info for role-based filtering
-    user_role = None
+    user_role = "admin" if admin_key == expected_key else None
     user_id = None
     user_name = None
     if admin_key != expected_key:
@@ -9340,6 +9340,11 @@ async def admin_get_all_orders(
     # Calculate total pages
     total_pages = (total_count + limit - 1) // limit
 
+    # Strip internal_notes for non-admin users (admin only)
+    if user_role != "admin":
+        for order in orders:
+            order.pop("internal_notes", None)
+
     return {
         "orders": orders,
         "pagination": {
@@ -9413,6 +9418,11 @@ async def get_my_projects(token: str, admin_key: str):
     for order in orders:
         if '_id' in order:
             del order['_id']
+
+    # Strip internal_notes for non-admin users (admin only)
+    if user_role != "admin":
+        for order in orders:
+            order.pop("internal_notes", None)
 
     # Calculate summary
     total_pending = sum(1 for o in orders if o.get("payment_status") == "pending")
