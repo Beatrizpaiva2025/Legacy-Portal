@@ -1490,6 +1490,9 @@ def get_order_confirmation_email_template(client_name: str, order_details: dict)
                                                 <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('estimated_delivery', 'N/A')}</td>
                                             </tr>
                                         </table>
+                                        <p style="color: #94a3b8; font-size: 11px; margin: 10px 0 0 0; font-style: italic;">
+                                            * Business days = Monday through Friday, excluding weekends.
+                                        </p>
                                     </td>
                                 </tr>
                             </table>
