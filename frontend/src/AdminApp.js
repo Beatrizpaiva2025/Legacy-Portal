@@ -3041,7 +3041,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           return (
             order.assigned_translator_id === user.id ||
             order.assigned_translator === user.name ||
-            order.assigned_translator_name === user.name
+            order.assigned_translator_name === user.name ||
+            (order.file_translator_ids && order.file_translator_ids.includes(user.id))
           );
         }
         // For PM: check if assigned to them or ready for review
@@ -3078,7 +3079,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         try {
           const docsResponse = await axios.get(`${API}/admin/orders/${order.id}/documents?admin_key=${adminKey}`);
           const docs = docsResponse.data.documents || [];
+          // For orders matched via file_translator_ids (individual file assignments),
+          // only show files assigned to this translator
+          const isFileLevel = order.file_translator_ids && order.file_translator_ids.includes(user.id)
+            && order.assigned_translator_id !== user.id
+            && order.assigned_translator !== user.name
+            && order.assigned_translator_name !== user.name;
           for (const doc of docs) {
+            // Skip files not assigned to this translator for file-level assignments
+            if (isFileLevel && doc.assigned_translator_id && doc.assigned_translator_id !== user.id) {
+              continue;
+            }
             allFiles.push({
               ...doc,
               order_id: order.id,
@@ -3247,7 +3258,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     try {
       // Fetch documents for this order
       const response = await axios.get(`${API}/admin/orders/${order.id}/documents?admin_key=${adminKey}`);
-      const docs = response.data.documents || [];
+      let docs = response.data.documents || [];
+
+      // For translators with file-level assignments, only show their assigned files
+      if (user?.role === 'translator' && order.file_translator_ids && order.file_translator_ids.includes(user.id)
+          && order.assigned_translator_id !== user.id
+          && order.assigned_translator !== user.name
+          && order.assigned_translator_name !== user.name) {
+        docs = docs.filter(d => !d.assigned_translator_id || d.assigned_translator_id === user.id);
+      }
       setSelectedProjectFiles(docs);
 
       if (docs.length === 0) {
@@ -7324,7 +7343,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {assignedOrders.map(order => {
                       // Check if translator (in-house or contractor) needs to accept this assignment first
-                      const isPendingAcceptance = isTranslator && order.translator_assignment_status === 'pending';
+                      // Only block if this translator is the one with the pending order-level assignment
+                      const isPendingAcceptance = isTranslator && order.translator_assignment_status === 'pending'
+                        && (order.assigned_translator_id === user.id || order.assigned_translator_name === user.name);
 
                       return (
                         <div
