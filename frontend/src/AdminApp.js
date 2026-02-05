@@ -26989,6 +26989,11 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         pm_name: user?.name || 'PM'
       });
 
+      // Update local document state to show "Pendente" status immediately
+      setProjectDocuments(prev => prev.map(d =>
+        d.id === doc.id ? { ...d, assignment_status: 'pending', assigned_translator_id: translator.id, assigned_translator_name: translator.name } : d
+      ));
+
       showToast(`📧 Email invitation sent to ${translator.name}!`);
     } catch (err) {
       console.error('Failed to send invite:', err);
@@ -30560,6 +30565,9 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                             <div className="text-sm font-medium">{doc.filename || 'Document'}</div>
                             <div className="text-[10px] text-gray-500">
                               {doc.source === 'manual_upload' ? 'Manual upload' : 'Partner portal'}
+                              {(doc.assigned_translator_name || fileAssignments[doc.id]?.name) && (
+                                <span className="ml-1 text-blue-600"> — {fileAssignments[doc.id]?.name || doc.assigned_translator_name}</span>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -30581,7 +30589,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                       </div>
 
                       {/* Translator Assignment */}
-                      <div className="flex items-center gap-2 pt-2 border-t border-gray-200">
+                      <div className="flex items-center gap-2 pt-2 border-t border-gray-200 flex-wrap">
                         <span className="text-xs text-gray-500">Atribuir to:</span>
                         <select
                           value={fileAssignments[doc.id]?.id || doc.assigned_translator_id || ''}
@@ -30613,7 +30621,15 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                             >
                               {sendingFileInvite[doc.id] ? '...' : '📧 Send'}
                             </button>
-                            <span className="text-xs text-green-600 font-medium">✓ Atribuído</span>
+                            {doc.assignment_status === 'accepted' ? (
+                              <span className="text-xs text-green-600 font-medium">✓ Aceito</span>
+                            ) : doc.assignment_status === 'declined' ? (
+                              <span className="text-xs text-red-600 font-medium">✗ Recusado</span>
+                            ) : doc.assignment_status === 'pending' ? (
+                              <span className="text-xs text-yellow-600 font-medium">⏳ Pendente</span>
+                            ) : (
+                              <span className="text-xs text-green-600 font-medium">✓ Atribuído</span>
+                            )}
                           </>
                         )}
                       </div>

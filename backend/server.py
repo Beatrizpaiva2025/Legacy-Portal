@@ -15993,134 +15993,248 @@ async def download_translated_document(order_id: str, admin_key: str):
 
 # ==================== TRANSLATOR ASSIGNMENT RESPONSE ENDPOINTS ====================
 
+# Helper to find assignment by token - checks both order-level and document-level tokens
+async def find_assignment_by_token(token: str):
+    """Find assignment by token. Returns (order, document_or_none, is_document_level)"""
+    # First check order-level tokens (from "Send Complete Project")
+    order = await db.translation_orders.find_one({"translator_assignment_token": token})
+    if order:
+        return order, None, False
+
+    # Then check document-level tokens (from individual file assignments)
+    doc = await db.order_documents.find_one({"assignment_token": token})
+    if not doc:
+        doc = await db.documents.find_one({"assignment_token": token})
+    if doc:
+        # Find the parent order for notifications
+        order = await db.translation_orders.find_one({"id": doc.get("order_id")})
+        return order, doc, True
+
+    return None, None, False
+
 @api_router.get("/translator/assignment/{token}/accept")
 async def accept_translator_assignment(token: str):
     """Accept a translator assignment via email link"""
-    # Find order by assignment token
-    order = await db.translation_orders.find_one({"translator_assignment_token": token})
-    if not order:
+    order, doc, is_doc_level = await find_assignment_by_token(token)
+    if not order and not doc:
         return HTMLResponse(content=get_assignment_response_page("error", "Invalid or expired link. This assignment token was not found."), status_code=404)
 
     # Check if already responded
-    if order.get("translator_assignment_status") in ["accepted", "declined"]:
-        status = order.get("translator_assignment_status")
-        return HTMLResponse(content=get_assignment_response_page("already_responded", f"You have already {status} this assignment."))
+    if is_doc_level:
+        if doc.get("assignment_status") in ["accepted", "declined"]:
+            status = doc.get("assignment_status")
+            return HTMLResponse(content=get_assignment_response_page("already_responded", f"You have already {status} this assignment."))
+    else:
+        if order.get("translator_assignment_status") in ["accepted", "declined"]:
+            status = order.get("translator_assignment_status")
+            return HTMLResponse(content=get_assignment_response_page("already_responded", f"You have already {status} this assignment."))
 
     # Update assignment status
-    await db.translation_orders.update_one(
-        {"id": order["id"]},
-        {"$set": {
-            "translator_assignment_status": "accepted",
-            "translator_assignment_responded_at": datetime.utcnow()
-        }}
-    )
+    if is_doc_level:
+        # Update the document-level assignment
+        collection = db.order_documents if await db.order_documents.find_one({"id": doc["id"]}) else db.documents
+        await collection.update_one(
+            {"id": doc["id"]},
+            {"$set": {
+                "assignment_status": "accepted",
+                "assignment_responded_at": datetime.utcnow()
+            }}
+        )
+        translator_name = doc.get("assigned_translator_name", "Unknown")
+        doc_name = doc.get("filename", "document")
+    else:
+        await db.translation_orders.update_one(
+            {"id": order["id"]},
+            {"$set": {
+                "translator_assignment_status": "accepted",
+                "translator_assignment_responded_at": datetime.utcnow()
+            }}
+        )
+        translator_name = order.get("assigned_translator_name", "Unknown")
+        doc_name = None
 
     # Create notification for admin/PM
+    order_number = order.get("order_number", order["id"]) if order else "Unknown"
+    msg = f"Translator {translator_name} has ACCEPTED the assignment for project {order_number}"
+    if doc_name:
+        msg += f" (file: {doc_name})"
+    msg += "."
     await create_notification(
-        user_id=order.get("assigned_pm_id") or "admin",
+        user_id=(order.get("assigned_pm_id") or "admin") if order else "admin",
         notif_type="assignment_accepted",
         title="Translator Accepted Assignment",
-        message=f"Translator {order.get('assigned_translator_name', 'Unknown')} has ACCEPTED the assignment for project {order.get('order_number', order['id'])}.",
-        order_id=order["id"],
-        order_number=order.get("order_number")
+        message=msg,
+        order_id=order["id"] if order else None,
+        order_number=order.get("order_number") if order else None
     )
 
-    return HTMLResponse(content=get_assignment_response_page("accepted", f"Thank you! You have accepted the assignment for project {order.get('order_number', '')}. You can now access it in your translator portal."))
+    return HTMLResponse(content=get_assignment_response_page("accepted", f"Thank you! You have accepted the assignment for project {order_number}. You can now access it in your translator portal."))
 
 @api_router.get("/translator/assignment/{token}/decline")
 async def decline_translator_assignment(token: str):
     """Decline a translator assignment via email link"""
-    # Find order by assignment token
-    order = await db.translation_orders.find_one({"translator_assignment_token": token})
-    if not order:
+    order, doc, is_doc_level = await find_assignment_by_token(token)
+    if not order and not doc:
         return HTMLResponse(content=get_assignment_response_page("error", "Invalid or expired link. This assignment token was not found."), status_code=404)
 
     # Check if already responded
-    if order.get("translator_assignment_status") in ["accepted", "declined"]:
-        status = order.get("translator_assignment_status")
-        return HTMLResponse(content=get_assignment_response_page("already_responded", f"You have already {status} this assignment."))
+    if is_doc_level:
+        if doc.get("assignment_status") in ["accepted", "declined"]:
+            status = doc.get("assignment_status")
+            return HTMLResponse(content=get_assignment_response_page("already_responded", f"You have already {status} this assignment."))
+    else:
+        if order.get("translator_assignment_status") in ["accepted", "declined"]:
+            status = order.get("translator_assignment_status")
+            return HTMLResponse(content=get_assignment_response_page("already_responded", f"You have already {status} this assignment."))
 
-    # Update assignment status - clear the translator assignment since they declined
-    await db.translation_orders.update_one(
-        {"id": order["id"]},
-        {"$set": {
-            "translator_assignment_status": "declined",
-            "translator_assignment_responded_at": datetime.utcnow()
-        }}
-    )
+    # Update assignment status
+    if is_doc_level:
+        collection = db.order_documents if await db.order_documents.find_one({"id": doc["id"]}) else db.documents
+        await collection.update_one(
+            {"id": doc["id"]},
+            {"$set": {
+                "assignment_status": "declined",
+                "assignment_responded_at": datetime.utcnow()
+            }}
+        )
+        translator_name = doc.get("assigned_translator_name", "Unknown")
+        doc_name = doc.get("filename", "document")
+    else:
+        await db.translation_orders.update_one(
+            {"id": order["id"]},
+            {"$set": {
+                "translator_assignment_status": "declined",
+                "translator_assignment_responded_at": datetime.utcnow()
+            }}
+        )
+        translator_name = order.get("assigned_translator_name", "Unknown")
+        doc_name = None
 
     # Create notification for admin/PM
+    order_number = order.get("order_number", order["id"]) if order else "Unknown"
+    msg = f"Translator {translator_name} has DECLINED the assignment for project {order_number}"
+    if doc_name:
+        msg += f" (file: {doc_name})"
+    msg += ". Please assign another translator."
     await create_notification(
-        user_id=order.get("assigned_pm_id") or "admin",
+        user_id=(order.get("assigned_pm_id") or "admin") if order else "admin",
         notif_type="assignment_declined",
         title="Translator Declined Assignment",
-        message=f"Translator {order.get('assigned_translator_name', 'Unknown')} has DECLINED the assignment for project {order.get('order_number', order['id'])}. Please assign another translator.",
-        order_id=order["id"],
-        order_number=order.get("order_number")
+        message=msg,
+        order_id=order["id"] if order else None,
+        order_number=order.get("order_number") if order else None
     )
 
-    return HTMLResponse(content=get_assignment_response_page("declined", f"You have declined the assignment for project {order.get('order_number', '')}. The team will be notified to assign another translator."))
+    return HTMLResponse(content=get_assignment_response_page("declined", f"You have declined the assignment for project {order_number}. The team will be notified to assign another translator."))
 
 # POST endpoints for frontend to call (returns JSON)
 @api_router.post("/translator/assignment/{token}/accept")
 async def accept_translator_assignment_api(token: str):
     """Accept a translator assignment via frontend (returns JSON)"""
-    order = await db.translation_orders.find_one({"translator_assignment_token": token})
-    if not order:
+    order, doc, is_doc_level = await find_assignment_by_token(token)
+    if not order and not doc:
         raise HTTPException(status_code=404, detail="Invalid or expired link. This assignment token was not found.")
 
-    if order.get("translator_assignment_status") in ["accepted", "declined"]:
-        status = order.get("translator_assignment_status")
-        raise HTTPException(status_code=400, detail=f"You have already {status} this assignment.")
+    if is_doc_level:
+        if doc.get("assignment_status") in ["accepted", "declined"]:
+            status = doc.get("assignment_status")
+            raise HTTPException(status_code=400, detail=f"You have already {status} this assignment.")
+    else:
+        if order.get("translator_assignment_status") in ["accepted", "declined"]:
+            status = order.get("translator_assignment_status")
+            raise HTTPException(status_code=400, detail=f"You have already {status} this assignment.")
 
-    await db.translation_orders.update_one(
-        {"id": order["id"]},
-        {"$set": {
-            "translator_assignment_status": "accepted",
-            "translator_assignment_responded_at": datetime.utcnow()
-        }}
-    )
+    if is_doc_level:
+        collection = db.order_documents if await db.order_documents.find_one({"id": doc["id"]}) else db.documents
+        await collection.update_one(
+            {"id": doc["id"]},
+            {"$set": {
+                "assignment_status": "accepted",
+                "assignment_responded_at": datetime.utcnow()
+            }}
+        )
+        translator_name = doc.get("assigned_translator_name", "Unknown")
+        doc_name = doc.get("filename", "document")
+    else:
+        await db.translation_orders.update_one(
+            {"id": order["id"]},
+            {"$set": {
+                "translator_assignment_status": "accepted",
+                "translator_assignment_responded_at": datetime.utcnow()
+            }}
+        )
+        translator_name = order.get("assigned_translator_name", "Unknown")
+        doc_name = None
 
+    order_number = order.get("order_number", order["id"]) if order else "Unknown"
+    msg = f"Translator {translator_name} has ACCEPTED the assignment for project {order_number}"
+    if doc_name:
+        msg += f" (file: {doc_name})"
+    msg += "."
     await create_notification(
-        user_id=order.get("assigned_pm_id") or "admin",
+        user_id=(order.get("assigned_pm_id") or "admin") if order else "admin",
         notif_type="assignment_accepted",
         title="Translator Accepted Assignment",
-        message=f"Translator {order.get('assigned_translator_name', 'Unknown')} has ACCEPTED the assignment for project {order.get('order_number', order['id'])}.",
-        order_id=order["id"],
-        order_number=order.get("order_number")
+        message=msg,
+        order_id=order["id"] if order else None,
+        order_number=order.get("order_number") if order else None
     )
 
-    return {"status": "accepted", "message": "Assignment accepted successfully", "order_number": order.get("order_number", "")}
+    return {"status": "accepted", "message": "Assignment accepted successfully", "order_number": order.get("order_number", "") if order else ""}
 
 @api_router.post("/translator/assignment/{token}/decline")
 async def decline_translator_assignment_api(token: str):
     """Decline a translator assignment via frontend (returns JSON)"""
-    order = await db.translation_orders.find_one({"translator_assignment_token": token})
-    if not order:
+    order, doc, is_doc_level = await find_assignment_by_token(token)
+    if not order and not doc:
         raise HTTPException(status_code=404, detail="Invalid or expired link. This assignment token was not found.")
 
-    if order.get("translator_assignment_status") in ["accepted", "declined"]:
-        status = order.get("translator_assignment_status")
-        raise HTTPException(status_code=400, detail=f"You have already {status} this assignment.")
+    if is_doc_level:
+        if doc.get("assignment_status") in ["accepted", "declined"]:
+            status = doc.get("assignment_status")
+            raise HTTPException(status_code=400, detail=f"You have already {status} this assignment.")
+    else:
+        if order.get("translator_assignment_status") in ["accepted", "declined"]:
+            status = order.get("translator_assignment_status")
+            raise HTTPException(status_code=400, detail=f"You have already {status} this assignment.")
 
-    await db.translation_orders.update_one(
-        {"id": order["id"]},
-        {"$set": {
-            "translator_assignment_status": "declined",
-            "translator_assignment_responded_at": datetime.utcnow()
-        }}
-    )
+    if is_doc_level:
+        collection = db.order_documents if await db.order_documents.find_one({"id": doc["id"]}) else db.documents
+        await collection.update_one(
+            {"id": doc["id"]},
+            {"$set": {
+                "assignment_status": "declined",
+                "assignment_responded_at": datetime.utcnow()
+            }}
+        )
+        translator_name = doc.get("assigned_translator_name", "Unknown")
+        doc_name = doc.get("filename", "document")
+    else:
+        await db.translation_orders.update_one(
+            {"id": order["id"]},
+            {"$set": {
+                "translator_assignment_status": "declined",
+                "translator_assignment_responded_at": datetime.utcnow()
+            }}
+        )
+        translator_name = order.get("assigned_translator_name", "Unknown")
+        doc_name = None
 
+    order_number = order.get("order_number", order["id"]) if order else "Unknown"
+    msg = f"Translator {translator_name} has DECLINED the assignment for project {order_number}"
+    if doc_name:
+        msg += f" (file: {doc_name})"
+    msg += ". Please assign another translator."
     await create_notification(
-        user_id=order.get("assigned_pm_id") or "admin",
+        user_id=(order.get("assigned_pm_id") or "admin") if order else "admin",
         notif_type="assignment_declined",
         title="Translator Declined Assignment",
-        message=f"Translator {order.get('assigned_translator_name', 'Unknown')} has DECLINED the assignment for project {order.get('order_number', order['id'])}. Please assign another translator.",
-        order_id=order["id"],
-        order_number=order.get("order_number")
+        message=msg,
+        order_id=order["id"] if order else None,
+        order_number=order.get("order_number") if order else None
     )
 
-    return {"status": "declined", "message": "Assignment declined successfully", "order_number": order.get("order_number", "")}
+    return {"status": "declined", "message": "Assignment declined successfully", "order_number": order.get("order_number", "") if order else ""}
 
 def get_assignment_response_page(status: str, message: str) -> str:
     """Generate HTML page for assignment response"""
@@ -16809,20 +16923,30 @@ async def send_file_assignment_email(admin_key: str, request: dict = Body(...)):
     # Get order details for the email
     order = await db.translation_orders.find_one({"id": order_id}) if order_id else None
 
-    # Generate assignment token and update order
+    # Generate assignment token and store at DOCUMENT level (not order level)
+    # This allows different files to be assigned to different translators
+    # without overwriting each other's tokens
+    document_id = request.get("document_id")
     assignment_token = str(uuid.uuid4())
-    if order_id:
-        # All translators must explicitly accept assignment via email
-        await db.translation_orders.update_one(
-            {"id": order_id},
-            {"$set": {
-                "assigned_translator_id": translator_id,
-                "assigned_translator_name": translator_name,
-                "translator_assignment_token": assignment_token,
-                "translator_assignment_status": "pending",
-                "translator_assignment_responded_at": None
-            }}
+    if document_id:
+        # Store token on the document itself so each file has its own accept/decline flow
+        doc_update = {
+            "assigned_translator_id": translator_id,
+            "assigned_translator_name": translator_name,
+            "assignment_token": assignment_token,
+            "assignment_status": "pending",
+            "assignment_responded_at": None
+        }
+        # Try order_documents first, then documents collection
+        result = await db.order_documents.update_one(
+            {"id": document_id},
+            {"$set": doc_update}
         )
+        if result.matched_count == 0:
+            await db.documents.update_one(
+                {"id": document_id},
+                {"$set": doc_update}
+            )
 
     # Build accept/decline URLs
     api_base = os.environ.get("API_URL", "https://legacy-portal-cont-backend.onrender.com")
@@ -17436,7 +17560,10 @@ async def admin_get_order_documents(order_id: str, admin_key: str):
             "filename": doc.get("filename"),
             "content_type": doc.get("content_type", "application/pdf"),
             "has_data": bool(doc.get("file_data") or doc.get("gridfs_id")),
-            "source": "partner_upload"
+            "source": "partner_upload",
+            "assigned_translator_id": doc.get("assigned_translator_id"),
+            "assigned_translator_name": doc.get("assigned_translator_name"),
+            "assignment_status": doc.get("assignment_status"),
         })
 
     for doc in docs_manual:
@@ -17447,7 +17574,10 @@ async def admin_get_order_documents(order_id: str, admin_key: str):
             "content_type": doc.get("content_type", "application/pdf"),
             "has_data": bool(doc.get("data") or doc.get("gridfs_id")),
             "source": doc.get("source", "manual_upload"),
-            "uploaded_at": doc.get("uploaded_at").isoformat() if doc.get("uploaded_at") else None
+            "uploaded_at": doc.get("uploaded_at").isoformat() if doc.get("uploaded_at") else None,
+            "assigned_translator_id": doc.get("assigned_translator_id"),
+            "assigned_translator_name": doc.get("assigned_translator_name"),
+            "assignment_status": doc.get("assignment_status"),
         })
 
     return {"documents": all_docs, "count": len(all_docs)}
@@ -17676,7 +17806,8 @@ async def admin_update_order_document(doc_id: str, admin_key: str, update_data: 
         raise HTTPException(status_code=403, detail="Only admin or PM can update document assignments")
 
     # Fields that can be updated
-    allowed_fields = ["assigned_translator_id", "assigned_translator_name", "notes", "status"]
+    allowed_fields = ["assigned_translator_id", "assigned_translator_name", "notes", "status",
+                      "assignment_token", "assignment_status", "assignment_responded_at"]
     update_dict = {k: v for k, v in update_data.items() if k in allowed_fields}
 
     if not update_dict:
