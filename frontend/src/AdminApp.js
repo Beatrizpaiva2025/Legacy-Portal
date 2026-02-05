@@ -14866,6 +14866,11 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     setOrderDocuments([]);
     setSelectedDocsForDelivery([]); // Reset selection
     try {
+      // Fetch fresh order data (includes pm_upload fields)
+      const orderResp = await axios.get(`${API}/admin/orders/${order.id}?admin_key=${adminKey}`);
+      if (orderResp.data.order) {
+        setViewingOrder(orderResp.data.order);
+      }
       const response = await axios.get(`${API}/admin/orders/${order.id}/documents?admin_key=${adminKey}`);
       console.log('Documents loaded:', response.data);
       const docs = response.data.documents || [];
@@ -14879,6 +14884,30 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     } finally {
       setLoadingDocuments(false);
     }
+  };
+
+  // PM Upload Translation - Admin actions
+  const acceptPmUploadAdmin = async (orderId) => {
+    if (!orderId) return;
+    if (!confirm('Accept this translation and send to client? This will set the status to FINAL.')) return;
+    try {
+      await axios.post(`${API}/admin/accept-pm-upload`, {
+        order_id: orderId,
+        admin_key: adminKey
+      });
+      showToast('Translation accepted and sent to client! Status set to FINAL.');
+      // Refresh the order in the modal
+      const resp = await axios.get(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`);
+      if (resp.data.order) setViewingOrder(resp.data.order);
+      fetchOrders();
+    } catch (err) {
+      console.error('Accept PM upload failed:', err);
+      showToast('Accept failed: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const downloadPmTranslationAdmin = (orderId) => {
+    window.open(`${API}/admin/orders/${orderId}/pm-translation-download?admin_key=${adminKey}`, '_blank');
   };
 
   // Download document
@@ -17985,6 +18014,83 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       </div>
                     )}
                   </div>
+
+                  {/* PM Upload Translation Section */}
+                  {(viewingOrder.pm_upload_filename || viewingOrder.translation_status === 'pm_upload_ready' || viewingOrder.translation_status === 'final') && (
+                    <div className="mt-4 pt-4 border-t">
+                      <div className="text-xs font-medium text-emerald-700 mb-2">📤 PM Upload Translation</div>
+
+                      {/* FINAL badge */}
+                      {viewingOrder.translation_status === 'final' && viewingOrder.pm_upload_filename && (
+                        <div className="p-4 bg-emerald-50 border-2 border-emerald-300 rounded-lg">
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className="text-2xl">🏁</span>
+                            <div>
+                              <div className="text-sm font-bold text-emerald-800">FINAL - Delivered to Client</div>
+                              {viewingOrder.completed_at && (
+                                <div className="text-[10px] text-emerald-600">Completed: {new Date(viewingOrder.completed_at).toLocaleString()}</div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-emerald-200">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xl">📎</span>
+                              <div>
+                                <div className="text-sm font-medium">{viewingOrder.pm_upload_filename}</div>
+                                <div className="text-[10px] text-gray-500">
+                                  {viewingOrder.pm_upload_file_size ? `${(viewingOrder.pm_upload_file_size / 1024).toFixed(1)} KB` : ''}
+                                  {viewingOrder.pm_uploaded_at ? ` • Uploaded ${new Date(viewingOrder.pm_uploaded_at).toLocaleString()}` : ''}
+                                </div>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => downloadPmTranslationAdmin(viewingOrder.id)}
+                              className="px-3 py-1.5 bg-emerald-600 text-white rounded text-xs hover:bg-emerald-700"
+                            >
+                              ⬇️ Download
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* READY - waiting for review */}
+                      {viewingOrder.translation_status === 'pm_upload_ready' && viewingOrder.pm_upload_filename && (
+                        <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-lg">
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white text-sm">✓</div>
+                            <div>
+                              <div className="text-sm font-bold text-emerald-800">Translation READY - Awaiting Review</div>
+                              <div className="text-[10px] text-emerald-600">PM has uploaded an external translation for this project</div>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-emerald-200 mb-3">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xl">📎</span>
+                              <div>
+                                <div className="text-sm font-medium">{viewingOrder.pm_upload_filename}</div>
+                                <div className="text-[10px] text-gray-500">
+                                  {viewingOrder.pm_upload_file_size ? `${(viewingOrder.pm_upload_file_size / 1024).toFixed(1)} KB` : ''}
+                                  {viewingOrder.pm_uploaded_at ? ` • Uploaded ${new Date(viewingOrder.pm_uploaded_at).toLocaleString()}` : ''}
+                                </div>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => downloadPmTranslationAdmin(viewingOrder.id)}
+                              className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                            >
+                              ⬇️ Open & Review
+                            </button>
+                          </div>
+                          <button
+                            onClick={() => acceptPmUploadAdmin(viewingOrder.id)}
+                            className="w-full px-4 py-2.5 bg-emerald-600 text-white text-sm font-bold rounded hover:bg-emerald-700 flex items-center justify-center gap-2"
+                          >
+                            ✅ Accept & Send to Client
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Translated Documents Section */}
                   <div className="mt-4 pt-4 border-t">
