@@ -9219,6 +9219,7 @@ async def admin_get_all_orders(
     # Get user info for role-based filtering
     user_role = None
     user_id = None
+    user_name = None
     if admin_key != expected_key:
         # It's a user token, get their role
         if admin_key in active_admin_tokens:
@@ -9229,6 +9230,11 @@ async def admin_get_all_orders(
             if user:
                 user_role = user.get("role")
                 user_id = user.get("id")
+        # Get user name for translator name-based matching
+        if user_role == "translator" and user_id:
+            tr_user = await db.admin_users.find_one({"id": user_id})
+            if tr_user:
+                user_name = tr_user.get("name")
 
     # Build query filter
     query = {}
@@ -9236,6 +9242,18 @@ async def admin_get_all_orders(
     # PM only sees their assigned projects
     if user_role == "pm" and user_id:
         query["assigned_pm_id"] = user_id
+
+    # Translator only sees projects assigned to them (order-level or file-level)
+    translator_filter = None
+    if user_role == "translator" and user_id:
+        tr_conditions = [
+            {"assigned_translator_id": user_id},
+            {"file_translator_ids": user_id}
+        ]
+        if user_name:
+            tr_conditions.append({"assigned_translator": user_name})
+            tr_conditions.append({"assigned_translator_name": user_name})
+        translator_filter = {"$or": tr_conditions}
 
     if status and status != "all":
         # Map status groups for filtering (include all case variations)
@@ -9259,6 +9277,15 @@ async def admin_get_all_orders(
             {"client_name": {"$regex": search, "$options": "i"}},
             {"client_email": {"$regex": search, "$options": "i"}}
         ]
+
+    # Combine translator filter with other filters using $and to avoid $or conflicts
+    if translator_filter:
+        if "$or" in query:
+            # Both translator filter and search use $or — combine with $and
+            search_or = query.pop("$or")
+            query["$and"] = [translator_filter, {"$or": search_or}]
+        else:
+            query.update(translator_filter)
 
     # Get total count for pagination
     total_count = await db.translation_orders.count_documents(query)
@@ -9345,8 +9372,18 @@ async def get_my_projects(token: str, admin_key: str):
         # PM sees projects assigned to them
         orders = await db.translation_orders.find({"assigned_pm_id": user_id}).sort("created_at", -1).to_list(500)
     elif user_role == "translator":
-        # Translator sees projects assigned to them
-        orders = await db.translation_orders.find({"assigned_translator_id": user_id}).sort("created_at", -1).to_list(500)
+        # Translator sees projects assigned to them (order-level or file-level, by ID or name)
+        tr_name = user.get("name", "")
+        tr_conditions = [
+            {"assigned_translator_id": user_id},
+            {"file_translator_ids": user_id}
+        ]
+        if tr_name:
+            tr_conditions.append({"assigned_translator": tr_name})
+            tr_conditions.append({"assigned_translator_name": tr_name})
+        orders = await db.translation_orders.find({
+            "$or": tr_conditions
+        }).sort("created_at", -1).to_list(500)
 
         # Auto-accept for in-house translators (status set to 'accepted' at assignment time)
         # Contractor translators must explicitly accept via email link (status 'pending')
