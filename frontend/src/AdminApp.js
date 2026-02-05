@@ -14896,6 +14896,11 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     setOrderDocuments([]);
     setSelectedDocsForDelivery([]); // Reset selection
     try {
+      // Fetch fresh order data (includes pm_upload fields)
+      const orderResp = await axios.get(`${API}/admin/orders/${order.id}?admin_key=${adminKey}`);
+      if (orderResp.data.order) {
+        setViewingOrder(orderResp.data.order);
+      }
       const response = await axios.get(`${API}/admin/orders/${order.id}/documents?admin_key=${adminKey}`);
       console.log('Documents loaded:', response.data);
       const docs = response.data.documents || [];
@@ -14909,6 +14914,30 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     } finally {
       setLoadingDocuments(false);
     }
+  };
+
+  // PM Upload Translation - Admin actions
+  const acceptPmUploadAdmin = async (orderId) => {
+    if (!orderId) return;
+    if (!confirm('Accept this translation and send to client? This will set the status to FINAL.')) return;
+    try {
+      await axios.post(`${API}/admin/accept-pm-upload`, {
+        order_id: orderId,
+        admin_key: adminKey
+      });
+      showToast('Translation accepted and sent to client! Status set to FINAL.');
+      // Refresh the order in the modal
+      const resp = await axios.get(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`);
+      if (resp.data.order) setViewingOrder(resp.data.order);
+      fetchOrders();
+    } catch (err) {
+      console.error('Accept PM upload failed:', err);
+      showToast('Accept failed: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const downloadPmTranslationAdmin = (orderId) => {
+    window.open(`${API}/admin/orders/${orderId}/pm-translation-download?admin_key=${adminKey}`, '_blank');
   };
 
   // Download document
@@ -17057,63 +17086,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       </button>
                       {openActionsDropdown === order.id && (
                         <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-50">
-                          {/* View Documents */}
-                          <button
-                            onClick={() => { viewOrderDocuments(order); setOpenActionsDropdown(null); }}
-                            className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-                          >
-                            <DocumentIcon className="w-4 h-4 text-slate-400" />
-                            View Documents
-                          </button>
-
-                          {/* Translation Tool */}
-                          {(isAdmin || isPM) && ['received', 'in_translation', 'review'].includes(order.translation_status) && (
-                            <button
-                              onClick={() => { startTranslation(order); setOpenActionsDropdown(null); }}
-                              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50 flex items-center gap-2"
-                            >
-                              <WriteIcon className="w-4 h-4 text-blue-500" />
-                              Open Translation
-                            </button>
-                          )}
-
-                          {/* Review Side-by-Side */}
-                          {(isAdmin || isPM) && ['review', 'ready', 'client_review'].includes(order.translation_status) && (
-                            <button
-                              onClick={() => { openReviewModal(order); setOpenActionsDropdown(null); }}
-                              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-emerald-50 flex items-center gap-2"
-                            >
-                              <SearchIcon className="w-4 h-4 text-emerald-500" />
-                              Review Side-by-Side
-                            </button>
-                          )}
-
-                          {/* Download Translation Package */}
-                          {(isAdmin || isPM) && (order.translation_ready || ['ready', 'delivered', 'final', 'pending_admin_approval', 'pending_admin_review', 'finalized_pending_admin', 'review', 'pending_pm_review'].includes(order.translation_status)) && (
-                            <button
-                              onClick={() => { downloadOrderPackage(order); setOpenActionsDropdown(null); }}
-                              disabled={downloadingPackage === order.id}
-                              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-purple-50 flex items-center gap-2 disabled:opacity-50"
-                            >
-                              <DownloadIcon className="w-4 h-4 text-purple-500" />
-                              {downloadingPackage === order.id ? 'Generating...' : 'Download Package (PDF)'}
-                            </button>
-                          )}
-
-                          {/* Confirm Payment - for WhatsApp/MIA quotes */}
-                          {isAdmin && (order.translation_status === 'Quote' || (order.translation_status === 'received' && order.payment_status === 'pending')) && (
-                            <button
-                              onClick={() => { confirmQuotePayment(order.id); setOpenActionsDropdown(null); }}
-                              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-green-50 flex items-center gap-2"
-                            >
-                              <CheckIcon className="w-4 h-4 text-green-500" />
-                              💰 Confirm Payment
-                            </button>
-                          )}
-
-                          <div className="border-t border-slate-100 my-1"></div>
-
-                          {/* Status Actions */}
+                          {/* Start Translation */}
                           {(isAdmin || isPM) && order.translation_status === 'received' && (isAdmin || order.translator_assignment_status === 'accepted') && (
                             <button
                               onClick={() => { updateStatus(order.id, 'in_translation'); setOpenActionsDropdown(null); }}
@@ -17124,141 +17097,15 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             </button>
                           )}
 
-                          {(isAdmin || isPM) && order.translation_status === 'in_translation' && (
-                            <button
-                              onClick={() => { updateStatus(order.id, 'review'); setOpenActionsDropdown(null); }}
-                              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-indigo-50 flex items-center gap-2"
-                            >
-                              <EyeIcon className="w-4 h-4 text-indigo-500" />
-                              Send to PM Review
-                            </button>
-                          )}
-
-                          {/* Admin only: Approve from PM/Translator */}
-                          {isAdmin && ['pending_admin_approval', 'pending_admin_review', 'finalized_pending_admin'].includes(order.translation_status) && (
-                            <>
-                              <button
-                                onClick={() => { updateStatus(order.id, 'ready'); setOpenActionsDropdown(null); }}
-                                className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-green-50 flex items-center gap-2"
-                              >
-                                <CheckIcon className="w-4 h-4 text-green-500" />
-                                ✅ Approve (Ready for Delivery)
-                              </button>
-                              <button
-                                onClick={() => { updateStatus(order.id, 'review'); setOpenActionsDropdown(null); }}
-                                className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-yellow-50 flex items-center gap-2"
-                              >
-                                <RefreshIcon className="w-4 h-4 text-yellow-500" />
-                                Return to PM Review
-                              </button>
-                            </>
-                          )}
-
-                          {/* Admin only: Send to Client Review and Mark as Final */}
-                          {isAdmin && (order.translation_status === 'review' || order.translation_status === 'pending_pm_review') && (
-                            <>
-                              <button
-                                onClick={() => { updateStatus(order.id, 'client_review'); setOpenActionsDropdown(null); }}
-                                className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50 flex items-center gap-2"
-                              >
-                                <MailIcon className="w-4 h-4 text-blue-500" />
-                                Send to Client Review
-                              </button>
-                              <button
-                                onClick={() => { updateStatus(order.id, 'ready'); setOpenActionsDropdown(null); }}
-                                className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-emerald-50 flex items-center gap-2"
-                              >
-                                <CheckIcon className="w-4 h-4 text-emerald-500" />
-                                Mark as Ready
-                              </button>
-                            </>
-                          )}
-
-                          {/* Admin only: Client review actions */}
-                          {isAdmin && order.translation_status === 'client_review' && (
-                            <>
-                              <button
-                                onClick={() => { updateStatus(order.id, 'review'); setOpenActionsDropdown(null); }}
-                                className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-yellow-50 flex items-center gap-2"
-                              >
-                                <RefreshIcon className="w-4 h-4 text-yellow-500" />
-                                Back to Revision
-                              </button>
-                              <button
-                                onClick={() => { updateStatus(order.id, 'ready'); setOpenActionsDropdown(null); }}
-                                className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-emerald-50 flex items-center gap-2"
-                              >
-                                <CheckIcon className="w-4 h-4 text-emerald-500" />
-                                Mark as Final
-                              </button>
-                            </>
-                          )}
-
-                          {/* Admin only: Preview & Send Translation */}
-                          {isAdmin && ['ready', 'pending_admin_approval', 'pending_admin_review', 'finalized_pending_admin', 'review', 'pending_pm_review'].includes(order.translation_status) && (
-                            <button
-                              onClick={() => { openDeliveryModal(order); setOpenActionsDropdown(null); }}
-                              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50 flex items-center gap-2"
-                            >
-                              <MailIcon className="w-4 h-4 text-blue-500" />
-                              📧 Preview & Send Email
-                            </button>
-                          )}
-
-                          {/* Admin only: Deliver to Client (quick) */}
-                          {isAdmin && (order.translation_status === 'ready' || order.translation_status === 'final') && (
-                            <button
-                              onClick={() => { deliverOrder(order.id); setOpenActionsDropdown(null); }}
-                              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50 flex items-center gap-2"
-                            >
-                              <SendIcon className="w-4 h-4 text-teal-500" />
-                              Deliver to Client (Quick)
-                            </button>
-                          )}
-
-                          {/* Admin only: Mark as Final (project completed) */}
-                          {isAdmin && (order.translation_status === 'delivered' || order.translation_status === 'ready') && (
-                            <button
-                              onClick={() => { updateStatus(order.id, 'final'); setOpenActionsDropdown(null); }}
-                              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50 flex items-center gap-2"
-                            >
-                              <CheckIcon className="w-4 h-4 text-purple-500" />
-                              Mark as Final
-                            </button>
-                          )}
-
-                          {/* Admin only: Reopen delivered/final order for corrections */}
-                          {isAdmin && (order.translation_status === 'delivered' || order.translation_status === 'final') && (
-                            <button
-                              onClick={() => { reopenOrder(order.id); setOpenActionsDropdown(null); }}
-                              className="w-full px-3 py-2 text-left text-sm text-yellow-700 hover:bg-yellow-50 flex items-center gap-2"
-                            >
-                              <RefreshIcon className="w-4 h-4 text-yellow-500" />
-                              Reopen for Corrections
-                            </button>
-                          )}
-
-                          {/* Admin-only Actions */}
+                          {/* Delete Order - Admin only */}
                           {isAdmin && (
-                            <>
-                              <div className="border-t border-slate-100 my-1"></div>
-                              {order.payment_status === 'pending' && (
-                                <button
-                                  onClick={() => { markPaid(order.id); setOpenActionsDropdown(null); }}
-                                  className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-emerald-50 flex items-center gap-2"
-                                >
-                                  <span className="w-4 h-4 flex items-center justify-center text-emerald-500 font-semibold">$</span>
-                                  Mark as Paid
-                                </button>
-                              )}
-                              <button
-                                onClick={() => { deleteOrder(order.id, order.order_number); setOpenActionsDropdown(null); }}
-                                className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                              >
-                                <TrashIcon className="w-4 h-4" />
-                                Delete Order
-                              </button>
-                            </>
+                            <button
+                              onClick={() => { deleteOrder(order.id, order.order_number); setOpenActionsDropdown(null); }}
+                              className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                            >
+                              <TrashIcon className="w-4 h-4" />
+                              Delete Order
+                            </button>
                           )}
                         </div>
                       )}
@@ -18019,6 +17866,83 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       </div>
                     )}
                   </div>
+
+                  {/* PM Upload Translation Section */}
+                  {(viewingOrder.pm_upload_filename || viewingOrder.translation_status === 'pm_upload_ready' || viewingOrder.translation_status === 'final') && (
+                    <div className="mt-4 pt-4 border-t">
+                      <div className="text-xs font-medium text-emerald-700 mb-2">📤 PM Upload Translation</div>
+
+                      {/* FINAL badge */}
+                      {viewingOrder.translation_status === 'final' && viewingOrder.pm_upload_filename && (
+                        <div className="p-4 bg-emerald-50 border-2 border-emerald-300 rounded-lg">
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className="text-2xl">🏁</span>
+                            <div>
+                              <div className="text-sm font-bold text-emerald-800">FINAL - Delivered to Client</div>
+                              {viewingOrder.completed_at && (
+                                <div className="text-[10px] text-emerald-600">Completed: {new Date(viewingOrder.completed_at).toLocaleString()}</div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-emerald-200">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xl">📎</span>
+                              <div>
+                                <div className="text-sm font-medium">{viewingOrder.pm_upload_filename}</div>
+                                <div className="text-[10px] text-gray-500">
+                                  {viewingOrder.pm_upload_file_size ? `${(viewingOrder.pm_upload_file_size / 1024).toFixed(1)} KB` : ''}
+                                  {viewingOrder.pm_uploaded_at ? ` • Uploaded ${new Date(viewingOrder.pm_uploaded_at).toLocaleString()}` : ''}
+                                </div>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => downloadPmTranslationAdmin(viewingOrder.id)}
+                              className="px-3 py-1.5 bg-emerald-600 text-white rounded text-xs hover:bg-emerald-700"
+                            >
+                              ⬇️ Download
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* READY - waiting for review */}
+                      {viewingOrder.translation_status === 'pm_upload_ready' && viewingOrder.pm_upload_filename && (
+                        <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-lg">
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white text-sm">✓</div>
+                            <div>
+                              <div className="text-sm font-bold text-emerald-800">Translation READY - Awaiting Review</div>
+                              <div className="text-[10px] text-emerald-600">PM has uploaded an external translation for this project</div>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-emerald-200 mb-3">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xl">📎</span>
+                              <div>
+                                <div className="text-sm font-medium">{viewingOrder.pm_upload_filename}</div>
+                                <div className="text-[10px] text-gray-500">
+                                  {viewingOrder.pm_upload_file_size ? `${(viewingOrder.pm_upload_file_size / 1024).toFixed(1)} KB` : ''}
+                                  {viewingOrder.pm_uploaded_at ? ` • Uploaded ${new Date(viewingOrder.pm_uploaded_at).toLocaleString()}` : ''}
+                                </div>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => downloadPmTranslationAdmin(viewingOrder.id)}
+                              className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                            >
+                              ⬇️ Open & Review
+                            </button>
+                          </div>
+                          <button
+                            onClick={() => acceptPmUploadAdmin(viewingOrder.id)}
+                            className="w-full px-4 py-2.5 bg-emerald-600 text-white text-sm font-bold rounded hover:bg-emerald-700 flex items-center justify-center gap-2"
+                          >
+                            ✅ Accept & Send to Client
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Translated Documents Section */}
                   <div className="mt-4 pt-4 border-t">
