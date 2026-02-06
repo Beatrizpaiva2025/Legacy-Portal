@@ -2015,7 +2015,7 @@ class AdminUserCreate(BaseModel):
     rate_per_page: Optional[float] = None
     rate_per_word: Optional[float] = None
     language_pairs: Optional[str] = None
-    translator_type: Optional[str] = 'contractor'  # 'in_house' or 'contractor'
+    translator_type: Optional[str] = 'contractor'  # 'in_house', 'contractor', or 'external'
 
 class AdminInvitationAccept(BaseModel):
     token: str
@@ -2064,7 +2064,7 @@ class AdminUserResponse(BaseModel):
     token: str
     pages_translated: Optional[int] = 0
     pages_pending_payment: Optional[int] = 0
-    translator_type: Optional[str] = 'contractor'  # 'in_house' or 'contractor'
+    translator_type: Optional[str] = 'contractor'  # 'in_house', 'contractor', or 'external'
 
 class AdminUserPublic(BaseModel):
     id: str
@@ -2072,7 +2072,7 @@ class AdminUserPublic(BaseModel):
     name: str
     role: str
     is_active: bool
-    translator_type: Optional[str] = 'contractor'  # 'in_house' or 'contractor'
+    translator_type: Optional[str] = 'contractor'  # 'in_house', 'contractor', or 'external'
 
 # Translation Order Models (with invoice tracking)
 class TranslationOrder(BaseModel):
@@ -17464,6 +17464,74 @@ async def translator_send_message_to_admin(admin_key: str, request: dict = Body(
     })
 
     return {"status": "success", "message_id": message_id}
+
+
+# ==================== EXTERNAL TRANSLATOR UPLOAD NOTIFICATION ====================
+@api_router.post("/external-translator/notify-upload")
+async def external_translator_notify_upload(admin_key: str, request: dict = Body(...)):
+    """Notify PM when external translator uploads a translation"""
+    # Validate token
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    order_id = request.get("order_id")
+    order_number = request.get("order_number", "N/A")
+    translator_name = request.get("translator_name", "External Translator")
+    translator_id = request.get("translator_id")
+    filename = request.get("filename", "unknown")
+
+    # Find the order to get the assigned PM
+    order = await db.translation_orders.find_one({"id": order_id})
+    pm_id = order.get("assigned_pm_id") if order else None
+    pm_name = order.get("assigned_pm_name", "PM") if order else "PM"
+
+    now = datetime.utcnow()
+
+    # Create notification for PM (or admin if no PM assigned)
+    notification = {
+        "id": str(uuid.uuid4()),
+        "type": "external_translator_upload",
+        "title": f"Translation Uploaded - {order_number}",
+        "message": f"External translator {translator_name} uploaded '{filename}' for order {order_number}. Please review and create the delivery package.",
+        "order_id": order_id,
+        "order_number": order_number,
+        "translator_id": translator_id,
+        "translator_name": translator_name,
+        "filename": filename,
+        "is_read": False,
+        "created_at": now
+    }
+    await db.admin_notifications.insert_one(notification)
+
+    # Also send a translator message to PM/admin so it shows in messaging
+    message = {
+        "id": str(uuid.uuid4()),
+        "type": "translator_to_admin",
+        "from_translator_id": translator_id,
+        "from_translator_name": translator_name,
+        "to_recipient_id": pm_id,
+        "to_recipient_name": pm_name,
+        "to_recipient_role": "pm" if pm_id else "admin",
+        "content": f"[Auto] Translation file '{filename}' uploaded for order {order_number}. Ready for review and package creation.",
+        "read": False,
+        "created_at": now
+    }
+    await db.translator_messages.insert_one(message)
+
+    # Update order status to indicate translation was received
+    if order:
+        await db.translation_orders.update_one(
+            {"id": order_id},
+            {"$set": {
+                "translation_status": "pending_pm_review",
+                "external_translation_uploaded_at": now,
+                "external_translation_uploaded_by": translator_name
+            }}
+        )
+
+    logger.info(f"External translator {translator_name} uploaded translation for order {order_number}")
+    return {"status": "success", "message": "PM has been notified"}
 
 
 @api_router.get("/messages/unread-count")
