@@ -4056,6 +4056,27 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
   };
 
+  // Diagnose all API key sources
+  const [diagnosisResult, setDiagnosisResult] = useState(null);
+  const diagnoseApiKeys = async () => {
+    setProcessingStatus('🔍 Diagnosticando chaves de API...');
+    setDiagnosisResult(null);
+    try {
+      const response = await axios.get(`${API}/admin/settings/api-key/diagnose?admin_key=${adminKey}`);
+      setDiagnosisResult(response.data);
+      if (response.data.sources?.length === 0) {
+        setProcessingStatus('❌ Nenhuma chave de API encontrada no sistema.');
+      } else {
+        const anyOk = response.data.sources.some(s => s.test_ok);
+        setProcessingStatus(anyOk
+          ? '✅ Diagnóstico concluído - chave válida encontrada!'
+          : '❌ Diagnóstico concluído - nenhuma chave válida encontrada.');
+      }
+    } catch (err) {
+      setProcessingStatus(`❌ Erro no diagnóstico: ${err.response?.data?.detail || err.message}`);
+    }
+  };
+
   // Load shared API key from backend
   const loadSharedApiKey = async () => {
     try {
@@ -7065,6 +7086,35 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               <p className="text-[10px] text-red-600 mt-1">
                 Configure sua chave de API do Claude para usar a tradução por IA. Obtenha em console.anthropic.com
               </p>
+            )}
+            {/* Diagnose button */}
+            <div className="mt-2 flex items-center gap-2">
+              <button
+                onClick={diagnoseApiKeys}
+                className="px-3 py-1 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600"
+              >
+                Diagnosticar todas as chaves
+              </button>
+              <span className="text-[10px] text-gray-500">Verifica todas as fontes de chave de API</span>
+            </div>
+            {/* Diagnosis results */}
+            {diagnosisResult && diagnosisResult.sources && (
+              <div className="mt-2 border border-gray-200 rounded p-2 bg-white text-xs space-y-2">
+                {diagnosisResult.sources.map((s, i) => (
+                  <div key={i} className={`p-2 rounded ${s.test_ok ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                    <div className="flex items-center gap-2">
+                      <span>{s.test_ok ? '✅' : '❌'}</span>
+                      <strong>{s.source}</strong>
+                    </div>
+                    <div className="ml-5 text-gray-600">Chave: <code>{s.key_preview}</code></div>
+                    <div className="ml-5">{s.test_result}</div>
+                    {s.updated_at && <div className="ml-5 text-gray-400">Atualizada: {s.updated_at}</div>}
+                  </div>
+                ))}
+                {diagnosisResult.sources.length === 0 && (
+                  <p className="text-red-600">{diagnosisResult.message}</p>
+                )}
+              </div>
             )}
           </div>
 

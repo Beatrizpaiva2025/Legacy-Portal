@@ -23545,6 +23545,69 @@ async def check_shared_api_key_available():
     settings = await db.app_settings.find_one({"key": "shared_claude_api_key"})
     return {"available": bool(settings and settings.get("value"))}
 
+@api_router.get("/admin/settings/api-key/diagnose")
+async def diagnose_api_keys(admin_key: str):
+    """Diagnose all API key sources and test each one"""
+    await validate_admin_or_user_token(admin_key)
+
+    sources = []
+
+    # Source 1: Environment variable
+    env_key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("CLAUDE_API_KEY")
+    if env_key:
+        sources.append({
+            "source": "Variável de ambiente (ANTHROPIC_API_KEY)",
+            "key_preview": f"{env_key[:7]}...{env_key[-4:]}",
+            "status": "encontrada"
+        })
+
+    # Source 2: Database shared key
+    settings = await db.app_settings.find_one({"key": "shared_claude_api_key"})
+    db_key = settings.get("value") if settings else None
+    if db_key:
+        sources.append({
+            "source": "Chave compartilhada (banco de dados)",
+            "key_preview": f"{db_key[:7]}...{db_key[-4:]}",
+            "status": "encontrada",
+            "updated_at": settings.get("updated_at", "desconhecido")
+        })
+
+    if not sources:
+        return {
+            "sources": [],
+            "message": "Nenhuma chave de API encontrada no sistema. Configure uma chave na aba START."
+        }
+
+    # Test each key
+    for source in sources:
+        key = env_key if "ambiente" in source["source"] else db_key
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                response = await client.post(
+                    "https://api.anthropic.com/v1/messages",
+                    headers={
+                        "x-api-key": key,
+                        "anthropic-version": "2023-06-01",
+                        "content-type": "application/json"
+                    },
+                    json={
+                        "model": "claude-sonnet-4-5-20250929",
+                        "max_tokens": 10,
+                        "messages": [{"role": "user", "content": "Hi"}]
+                    }
+                )
+                if response.status_code == 200:
+                    source["test_result"] = "OK - Funcionando"
+                    source["test_ok"] = True
+                else:
+                    source["test_result"] = parse_claude_api_error(response.text, response.status_code)
+                    source["test_ok"] = False
+        except Exception as e:
+            source["test_result"] = f"Erro: {str(e)}"
+            source["test_ok"] = False
+
+    return {"sources": sources}
+
 @api_router.get("/settings/api-key/use")
 async def get_api_key_for_translation(token: str = None):
     """Get the actual API key for translation (requires authentication)"""
