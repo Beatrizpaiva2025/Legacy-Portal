@@ -29050,6 +29050,24 @@ async def update_acquisition(acquisition_id: str, request: Request, admin_key: s
 
     return {"success": True, "acquisition": updated}
 
+# Delete acquisition
+@api_router.delete("/admin/partner-acquisitions/{acquisition_id}")
+async def delete_acquisition(acquisition_id: str, admin_key: str = Header(None)):
+    if not admin_key:
+        raise HTTPException(status_code=401, detail="Admin key required")
+
+    acq = await db.partner_acquisitions.find_one({"id": acquisition_id})
+    if not acq:
+        raise HTTPException(status_code=404, detail="Acquisition not found")
+
+    # Delete the acquisition
+    await db.partner_acquisitions.delete_one({"id": acquisition_id})
+
+    # Also delete related outreach emails
+    await db.outreach_emails.delete_many({"acquisition_id": acquisition_id})
+
+    return {"success": True}
+
 # Get sales dashboard stats
 @api_router.get("/admin/sales-dashboard")
 async def get_sales_dashboard(admin_key: str = Header(None)):
