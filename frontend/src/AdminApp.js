@@ -4033,6 +4033,29 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
   };
 
+  // Test API key by making a validation call
+  const testApiKey = async () => {
+    const keyToTest = claudeApiKey;
+    if (!keyToTest) {
+      setProcessingStatus('❌ Nenhuma chave de API configurada para testar.');
+      return;
+    }
+    setProcessingStatus('🔄 Testando chave de API...');
+    try {
+      const response = await axios.post(`${API}/admin/settings/api-key/test?admin_key=${adminKey}`, {
+        api_key: keyToTest
+      });
+      if (response.data?.valid) {
+        setProcessingStatus(`✅ ${response.data.message}`);
+      } else {
+        setProcessingStatus(`❌ ${response.data.message}`);
+      }
+    } catch (err) {
+      const msg = err.response?.data?.detail || err.message;
+      setProcessingStatus(`❌ Erro ao testar: ${msg}`);
+    }
+  };
+
   // Load shared API key from backend
   const loadSharedApiKey = async () => {
     try {
@@ -6991,6 +7014,59 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               {processingStatus}
             </div>
           )}
+
+          {/* API Key Status & Configuration */}
+          <div className={`border rounded-lg p-3 ${claudeApiKey ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-sm">{claudeApiKey ? '🟢' : '🔴'}</span>
+                <span className={`text-xs font-bold ${claudeApiKey ? 'text-green-800' : 'text-red-800'}`}>
+                  Claude API Key: {claudeApiKey ? 'Configurada' : 'Não configurada'}
+                </span>
+                {claudeApiKey && (
+                  <span className="text-[10px] text-gray-500">({claudeApiKey.slice(0, 7)}...{claudeApiKey.slice(-4)})</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {claudeApiKey && (
+                  <button
+                    onClick={testApiKey}
+                    className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                  >
+                    Testar Chave
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowApiKey(!showApiKey)}
+                  className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+                >
+                  {showApiKey ? 'Fechar' : 'Alterar Chave'}
+                </button>
+              </div>
+            </div>
+            {showApiKey && (
+              <div className="mt-3 flex gap-2">
+                <input
+                  type="password"
+                  value={claudeApiKey}
+                  onChange={(e) => setClaudeApiKey(e.target.value)}
+                  placeholder="sk-ant-..."
+                  className="flex-1 px-3 py-1.5 text-xs border rounded font-mono"
+                />
+                <button
+                  onClick={saveApiKey}
+                  className="px-3 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                >
+                  Salvar
+                </button>
+              </div>
+            )}
+            {!claudeApiKey && (
+              <p className="text-[10px] text-red-600 mt-1">
+                Configure sua chave de API do Claude para usar a tradução por IA. Obtenha em console.anthropic.com
+              </p>
+            )}
+          </div>
 
           {/* Upload Document Section - Compact */}
           <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-3">

@@ -23504,6 +23504,41 @@ async def delete_shared_api_key(admin_key: str):
     logger.info("Shared Claude API key deleted")
     return {"status": "success", "message": "API key removed"}
 
+@api_router.post("/admin/settings/api-key/test")
+async def test_api_key(admin_key: str, api_key: str = Body(..., embed=True)):
+    """Test a Claude API key by making a minimal API call"""
+    await validate_admin_or_user_token(admin_key)
+
+    if not api_key or not api_key.startswith("sk-"):
+        return {"valid": False, "message": "Formato de chave inválido. A chave deve começar com 'sk-'."}
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json"
+                },
+                json={
+                    "model": "claude-sonnet-4-5-20250929",
+                    "max_tokens": 10,
+                    "messages": [{"role": "user", "content": "Hi"}]
+                }
+            )
+
+            if response.status_code == 200:
+                return {"valid": True, "message": "Chave de API válida! Conexão e créditos OK."}
+            else:
+                friendly_msg = parse_claude_api_error(response.text, response.status_code)
+                return {"valid": False, "message": friendly_msg}
+
+    except httpx.TimeoutException:
+        return {"valid": False, "message": "Timeout ao conectar com a API do Claude. Verifique sua conexão."}
+    except Exception as e:
+        return {"valid": False, "message": f"Erro ao testar a chave: {str(e)}"}
+
 @api_router.get("/settings/api-key/check")
 async def check_shared_api_key_available():
     """Public endpoint to check if a shared API key is configured (for translators)"""
