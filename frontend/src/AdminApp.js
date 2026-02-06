@@ -6664,20 +6664,32 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     if (!pmUploadFiles.length || !orderId) return;
     setPmUploadLoading(true);
     try {
-      const formData = new FormData();
-      formData.append('order_id', orderId);
-      formData.append('admin_key', adminKey);
-      pmUploadFiles.forEach(file => formData.append('files', file));
-      const response = await axios.post(`${API}/admin/upload-pm-translation`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      // Upload each file using the same method as admin (base64 + JSON)
+      for (const file of pmUploadFiles) {
+        const base64Data = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result.split(',')[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        await axios.post(`${API}/admin/orders/${orderId}/documents?admin_key=${adminKey}`, {
+          filename: file.name,
+          file_data: base64Data,
+          content_type: file.type || 'application/octet-stream',
+          source: 'translated_document'
+        });
+      }
+      // Update order status to pm_upload_ready
+      await axios.put(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`, {
+        translation_status: 'pm_upload_ready',
+        pm_uploaded_at: new Date().toISOString()
       });
       showToast(`${pmUploadFiles.length} file(s) uploaded successfully! Status set to READY.`);
       setPmUploadFiles([]);
-      // Refresh order data
       fetchAssignedOrders();
     } catch (err) {
       console.error('PM upload failed:', err);
-      showToast('Error uploading translation: ' + (err.response?.data?.detail || err.message));
+      showToast('Error uploading: ' + (err.response?.data?.detail || err.message));
     } finally {
       setPmUploadLoading(false);
     }
@@ -26900,16 +26912,29 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     if (!pmUploadFiles.length || !orderId) return;
     setPmUploadLoading(true);
     try {
-      const formData = new FormData();
-      formData.append('order_id', orderId);
-      formData.append('admin_key', adminKey);
-      pmUploadFiles.forEach(file => formData.append('files', file));
-      await axios.post(`${API}/admin/upload-pm-translation`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      // Upload each file using the same method as admin (base64 + JSON)
+      for (const file of pmUploadFiles) {
+        const base64Data = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result.split(',')[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        await axios.post(`${API}/admin/orders/${orderId}/documents?admin_key=${adminKey}`, {
+          filename: file.name,
+          file_data: base64Data,
+          content_type: file.type || 'application/octet-stream',
+          source: 'translated_document'
+        });
+      }
+      // Update order status to pm_upload_ready
+      await axios.put(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`, {
+        translation_status: 'pm_upload_ready',
+        pm_uploaded_at: new Date().toISOString()
       });
-      showToast(`${pmUploadFiles.length} file(s) uploaded successfully! Status set to READY.`);
+      showToast(`${pmUploadFiles.length} file(s) uploaded successfully! Sent to Admin.`);
       setPmUploadFiles([]);
-      // Refresh the order data in selectedProject
+      // Refresh the order data
       try {
         const resp = await axios.get(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`);
         if (resp.data.order) setSelectedProject(resp.data.order);

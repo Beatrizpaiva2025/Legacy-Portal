@@ -9452,9 +9452,11 @@ async def get_my_projects(token: str, admin_key: str):
 async def upload_pm_translation(
     order_id: str = Form(...),
     admin_key: str = Form(...),
-    files: List[UploadFile] = File(...)
+    file: UploadFile = File(...),
+    clear_previous: str = Form("false")
 ):
-    """PM uploads external translation file(s). Status becomes pm_upload_ready. Supports multiple files."""
+    """PM uploads an external translation file. Supports uploading multiple files via multiple calls.
+    Set clear_previous=true on the first call to remove old PM uploads."""
     # Validate admin key or user token (admin/pm)
     is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
     if not is_valid:
@@ -9471,68 +9473,63 @@ async def upload_pm_translation(
 
     try:
         now = datetime.utcnow()
-        uploaded_files = []
 
-        # Remove any previous PM-uploaded translated documents first (once, before loop)
-        await db.order_documents.delete_many({
-            "order_id": order_id,
-            "source": "translated_document",
-            "uploaded_by": "pm"
-        })
-
-        for file in files:
-            # Read file content
-            file_content = await file.read()
-            file_size = len(file_content)
-
-            # Max 20MB per file
-            if file_size > 20 * 1024 * 1024:
-                raise HTTPException(status_code=400, detail=f"File '{file.filename}' too large. Maximum size is 20MB per file.")
-
-            # Store in GridFS
-            file_metadata = {
-                "filename": file.filename,
-                "content_type": file.content_type or "application/octet-stream",
-                "uploaded_at": now,
+        # Only clear previous PM uploads when explicitly requested (first file in batch)
+        if clear_previous.lower() == "true":
+            await db.order_documents.delete_many({
                 "order_id": order_id,
-                "source": "pm_upload_translation"
-            }
-            file_id = await fs_bucket.upload_from_stream(
-                file.filename,
-                io.BytesIO(file_content),
-                metadata=file_metadata
-            )
-
-            # Add to order_documents so admin sees it in Files tab
-            doc_record = {
-                "id": str(uuid.uuid4()),
-                "order_id": order_id,
-                "filename": file.filename,
-                "content_type": file.content_type or "application/octet-stream",
                 "source": "translated_document",
-                "uploaded_by": "pm",
-                "uploaded_at": now,
-                "gridfs_id": str(file_id),
-                "file_size": file_size,
-                "data": None,
-                "file_data": None
-            }
-            result = await db.order_documents.insert_one(doc_record)
-            logger.info(f"PM translation added to order_documents: {file.filename} (inserted_id={result.inserted_id}, order_id={order_id})")
-            uploaded_files.append({"filename": file.filename, "size": file_size, "gridfs_id": str(file_id)})
+                "uploaded_by": "pm"
+            })
+            logger.info(f"Cleared previous PM uploads for order {order_id}")
 
-        # Update order with PM upload info (use last file for backwards compat fields)
-        last_file = uploaded_files[-1] if uploaded_files else {}
-        filenames_str = ", ".join(f["filename"] for f in uploaded_files)
-        total_size = sum(f["size"] for f in uploaded_files)
+        # Read file content
+        file_content = await file.read()
+        file_size = len(file_content)
+
+        # Max 20MB per file
+        if file_size > 20 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail=f"File too large. Maximum size is 20MB.")
+
+        # Store in GridFS
+        file_metadata = {
+            "filename": file.filename,
+            "content_type": file.content_type or "application/octet-stream",
+            "uploaded_at": now,
+            "order_id": order_id,
+            "source": "pm_upload_translation"
+        }
+        file_id = await fs_bucket.upload_from_stream(
+            file.filename,
+            io.BytesIO(file_content),
+            metadata=file_metadata
+        )
+
+        # Add to order_documents so admin sees it in Files tab
+        doc_record = {
+            "id": str(uuid.uuid4()),
+            "order_id": order_id,
+            "filename": file.filename,
+            "content_type": file.content_type or "application/octet-stream",
+            "source": "translated_document",
+            "uploaded_by": "pm",
+            "uploaded_at": now,
+            "gridfs_id": str(file_id),
+            "file_size": file_size,
+            "data": None,
+            "file_data": None
+        }
+        result = await db.order_documents.insert_one(doc_record)
+        logger.info(f"PM translation added to order_documents: {file.filename} (inserted_id={result.inserted_id}, order_id={order_id})")
+
+        # Update order with PM upload info
         await db.translation_orders.update_one(
             {"id": order_id},
             {"$set": {
-                "pm_upload_file_id": last_file.get("gridfs_id", ""),
-                "pm_upload_filename": filenames_str if len(uploaded_files) > 1 else last_file.get("filename", ""),
-                "pm_upload_content_type": "multiple" if len(uploaded_files) > 1 else (files[0].content_type or "application/octet-stream"),
-                "pm_upload_file_size": total_size,
-                "pm_upload_file_count": len(uploaded_files),
+                "pm_upload_file_id": str(file_id),
+                "pm_upload_filename": file.filename,
+                "pm_upload_content_type": file.content_type or "application/octet-stream",
+                "pm_upload_file_size": file_size,
                 "pm_uploaded_at": now.isoformat(),
                 "translation_status": "pm_upload_ready"
             }}
@@ -9543,23 +9540,16 @@ async def upload_pm_translation(
             admin_email = os.environ.get("ADMIN_EMAIL", "contact@legacytranslations.com")
             order_number = order.get("order_number", order_id)
             client_name = order.get("client_name", "Unknown")
-            files_html = "".join(
-                f'<tr><td style="padding: 8px; border-bottom: 1px solid #eee;">{f["filename"]}</td><td style="padding: 8px; border-bottom: 1px solid #eee;">{f["size"] / 1024:.1f} KB</td></tr>'
-                for f in uploaded_files
-            )
             email_html = f"""
             {get_email_header()}
             <div style="padding: 30px;">
                 <h2 style="color: #10b981;">Translation Ready for Review</h2>
-                <p>A PM has uploaded {len(uploaded_files)} translation file(s) for project <strong>{order_number}</strong>.</p>
+                <p>A PM has uploaded a translation file for project <strong>{order_number}</strong>.</p>
                 <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
                     <tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Project:</td><td style="padding: 8px; border-bottom: 1px solid #eee;">{order_number}</td></tr>
                     <tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Client:</td><td style="padding: 8px; border-bottom: 1px solid #eee;">{client_name}</td></tr>
-                    <tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Files:</td><td style="padding: 8px; border-bottom: 1px solid #eee;">{len(uploaded_files)} file(s) - {total_size / 1024:.1f} KB total</td></tr>
-                </table>
-                <table style="width: 100%; border-collapse: collapse; margin: 10px 0;">
-                    <tr style="background: #f3f4f6;"><th style="padding: 8px; text-align: left;">File</th><th style="padding: 8px; text-align: left;">Size</th></tr>
-                    {files_html}
+                    <tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">File:</td><td style="padding: 8px; border-bottom: 1px solid #eee;">{file.filename}</td></tr>
+                    <tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Size:</td><td style="padding: 8px; border-bottom: 1px solid #eee;">{file_size / 1024:.1f} KB</td></tr>
                 </table>
                 <p>Please log in to the admin panel to review and approve this translation.</p>
             </div>
@@ -9572,9 +9562,9 @@ async def upload_pm_translation(
 
         return {
             "success": True,
-            "message": f"{len(uploaded_files)} file(s) uploaded successfully. Status set to READY.",
-            "files": [{"filename": f["filename"], "size": f["size"]} for f in uploaded_files],
-            "file_count": len(uploaded_files),
+            "message": f"File '{file.filename}' uploaded successfully. Status set to READY.",
+            "pm_upload_filename": file.filename,
+            "pm_upload_file_size": file_size,
             "pm_uploaded_at": now.isoformat(),
             "translation_status": "pm_upload_ready"
         }
