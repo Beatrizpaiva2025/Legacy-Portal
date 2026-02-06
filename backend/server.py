@@ -9475,6 +9475,28 @@ async def upload_pm_translation(
             }}
         )
 
+        # Also add to order_documents as translated_document so admin sees it in Files tab
+        # Remove any previous PM-uploaded translated documents first
+        await db.order_documents.delete_many({
+            "order_id": order_id,
+            "source": "translated_document",
+            "uploaded_by": "pm"
+        })
+        doc_record = {
+            "id": str(uuid.uuid4()),
+            "order_id": order_id,
+            "filename": file.filename,
+            "content_type": file.content_type or "application/octet-stream",
+            "source": "translated_document",
+            "uploaded_by": "pm",
+            "uploaded_at": now,
+            "gridfs_id": str(file_id),
+            "data": None,
+            "file_data": None
+        }
+        await db.order_documents.insert_one(doc_record)
+        logger.info(f"PM translation added to order_documents for admin review: {file.filename}")
+
         # Send email to admin notifying about READY translation
         try:
             admin_email = os.environ.get("ADMIN_EMAIL", "contact@legacytranslations.com")
