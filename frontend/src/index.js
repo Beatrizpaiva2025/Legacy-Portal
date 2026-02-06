@@ -10,6 +10,7 @@ import SalespersonApp from "./SalespersonApp";
 import B2BLandingPage from "./B2BLandingPage";
 import AssignmentPage from "./AssignmentPage";
 import VerificationPage from "./VerificationPage";
+import VendorTranslatorApp from "./VendorTranslatorApp";
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
@@ -29,6 +30,8 @@ root.render(
         {/* Salesperson Portal - /#/sales */}
         <Route path="/sales/*" element={<SalespersonApp />} />
         <Route path="/sales-invite" element={<SalespersonApp />} />
+        {/* Vendor Translator Portal - /#/vendor */}
+        <Route path="/vendor/*" element={<VendorTranslatorApp />} />
         {/* Assignment Accept/Decline - /#/assignment/:token/:action */}
         <Route path="/assignment/:token/:action" element={<AssignmentPage />} />
         {/* Document Verification - /#/verify/:certificationId */}
