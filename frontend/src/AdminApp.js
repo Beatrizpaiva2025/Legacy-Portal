@@ -26895,64 +26895,64 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     window.open(`${API}/admin/orders/${orderId}/pm-translation-download?admin_key=${adminKey}`, '_blank');
   };
 
-  // Delete a single order from PM Dashboard
-  const deletePmOrder = async (orderId, orderNumber) => {
-    if (!window.confirm(`Tem certeza que deseja deletar o projeto ${orderNumber}?\n\nEssa ação não pode ser desfeita.`)) return;
+  // Archive a single order from PM Dashboard (hidden from PM, still visible to admin)
+  const archivePmOrder = async (orderId, orderNumber) => {
+    if (!window.confirm(`Arquivar o projeto ${orderNumber}?\n\nO projeto será removido do seu painel, mas o admin ainda terá acesso.`)) return;
     try {
-      await axios.delete(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`);
-      showToast(`Projeto ${orderNumber} deletado com sucesso`);
+      await axios.post(`${API}/admin/orders/${orderId}/archive?admin_key=${adminKey}`);
+      showToast(`Projeto ${orderNumber} arquivado com sucesso`);
       fetchDashboardData();
     } catch (err) {
-      console.error('Failed to delete order:', err);
-      showToast('Erro ao deletar: ' + (err.response?.data?.detail || err.message));
+      console.error('Failed to archive order:', err);
+      showToast('Erro ao arquivar: ' + (err.response?.data?.detail || err.message));
     }
   };
 
-  // Bulk delete selected orders
-  const bulkDeleteOrders = async () => {
+  // Bulk archive selected orders
+  const bulkArchiveOrders = async () => {
     if (selectedOrderIds.size === 0) {
-      showToast('Selecione os projetos que deseja deletar');
+      showToast('Selecione os projetos que deseja arquivar');
       return;
     }
     const count = selectedOrderIds.size;
-    if (!window.confirm(`Tem certeza que deseja deletar ${count} projeto(s)?\n\nEssa ação não pode ser desfeita.`)) return;
+    if (!window.confirm(`Arquivar ${count} projeto(s)?\n\nOs projetos serão removidos do seu painel, mas o admin ainda terá acesso.`)) return;
     setDeletingOrders(true);
     try {
-      const res = await axios.post(`${API}/admin/orders/bulk-delete?admin_key=${adminKey}`, {
+      const res = await axios.post(`${API}/admin/orders/bulk-archive?admin_key=${adminKey}`, {
         order_ids: Array.from(selectedOrderIds)
       });
-      const { deleted_count, failed } = res.data;
-      showToast(`${deleted_count} projeto(s) deletado(s)${failed?.length ? `, ${failed.length} falharam` : ''}`);
+      const { archived_count, failed } = res.data;
+      showToast(`${archived_count} projeto(s) arquivado(s)${failed?.length ? `, ${failed.length} falharam` : ''}`);
       setSelectedOrderIds(new Set());
       fetchDashboardData();
     } catch (err) {
-      console.error('Bulk delete failed:', err);
-      showToast('Erro ao deletar projetos: ' + (err.response?.data?.detail || err.message));
+      console.error('Bulk archive failed:', err);
+      showToast('Erro ao arquivar projetos: ' + (err.response?.data?.detail || err.message));
     } finally {
       setDeletingOrders(false);
     }
   };
 
-  // Delete all completed/final/delivered orders
-  const deleteAllCompletedOrders = async () => {
+  // Archive all completed/final/delivered orders
+  const archiveAllCompletedOrders = async () => {
     const completedOrders = orders.filter(o => ['final', 'delivered'].includes(o.translation_status));
     if (completedOrders.length === 0) {
-      showToast('Nenhum projeto finalizado para deletar');
+      showToast('Nenhum projeto finalizado para arquivar');
       return;
     }
-    if (!window.confirm(`Tem certeza que deseja deletar TODOS os ${completedOrders.length} projetos finalizados/entregues?\n\nEssa ação não pode ser desfeita.`)) return;
+    if (!window.confirm(`Arquivar TODOS os ${completedOrders.length} projetos finalizados/entregues?\n\nOs projetos serão removidos do seu painel, mas o admin ainda terá acesso.`)) return;
     setDeletingOrders(true);
     try {
-      const res = await axios.post(`${API}/admin/orders/bulk-delete?admin_key=${adminKey}`, {
+      const res = await axios.post(`${API}/admin/orders/bulk-archive?admin_key=${adminKey}`, {
         order_ids: completedOrders.map(o => o.id)
       });
-      const { deleted_count, failed } = res.data;
-      showToast(`${deleted_count} projeto(s) deletado(s)${failed?.length ? `, ${failed.length} falharam` : ''}`);
+      const { archived_count, failed } = res.data;
+      showToast(`${archived_count} projeto(s) arquivado(s)${failed?.length ? `, ${failed.length} falharam` : ''}`);
       setSelectedOrderIds(new Set());
       fetchDashboardData();
     } catch (err) {
-      console.error('Bulk delete completed failed:', err);
-      showToast('Erro ao deletar projetos: ' + (err.response?.data?.detail || err.message));
+      console.error('Bulk archive completed failed:', err);
+      showToast('Erro ao arquivar projetos: ' + (err.response?.data?.detail || err.message));
     } finally {
       setDeletingOrders(false);
     }
@@ -28461,19 +28461,19 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
               <div className="flex gap-2">
                 {selectedOrderIds.size > 0 && (
                   <button
-                    onClick={bulkDeleteOrders}
+                    onClick={bulkArchiveOrders}
                     disabled={deletingOrders}
-                    className="px-3 py-1.5 bg-red-500 text-white rounded text-xs hover:bg-red-600 disabled:bg-gray-400 flex items-center gap-1"
+                    className="px-3 py-1.5 bg-amber-500 text-white rounded text-xs hover:bg-amber-600 disabled:bg-gray-400 flex items-center gap-1"
                   >
-                    🗑 Deletar Selecionados ({selectedOrderIds.size})
+                    📦 Arquivar Selecionados ({selectedOrderIds.size})
                   </button>
                 )}
                 <button
-                  onClick={deleteAllCompletedOrders}
+                  onClick={archiveAllCompletedOrders}
                   disabled={deletingOrders}
-                  className="px-3 py-1.5 bg-red-600 text-white rounded text-xs hover:bg-red-700 disabled:bg-gray-400 flex items-center gap-1"
+                  className="px-3 py-1.5 bg-amber-600 text-white rounded text-xs hover:bg-amber-700 disabled:bg-gray-400 flex items-center gap-1"
                 >
-                  {deletingOrders ? 'Deletando...' : '🗑 Deletar Todos Finalizados'}
+                  {deletingOrders ? 'Arquivando...' : '📦 Arquivar Todos Finalizados'}
                 </button>
               </div>
             </div>
@@ -28500,7 +28500,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 </thead>
                 <tbody>
                   {orders.map(order => (
-                    <tr key={order.id} className={`border-b hover:bg-gray-50 ${selectedOrderIds.has(order.id) ? 'bg-red-50' : ''}`}>
+                    <tr key={order.id} className={`border-b hover:bg-gray-50 ${selectedOrderIds.has(order.id) ? 'bg-amber-50' : ''}`}>
                       <td className="py-2 px-2 text-center">
                         <input
                           type="checkbox"
@@ -28599,11 +28599,11 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                             </button>
                           )}
                           <button
-                            onClick={() => deletePmOrder(order.id, order.order_number)}
-                            className="px-2 py-1 bg-red-500 text-white rounded text-[10px] hover:bg-red-600 flex items-center gap-1"
-                            title="Deletar projeto"
+                            onClick={() => archivePmOrder(order.id, order.order_number)}
+                            className="px-2 py-1 bg-amber-500 text-white rounded text-[10px] hover:bg-amber-600 flex items-center gap-1"
+                            title="Arquivar projeto"
                           >
-                            🗑
+                            📦
                           </button>
                         </div>
                       </td>
