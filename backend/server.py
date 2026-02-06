@@ -9280,9 +9280,8 @@ async def admin_get_all_orders(
             'ready': ['ready', 'Ready', 'READY', 'pending_admin_approval', 'Pending Admin Approval'],
             'received': ['received', 'Received', 'RECEIVED', 'Quote', 'quote', 'QUOTE'],
             'client_review': ['client_review', 'Client Review', 'CLIENT_REVIEW', 'client review'],
-            'delivered': ['delivered', 'Delivered', 'DELIVERED'],
             'pm_upload_ready': ['pm_upload_ready', 'PM_UPLOAD_READY'],
-            'final': ['final', 'Final', 'FINAL']
+            'final': ['final', 'Final', 'FINAL', 'delivered', 'Delivered', 'DELIVERED']
         }
         if status in status_mappings:
             query["translation_status"] = {"$in": status_mappings[status]}

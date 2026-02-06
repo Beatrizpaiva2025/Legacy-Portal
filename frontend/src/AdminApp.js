@@ -15796,7 +15796,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       'finalized_pending_admin': 'Ready (Admin)',
       'client_review': 'Client Review',
       'ready': 'Ready',
-      'delivered': 'Delivered',
+      'delivered': 'FINAL',
       'pm_upload_ready': 'READY',
       'final': 'FINAL'
     };
@@ -16377,7 +16377,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
             </button>
           )}
           <div className="flex space-x-1">
-            {['all', 'received', 'review', 'client_review', 'ready', 'delivered', 'pm_upload_ready', 'final'].map((s) => (
+            {['all', 'received', 'review', 'client_review', 'ready', 'pm_upload_ready', 'final'].map((s) => (
               <button key={s} onClick={() => setStatusFilter(s)}
                 className={`px-2 py-1 text-[10px] rounded ${statusFilter === s ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
                 {s === 'all' ? 'All' : getStatusLabel(s)}
@@ -17094,6 +17094,17 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             >
                               <PlayIcon className="w-4 h-4 text-sky-500" />
                               Start Translation
+                            </button>
+                          )}
+
+                          {/* Mark as Final - Admin only, for delivered orders */}
+                          {isAdmin && order.translation_status === 'delivered' && (
+                            <button
+                              onClick={() => { updateStatus(order.id, 'final'); setOpenActionsDropdown(null); }}
+                              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-green-50 flex items-center gap-2"
+                            >
+                              <CheckIcon className="w-4 h-4 text-green-500" />
+                              Mark as Final
                             </button>
                           )}
 
@@ -18211,7 +18222,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       { status: 'review', label: 'PM Review', icon: '🔍', desc: 'Project Manager reviewing translation' },
                       { status: 'client_review', label: 'Client Review', icon: '👤', desc: 'Client reviewing the translation' },
                       { status: 'ready', label: 'Ready', icon: '✅', desc: 'Translation approved and ready for delivery' },
-                      { status: 'delivered', label: 'Delivered', icon: '📤', desc: 'Sent to client' }
+                      { status: 'delivered', label: 'FINAL', icon: '📤', desc: 'Sent to client' }
                     ].map((step, idx) => {
                       const currentIdx = ['received', 'in_translation', 'review', 'client_review', 'ready', 'delivered'].indexOf(viewingOrder.translation_status);
                       const stepIdx = idx;
@@ -29947,7 +29958,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   { status: 'in_translation', color: 'bg-yellow-500', count: stats.inProgress },
                   { status: 'review', color: 'bg-blue-500', count: stats.awaitingReview },
                   { status: 'ready', color: 'bg-green-500', count: orders.filter(o => o.translation_status === 'ready').length },
-                  { status: 'delivered', color: 'bg-blue-500', count: orders.filter(o => o.translation_status === 'delivered').length }
+                  { status: 'final', color: 'bg-blue-500', count: orders.filter(o => o.translation_status === 'delivered' || o.translation_status === 'final').length }
                 ].map(item => (
                   item.count > 0 && (
                     <div
