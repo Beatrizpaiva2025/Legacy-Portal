@@ -9575,6 +9575,53 @@ async def upload_pm_translation(
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 
+@api_router.post("/admin/notify-pm-upload")
+async def notify_pm_upload(data: dict = Body(...)):
+    """Notify admin via email that PM has uploaded translation files."""
+    admin_key = data.get("admin_key", "")
+    order_id = data.get("order_id", "")
+    file_count = data.get("file_count", 1)
+    filenames = data.get("filenames", [])
+
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin", "pm"]:
+            is_valid = True
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    order = await db.translation_orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    try:
+        admin_email = os.environ.get("ADMIN_EMAIL", "contact@legacytranslations.com")
+        order_number = order.get("order_number", order_id)
+        client_name = order.get("client_name", "Unknown")
+        files_list = "".join([f"<li>{fn}</li>" for fn in filenames]) if filenames else f"<li>{file_count} file(s)</li>"
+        email_html = f"""
+        {get_email_header()}
+        <div style="padding: 30px;">
+            <h2 style="color: #10b981;">Translation Ready for Review</h2>
+            <p>A PM has uploaded translation file(s) for project <strong>{order_number}</strong>.</p>
+            <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+                <tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Project:</td><td style="padding: 8px; border-bottom: 1px solid #eee;">{order_number}</td></tr>
+                <tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Client:</td><td style="padding: 8px; border-bottom: 1px solid #eee;">{client_name}</td></tr>
+                <tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Files:</td><td style="padding: 8px; border-bottom: 1px solid #eee;"><ul style="margin:0;padding-left:20px;">{files_list}</ul></td></tr>
+            </table>
+            <p>Please log in to the admin panel to review and approve this translation.</p>
+        </div>
+        {get_email_footer()}
+        """
+        await email_service.send_email(admin_email, f"Translation READY - {order_number}", email_html)
+        logger.info(f"PM upload notification sent to admin for order {order_id}")
+        return {"success": True, "message": "Admin notified successfully"}
+    except Exception as e:
+        logger.error(f"Failed to send PM upload notification email: {str(e)}")
+        return {"success": False, "message": f"Notification failed: {str(e)}"}
+
+
 @api_router.post("/admin/accept-pm-upload")
 async def accept_pm_upload(data: dict = Body(...), admin_key: str = ""):
     """Admin accepts PM upload and sends to client. Status becomes final."""
