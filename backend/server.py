@@ -18479,6 +18479,49 @@ CRITICAL INSTRUCTIONS:
         raise HTTPException(status_code=500, detail=f"OCR failed: {str(e)}")
 
 
+def parse_claude_api_error(error_text: str, status_code: int = None) -> str:
+    """Parse Claude API error responses and return user-friendly messages in Portuguese."""
+    try:
+        error_data = json.loads(error_text)
+        error_type = error_data.get("error", {}).get("type", "")
+        error_message = error_data.get("error", {}).get("message", "")
+    except (json.JSONDecodeError, TypeError):
+        error_type = ""
+        error_message = str(error_text)
+
+    # Map known API error types to user-friendly messages
+    if "credit balance" in error_message.lower() or "billing" in error_message.lower():
+        return (
+            "Saldo insuficiente na API do Claude. "
+            "A chave de API utilizada não possui créditos suficientes. "
+            "Acesse console.anthropic.com → Plans & Billing para adicionar créditos ou atualizar seu plano."
+        )
+    elif error_type == "authentication_error" or status_code == 401:
+        return (
+            "Chave de API inválida ou expirada. "
+            "Verifique se a chave está correta nas configurações (Settings → API Key)."
+        )
+    elif error_type == "rate_limit_error" or status_code == 429:
+        return (
+            "Limite de requisições excedido na API do Claude. "
+            "Aguarde alguns segundos e tente novamente."
+        )
+    elif error_type == "overloaded_error" or status_code == 529:
+        return (
+            "O servidor da API do Claude está sobrecarregado no momento. "
+            "Tente novamente em alguns instantes."
+        )
+    elif "model" in error_message.lower() and "not found" in error_message.lower():
+        return (
+            "O modelo de IA solicitado não está disponível. "
+            "Entre em contato com o suporte técnico."
+        )
+    elif error_type == "invalid_request_error":
+        return f"Erro na requisição para a API do Claude: {error_message}"
+    else:
+        return f"Erro na API do Claude (código {status_code}): {error_message or error_text}"
+
+
 async def fetch_matching_instructions(source_lang: str, target_lang: str, document_type: str = None) -> str:
     """Fetch translation instructions that match the language pair and document type.
 
@@ -19040,7 +19083,8 @@ CRITICAL INSTRUCTIONS:
             if response.status_code != 200:
                 error_detail = response.text
                 logger.error(f"Claude API error: {response.status_code} - {error_detail}")
-                raise HTTPException(status_code=response.status_code, detail=f"Claude API error: {error_detail}")
+                friendly_msg = parse_claude_api_error(error_detail, response.status_code)
+                raise HTTPException(status_code=response.status_code, detail=friendly_msg)
 
             result = response.json()
             translation = result.get("content", [{}])[0].get("text", "")
@@ -19346,7 +19390,8 @@ Retorne o JSON com a análise completa."""
             if response.status_code != 200:
                 error_detail = response.text
                 logger.error(f"Claude API error in simple proofread: {response.status_code} - {error_detail}")
-                raise HTTPException(status_code=response.status_code, detail=f"AI analysis failed: {error_detail}")
+                friendly_msg = parse_claude_api_error(error_detail, response.status_code)
+                raise HTTPException(status_code=response.status_code, detail=friendly_msg)
 
             result = response.json()
             proofreading_result = result.get("content", [{}])[0].get("text", "")
@@ -19624,7 +19669,8 @@ Analise minuciosamente e retorne o JSON com todos os erros encontrados."""
             if response.status_code != 200:
                 error_detail = response.text
                 logger.error(f"Claude API error: {response.status_code} - {error_detail}")
-                raise HTTPException(status_code=response.status_code, detail=f"Claude API error: {error_detail}")
+                friendly_msg = parse_claude_api_error(error_detail, response.status_code)
+                raise HTTPException(status_code=response.status_code, detail=friendly_msg)
 
             result = response.json()
             proofreading_result = result.get("content", [{}])[0].get("text", "")
@@ -25093,7 +25139,7 @@ OUTPUT: Complete corrected HTML document."""
         }
 
     except anthropic.APIError as api_error:
-        error_msg = f"Claude API error: {str(api_error)}"
+        error_msg = parse_claude_api_error(str(api_error), getattr(api_error, 'status_code', None))
         logger.error(f"AI Layout stage API error: {error_msg}")
         # Return the original translation so the pipeline can continue
         return {
@@ -25101,7 +25147,7 @@ OUTPUT: Complete corrected HTML document."""
             "result": previous_translation,
             "tokens_used": 0,
             "changes_made": [],
-            "notes": f"Layout skipped due to API error. Translation preserved."
+            "notes": f"Layout pulado por erro na API: {error_msg}"
         }
 
     except Exception as e:
@@ -25360,14 +25406,14 @@ OUTPUT: Complete corrected HTML with proofreading report."""
         }
 
     except anthropic.APIError as api_error:
-        error_msg = f"Claude API error: {str(api_error)}"
+        error_msg = parse_claude_api_error(str(api_error), getattr(api_error, 'status_code', None))
         logger.error(f"AI Proofreader stage API error: {error_msg}")
         return {
             "success": True,  # Mark as success to continue pipeline
             "result": previous_translation,
             "tokens_used": 0,
             "changes_made": [],
-            "notes": "Proofreading skipped due to API error. Translation preserved.",
+            "notes": f"Revisão pulada por erro na API: {error_msg}",
             "quality_score": "not_evaluated"
         }
 
@@ -25470,8 +25516,9 @@ async def start_ai_pipeline(request: AIPipelineCreate, admin_key: str):
                         original_filename = doc.get("filename")
 
                 except Exception as e:
-                    print(f"Error extracting text from document: {e}")
-                    extracted_texts.append(f"--- Document: {doc.get('filename', 'unknown')} ---\n[Error extracting text: {str(e)}]")
+                    friendly_msg = parse_claude_api_error(str(e), getattr(e, 'status_code', None))
+                    logger.error(f"Error extracting text from document: {friendly_msg}")
+                    extracted_texts.append(f"--- Document: {doc.get('filename', 'unknown')} ---\n[Erro ao extrair texto: {friendly_msg}]")
 
         if extracted_texts:
             original_text = "\n\n".join(extracted_texts)

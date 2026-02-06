@@ -37,6 +37,30 @@ const showToast = (message) => {
   window.showAppToast(message, type);
 };
 
+// Parse API error messages into user-friendly text
+const parseApiError = (error) => {
+  const detail = error?.response?.data?.detail || error?.message || String(error);
+  // If the backend already returned a friendly Portuguese message, use it
+  if (detail.includes('Saldo insuficiente') || detail.includes('Chave de API') ||
+      detail.includes('Limite de requisições') || detail.includes('sobrecarregado')) {
+    return detail;
+  }
+  // Fallback: parse raw JSON error from Anthropic API
+  if (detail.includes('credit balance') || detail.includes('billing')) {
+    return 'Saldo insuficiente na API do Claude. Verifique seus créditos em console.anthropic.com → Plans & Billing.';
+  }
+  if (detail.includes('authentication_error') || detail.includes('invalid x-api-key')) {
+    return 'Chave de API inválida ou expirada. Verifique a chave nas configurações (Settings → API Key).';
+  }
+  if (detail.includes('rate_limit')) {
+    return 'Limite de requisições excedido. Aguarde alguns segundos e tente novamente.';
+  }
+  if (detail.includes('overloaded')) {
+    return 'O servidor da API está sobrecarregado. Tente novamente em alguns instantes.';
+  }
+  return detail;
+};
+
 const ToastContainer = () => {
   const [toasts, setToasts] = useState([]);
 
@@ -5251,7 +5275,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       setActiveSubTab('review');
     } catch (error) {
       console.error('Translation error:', error);
-      setProcessingStatus(`❌ Translation failed: ${error.response?.data?.detail || error.message}`);
+      setProcessingStatus(`❌ Erro na tradução: ${parseApiError(error)}`);
     } finally {
       setIsProcessing(false);
     }
@@ -5313,7 +5337,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       setProcessingStatus(`✅ Translation completed! ${totalPages} page(s) translated.`);
     } catch (error) {
       console.error('Translation error:', error);
-      setProcessingStatus(`❌ Translation failed: ${error.response?.data?.detail || error.message}`);
+      setProcessingStatus(`❌ Erro na tradução: ${parseApiError(error)}`);
     } finally {
       setIsProcessing(false);
     }
