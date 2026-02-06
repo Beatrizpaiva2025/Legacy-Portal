@@ -37,6 +37,36 @@ const showToast = (message) => {
   window.showAppToast(message, type);
 };
 
+// Parse API error messages into user-friendly text
+const parseApiError = (error) => {
+  const status = error?.response?.status;
+  const detail = error?.response?.data?.detail || error?.message || String(error);
+
+  // Session expired / invalid token
+  if (status === 401 || detail.includes('Invalid admin key') || detail.includes('Sessão expirada')) {
+    return 'Sessão expirada. Faça login novamente para continuar.';
+  }
+  // If the backend already returned a friendly Portuguese message, use it
+  if (detail.includes('Saldo insuficiente') || detail.includes('Chave de API') ||
+      detail.includes('Limite de requisições') || detail.includes('sobrecarregado')) {
+    return detail;
+  }
+  // Fallback: parse raw JSON error from Anthropic API
+  if (detail.includes('credit balance') || detail.includes('billing')) {
+    return 'Saldo insuficiente na API do Claude. Verifique seus créditos em console.anthropic.com → Plans & Billing.';
+  }
+  if (detail.includes('authentication_error') || detail.includes('invalid x-api-key')) {
+    return 'Chave de API inválida ou expirada. Verifique a chave nas configurações (Settings → API Key).';
+  }
+  if (detail.includes('rate_limit')) {
+    return 'Limite de requisições excedido. Aguarde alguns segundos e tente novamente.';
+  }
+  if (detail.includes('overloaded')) {
+    return 'O servidor da API está sobrecarregado. Tente novamente em alguns instantes.';
+  }
+  return detail;
+};
+
 const ToastContainer = () => {
   const [toasts, setToasts] = useState([]);
 
@@ -3126,11 +3156,16 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
   // Fetch messages for translator
   const fetchTranslatorMessages = async () => {
-    if (!user?.id) return;
+    if (!user?.id || !adminKey) return;
     try {
       const response = await axios.get(`${API}/translator/messages?admin_key=${adminKey}&translator_id=${user.id}`);
       setTranslatorMessages(response.data.messages || []);
     } catch (err) {
+      if (err.response?.status === 401) {
+        // Session expired - don't keep polling, notify user
+        console.warn('Session expired - stopping message polling');
+        return;
+      }
       console.error('Failed to fetch translator messages:', err);
     }
   };
@@ -4006,6 +4041,50 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       // Fallback to localStorage only
       localStorage.setItem('claude_api_key', claudeApiKey);
       setProcessingStatus('⚠️ API Key saved locally only. Backend save failed.');
+    }
+  };
+
+  // Test API key by making a validation call
+  const testApiKey = async () => {
+    const keyToTest = claudeApiKey;
+    if (!keyToTest) {
+      setProcessingStatus('❌ Nenhuma chave de API configurada para testar.');
+      return;
+    }
+    setProcessingStatus('🔄 Testando chave de API...');
+    try {
+      const response = await axios.post(`${API}/admin/settings/api-key/test?admin_key=${adminKey}`, {
+        api_key: keyToTest
+      });
+      if (response.data?.valid) {
+        setProcessingStatus(`✅ ${response.data.message}`);
+      } else {
+        setProcessingStatus(`❌ ${response.data.message}`);
+      }
+    } catch (err) {
+      const msg = err.response?.data?.detail || err.message;
+      setProcessingStatus(`❌ Erro ao testar: ${msg}`);
+    }
+  };
+
+  // Diagnose all API key sources
+  const [diagnosisResult, setDiagnosisResult] = useState(null);
+  const diagnoseApiKeys = async () => {
+    setProcessingStatus('🔍 Diagnosticando chaves de API...');
+    setDiagnosisResult(null);
+    try {
+      const response = await axios.get(`${API}/admin/settings/api-key/diagnose?admin_key=${adminKey}`);
+      setDiagnosisResult(response.data);
+      if (response.data.sources?.length === 0) {
+        setProcessingStatus('❌ Nenhuma chave de API encontrada no sistema.');
+      } else {
+        const anyOk = response.data.sources.some(s => s.test_ok);
+        setProcessingStatus(anyOk
+          ? '✅ Diagnóstico concluído - chave válida encontrada!'
+          : '❌ Diagnóstico concluído - nenhuma chave válida encontrada.');
+      }
+    } catch (err) {
+      setProcessingStatus(`❌ Erro no diagnóstico: ${err.response?.data?.detail || err.message}`);
     }
   };
 
@@ -5251,7 +5330,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       setActiveSubTab('review');
     } catch (error) {
       console.error('Translation error:', error);
-      setProcessingStatus(`❌ Translation failed: ${error.response?.data?.detail || error.message}`);
+      setProcessingStatus(`❌ Erro na tradução: ${parseApiError(error)}`);
     } finally {
       setIsProcessing(false);
     }
@@ -5313,7 +5392,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       setProcessingStatus(`✅ Translation completed! ${totalPages} page(s) translated.`);
     } catch (error) {
       console.error('Translation error:', error);
-      setProcessingStatus(`❌ Translation failed: ${error.response?.data?.detail || error.message}`);
+      setProcessingStatus(`❌ Erro na tradução: ${parseApiError(error)}`);
     } finally {
       setIsProcessing(false);
     }
@@ -6967,6 +7046,88 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               {processingStatus}
             </div>
           )}
+
+          {/* API Key Status & Configuration */}
+          <div className={`border rounded-lg p-3 ${claudeApiKey ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-sm">{claudeApiKey ? '🟢' : '🔴'}</span>
+                <span className={`text-xs font-bold ${claudeApiKey ? 'text-green-800' : 'text-red-800'}`}>
+                  Claude API Key: {claudeApiKey ? 'Configurada' : 'Não configurada'}
+                </span>
+                {claudeApiKey && (
+                  <span className="text-[10px] text-gray-500">({claudeApiKey.slice(0, 7)}...{claudeApiKey.slice(-4)})</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {claudeApiKey && (
+                  <button
+                    onClick={testApiKey}
+                    className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                  >
+                    Testar Chave
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowApiKey(!showApiKey)}
+                  className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+                >
+                  {showApiKey ? 'Fechar' : 'Alterar Chave'}
+                </button>
+              </div>
+            </div>
+            {showApiKey && (
+              <div className="mt-3 flex gap-2">
+                <input
+                  type="password"
+                  value={claudeApiKey}
+                  onChange={(e) => setClaudeApiKey(e.target.value)}
+                  placeholder="sk-ant-..."
+                  className="flex-1 px-3 py-1.5 text-xs border rounded font-mono"
+                />
+                <button
+                  onClick={saveApiKey}
+                  className="px-3 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                >
+                  Salvar
+                </button>
+              </div>
+            )}
+            {!claudeApiKey && (
+              <p className="text-[10px] text-red-600 mt-1">
+                Configure sua chave de API do Claude para usar a tradução por IA. Obtenha em console.anthropic.com
+              </p>
+            )}
+            {/* Diagnose button */}
+            <div className="mt-2 flex items-center gap-2">
+              <button
+                onClick={diagnoseApiKeys}
+                className="px-3 py-1 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600"
+              >
+                Diagnosticar todas as chaves
+              </button>
+              <span className="text-[10px] text-gray-500">Verifica todas as fontes de chave de API</span>
+            </div>
+            {/* Diagnosis results */}
+            {diagnosisResult && diagnosisResult.sources && (
+              <div className="mt-2 border border-gray-200 rounded p-2 bg-white text-xs space-y-2">
+                {diagnosisResult.sources.map((s, i) => (
+                  <div key={i} className={`p-2 rounded ${s.test_ok ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                    <div className="flex items-center gap-2">
+                      <span>{s.test_ok ? '✅' : '❌'}</span>
+                      <strong>{s.source}</strong>
+                    </div>
+                    <div className="ml-5 text-gray-600">Chave: <code>{s.key_preview}</code></div>
+                    <div className="ml-5">{s.test_result}</div>
+                    {s.updated_at && <div className="ml-5 text-gray-400">Atualizada: {s.updated_at}</div>}
+                  </div>
+                ))}
+                {diagnosisResult.sources.length === 0 && (
+                  <p className="text-red-600">{diagnosisResult.message}</p>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Upload Document Section - Compact */}
           <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-3">
@@ -33275,10 +33436,27 @@ function AdminApp() {
     }
   };
 
+  const [sessionExpired, setSessionExpired] = useState(false);
+
+  // Global axios 401 interceptor - detect session expiration
+  useEffect(() => {
+    const interceptor = axios.interceptors.response.use(
+      response => response,
+      error => {
+        if (error.response?.status === 401 && adminKey && !sessionExpired) {
+          setSessionExpired(true);
+        }
+        return Promise.reject(error);
+      }
+    );
+    return () => axios.interceptors.response.eject(interceptor);
+  }, [adminKey, sessionExpired]);
+
   const handleLogout = () => {
     // Clear local state immediately (don't wait for server)
     setAdminKey(null);
     setUser(null);
+    setSessionExpired(false);
     localStorage.removeItem('admin_key');
     localStorage.removeItem('admin_user');
 
@@ -33292,7 +33470,7 @@ function AdminApp() {
 
   // Global invoice notifications fetch
   const fetchGlobalInvoiceNotifications = async () => {
-    if (!adminKey) return;
+    if (!adminKey || sessionExpired) return;
     try {
       const [notifRes, zelleRes] = await Promise.all([
         axios.get(`${API}/admin/invoice-notifications?admin_key=${adminKey}&unread_only=false`),
@@ -33430,18 +33608,40 @@ function AdminApp() {
     return <AdminLogin onLogin={handleLogin} />;
   }
 
+  // Session expired banner component
+  const SessionExpiredBanner = () => sessionExpired ? (
+    <div className="fixed top-0 left-0 right-0 z-[9999] bg-red-600 text-white p-3 text-center shadow-lg">
+      <div className="flex items-center justify-center gap-3">
+        <span className="text-sm font-bold">Sua sessão expirou. Faça login novamente para continuar.</span>
+        <button
+          onClick={handleLogout}
+          className="px-4 py-1 bg-white text-red-600 text-sm font-bold rounded hover:bg-red-100"
+        >
+          Fazer Login
+        </button>
+      </div>
+    </div>
+  ) : null;
+
   // If translation-tool route, render standalone page
   if (isTranslationTool) {
-    return <TranslationToolPage adminKey={adminKey} onLogout={handleLogout} user={user} />;
+    return <>
+      <SessionExpiredBanner />
+      <TranslationToolPage adminKey={adminKey} onLogout={handleLogout} user={user} />
+    </>;
   }
 
   // If in translation workspace, render as full page without admin header
   if (activeTab === 'translation') {
-    return <TranslationWorkspace adminKey={adminKey} selectedOrder={selectedOrder} onBack={navigateToProjects} user={user} />;
+    return <>
+      <SessionExpiredBanner />
+      <TranslationWorkspace adminKey={adminKey} selectedOrder={selectedOrder} onBack={navigateToProjects} user={user} />
+    </>;
   }
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
+      <SessionExpiredBanner />
       <TopBar
         activeTab={activeTab}
         setActiveTab={setActiveTab}

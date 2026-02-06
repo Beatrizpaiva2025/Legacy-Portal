@@ -690,7 +690,7 @@ const TranslationWorkspace = ({ adminKey }) => {
       setProcessingStatus('✅ Translation completed!');
     } catch (error) {
       console.error('Translation error:', error);
-      setProcessingStatus(`❌ Translation failed: ${error.message}`);
+      setProcessingStatus(`❌ Erro na tradução: ${error.response?.data?.detail || error.message}`);
     } finally {
       setIsProcessing(false);
     }

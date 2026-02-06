@@ -18520,6 +18520,49 @@ CRITICAL INSTRUCTIONS:
         raise HTTPException(status_code=500, detail=f"OCR failed: {str(e)}")
 
 
+def parse_claude_api_error(error_text: str, status_code: int = None) -> str:
+    """Parse Claude API error responses and return user-friendly messages in Portuguese."""
+    try:
+        error_data = json.loads(error_text)
+        error_type = error_data.get("error", {}).get("type", "")
+        error_message = error_data.get("error", {}).get("message", "")
+    except (json.JSONDecodeError, TypeError):
+        error_type = ""
+        error_message = str(error_text)
+
+    # Map known API error types to user-friendly messages
+    if "credit balance" in error_message.lower() or "billing" in error_message.lower():
+        return (
+            "Saldo insuficiente na API do Claude. "
+            "A chave de API utilizada não possui créditos suficientes. "
+            "Acesse console.anthropic.com → Plans & Billing para adicionar créditos ou atualizar seu plano."
+        )
+    elif error_type == "authentication_error" or status_code == 401:
+        return (
+            "Chave de API inválida ou expirada. "
+            "Verifique se a chave está correta nas configurações (Settings → API Key)."
+        )
+    elif error_type == "rate_limit_error" or status_code == 429:
+        return (
+            "Limite de requisições excedido na API do Claude. "
+            "Aguarde alguns segundos e tente novamente."
+        )
+    elif error_type == "overloaded_error" or status_code == 529:
+        return (
+            "O servidor da API do Claude está sobrecarregado no momento. "
+            "Tente novamente em alguns instantes."
+        )
+    elif "model" in error_message.lower() and "not found" in error_message.lower():
+        return (
+            "O modelo de IA solicitado não está disponível. "
+            "Entre em contato com o suporte técnico."
+        )
+    elif error_type == "invalid_request_error":
+        return f"Erro na requisição para a API do Claude: {error_message}"
+    else:
+        return f"Erro na API do Claude (código {status_code}): {error_message or error_text}"
+
+
 async def fetch_matching_instructions(source_lang: str, target_lang: str, document_type: str = None) -> str:
     """Fetch translation instructions that match the language pair and document type.
 
@@ -18586,7 +18629,7 @@ async def admin_translate(request: TranslateRequest, admin_key: str):
             is_valid = True
 
     if not is_valid:
-        raise HTTPException(status_code=401, detail="Invalid admin key")
+        raise HTTPException(status_code=401, detail="Sessão expirada. Por favor, faça login novamente.")
 
     if not request.claude_api_key:
         raise HTTPException(status_code=400, detail="Claude API key is required")
@@ -19081,7 +19124,8 @@ CRITICAL INSTRUCTIONS:
             if response.status_code != 200:
                 error_detail = response.text
                 logger.error(f"Claude API error: {response.status_code} - {error_detail}")
-                raise HTTPException(status_code=response.status_code, detail=f"Claude API error: {error_detail}")
+                friendly_msg = parse_claude_api_error(error_detail, response.status_code)
+                raise HTTPException(status_code=response.status_code, detail=friendly_msg)
 
             result = response.json()
             translation = result.get("content", [{}])[0].get("text", "")
@@ -19387,7 +19431,8 @@ Retorne o JSON com a análise completa."""
             if response.status_code != 200:
                 error_detail = response.text
                 logger.error(f"Claude API error in simple proofread: {response.status_code} - {error_detail}")
-                raise HTTPException(status_code=response.status_code, detail=f"AI analysis failed: {error_detail}")
+                friendly_msg = parse_claude_api_error(error_detail, response.status_code)
+                raise HTTPException(status_code=response.status_code, detail=friendly_msg)
 
             result = response.json()
             proofreading_result = result.get("content", [{}])[0].get("text", "")
@@ -19665,7 +19710,8 @@ Analise minuciosamente e retorne o JSON com todos os erros encontrados."""
             if response.status_code != 200:
                 error_detail = response.text
                 logger.error(f"Claude API error: {response.status_code} - {error_detail}")
-                raise HTTPException(status_code=response.status_code, detail=f"Claude API error: {error_detail}")
+                friendly_msg = parse_claude_api_error(error_detail, response.status_code)
+                raise HTTPException(status_code=response.status_code, detail=friendly_msg)
 
             result = response.json()
             proofreading_result = result.get("content", [{}])[0].get("text", "")
@@ -23499,11 +23545,109 @@ async def delete_shared_api_key(admin_key: str):
     logger.info("Shared Claude API key deleted")
     return {"status": "success", "message": "API key removed"}
 
+@api_router.post("/admin/settings/api-key/test")
+async def test_api_key(admin_key: str, api_key: str = Body(..., embed=True)):
+    """Test a Claude API key by making a minimal API call"""
+    await validate_admin_or_user_token(admin_key)
+
+    if not api_key or not api_key.startswith("sk-"):
+        return {"valid": False, "message": "Formato de chave inválido. A chave deve começar com 'sk-'."}
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json"
+                },
+                json={
+                    "model": "claude-sonnet-4-5-20250929",
+                    "max_tokens": 10,
+                    "messages": [{"role": "user", "content": "Hi"}]
+                }
+            )
+
+            if response.status_code == 200:
+                return {"valid": True, "message": "Chave de API válida! Conexão e créditos OK."}
+            else:
+                friendly_msg = parse_claude_api_error(response.text, response.status_code)
+                return {"valid": False, "message": friendly_msg}
+
+    except httpx.TimeoutException:
+        return {"valid": False, "message": "Timeout ao conectar com a API do Claude. Verifique sua conexão."}
+    except Exception as e:
+        return {"valid": False, "message": f"Erro ao testar a chave: {str(e)}"}
+
 @api_router.get("/settings/api-key/check")
 async def check_shared_api_key_available():
     """Public endpoint to check if a shared API key is configured (for translators)"""
     settings = await db.app_settings.find_one({"key": "shared_claude_api_key"})
     return {"available": bool(settings and settings.get("value"))}
+
+@api_router.get("/admin/settings/api-key/diagnose")
+async def diagnose_api_keys(admin_key: str):
+    """Diagnose all API key sources and test each one"""
+    await validate_admin_or_user_token(admin_key)
+
+    sources = []
+
+    # Source 1: Environment variable
+    env_key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("CLAUDE_API_KEY")
+    if env_key:
+        sources.append({
+            "source": "Variável de ambiente (ANTHROPIC_API_KEY)",
+            "key_preview": f"{env_key[:7]}...{env_key[-4:]}",
+            "status": "encontrada"
+        })
+
+    # Source 2: Database shared key
+    settings = await db.app_settings.find_one({"key": "shared_claude_api_key"})
+    db_key = settings.get("value") if settings else None
+    if db_key:
+        sources.append({
+            "source": "Chave compartilhada (banco de dados)",
+            "key_preview": f"{db_key[:7]}...{db_key[-4:]}",
+            "status": "encontrada",
+            "updated_at": settings.get("updated_at", "desconhecido")
+        })
+
+    if not sources:
+        return {
+            "sources": [],
+            "message": "Nenhuma chave de API encontrada no sistema. Configure uma chave na aba START."
+        }
+
+    # Test each key
+    for source in sources:
+        key = env_key if "ambiente" in source["source"] else db_key
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                response = await client.post(
+                    "https://api.anthropic.com/v1/messages",
+                    headers={
+                        "x-api-key": key,
+                        "anthropic-version": "2023-06-01",
+                        "content-type": "application/json"
+                    },
+                    json={
+                        "model": "claude-sonnet-4-5-20250929",
+                        "max_tokens": 10,
+                        "messages": [{"role": "user", "content": "Hi"}]
+                    }
+                )
+                if response.status_code == 200:
+                    source["test_result"] = "OK - Funcionando"
+                    source["test_ok"] = True
+                else:
+                    source["test_result"] = parse_claude_api_error(response.text, response.status_code)
+                    source["test_ok"] = False
+        except Exception as e:
+            source["test_result"] = f"Erro: {str(e)}"
+            source["test_ok"] = False
+
+    return {"sources": sources}
 
 @api_router.get("/settings/api-key/use")
 async def get_api_key_for_translation(token: str = None):
@@ -25134,7 +25278,7 @@ OUTPUT: Complete corrected HTML document."""
         }
 
     except anthropic.APIError as api_error:
-        error_msg = f"Claude API error: {str(api_error)}"
+        error_msg = parse_claude_api_error(str(api_error), getattr(api_error, 'status_code', None))
         logger.error(f"AI Layout stage API error: {error_msg}")
         # Return the original translation so the pipeline can continue
         return {
@@ -25142,7 +25286,7 @@ OUTPUT: Complete corrected HTML document."""
             "result": previous_translation,
             "tokens_used": 0,
             "changes_made": [],
-            "notes": f"Layout skipped due to API error. Translation preserved."
+            "notes": f"Layout pulado por erro na API: {error_msg}"
         }
 
     except Exception as e:
@@ -25401,14 +25545,14 @@ OUTPUT: Complete corrected HTML with proofreading report."""
         }
 
     except anthropic.APIError as api_error:
-        error_msg = f"Claude API error: {str(api_error)}"
+        error_msg = parse_claude_api_error(str(api_error), getattr(api_error, 'status_code', None))
         logger.error(f"AI Proofreader stage API error: {error_msg}")
         return {
             "success": True,  # Mark as success to continue pipeline
             "result": previous_translation,
             "tokens_used": 0,
             "changes_made": [],
-            "notes": "Proofreading skipped due to API error. Translation preserved.",
+            "notes": f"Revisão pulada por erro na API: {error_msg}",
             "quality_score": "not_evaluated"
         }
 
@@ -25511,8 +25655,9 @@ async def start_ai_pipeline(request: AIPipelineCreate, admin_key: str):
                         original_filename = doc.get("filename")
 
                 except Exception as e:
-                    print(f"Error extracting text from document: {e}")
-                    extracted_texts.append(f"--- Document: {doc.get('filename', 'unknown')} ---\n[Error extracting text: {str(e)}]")
+                    friendly_msg = parse_claude_api_error(str(e), getattr(e, 'status_code', None))
+                    logger.error(f"Error extracting text from document: {friendly_msg}")
+                    extracted_texts.append(f"--- Document: {doc.get('filename', 'unknown')} ---\n[Erro ao extrair texto: {friendly_msg}]")
 
         if extracted_texts:
             original_text = "\n\n".join(extracted_texts)
