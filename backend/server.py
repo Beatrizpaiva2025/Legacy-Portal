@@ -2015,7 +2015,7 @@ class AdminUserCreate(BaseModel):
     rate_per_page: Optional[float] = None
     rate_per_word: Optional[float] = None
     language_pairs: Optional[str] = None
-    translator_type: Optional[str] = 'contractor'  # 'in_house', 'contractor', or 'external'
+    translator_type: Optional[str] = 'contractor'  # 'in_house', 'contractor', or 'vendor'
 
 class AdminInvitationAccept(BaseModel):
     token: str
@@ -2064,7 +2064,7 @@ class AdminUserResponse(BaseModel):
     token: str
     pages_translated: Optional[int] = 0
     pages_pending_payment: Optional[int] = 0
-    translator_type: Optional[str] = 'contractor'  # 'in_house', 'contractor', or 'external'
+    translator_type: Optional[str] = 'contractor'  # 'in_house', 'contractor', or 'vendor'
 
 class AdminUserPublic(BaseModel):
     id: str
@@ -2072,7 +2072,7 @@ class AdminUserPublic(BaseModel):
     name: str
     role: str
     is_active: bool
-    translator_type: Optional[str] = 'contractor'  # 'in_house', 'contractor', or 'external'
+    translator_type: Optional[str] = 'contractor'  # 'in_house', 'contractor', or 'vendor'
 
 # Translation Order Models (with invoice tracking)
 class TranslationOrder(BaseModel):
@@ -17466,10 +17466,10 @@ async def translator_send_message_to_admin(admin_key: str, request: dict = Body(
     return {"status": "success", "message_id": message_id}
 
 
-# ==================== EXTERNAL TRANSLATOR UPLOAD NOTIFICATION ====================
-@api_router.post("/external-translator/notify-upload")
-async def external_translator_notify_upload(admin_key: str, request: dict = Body(...)):
-    """Notify PM when external translator uploads a translation"""
+# ==================== VENDOR TRANSLATOR UPLOAD NOTIFICATION ====================
+@api_router.post("/vendor-translator/notify-upload")
+async def vendor_translator_notify_upload(admin_key: str, request: dict = Body(...)):
+    """Notify PM when vendor translator uploads a translation"""
     # Validate token
     user_info = await validate_admin_or_user_token(admin_key)
     if not user_info:
@@ -17477,7 +17477,7 @@ async def external_translator_notify_upload(admin_key: str, request: dict = Body
 
     order_id = request.get("order_id")
     order_number = request.get("order_number", "N/A")
-    translator_name = request.get("translator_name", "External Translator")
+    translator_name = request.get("translator_name", "Vendor Translator")
     translator_id = request.get("translator_id")
     filename = request.get("filename", "unknown")
 
@@ -17491,9 +17491,9 @@ async def external_translator_notify_upload(admin_key: str, request: dict = Body
     # Create notification for PM (or admin if no PM assigned)
     notification = {
         "id": str(uuid.uuid4()),
-        "type": "external_translator_upload",
+        "type": "vendor_translator_upload",
         "title": f"Translation Uploaded - {order_number}",
-        "message": f"External translator {translator_name} uploaded '{filename}' for order {order_number}. Please review and create the delivery package.",
+        "message": f"Vendor translator {translator_name} uploaded '{filename}' for order {order_number}. Please review and create the delivery package.",
         "order_id": order_id,
         "order_number": order_number,
         "translator_id": translator_id,
@@ -17525,12 +17525,12 @@ async def external_translator_notify_upload(admin_key: str, request: dict = Body
             {"id": order_id},
             {"$set": {
                 "translation_status": "pending_pm_review",
-                "external_translation_uploaded_at": now,
-                "external_translation_uploaded_by": translator_name
+                "vendor_translation_uploaded_at": now,
+                "vendor_translation_uploaded_by": translator_name
             }}
         )
 
-    logger.info(f"External translator {translator_name} uploaded translation for order {order_number}")
+    logger.info(f"Vendor translator {translator_name} uploaded translation for order {order_number}")
     return {"status": "success", "message": "PM has been notified"}
 
 

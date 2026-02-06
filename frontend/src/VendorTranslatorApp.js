@@ -46,7 +46,7 @@ const showToast = (message, type = 'info') => {
 };
 
 // ==================== LOGIN PAGE ====================
-const ExternalLogin = ({ onLogin }) => {
+const VendorLogin = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -61,12 +61,12 @@ const ExternalLogin = ({ onLogin }) => {
       const response = await axios.post(`${API}/admin/auth/login`, { email, password });
       if (response.data && response.data.token) {
         if (response.data.role !== 'translator') {
-          setError('This portal is for external translators only.');
+          setError('This portal is for vendor translators only.');
           setLoading(false);
           return;
         }
-        if (response.data.translator_type !== 'external') {
-          setError('This portal is for external translators only. Please use the main translator portal at /#/admin.');
+        if (response.data.translator_type !== 'vendor') {
+          setError('This portal is for vendor translators only. Please use the main translator portal at /#/admin.');
           setLoading(false);
           return;
         }
@@ -100,7 +100,7 @@ const ExternalLogin = ({ onLogin }) => {
             </div>
           </div>
           <h1 className="text-xl font-semibold text-white">Legacy Translations</h1>
-          <p className="text-emerald-100 text-sm mt-1">External Translator Portal</p>
+          <p className="text-emerald-100 text-sm mt-1">Vendor Translator Portal</p>
         </div>
 
         {/* Form */}
@@ -151,7 +151,7 @@ const ExternalLogin = ({ onLogin }) => {
 };
 
 // ==================== MAIN PORTAL ====================
-const ExternalPortal = ({ user, adminKey, onLogout }) => {
+const VendorPortal = ({ user, adminKey, onLogout }) => {
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState(null);
   const [projectFiles, setProjectFiles] = useState([]);
@@ -274,7 +274,7 @@ const ExternalPortal = ({ user, adminKey, onLogout }) => {
 
           // Notify PM about the upload
           try {
-            await axios.post(`${API}/external-translator/notify-upload?admin_key=${adminKey}`, {
+            await axios.post(`${API}/vendor-translator/notify-upload?admin_key=${adminKey}`, {
               order_id: selectedProject.id,
               order_number: selectedProject.order_number,
               translator_name: user.name,
@@ -336,7 +336,7 @@ const ExternalPortal = ({ user, adminKey, onLogout }) => {
             </svg>
             <div>
               <h1 className="text-lg font-semibold">Legacy Translations</h1>
-              <p className="text-emerald-200 text-xs">External Translator Portal</p>
+              <p className="text-emerald-200 text-xs">Vendor Translator Portal</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -662,7 +662,7 @@ const ExternalPortal = ({ user, adminKey, onLogout }) => {
 };
 
 // ==================== MAIN APP ====================
-function ExternalTranslatorApp() {
+function VendorTranslatorApp() {
   const [user, setUser] = useState(null);
   const [adminKey, setAdminKey] = useState(null);
 
@@ -672,19 +672,19 @@ function ExternalTranslatorApp() {
   const resetToken = urlParams.get('reset_token');
 
   useEffect(() => {
-    const savedKey = localStorage.getItem('external_translator_key');
-    const savedUser = localStorage.getItem('external_translator_user');
+    const savedKey = localStorage.getItem('vendor_translator_key');
+    const savedUser = localStorage.getItem('vendor_translator_user');
     if (savedKey && savedUser) {
       try {
         const parsedUser = JSON.parse(savedUser);
-        // Verify it's an external translator
-        if (parsedUser.translator_type === 'external') {
+        // Verify it's a vendor translator
+        if (parsedUser.translator_type === 'vendor') {
           setAdminKey(savedKey);
           setUser(parsedUser);
         } else {
           // Clear invalid session
-          localStorage.removeItem('external_translator_key');
-          localStorage.removeItem('external_translator_user');
+          localStorage.removeItem('vendor_translator_key');
+          localStorage.removeItem('vendor_translator_user');
         }
       } catch (e) {
         console.error('Error parsing saved user:', e);
@@ -696,16 +696,16 @@ function ExternalTranslatorApp() {
     const key = userData.adminKey || userData.token;
     setAdminKey(key);
     setUser(userData);
-    localStorage.setItem('external_translator_key', key);
-    localStorage.setItem('external_translator_user', JSON.stringify(userData));
+    localStorage.setItem('vendor_translator_key', key);
+    localStorage.setItem('vendor_translator_user', JSON.stringify(userData));
   };
 
   const handleLogout = () => {
     setAdminKey(null);
     setUser(null);
-    localStorage.removeItem('external_translator_key');
-    localStorage.removeItem('external_translator_user');
-    window.location.href = '/#/external';
+    localStorage.removeItem('vendor_translator_key');
+    localStorage.removeItem('vendor_translator_user');
+    window.location.href = '/#/vendor';
   };
 
   // Handle invitation - redirect to admin for password setup
@@ -715,10 +715,10 @@ function ExternalTranslatorApp() {
   }
 
   if (!adminKey || !user) {
-    return <ExternalLogin onLogin={handleLogin} />;
+    return <VendorLogin onLogin={handleLogin} />;
   }
 
-  return <ExternalPortal user={user} adminKey={adminKey} onLogout={handleLogout} />;
+  return <VendorPortal user={user} adminKey={adminKey} onLogout={handleLogout} />;
 }
 
-export default ExternalTranslatorApp;
+export default VendorTranslatorApp;

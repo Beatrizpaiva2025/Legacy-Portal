@@ -701,10 +701,10 @@ const AdminLogin = ({ onLogin }) => {
         // New user-based login
         const response = await axios.post(`${API}/admin/auth/login`, { email, password });
         if (response.data && response.data.token) {
-          // Redirect external translators to their dedicated portal
-          if (response.data.translator_type === 'external') {
-            window.location.href = '/#/external';
-            setError('External translators should use the External Translator Portal. Redirecting...');
+          // Redirect vendor translators to their dedicated portal
+          if (response.data.translator_type === 'vendor') {
+            window.location.href = '/#/vendor';
+            setError('Vendor translators should use the Vendor Translator Portal. Redirecting...');
             setLoading(false);
             return;
           }
@@ -1490,7 +1490,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const isPM = user?.role === 'pm';
   const isTranslator = user?.role === 'translator';
   const isInHouseTranslator = isTranslator && user?.translator_type === 'in_house';
-  const isExternalTranslator = isTranslator && user?.translator_type === 'external';
+  const isVendorTranslator = isTranslator && user?.translator_type === 'vendor';
   const isContractor = isTranslator && user?.translator_type === 'contractor';  // Contractors have limited DELIVER tab access
 
   // State
@@ -6707,21 +6707,21 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     window.open(`${API}/admin/orders/${orderId}/pm-translation-download?admin_key=${adminKey}`, '_blank');
   };
 
-  // External translators should use the dedicated portal
-  if (isExternalTranslator) {
+  // Vendor translators should use the dedicated portal
+  if (isVendorTranslator) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="bg-white rounded-xl shadow-lg p-8 max-w-md text-center">
           <div className="text-5xl mb-4">🌐</div>
-          <h2 className="text-xl font-bold text-gray-800 mb-2">External Translator Portal</h2>
+          <h2 className="text-xl font-bold text-gray-800 mb-2">Vendor Translator Portal</h2>
           <p className="text-sm text-gray-600 mb-6">
-            As an external translator, please use the dedicated portal to download source files and upload your translations.
+            As a vendor translator, please use the dedicated portal to download source files and upload your translations.
           </p>
           <a
-            href="/#/external"
+            href="/#/vendor"
             className="inline-block px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors"
           >
-            Go to External Portal
+            Go to Vendor Portal
           </a>
         </div>
       </div>
@@ -6925,8 +6925,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         ].filter(tab => {
           const userRole = user?.role || 'translator';
           // For translators, check translator_type for extended access
-          if (userRole === 'translator' && user?.translator_type === 'external') {
-            // External translators should use /#/external portal - hide all tabs here
+          if (userRole === 'translator' && user?.translator_type === 'vendor') {
+            // Vendor translators should use /#/vendor portal - hide all tabs here
             return false;
           }
           if (userRole === 'translator' && user?.translator_type === 'in_house') {
@@ -21904,7 +21904,7 @@ const UsersPage = ({ adminKey, user }) => {
                     >
                       <option value="contractor">Contractor (Limited)</option>
                       <option value="in_house">In-House (Full Access)</option>
-                      <option value="external">External (Download/Upload Only)</option>
+                      <option value="vendor">Vendor (Download/Upload Only)</option>
                     </select>
                   </div>
                   <div>
@@ -21998,11 +21998,11 @@ const UsersPage = ({ adminKey, user }) => {
                       <span className={`px-2 py-1 rounded text-xs font-medium ${
                         u.translator_type === 'in_house'
                           ? 'bg-blue-100 text-blue-800'
-                          : u.translator_type === 'external'
+                          : u.translator_type === 'vendor'
                             ? 'bg-emerald-100 text-emerald-800'
                             : 'bg-orange-100 text-orange-800'
                       }`}>
-                        {u.translator_type === 'in_house' ? 'In-House' : u.translator_type === 'external' ? 'External' : 'Contractor'}
+                        {u.translator_type === 'in_house' ? 'In-House' : u.translator_type === 'vendor' ? 'Vendor' : 'Contractor'}
                       </span>
                     ) : (
                       <span className="text-gray-400">-</span>
@@ -22157,11 +22157,11 @@ const UsersPage = ({ adminKey, user }) => {
                                   >
                                     <option value="contractor">Contractor (Limitado)</option>
                                     <option value="in_house">In-House (Acesso Completo)</option>
-                                    <option value="external">External (Download/Upload)</option>
+                                    <option value="vendor">Vendor (Download/Upload)</option>
                                   </select>
                                 ) : (
-                                  <div className={`font-medium ${u.translator_type === 'in_house' ? 'text-blue-600' : u.translator_type === 'external' ? 'text-emerald-600' : 'text-orange-600'}`}>
-                                    {u.translator_type === 'in_house' ? 'In-House' : u.translator_type === 'external' ? 'External' : 'Contractor'}
+                                  <div className={`font-medium ${u.translator_type === 'in_house' ? 'text-blue-600' : u.translator_type === 'vendor' ? 'text-emerald-600' : 'text-orange-600'}`}>
+                                    {u.translator_type === 'in_house' ? 'In-House' : u.translator_type === 'vendor' ? 'Vendor' : 'Contractor'}
                                   </div>
                                 )}
                               </div>
