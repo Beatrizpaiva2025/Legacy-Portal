@@ -18588,7 +18588,7 @@ async def admin_translate(request: TranslateRequest, admin_key: str):
             is_valid = True
 
     if not is_valid:
-        raise HTTPException(status_code=401, detail="Sessão expirada. Por favor, faça login novamente.")
+        raise HTTPException(status_code=401, detail="Invalid admin key")
 
     if not request.claude_api_key:
         raise HTTPException(status_code=400, detail="Claude API key is required")
