@@ -12893,14 +12893,23 @@ async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate,
 
 @api_router.delete("/admin/orders/{order_id}")
 async def admin_delete_order(order_id: str, admin_key: str):
-    """Delete an order (admin only)"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
-        raise HTTPException(status_code=401, detail="Invalid admin key")
+    """Delete an order (admin or PM who owns the project)"""
+    is_master = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    user = None
+    if not is_master:
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Invalid admin key")
 
     # Find order first to check it exists
     order = await db.translation_orders.find_one({"id": order_id})
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
+
+    # PMs can only delete their own assigned projects
+    if user and user.get("role") == "pm":
+        if order.get("assigned_pm_id") != user.get("id"):
+            raise HTTPException(status_code=403, detail="You can only delete projects assigned to you")
 
     # Delete the order
     result = await db.translation_orders.delete_one({"id": order_id})
@@ -12909,6 +12918,40 @@ async def admin_delete_order(order_id: str, admin_key: str):
         raise HTTPException(status_code=404, detail="Order not found")
 
     return {"status": "success", "message": f"Order {order.get('order_number', order_id)} deleted"}
+
+@api_router.post("/admin/orders/bulk-delete")
+async def admin_bulk_delete_orders(admin_key: str, body: dict = Body(...)):
+    """Bulk delete orders (admin or PM). PMs can only delete their own projects."""
+    is_master = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    user = None
+    if not is_master:
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    order_ids = body.get("order_ids", [])
+    if not order_ids:
+        raise HTTPException(status_code=400, detail="No order IDs provided")
+
+    deleted_count = 0
+    failed = []
+    for order_id in order_ids:
+        order = await db.translation_orders.find_one({"id": order_id})
+        if not order:
+            failed.append({"id": order_id, "reason": "Not found"})
+            continue
+        # PMs can only delete their own projects
+        if user and user.get("role") == "pm":
+            if order.get("assigned_pm_id") != user.get("id"):
+                failed.append({"id": order_id, "reason": "Not assigned to you"})
+                continue
+        result = await db.translation_orders.delete_one({"id": order_id})
+        if result.deleted_count > 0:
+            deleted_count += 1
+        else:
+            failed.append({"id": order_id, "reason": "Delete failed"})
+
+    return {"status": "success", "deleted_count": deleted_count, "failed": failed}
 
 @api_router.post("/admin/orders/{order_id}/mark-paid")
 async def admin_mark_order_paid(order_id: str, admin_key: str):

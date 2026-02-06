@@ -26308,6 +26308,10 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   // Download package state
   const [downloadingPackagePM, setDownloadingPackagePM] = useState(null); // Order ID being downloaded
 
+  // Delete/bulk delete state
+  const [selectedOrderIds, setSelectedOrderIds] = useState(new Set());
+  const [deletingOrders, setDeletingOrders] = useState(false);
+
   const [stats, setStats] = useState({
     totalProjects: 0,
     inProgress: 0,
@@ -26889,6 +26893,88 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
   const downloadPmTranslationPM = (orderId) => {
     window.open(`${API}/admin/orders/${orderId}/pm-translation-download?admin_key=${adminKey}`, '_blank');
+  };
+
+  // Delete a single order from PM Dashboard
+  const deletePmOrder = async (orderId, orderNumber) => {
+    if (!window.confirm(`Tem certeza que deseja deletar o projeto ${orderNumber}?\n\nEssa ação não pode ser desfeita.`)) return;
+    try {
+      await axios.delete(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`);
+      showToast(`Projeto ${orderNumber} deletado com sucesso`);
+      fetchDashboardData();
+    } catch (err) {
+      console.error('Failed to delete order:', err);
+      showToast('Erro ao deletar: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  // Bulk delete selected orders
+  const bulkDeleteOrders = async () => {
+    if (selectedOrderIds.size === 0) {
+      showToast('Selecione os projetos que deseja deletar');
+      return;
+    }
+    const count = selectedOrderIds.size;
+    if (!window.confirm(`Tem certeza que deseja deletar ${count} projeto(s)?\n\nEssa ação não pode ser desfeita.`)) return;
+    setDeletingOrders(true);
+    try {
+      const res = await axios.post(`${API}/admin/orders/bulk-delete?admin_key=${adminKey}`, {
+        order_ids: Array.from(selectedOrderIds)
+      });
+      const { deleted_count, failed } = res.data;
+      showToast(`${deleted_count} projeto(s) deletado(s)${failed?.length ? `, ${failed.length} falharam` : ''}`);
+      setSelectedOrderIds(new Set());
+      fetchDashboardData();
+    } catch (err) {
+      console.error('Bulk delete failed:', err);
+      showToast('Erro ao deletar projetos: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setDeletingOrders(false);
+    }
+  };
+
+  // Delete all completed/final/delivered orders
+  const deleteAllCompletedOrders = async () => {
+    const completedOrders = orders.filter(o => ['final', 'delivered'].includes(o.translation_status));
+    if (completedOrders.length === 0) {
+      showToast('Nenhum projeto finalizado para deletar');
+      return;
+    }
+    if (!window.confirm(`Tem certeza que deseja deletar TODOS os ${completedOrders.length} projetos finalizados/entregues?\n\nEssa ação não pode ser desfeita.`)) return;
+    setDeletingOrders(true);
+    try {
+      const res = await axios.post(`${API}/admin/orders/bulk-delete?admin_key=${adminKey}`, {
+        order_ids: completedOrders.map(o => o.id)
+      });
+      const { deleted_count, failed } = res.data;
+      showToast(`${deleted_count} projeto(s) deletado(s)${failed?.length ? `, ${failed.length} falharam` : ''}`);
+      setSelectedOrderIds(new Set());
+      fetchDashboardData();
+    } catch (err) {
+      console.error('Bulk delete completed failed:', err);
+      showToast('Erro ao deletar projetos: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setDeletingOrders(false);
+    }
+  };
+
+  // Toggle single order selection
+  const toggleOrderSelection = (orderId) => {
+    setSelectedOrderIds(prev => {
+      const next = new Set(prev);
+      if (next.has(orderId)) next.delete(orderId);
+      else next.add(orderId);
+      return next;
+    });
+  };
+
+  // Toggle all orders selection
+  const toggleSelectAll = () => {
+    if (selectedOrderIds.size === orders.length) {
+      setSelectedOrderIds(new Set());
+    } else {
+      setSelectedOrderIds(new Set(orders.map(o => o.id)));
+    }
   };
 
   // Assign translator to specific document
@@ -28370,11 +28456,39 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
           {/* Recent Projects */}
           <div className="bg-white rounded-lg shadow p-4">
-            <h3 className="text-sm font-bold text-gray-800 mb-3">📋 Recent Projects</h3>
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-sm font-bold text-gray-800">📋 Recent Projects</h3>
+              <div className="flex gap-2">
+                {selectedOrderIds.size > 0 && (
+                  <button
+                    onClick={bulkDeleteOrders}
+                    disabled={deletingOrders}
+                    className="px-3 py-1.5 bg-red-500 text-white rounded text-xs hover:bg-red-600 disabled:bg-gray-400 flex items-center gap-1"
+                  >
+                    🗑 Deletar Selecionados ({selectedOrderIds.size})
+                  </button>
+                )}
+                <button
+                  onClick={deleteAllCompletedOrders}
+                  disabled={deletingOrders}
+                  className="px-3 py-1.5 bg-red-600 text-white rounded text-xs hover:bg-red-700 disabled:bg-gray-400 flex items-center gap-1"
+                >
+                  {deletingOrders ? 'Deletando...' : '🗑 Deletar Todos Finalizados'}
+                </button>
+              </div>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b">
+                    <th className="text-center py-2 px-2 w-8">
+                      <input
+                        type="checkbox"
+                        checked={orders.length > 0 && selectedOrderIds.size === orders.length}
+                        onChange={toggleSelectAll}
+                        className="rounded"
+                      />
+                    </th>
                     <th className="text-left py-2 px-2">Code</th>
                     <th className="text-left py-2 px-2">Client</th>
                     <th className="text-left py-2 px-2">Languages</th>
@@ -28385,8 +28499,16 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {orders.slice(0, 10).map(order => (
-                    <tr key={order.id} className="border-b hover:bg-gray-50">
+                  {orders.map(order => (
+                    <tr key={order.id} className={`border-b hover:bg-gray-50 ${selectedOrderIds.has(order.id) ? 'bg-red-50' : ''}`}>
+                      <td className="py-2 px-2 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedOrderIds.has(order.id)}
+                          onChange={() => toggleOrderSelection(order.id)}
+                          className="rounded"
+                        />
+                      </td>
                       <td className="py-2 px-2">
                         <button
                           onClick={() => viewProjectFiles(order)}
@@ -28465,16 +28587,25 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         {order.deadline ? formatDateLocal(order.deadline) : '-'}
                       </td>
                       <td className="py-2 px-2 text-center">
-                        {(order.translation_ready || ['ready', 'delivered', 'final', 'pending_admin_approval', 'pending_admin_review', 'finalized_pending_admin', 'review', 'pending_pm_review'].includes(order.translation_status)) && (
+                        <div className="flex items-center justify-center gap-1">
+                          {(order.translation_ready || ['ready', 'delivered', 'final', 'pending_admin_approval', 'pending_admin_review', 'finalized_pending_admin', 'review', 'pending_pm_review'].includes(order.translation_status)) && (
+                            <button
+                              onClick={() => downloadOrderPackagePM(order)}
+                              disabled={downloadingPackagePM === order.id}
+                              className="px-2 py-1 bg-purple-500 text-white rounded text-[10px] hover:bg-purple-600 disabled:bg-gray-400 flex items-center gap-1"
+                              title="Download complete translation package"
+                            >
+                              {downloadingPackagePM === order.id ? '...' : '📥 Package'}
+                            </button>
+                          )}
                           <button
-                            onClick={() => downloadOrderPackagePM(order)}
-                            disabled={downloadingPackagePM === order.id}
-                            className="px-2 py-1 bg-purple-500 text-white rounded text-[10px] hover:bg-purple-600 disabled:bg-gray-400 flex items-center gap-1 mx-auto"
-                            title="Download complete translation package"
+                            onClick={() => deletePmOrder(order.id, order.order_number)}
+                            className="px-2 py-1 bg-red-500 text-white rounded text-[10px] hover:bg-red-600 flex items-center gap-1"
+                            title="Deletar projeto"
                           >
-                            {downloadingPackagePM === order.id ? '...' : '📥 Package'}
+                            🗑
                           </button>
-                        )}
+                        </div>
                       </td>
                     </tr>
                   ))}
