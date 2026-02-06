@@ -9390,8 +9390,11 @@ async def get_my_projects(token: str, admin_key: str):
         # Admin sees all
         orders = await db.translation_orders.find().sort("created_at", -1).to_list(500)
     elif user_role == "pm":
-        # PM sees projects assigned to them
-        orders = await db.translation_orders.find({"assigned_pm_id": user_id}).sort("created_at", -1).to_list(500)
+        # PM sees projects assigned to them (excluding archived)
+        orders = await db.translation_orders.find({
+            "assigned_pm_id": user_id,
+            "archived_by_pm": {"$ne": True}
+        }).sort("created_at", -1).to_list(500)
     elif user_role == "translator":
         # Translator sees projects assigned to them (order-level or file-level, by ID or name)
         tr_name = user.get("name", "")
@@ -12909,6 +12912,66 @@ async def admin_delete_order(order_id: str, admin_key: str):
         raise HTTPException(status_code=404, detail="Order not found")
 
     return {"status": "success", "message": f"Order {order.get('order_number', order_id)} deleted"}
+
+@api_router.post("/admin/orders/{order_id}/archive")
+async def archive_order_for_pm(order_id: str, admin_key: str):
+    """Archive an order so it's hidden from PM dashboard but still visible to admin."""
+    user = await get_current_admin_user(admin_key)
+    if not user or user.get("role") not in ["admin", "pm"]:
+        is_master = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+        if not is_master:
+            raise HTTPException(status_code=401, detail="Invalid admin key")
+        user = None
+
+    order = await db.translation_orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # PMs can only archive their own assigned projects
+    if user and user.get("role") == "pm":
+        if order.get("assigned_pm_id") != user.get("id"):
+            raise HTTPException(status_code=403, detail="You can only archive projects assigned to you")
+
+    await db.translation_orders.update_one(
+        {"id": order_id},
+        {"$set": {"archived_by_pm": True, "archived_at": datetime.utcnow().isoformat()}}
+    )
+
+    return {"status": "success", "message": f"Order {order.get('order_number', order_id)} archived"}
+
+@api_router.post("/admin/orders/bulk-archive")
+async def bulk_archive_orders(admin_key: str, body: dict = Body(...)):
+    """Bulk archive orders for PM. Projects are hidden from PM but still visible to admin."""
+    user = await get_current_admin_user(admin_key)
+    if not user or user.get("role") not in ["admin", "pm"]:
+        is_master = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+        if not is_master:
+            raise HTTPException(status_code=401, detail="Invalid admin key")
+        user = None
+
+    order_ids = body.get("order_ids", [])
+    if not order_ids:
+        raise HTTPException(status_code=400, detail="No order IDs provided")
+
+    archived_count = 0
+    failed = []
+    for order_id in order_ids:
+        order = await db.translation_orders.find_one({"id": order_id})
+        if not order:
+            failed.append({"id": order_id, "reason": "Not found"})
+            continue
+        # PMs can only archive their own projects
+        if user and user.get("role") == "pm":
+            if order.get("assigned_pm_id") != user.get("id"):
+                failed.append({"id": order_id, "reason": "Not assigned to you"})
+                continue
+        await db.translation_orders.update_one(
+            {"id": order_id},
+            {"$set": {"archived_by_pm": True, "archived_at": datetime.utcnow().isoformat()}}
+        )
+        archived_count += 1
+
+    return {"status": "success", "archived_count": archived_count, "failed": failed}
 
 @api_router.post("/admin/orders/{order_id}/mark-paid")
 async def admin_mark_order_paid(order_id: str, admin_key: str):

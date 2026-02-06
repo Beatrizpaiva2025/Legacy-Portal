@@ -26308,6 +26308,10 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   // Download package state
   const [downloadingPackagePM, setDownloadingPackagePM] = useState(null); // Order ID being downloaded
 
+  // Delete/bulk delete state
+  const [selectedOrderIds, setSelectedOrderIds] = useState(new Set());
+  const [deletingOrders, setDeletingOrders] = useState(false);
+
   const [stats, setStats] = useState({
     totalProjects: 0,
     inProgress: 0,
@@ -26889,6 +26893,88 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
   const downloadPmTranslationPM = (orderId) => {
     window.open(`${API}/admin/orders/${orderId}/pm-translation-download?admin_key=${adminKey}`, '_blank');
+  };
+
+  // Archive a single order from PM Dashboard (hidden from PM, still visible to admin)
+  const archivePmOrder = async (orderId, orderNumber) => {
+    if (!window.confirm(`Arquivar o projeto ${orderNumber}?\n\nO projeto será removido do seu painel, mas o admin ainda terá acesso.`)) return;
+    try {
+      await axios.post(`${API}/admin/orders/${orderId}/archive?admin_key=${adminKey}`);
+      showToast(`Projeto ${orderNumber} arquivado com sucesso`);
+      fetchDashboardData();
+    } catch (err) {
+      console.error('Failed to archive order:', err);
+      showToast('Erro ao arquivar: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  // Bulk archive selected orders
+  const bulkArchiveOrders = async () => {
+    if (selectedOrderIds.size === 0) {
+      showToast('Selecione os projetos que deseja arquivar');
+      return;
+    }
+    const count = selectedOrderIds.size;
+    if (!window.confirm(`Arquivar ${count} projeto(s)?\n\nOs projetos serão removidos do seu painel, mas o admin ainda terá acesso.`)) return;
+    setDeletingOrders(true);
+    try {
+      const res = await axios.post(`${API}/admin/orders/bulk-archive?admin_key=${adminKey}`, {
+        order_ids: Array.from(selectedOrderIds)
+      });
+      const { archived_count, failed } = res.data;
+      showToast(`${archived_count} projeto(s) arquivado(s)${failed?.length ? `, ${failed.length} falharam` : ''}`);
+      setSelectedOrderIds(new Set());
+      fetchDashboardData();
+    } catch (err) {
+      console.error('Bulk archive failed:', err);
+      showToast('Erro ao arquivar projetos: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setDeletingOrders(false);
+    }
+  };
+
+  // Archive all completed/final/delivered orders
+  const archiveAllCompletedOrders = async () => {
+    const completedOrders = orders.filter(o => ['final', 'delivered'].includes(o.translation_status));
+    if (completedOrders.length === 0) {
+      showToast('Nenhum projeto finalizado para arquivar');
+      return;
+    }
+    if (!window.confirm(`Arquivar TODOS os ${completedOrders.length} projetos finalizados/entregues?\n\nOs projetos serão removidos do seu painel, mas o admin ainda terá acesso.`)) return;
+    setDeletingOrders(true);
+    try {
+      const res = await axios.post(`${API}/admin/orders/bulk-archive?admin_key=${adminKey}`, {
+        order_ids: completedOrders.map(o => o.id)
+      });
+      const { archived_count, failed } = res.data;
+      showToast(`${archived_count} projeto(s) arquivado(s)${failed?.length ? `, ${failed.length} falharam` : ''}`);
+      setSelectedOrderIds(new Set());
+      fetchDashboardData();
+    } catch (err) {
+      console.error('Bulk archive completed failed:', err);
+      showToast('Erro ao arquivar projetos: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setDeletingOrders(false);
+    }
+  };
+
+  // Toggle single order selection
+  const toggleOrderSelection = (orderId) => {
+    setSelectedOrderIds(prev => {
+      const next = new Set(prev);
+      if (next.has(orderId)) next.delete(orderId);
+      else next.add(orderId);
+      return next;
+    });
+  };
+
+  // Toggle all orders selection
+  const toggleSelectAll = () => {
+    if (selectedOrderIds.size === orders.length) {
+      setSelectedOrderIds(new Set());
+    } else {
+      setSelectedOrderIds(new Set(orders.map(o => o.id)));
+    }
   };
 
   // Assign translator to specific document
@@ -28370,11 +28456,39 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
           {/* Recent Projects */}
           <div className="bg-white rounded-lg shadow p-4">
-            <h3 className="text-sm font-bold text-gray-800 mb-3">📋 Recent Projects</h3>
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-sm font-bold text-gray-800">📋 Recent Projects</h3>
+              <div className="flex gap-2">
+                {selectedOrderIds.size > 0 && (
+                  <button
+                    onClick={bulkArchiveOrders}
+                    disabled={deletingOrders}
+                    className="px-3 py-1.5 bg-amber-500 text-white rounded text-xs hover:bg-amber-600 disabled:bg-gray-400 flex items-center gap-1"
+                  >
+                    📦 Arquivar Selecionados ({selectedOrderIds.size})
+                  </button>
+                )}
+                <button
+                  onClick={archiveAllCompletedOrders}
+                  disabled={deletingOrders}
+                  className="px-3 py-1.5 bg-amber-600 text-white rounded text-xs hover:bg-amber-700 disabled:bg-gray-400 flex items-center gap-1"
+                >
+                  {deletingOrders ? 'Arquivando...' : '📦 Arquivar Todos Finalizados'}
+                </button>
+              </div>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b">
+                    <th className="text-center py-2 px-2 w-8">
+                      <input
+                        type="checkbox"
+                        checked={orders.length > 0 && selectedOrderIds.size === orders.length}
+                        onChange={toggleSelectAll}
+                        className="rounded"
+                      />
+                    </th>
                     <th className="text-left py-2 px-2">Code</th>
                     <th className="text-left py-2 px-2">Client</th>
                     <th className="text-left py-2 px-2">Languages</th>
@@ -28385,8 +28499,16 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {orders.slice(0, 10).map(order => (
-                    <tr key={order.id} className="border-b hover:bg-gray-50">
+                  {orders.map(order => (
+                    <tr key={order.id} className={`border-b hover:bg-gray-50 ${selectedOrderIds.has(order.id) ? 'bg-amber-50' : ''}`}>
+                      <td className="py-2 px-2 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedOrderIds.has(order.id)}
+                          onChange={() => toggleOrderSelection(order.id)}
+                          className="rounded"
+                        />
+                      </td>
                       <td className="py-2 px-2">
                         <button
                           onClick={() => viewProjectFiles(order)}
@@ -28465,16 +28587,25 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         {order.deadline ? formatDateLocal(order.deadline) : '-'}
                       </td>
                       <td className="py-2 px-2 text-center">
-                        {(order.translation_ready || ['ready', 'delivered', 'final', 'pending_admin_approval', 'pending_admin_review', 'finalized_pending_admin', 'review', 'pending_pm_review'].includes(order.translation_status)) && (
+                        <div className="flex items-center justify-center gap-1">
+                          {(order.translation_ready || ['ready', 'delivered', 'final', 'pending_admin_approval', 'pending_admin_review', 'finalized_pending_admin', 'review', 'pending_pm_review'].includes(order.translation_status)) && (
+                            <button
+                              onClick={() => downloadOrderPackagePM(order)}
+                              disabled={downloadingPackagePM === order.id}
+                              className="px-2 py-1 bg-purple-500 text-white rounded text-[10px] hover:bg-purple-600 disabled:bg-gray-400 flex items-center gap-1"
+                              title="Download complete translation package"
+                            >
+                              {downloadingPackagePM === order.id ? '...' : '📥 Package'}
+                            </button>
+                          )}
                           <button
-                            onClick={() => downloadOrderPackagePM(order)}
-                            disabled={downloadingPackagePM === order.id}
-                            className="px-2 py-1 bg-purple-500 text-white rounded text-[10px] hover:bg-purple-600 disabled:bg-gray-400 flex items-center gap-1 mx-auto"
-                            title="Download complete translation package"
+                            onClick={() => archivePmOrder(order.id, order.order_number)}
+                            className="px-2 py-1 bg-amber-500 text-white rounded text-[10px] hover:bg-amber-600 flex items-center gap-1"
+                            title="Arquivar projeto"
                           >
-                            {downloadingPackagePM === order.id ? '...' : '📥 Package'}
+                            📦
                           </button>
-                        )}
+                        </div>
                       </td>
                     </tr>
                   ))}
