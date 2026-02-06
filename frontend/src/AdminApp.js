@@ -30659,6 +30659,7 @@ const SalesControlPage = ({ adminKey }) => {
   const [outreachEmails, setOutreachEmails] = useState([]);
   const [sendingOutreach, setSendingOutreach] = useState(null);
   const [outreachResult, setOutreachResult] = useState(null);
+  const [deletingAcquisition, setDeletingAcquisition] = useState(null);
   const [newGoal, setNewGoal] = useState({
     salesperson_id: '', month: new Date().toISOString().slice(0, 7), target_partners: 10, target_revenue: 5000
   });
@@ -30881,6 +30882,26 @@ const SalesControlPage = ({ adminKey }) => {
     } catch (error) {
       console.error('Error updating acquisition:', error);
       showToast('Erro ao atualizar aquisição');
+    }
+  };
+
+  const handleDeleteAcquisition = async () => {
+    if (!deletingAcquisition) return;
+    try {
+      const res = await fetch(`${API_URL}/api/admin/partner-acquisitions/${deletingAcquisition.id}`, {
+        method: 'DELETE',
+        headers: { 'admin-key': adminKey }
+      });
+      if (res.ok) {
+        showToast('Aquisição deletada com sucesso!');
+        setDeletingAcquisition(null);
+        fetchAllData();
+      } else {
+        showToast('Erro ao deletar aquisição');
+      }
+    } catch (error) {
+      console.error('Error deleting acquisition:', error);
+      showToast('Erro ao deletar aquisição');
     }
   };
 
@@ -31462,6 +31483,13 @@ const SalesControlPage = ({ adminKey }) => {
                             ✓ Pago
                           </span>
                         )}
+                        <button
+                          onClick={() => setDeletingAcquisition(acq)}
+                          className="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
+                          title="Deletar aquisição"
+                        >
+                          Deletar
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -32609,6 +32637,39 @@ const SalesControlPage = ({ adminKey }) => {
                 className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
               >
                 Salvar Alterações
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Acquisition Confirmation Modal */}
+      {deletingAcquisition && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4 text-red-600">
+              Confirmar Exclusão
+            </h3>
+            <p className="text-gray-700 mb-2">
+              Tem certeza que deseja deletar a aquisição do parceiro:
+            </p>
+            <p className="font-semibold text-gray-900 mb-1">{deletingAcquisition.partner_name}</p>
+            <p className="text-sm text-gray-500 mb-4">ID: {deletingAcquisition.id}</p>
+            <p className="text-sm text-red-500 mb-6">
+              Esta ação não pode ser desfeita. Os emails de outreach relacionados também serão removidos.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setDeletingAcquisition(null)}
+                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteAcquisition}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+              >
+                Deletar
               </button>
             </div>
           </div>
