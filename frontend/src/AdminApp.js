@@ -18060,8 +18060,9 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                               <div>
                                 <div className="text-sm font-medium text-green-800">{doc.filename || 'Translated Document'}</div>
                                 <div className="text-[10px] text-green-600">
-                                  Approved translation
+                                  {doc.uploaded_by === 'pm' ? 'PM upload' : doc.uploaded_by === 'workspace' ? 'Workspace' : doc.uploaded_by === 'translator' ? 'Translator' : 'Translation'}
                                   {doc.uploaded_at && ` • ${new Date(doc.uploaded_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}`}
+                                  {doc.file_size && ` • ${(doc.file_size / 1024).toFixed(1)} KB`}
                                 </div>
                               </div>
                             </div>

@@ -8216,6 +8216,7 @@ async def submit_translation(
                     "file_data": doc_base64,
                     "content_type": "text/html",
                     "source": "translated_document",
+                    "uploaded_by": "translator",
                     "uploaded_at": datetime.utcnow()
                 }
                 await db.order_documents.insert_one(doc_record)
@@ -8241,6 +8242,7 @@ async def submit_translation(
                     "file_data": tf["data"],
                     "content_type": tf["content_type"],
                     "source": "translated_document",
+                    "uploaded_by": "translator",
                     "uploaded_at": datetime.utcnow()
                 }
                 await db.order_documents.insert_one(doc_record)
@@ -9520,11 +9522,12 @@ async def upload_pm_translation(
             "uploaded_by": "pm",
             "uploaded_at": now,
             "gridfs_id": str(file_id),
+            "file_size": file_size,
             "data": None,
             "file_data": None
         }
-        await db.order_documents.insert_one(doc_record)
-        logger.info(f"PM translation added to order_documents for admin review: {file.filename}")
+        result = await db.order_documents.insert_one(doc_record)
+        logger.info(f"PM translation added to order_documents for admin review: {file.filename} (inserted_id={result.inserted_id}, order_id={order_id})")
 
         # Send email to admin notifying about READY translation
         try:
@@ -13816,10 +13819,12 @@ async def admin_save_translation(order_id: str, data: TranslationData, admin_key
             doc_filename = f"{order_number}_Translation.html"
             doc_base64 = base64.b64encode(data.translation_html.encode('utf-8')).decode('utf-8')
 
-            # Remove any existing translated documents for this order to avoid duplicates
+            # Remove only workspace/translator-generated translated documents
+            # PM and admin file uploads must be preserved
             await db.order_documents.delete_many({
                 "order_id": order_id,
-                "source": "translated_document"
+                "source": "translated_document",
+                "uploaded_by": {"$in": ["workspace", "translator", None]}
             })
 
             doc_record = {
@@ -13830,6 +13835,7 @@ async def admin_save_translation(order_id: str, data: TranslationData, admin_key
                 "file_data": doc_base64,
                 "content_type": "text/html",
                 "source": "translated_document",
+                "uploaded_by": "workspace",
                 "uploaded_at": datetime.utcnow()
             }
             await db.order_documents.insert_one(doc_record)
@@ -17799,13 +17805,24 @@ async def admin_get_order_documents(order_id: str, admin_key: str):
 
     for doc in docs_manual:
         doc["_id"] = str(doc["_id"])
+        # Handle uploaded_at safely - could be datetime or string
+        uploaded_at_val = doc.get("uploaded_at")
+        if uploaded_at_val:
+            try:
+                uploaded_at_str = uploaded_at_val.isoformat() if hasattr(uploaded_at_val, 'isoformat') else str(uploaded_at_val)
+            except Exception:
+                uploaded_at_str = str(uploaded_at_val)
+        else:
+            uploaded_at_str = None
         all_docs.append({
             "id": doc.get("id"),
             "filename": doc.get("filename"),
             "content_type": doc.get("content_type", "application/pdf"),
-            "has_data": bool(doc.get("data") or doc.get("gridfs_id")),
+            "has_data": bool(doc.get("data") or doc.get("file_data") or doc.get("gridfs_id")),
             "source": doc.get("source", "manual_upload"),
-            "uploaded_at": doc.get("uploaded_at").isoformat() if doc.get("uploaded_at") else None,
+            "uploaded_at": uploaded_at_str,
+            "uploaded_by": doc.get("uploaded_by"),
+            "file_size": doc.get("file_size"),
             "assigned_translator_id": doc.get("assigned_translator_id"),
             "assigned_translator_name": doc.get("assigned_translator_name"),
             "assignment_status": doc.get("assignment_status"),
@@ -17907,12 +17924,20 @@ async def admin_upload_order_document(order_id: str, doc_data: OrderDocumentUplo
                 import traceback
                 traceback.print_exc()
 
+        # Determine who uploaded this document
+        uploader = "admin"
+        if user_info and isinstance(user_info, dict):
+            uploader = user_info.get("role", "admin")
+            if user_info.get("role") == "pm":
+                uploader = "pm"
+
         doc_record = {
             "id": str(uuid.uuid4()),
             "order_id": order_id,
             "filename": final_filename,
             "content_type": final_content_type,
             "source": doc_data.source,
+            "uploaded_by": uploader,
             "uploaded_at": datetime.utcnow()
         }
 
