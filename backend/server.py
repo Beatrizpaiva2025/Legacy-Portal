@@ -14849,6 +14849,50 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                 import traceback
                 traceback.print_exc()
 
+                # CRITICAL: Retry certification creation with minimal data so verification page still appears
+                try:
+                    cert_id = f"LT-{datetime.now().strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}"
+                    base_url = os.environ.get("FRONTEND_URL", "https://portal.legacytranslations.com")
+                    verification_url = f"{base_url}/#/verify/{cert_id}"
+
+                    # Minimal certification data so the verification page can still be generated
+                    certification_data = {
+                        "certification_id": cert_id,
+                        "order_id": order_id,
+                        "order_number": order.get("order_number"),
+                        "document_type": order.get("document_type", "Document"),
+                        "source_language": order.get("source_language", ""),
+                        "target_language": order.get("target_language", ""),
+                        "page_count": 1,
+                        "document_hash": "",
+                        "certifier_name": certifier_name if certifier_name not in ["Admin (Self)", "Admin", "Self", None, ""] else "Beatriz Paiva",
+                        "certifier_title": "Legal Representative",
+                        "certifier_credentials": "ATA Member # 275993",
+                        "company_name": "Legacy Translations Inc.",
+                        "company_address": "867 Boylston Street, 5th Floor, #2073, Boston, MA 02116",
+                        "company_phone": "(857) 316-7770",
+                        "company_email": "contact@legacytranslations.com",
+                        "client_name": order.get("client_name", ""),
+                        "certified_at": datetime.utcnow(),
+                        "is_valid": True,
+                        "verification_url": verification_url,
+                        "qr_code_data": None
+                    }
+
+                    # Try to store in DB but don't fail if it doesn't work
+                    try:
+                        await db.certifications.insert_one(certification_data)
+                        logger.info(f"Retry certification succeeded: {cert_id}")
+                    except Exception:
+                        logger.warning(f"Could not store certification in DB, but verification page will still be generated: {cert_id}")
+
+                except Exception as retry_err:
+                    logger.error(f"Retry certification also failed: {str(retry_err)}")
+                    # certification_data remains None - verification page will be skipped
+
+        if include_verification_page and not certification_data:
+            logger.warning(f"VERIFICATION PAGE WILL BE MISSING for order {order.get('order_number')} - certification_data is None")
+
         # ==================== GENERATE COMBINED PDF OR SEPARATE ATTACHMENTS ====================
         if generate_combined_pdf:
             # Generate a single combined PDF with all parts
@@ -14881,6 +14925,11 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                 # If still no docs, try to get from order itself
                 original_file_data = None
                 original_file_list = []  # Support multiple originals
+
+                # Sort original docs by page_number if page grouping is set
+                if original_docs:
+                    original_docs.sort(key=lambda d: (d.get("page_group_id") or "", d.get("page_number") or 999))
+
                 if original_docs:
                     for doc in original_docs:
                         # Check for GridFS storage first
@@ -14898,7 +14947,9 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                             original_file_list.append({
                                 "data": doc_data,
                                 "filename": doc.get("filename", "original.pdf"),
-                                "content_type": doc.get("content_type", "application/pdf")
+                                "content_type": doc.get("content_type", "application/pdf"),
+                                "page_group_id": doc.get("page_group_id"),
+                                "page_number": doc.get("page_number")
                             })
                             if not original_file_data:
                                 original_file_data = doc_data  # Keep first for backward compatibility
@@ -15409,6 +15460,10 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                             "order_id": order_id,
                             "source": {"$ne": "translated_document"}
                         }).to_list(10)
+
+                    # Sort by page_group_id and page_number for correct ordering
+                    if original_docs:
+                        original_docs.sort(key=lambda d: (d.get("page_group_id") or "", d.get("page_number") or 999))
 
                     if original_docs:
                         # Add separator page
@@ -17854,6 +17909,8 @@ async def admin_get_order_documents(order_id: str, admin_key: str):
             "assigned_translator_id": doc.get("assigned_translator_id"),
             "assigned_translator_name": doc.get("assigned_translator_name"),
             "assignment_status": doc.get("assignment_status"),
+            "page_group_id": doc.get("page_group_id"),
+            "page_number": doc.get("page_number"),
         })
 
     for doc in docs_manual:
@@ -17879,6 +17936,8 @@ async def admin_get_order_documents(order_id: str, admin_key: str):
             "assigned_translator_id": doc.get("assigned_translator_id"),
             "assigned_translator_name": doc.get("assigned_translator_name"),
             "assignment_status": doc.get("assignment_status"),
+            "page_group_id": doc.get("page_group_id"),
+            "page_number": doc.get("page_number"),
         })
 
     return {"documents": all_docs, "count": len(all_docs)}
@@ -18110,13 +18169,19 @@ async def admin_update_order_document(doc_id: str, admin_key: str, update_data: 
     if not user_info:
         raise HTTPException(status_code=401, detail="Invalid admin key or token")
 
-    # Only allow admin or PM to update
+    # Translators can only update page grouping fields
+    translator_allowed_fields = ["page_group_id", "page_number"]
     if user_info.get("role") not in ["admin", "pm"]:
-        raise HTTPException(status_code=403, detail="Only admin or PM can update document assignments")
+        # Check if translator is only updating page grouping fields
+        if user_info.get("role") == "translator" and all(k in translator_allowed_fields for k in update_data.keys()):
+            pass  # Allow translators to set page grouping
+        else:
+            raise HTTPException(status_code=403, detail="Only admin or PM can update document assignments")
 
     # Fields that can be updated
     allowed_fields = ["assigned_translator_id", "assigned_translator_name", "notes", "status",
-                      "assignment_token", "assignment_status", "assignment_responded_at"]
+                      "assignment_token", "assignment_status", "assignment_responded_at",
+                      "page_group_id", "page_number"]
     update_dict = {k: v for k, v in update_data.items() if k in allowed_fields}
 
     if not update_dict:
@@ -18209,6 +18274,83 @@ async def admin_delete_order_document(doc_id: str, admin_key: str):
 
     logger.info(f"Document {doc_id} deleted by {user_info.get('name', 'Unknown')}")
     return {"success": True, "message": "Document deleted successfully"}
+
+
+# ==================== PAGE GROUPING ENDPOINTS ====================
+
+class PageGroupItem(BaseModel):
+    doc_id: str
+    page_number: int
+
+class PageGroupRequest(BaseModel):
+    page_group_id: str
+    items: List[PageGroupItem]
+
+@api_router.post("/admin/orders/{order_id}/page-group")
+async def set_page_group(order_id: str, admin_key: str, request: PageGroupRequest):
+    """Set page grouping for multiple documents at once"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    if user_info.get("role") not in ["admin", "pm", "translator"]:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    updated_count = 0
+    for item in request.items:
+        update_dict = {
+            "page_group_id": request.page_group_id,
+            "page_number": item.page_number
+        }
+        # Try order_documents first
+        result = await db.order_documents.update_one(
+            {"id": item.doc_id, "order_id": order_id},
+            {"$set": update_dict}
+        )
+        if result.matched_count == 0:
+            # Try main documents collection
+            result = await db.documents.update_one(
+                {"id": item.doc_id, "order_id": order_id},
+                {"$set": update_dict}
+            )
+        if result.matched_count > 0:
+            updated_count += 1
+
+    return {
+        "success": True,
+        "message": f"Page group set for {updated_count} documents",
+        "page_group_id": request.page_group_id,
+        "updated_count": updated_count
+    }
+
+@api_router.delete("/admin/orders/{order_id}/page-group/{page_group_id}")
+async def remove_page_group(order_id: str, page_group_id: str, admin_key: str):
+    """Remove page grouping from all documents in a group"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    if user_info.get("role") not in ["admin", "pm", "translator"]:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    # Remove page_group_id and page_number from all matching documents
+    unset_fields = {"page_group_id": "", "page_number": ""}
+
+    result1 = await db.order_documents.update_many(
+        {"order_id": order_id, "page_group_id": page_group_id},
+        {"$unset": unset_fields}
+    )
+    result2 = await db.documents.update_many(
+        {"order_id": order_id, "page_group_id": page_group_id},
+        {"$unset": unset_fields}
+    )
+
+    total = result1.modified_count + result2.modified_count
+    return {
+        "success": True,
+        "message": f"Page group removed from {total} documents",
+        "removed_count": total
+    }
 
 
 # ==================== TRANSLATION WORKSPACE ENDPOINTS ====================

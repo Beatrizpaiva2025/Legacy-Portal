@@ -1530,6 +1530,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [allProjectFiles, setAllProjectFiles] = useState([]); // All files from all projects for individual view
   const [viewMode, setViewMode] = useState('files'); // 'projects' or 'files' - default to files view
 
+  // Page grouping state
+  const [pageGroupMode, setPageGroupMode] = useState(false); // Toggle grouping mode
+  const [pageGroupSelections, setPageGroupSelections] = useState({}); // { docId: pageNumber }
+  const [savingPageGroup, setSavingPageGroup] = useState(false);
+
   // Translator messages
   const [translatorMessages, setTranslatorMessages] = useState([]);
   const [showTranslatorMessages, setShowTranslatorMessages] = useState(false);
@@ -3501,6 +3506,162 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       console.error('Failed to load file to workspace:', err);
       setProcessingStatus('');
       showToast('Error loading file to workspace');
+    }
+  };
+
+  // ==================== PAGE GROUPING FUNCTIONS ====================
+
+  // Save page group - assigns page_group_id and page_number to selected files
+  const savePageGroup = async () => {
+    const selectedEntries = Object.entries(pageGroupSelections).filter(([_, num]) => num > 0);
+    if (selectedEntries.length < 2) {
+      showToast('Select at least 2 files and assign page numbers to create a group');
+      return;
+    }
+
+    // Verify all page numbers are unique
+    const pageNumbers = selectedEntries.map(([_, num]) => num);
+    if (new Set(pageNumbers).size !== pageNumbers.length) {
+      showToast('Each file must have a unique page number');
+      return;
+    }
+
+    // Find the order_id from the first selected file
+    const firstFile = allProjectFiles.find(f => f.id === selectedEntries[0][0]);
+    if (!firstFile) return;
+
+    // All files must be from the same order
+    const allSameOrder = selectedEntries.every(([docId]) => {
+      const file = allProjectFiles.find(f => f.id === docId);
+      return file && file.order_id === firstFile.order_id;
+    });
+    if (!allSameOrder) {
+      showToast('All files in a group must be from the same project/order');
+      return;
+    }
+
+    setSavingPageGroup(true);
+    try {
+      const pageGroupId = `pg_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+      const items = selectedEntries.map(([docId, pageNumber]) => ({
+        doc_id: docId,
+        page_number: pageNumber
+      }));
+
+      await axios.post(
+        `${API}/admin/orders/${firstFile.order_id}/page-group?admin_key=${adminKey}`,
+        { page_group_id: pageGroupId, items }
+      );
+
+      showToast(`Page group created with ${items.length} pages`);
+      setPageGroupMode(false);
+      setPageGroupSelections({});
+
+      // Refresh files to show updated grouping
+      await fetchAssignedOrders();
+    } catch (err) {
+      console.error('Failed to save page group:', err);
+      showToast('Error saving page group');
+    } finally {
+      setSavingPageGroup(false);
+    }
+  };
+
+  // Remove page group from all files in a group
+  const removePageGroup = async (pageGroupId, orderId) => {
+    try {
+      await axios.delete(
+        `${API}/admin/orders/${orderId}/page-group/${pageGroupId}?admin_key=${adminKey}`
+      );
+      showToast('Page group removed');
+      await fetchAssignedOrders();
+    } catch (err) {
+      console.error('Failed to remove page group:', err);
+      showToast('Error removing page group');
+    }
+  };
+
+  // Load all files in a page group into the workspace (in order)
+  const loadPageGroup = async (pageGroupId) => {
+    const groupFiles = allProjectFiles
+      .filter(f => f.page_group_id === pageGroupId)
+      .sort((a, b) => (a.page_number || 0) - (b.page_number || 0));
+
+    if (groupFiles.length === 0) return;
+
+    // Set order context from first file
+    const order = assignedOrders.find(o => o.id === groupFiles[0].order_id);
+    if (order) {
+      setSelectedOrderId(order.id);
+      setOrderNumber(order.order_number);
+      if (order.translate_from) setSourceLanguage(order.translate_from);
+      if (order.translate_to) setTargetLanguage(order.translate_to);
+    }
+
+    setProcessingStatus(`Loading ${groupFiles.length} grouped pages...`);
+    const allImages = [];
+
+    for (let i = 0; i < groupFiles.length; i++) {
+      const file = groupFiles[i];
+      setProcessingStatus(`Loading page ${i + 1} of ${groupFiles.length}: "${file.filename}"...`);
+
+      try {
+        const downloadResponse = await axios.get(
+          `${API}/admin/order-documents/${file.id}/download?admin_key=${adminKey}`
+        );
+
+        if (downloadResponse.data.file_data) {
+          const contentType = downloadResponse.data.content_type || 'application/pdf';
+          const base64Data = downloadResponse.data.file_data;
+
+          if (contentType === 'application/pdf' || file.filename?.toLowerCase().endsWith('.pdf')) {
+            // Convert PDF pages to images
+            const binaryString = atob(base64Data);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let j = 0; j < binaryString.length; j++) {
+              bytes[j] = binaryString.charCodeAt(j);
+            }
+            const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+              const page = await pdf.getPage(pageNum);
+              const scale = 3;
+              const viewport = page.getViewport({ scale });
+              const canvas = document.createElement('canvas');
+              const context = canvas.getContext('2d');
+              canvas.height = viewport.height;
+              canvas.width = viewport.width;
+              await page.render({ canvasContext: context, viewport }).promise;
+              const base64Image = canvas.toDataURL('image/png').split(',')[1];
+              allImages.push({
+                filename: `${file.filename}_page_${pageNum}.png`,
+                data: base64Image,
+                type: 'image/png'
+              });
+            }
+          } else {
+            // Image file - add directly
+            allImages.push({
+              filename: file.filename,
+              data: base64Data,
+              type: contentType
+            });
+          }
+        }
+      } catch (err) {
+        console.error(`Failed to load grouped file ${file.filename}:`, err);
+      }
+    }
+
+    if (allImages.length > 0) {
+      setOriginalImages(allImages);
+      setSelectedFileId(groupFiles[0].id);
+      setProcessingStatus(`${allImages.length} page(s) loaded from group`);
+      showToast(`${allImages.length} page(s) loaded from group`);
+      if (activeSubTab === 'start') {
+        setActiveSubTab('translate');
+      }
+    } else {
+      setProcessingStatus('No images could be loaded from group');
     }
   };
 
@@ -7410,8 +7571,48 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       📁 Projects
                     </button>
                   </div>
+                  {/* Group Pages Toggle */}
+                  {viewMode === 'files' && allProjectFiles.length > 1 && (
+                    <button
+                      onClick={() => {
+                        setPageGroupMode(!pageGroupMode);
+                        if (pageGroupMode) setPageGroupSelections({});
+                      }}
+                      className={`px-3 py-1 text-xs rounded-md transition-all ${
+                        pageGroupMode
+                          ? 'bg-orange-500 text-white shadow'
+                          : 'bg-white border border-orange-300 text-orange-600 hover:bg-orange-50'
+                      }`}
+                      title="Group multiple pages/images into a single translation"
+                    >
+                      {pageGroupMode ? '✕ Cancel' : '🔗 Group Pages'}
+                    </button>
+                  )}
                 </div>
               </div>
+
+              {/* Page Grouping Toolbar */}
+              {pageGroupMode && viewMode === 'files' && (
+                <div className="mb-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-orange-700">
+                      <strong>Page Grouping Mode:</strong> Type page numbers (1, 2, 3...) on each file to set the order. Files with numbers will be grouped together.
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-orange-600">
+                        {Object.values(pageGroupSelections).filter(v => v > 0).length} selected
+                      </span>
+                      <button
+                        onClick={savePageGroup}
+                        disabled={savingPageGroup || Object.values(pageGroupSelections).filter(v => v > 0).length < 2}
+                        className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 text-white text-xs rounded-md transition-colors font-medium"
+                      >
+                        {savingPageGroup ? 'Saving...' : 'Save Group'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {loadingAssigned ? (
                 <div className="text-center py-4 text-gray-500 text-sm">Loading...</div>
@@ -7419,10 +7620,25 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 /* FILES VIEW - Show individual files */
                 allProjectFiles.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {allProjectFiles.map((file, idx) => (
+                    {[...allProjectFiles].sort((a, b) => {
+                      // Group files with page_group_id together, sorted by page_number
+                      if (a.page_group_id && b.page_group_id && a.page_group_id === b.page_group_id) {
+                        return (a.page_number || 0) - (b.page_number || 0);
+                      }
+                      if (a.page_group_id && !b.page_group_id) return -1;
+                      if (!a.page_group_id && b.page_group_id) return 1;
+                      if (a.page_group_id && b.page_group_id) return a.page_group_id.localeCompare(b.page_group_id);
+                      return 0; // Keep original order for ungrouped files
+                    }).map((file, idx) => (
                       <div
                         key={file.id || idx}
                         onClick={async () => {
+                          if (pageGroupMode) return; // Don't load files in grouping mode
+                          // If file is part of a group, load all group files
+                          if (file.page_group_id) {
+                            await loadPageGroup(file.page_group_id);
+                            return;
+                          }
                           // Set order context
                           const order = assignedOrders.find(o => o.id === file.order_id);
                           if (order) {
@@ -7435,11 +7651,58 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           await loadProjectFile(file);
                         }}
                         className={`p-3 rounded-lg cursor-pointer transition-all border ${
-                          selectedFileId === file.id
+                          pageGroupMode && pageGroupSelections[file.id] > 0
+                            ? 'bg-orange-50 border-orange-400 shadow-md ring-2 ring-orange-300'
+                            : file.page_group_id
+                            ? 'bg-purple-50 border-purple-300 hover:border-purple-500 hover:shadow'
+                            : selectedFileId === file.id
                             ? 'bg-blue-100 border-blue-500 shadow-md'
                             : 'bg-white border-gray-200 hover:border-blue-400 hover:shadow'
                         }`}
                       >
+                        {/* Page Grouping Input */}
+                        {pageGroupMode && !file.page_group_id && (
+                          <div className="mb-2 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                            <label className="text-[10px] text-orange-600 font-medium whitespace-nowrap">Page #:</label>
+                            <input
+                              type="number"
+                              min="0"
+                              max="99"
+                              value={pageGroupSelections[file.id] || ''}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value) || 0;
+                                setPageGroupSelections(prev => ({
+                                  ...prev,
+                                  [file.id]: val
+                                }));
+                              }}
+                              className="w-14 px-2 py-1 text-sm border border-orange-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-orange-400"
+                              placeholder="-"
+                            />
+                          </div>
+                        )}
+
+                        {/* Existing Group Badge */}
+                        {file.page_group_id && (
+                          <div className="mb-2 flex items-center justify-between">
+                            <span className="text-[10px] px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full font-medium">
+                              🔗 Page {file.page_number} of {allProjectFiles.filter(f => f.page_group_id === file.page_group_id).length}
+                            </span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (confirm('Remove this file from the page group?')) {
+                                  removePageGroup(file.page_group_id, file.order_id);
+                                }
+                              }}
+                              className="text-[10px] text-red-400 hover:text-red-600"
+                              title="Remove group"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        )}
+
                         <div className="flex items-center justify-between mb-2">
                           <span className="font-bold text-blue-700 text-xs truncate max-w-[120px]" title={file.filename}>
                             {file.filename || 'Document'}
@@ -7479,16 +7742,30 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         )}
                         {/* Action buttons */}
                         <div className="mt-2 flex flex-wrap gap-1">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              loadFileToWorkspace(file.id, file.filename);
-                            }}
-                            className="flex-1 px-2 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded flex items-center justify-center gap-1 transition-colors"
-                            title="Load PDF/Image to workspace (PDF auto-converts to images)"
-                          >
-                            📥 Load
-                          </button>
+                          {/* Load Group button for grouped files */}
+                          {file.page_group_id ? (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                loadPageGroup(file.page_group_id);
+                              }}
+                              className="flex-1 px-2 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded flex items-center justify-center gap-1 transition-colors"
+                              title="Load all pages in this group into workspace (in order)"
+                            >
+                              🔗 Load Group ({allProjectFiles.filter(f => f.page_group_id === file.page_group_id).length} pages)
+                            </button>
+                          ) : !pageGroupMode && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                loadFileToWorkspace(file.id, file.filename);
+                              }}
+                              className="flex-1 px-2 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded flex items-center justify-center gap-1 transition-colors"
+                              title="Load PDF/Image to workspace (PDF auto-converts to images)"
+                            >
+                              📥 Load
+                            </button>
+                          )}
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -14749,6 +15026,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const openDeliveryModal = async (order) => {
     setDeliveryModalOrder(order);
     setDeliveryStatus('');
+    setDeliveryIncludeVerification(true); // Always reset to include verification page
     setShowDeliveryModal(true);
 
     // Fetch the translation HTML
