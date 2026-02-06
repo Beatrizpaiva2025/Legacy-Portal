@@ -1518,7 +1518,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [adminPmList, setAdminPmList] = useState([]);
   const [selectedAdminPm, setSelectedAdminPm] = useState('');
   // PM Upload Translation state
-  const [pmUploadFile, setPmUploadFile] = useState(null);
+  const [pmUploadFiles, setPmUploadFiles] = useState([]);
   const [pmUploadLoading, setPmUploadLoading] = useState(false);
   const [pmAcceptLoading, setPmAcceptLoading] = useState(false);
 
@@ -6661,18 +6661,18 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
   // ==================== PM UPLOAD TRANSLATION FUNCTIONS ====================
   const uploadPmTranslation = async (orderId) => {
-    if (!pmUploadFile || !orderId) return;
+    if (!pmUploadFiles.length || !orderId) return;
     setPmUploadLoading(true);
     try {
       const formData = new FormData();
       formData.append('order_id', orderId);
       formData.append('admin_key', adminKey);
-      formData.append('file', pmUploadFile);
+      pmUploadFiles.forEach(file => formData.append('files', file));
       const response = await axios.post(`${API}/admin/upload-pm-translation`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      showToast('Translation uploaded successfully! Status set to READY.');
-      setPmUploadFile(null);
+      showToast(`${pmUploadFiles.length} file(s) uploaded successfully! Status set to READY.`);
+      setPmUploadFiles([]);
       // Refresh order data
       fetchAssignedOrders();
     } catch (err) {
@@ -9876,73 +9876,91 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 {orderStatus !== 'final' && (
                   <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-lg p-4">
                     <h3 className="text-xs font-bold text-orange-800 mb-3">
-                      {hasPmUpload ? 'Re-upload Translation File' : 'Upload External Translation'}
+                      {hasPmUpload ? 'Re-upload Translation Files' : 'Upload External Translation'}
                     </h3>
+                    <p className="text-xs text-orange-600 mb-2">Multiple files allowed. Max 20MB per file.</p>
                     <div
                       className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-                        pmUploadFile ? 'border-orange-400 bg-orange-100' : 'border-orange-300 hover:border-orange-500'
+                        pmUploadFiles.length > 0 ? 'border-orange-400 bg-orange-100' : 'border-orange-300 hover:border-orange-500'
                       }`}
                       onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                       onDrop={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        const files = e.dataTransfer.files;
-                        if (files.length > 0) {
-                          const file = files[0];
-                          if (file.size > 20 * 1024 * 1024) {
-                            showToast('File too large. Maximum size is 20MB.');
-                            return;
+                        const droppedFiles = Array.from(e.dataTransfer.files);
+                        const validFiles = droppedFiles.filter(f => {
+                          if (f.size > 20 * 1024 * 1024) {
+                            showToast(`File "${f.name}" too large. Maximum 20MB per file.`);
+                            return false;
                           }
-                          setPmUploadFile(file);
-                        }
+                          return true;
+                        });
+                        if (validFiles.length > 0) setPmUploadFiles(prev => [...prev, ...validFiles]);
                       }}
                     >
-                      {pmUploadFile ? (
+                      {pmUploadFiles.length > 0 ? (
                         <div>
                           <div className="text-3xl mb-2">📎</div>
-                          <div className="text-sm font-medium text-orange-800">{pmUploadFile.name}</div>
-                          <div className="text-xs text-orange-600 mt-1">{(pmUploadFile.size / 1024).toFixed(1)} KB</div>
+                          <div className="text-sm font-medium text-orange-800">{pmUploadFiles.length} file(s) selected</div>
+                          <div className="mt-1 space-y-1">
+                            {pmUploadFiles.map((f, i) => (
+                              <div key={i} className="text-xs text-orange-700 flex items-center justify-center gap-2">
+                                <span>{f.name} ({(f.size / 1024).toFixed(1)} KB)</span>
+                                <button onClick={(e) => { e.stopPropagation(); setPmUploadFiles(prev => prev.filter((_, idx) => idx !== i)); }} className="text-red-500 hover:text-red-700 font-bold">x</button>
+                              </div>
+                            ))}
+                          </div>
                           <button
-                            onClick={() => setPmUploadFile(null)}
+                            onClick={() => setPmUploadFiles([])}
                             className="mt-2 text-xs text-red-500 hover:text-red-700 underline"
                           >
-                            Remove
+                            Remove All
                           </button>
                         </div>
                       ) : (
                         <div>
                           <div className="text-3xl mb-2">📤</div>
-                          <p className="text-sm text-orange-700 mb-1">Drag & drop your translation file here</p>
-                          <p className="text-xs text-orange-500">PDF, DOCX, TXT, XLSX (max 20MB)</p>
+                          <p className="text-sm text-orange-700 mb-1">Drag & drop your translation files here</p>
+                          <p className="text-xs text-orange-500">PDF, DOCX, TXT, XLSX (max 20MB per file)</p>
                         </div>
                       )}
                       <input
                         type="file"
                         accept=".pdf,.docx,.doc,.txt,.xlsx,.xls,.pptx,.rtf"
+                        multiple
                         onChange={(e) => {
-                          const file = e.target.files[0];
-                          if (file) {
-                            if (file.size > 20 * 1024 * 1024) {
-                              showToast('File too large. Maximum size is 20MB.');
-                              return;
+                          const newFiles = Array.from(e.target.files).filter(f => {
+                            if (f.size > 20 * 1024 * 1024) {
+                              showToast(`File "${f.name}" too large. Maximum 20MB per file.`);
+                              return false;
                             }
-                            setPmUploadFile(file);
-                          }
+                            return true;
+                          });
+                          if (newFiles.length > 0) setPmUploadFiles(prev => [...prev, ...newFiles]);
+                          e.target.value = '';
                         }}
                         className="hidden"
                         id="pm-upload-input"
                       />
-                      {!pmUploadFile && (
+                      {pmUploadFiles.length === 0 && (
                         <label
                           htmlFor="pm-upload-input"
                           className="mt-3 inline-block px-4 py-2 bg-orange-500 text-white text-sm rounded cursor-pointer hover:bg-orange-600 transition"
                         >
-                          Choose File
+                          Choose Files
+                        </label>
+                      )}
+                      {pmUploadFiles.length > 0 && (
+                        <label
+                          htmlFor="pm-upload-input"
+                          className="mt-2 inline-block px-3 py-1 bg-orange-400 text-white text-xs rounded cursor-pointer hover:bg-orange-500 transition"
+                        >
+                          + Add More Files
                         </label>
                       )}
                     </div>
 
-                    {pmUploadFile && (
+                    {pmUploadFiles.length > 0 && (
                       <button
                         onClick={() => uploadPmTranslation(selectedOrderId)}
                         disabled={pmUploadLoading}
@@ -9954,7 +9972,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             Uploading...
                           </>
                         ) : (
-                          'Upload & Send to Admin'
+                          `Upload ${pmUploadFiles.length} File(s) & Send to Admin`
                         )}
                       </button>
                     )}
@@ -26293,7 +26311,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
   // PM Upload Translation state
   const [projectModalTab, setProjectModalTab] = useState('files'); // 'files' or 'upload'
-  const [pmUploadFile, setPmUploadFile] = useState(null);
+  const [pmUploadFiles, setPmUploadFiles] = useState([]);
   const [pmUploadLoading, setPmUploadLoading] = useState(false);
   const [pmAcceptLoading, setPmAcceptLoading] = useState(false);
 
@@ -26883,18 +26901,18 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
   // PM Upload Translation functions
   const uploadPmTranslationPM = async (orderId) => {
-    if (!pmUploadFile || !orderId) return;
+    if (!pmUploadFiles.length || !orderId) return;
     setPmUploadLoading(true);
     try {
       const formData = new FormData();
       formData.append('order_id', orderId);
       formData.append('admin_key', adminKey);
-      formData.append('file', pmUploadFile);
+      pmUploadFiles.forEach(file => formData.append('files', file));
       await axios.post(`${API}/admin/upload-pm-translation`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      showToast('Translation uploaded successfully! Status set to READY.');
-      setPmUploadFile(null);
+      showToast(`${pmUploadFiles.length} file(s) uploaded successfully! Status set to READY.`);
+      setPmUploadFiles([]);
       // Refresh the order data in selectedProject
       try {
         const resp = await axios.get(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`);
@@ -30420,7 +30438,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 <h3 className="font-bold">📁 Project Files {selectedProject.order_number}</h3>
                 <p className="text-xs opacity-80">{selectedProject.client_name} • {selectedProject.translate_from} → {selectedProject.translate_to}</p>
               </div>
-              <button onClick={() => { setSelectedProject(null); setProjectTrDeadline({ date: '', time: '17:00' }); setProjectModalTab('files'); setPmUploadFile(null); }} className="text-white hover:text-gray-200 text-xl">×</button>
+              <button onClick={() => { setSelectedProject(null); setProjectTrDeadline({ date: '', time: '17:00' }); setProjectModalTab('files'); setPmUploadFiles([]); }} className="text-white hover:text-gray-200 text-xl">×</button>
             </div>
 
             {/* Tabs */}
@@ -30510,67 +30528,85 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   {/* Upload area - always visible so PM can upload/re-upload and send to admin */}
                   <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-lg p-4">
                       <h3 className="text-xs font-bold text-orange-800 mb-3">
-                        {selectedProject.pm_upload_filename ? 'Re-upload Translation File' : 'Upload External Translation'}
+                        {selectedProject.pm_upload_filename ? 'Re-upload Translation Files' : 'Upload External Translation'}
                       </h3>
-                      <p className="text-xs text-orange-600 mb-3">Upload the final translated file (PDF, DOCX, TXT, XLSX). Max 20MB.</p>
+                      <p className="text-xs text-orange-600 mb-3">Upload translated files (PDF, DOCX, TXT, XLSX). Multiple files allowed. Max 20MB per file.</p>
                       <div
                         className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-                          pmUploadFile ? 'border-orange-400 bg-orange-100' : 'border-orange-300 hover:border-orange-500 cursor-pointer'
+                          pmUploadFiles.length > 0 ? 'border-orange-400 bg-orange-100' : 'border-orange-300 hover:border-orange-500 cursor-pointer'
                         }`}
                         onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                         onDrop={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          const files = e.dataTransfer.files;
-                          if (files.length > 0) {
-                            const file = files[0];
-                            if (file.size > 20 * 1024 * 1024) {
-                              showToast('File too large. Maximum size is 20MB.');
-                              return;
+                          const droppedFiles = Array.from(e.dataTransfer.files);
+                          const validFiles = droppedFiles.filter(f => {
+                            if (f.size > 20 * 1024 * 1024) {
+                              showToast(`File "${f.name}" too large. Maximum 20MB per file.`);
+                              return false;
                             }
-                            setPmUploadFile(file);
-                          }
+                            return true;
+                          });
+                          if (validFiles.length > 0) setPmUploadFiles(prev => [...prev, ...validFiles]);
                         }}
-                        onClick={() => { if (!pmUploadFile) document.getElementById('pm-upload-input-modal').click(); }}
+                        onClick={() => { if (pmUploadFiles.length === 0) document.getElementById('pm-upload-input-modal').click(); }}
                       >
-                        {pmUploadFile ? (
+                        {pmUploadFiles.length > 0 ? (
                           <div>
                             <div className="text-3xl mb-2">📎</div>
-                            <div className="text-sm font-medium text-orange-800">{pmUploadFile.name}</div>
-                            <div className="text-xs text-orange-600 mt-1">{(pmUploadFile.size / 1024).toFixed(1)} KB</div>
+                            <div className="text-sm font-medium text-orange-800">{pmUploadFiles.length} file(s) selected</div>
+                            <div className="mt-1 space-y-1">
+                              {pmUploadFiles.map((f, i) => (
+                                <div key={i} className="text-xs text-orange-700 flex items-center justify-center gap-2">
+                                  <span>{f.name} ({(f.size / 1024).toFixed(1)} KB)</span>
+                                  <button onClick={(e) => { e.stopPropagation(); setPmUploadFiles(prev => prev.filter((_, idx) => idx !== i)); }} className="text-red-500 hover:text-red-700 font-bold">x</button>
+                                </div>
+                              ))}
+                            </div>
                             <button
-                              onClick={(e) => { e.stopPropagation(); setPmUploadFile(null); }}
+                              onClick={(e) => { e.stopPropagation(); setPmUploadFiles([]); }}
                               className="mt-2 text-xs text-red-500 hover:text-red-700 underline"
                             >
-                              Remove
+                              Remove All
                             </button>
                           </div>
                         ) : (
                           <div>
                             <div className="text-3xl mb-2">📤</div>
-                            <p className="text-sm text-orange-700 mb-1">Drag & drop your translation file here</p>
-                            <p className="text-xs text-orange-500">or click to browse</p>
+                            <p className="text-sm text-orange-700 mb-1">Drag & drop your translation files here</p>
+                            <p className="text-xs text-orange-500">or click to browse (multiple files allowed)</p>
                           </div>
                         )}
                         <input
                           type="file"
                           accept=".pdf,.docx,.doc,.txt,.xlsx,.xls,.pptx,.rtf"
+                          multiple
                           onChange={(e) => {
-                            const file = e.target.files[0];
-                            if (file) {
-                              if (file.size > 20 * 1024 * 1024) {
-                                showToast('File too large. Maximum size is 20MB.');
-                                return;
+                            const newFiles = Array.from(e.target.files).filter(f => {
+                              if (f.size > 20 * 1024 * 1024) {
+                                showToast(`File "${f.name}" too large. Maximum 20MB per file.`);
+                                return false;
                               }
-                              setPmUploadFile(file);
-                            }
+                              return true;
+                            });
+                            if (newFiles.length > 0) setPmUploadFiles(prev => [...prev, ...newFiles]);
+                            e.target.value = '';
                           }}
                           className="hidden"
                           id="pm-upload-input-modal"
                         />
+                        {pmUploadFiles.length > 0 && (
+                          <label
+                            htmlFor="pm-upload-input-modal"
+                            className="mt-2 inline-block px-3 py-1 bg-orange-400 text-white text-xs rounded cursor-pointer hover:bg-orange-500 transition"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            + Add More Files
+                          </label>
+                        )}
                       </div>
 
-                      {pmUploadFile && (
+                      {pmUploadFiles.length > 0 && (
                         <button
                           onClick={() => uploadPmTranslationPM(selectedProject.id)}
                           disabled={pmUploadLoading}
@@ -30579,10 +30615,10 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                           {pmUploadLoading ? (
                             <>
                               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                              Uploading...
+                              Uploading {pmUploadFiles.length} file(s)...
                             </>
                           ) : (
-                            'Upload & Send to Admin'
+                            `Upload ${pmUploadFiles.length} File(s) & Send to Admin`
                           )}
                         </button>
                       )}
@@ -30769,7 +30805,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
             {/* Footer */}
             <div className="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end">
               <button
-                onClick={() => { setSelectedProject(null); setProjectTrDeadline({ date: '', time: '17:00' }); setProjectModalTab('files'); setPmUploadFile(null); }}
+                onClick={() => { setSelectedProject(null); setProjectTrDeadline({ date: '', time: '17:00' }); setProjectModalTab('files'); setPmUploadFiles([]); }}
                 className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
               >
                 Fechar
