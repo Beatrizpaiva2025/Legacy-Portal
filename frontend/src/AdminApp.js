@@ -23147,6 +23147,12 @@ const FinancesPage = ({ adminKey }) => {
   const [creatingInvoice, setCreatingInvoice] = useState(false);
   const [showInvoicesModal, setShowInvoicesModal] = useState(false);
   const [selectedPartnerInvoices, setSelectedPartnerInvoices] = useState([]);
+  // Bulk partner selection state
+  const [selectedPartnerIds, setSelectedPartnerIds] = useState([]);
+  const [showBulkEmailModal, setShowBulkEmailModal] = useState(false);
+  const [bulkEmailSubject, setBulkEmailSubject] = useState('');
+  const [bulkEmailMessage, setBulkEmailMessage] = useState('');
+  const [sendingBulkEmail, setSendingBulkEmail] = useState(false);
   // Invoice payment management state
   const [pendingZelleInvoices, setPendingZelleInvoices] = useState([]);
   const [paymentHistory, setPaymentHistory] = useState([]);
@@ -23754,6 +23760,66 @@ const FinancesPage = ({ adminKey }) => {
       fetchPartnerStats(); // Refresh the list
     } catch (err) {
       showToast('Error deleting partner: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  // Bulk partner selection helpers
+  const togglePartnerSelection = (partnerId) => {
+    setSelectedPartnerIds(prev =>
+      prev.includes(partnerId)
+        ? prev.filter(id => id !== partnerId)
+        : [...prev, partnerId]
+    );
+  };
+
+  const toggleSelectAllPartners = () => {
+    const realPartners = partnerStats.partners?.filter(p => p.is_real_partner) || [];
+    if (selectedPartnerIds.length === realPartners.length) {
+      setSelectedPartnerIds([]);
+    } else {
+      setSelectedPartnerIds(realPartners.map(p => p.partner_id));
+    }
+  };
+
+  const bulkDeletePartners = async () => {
+    if (selectedPartnerIds.length === 0) {
+      showToast('No partners selected');
+      return;
+    }
+    if (!window.confirm(`Are you sure you want to delete ${selectedPartnerIds.length} partner(s)?\n\nThis action cannot be undone.`)) return;
+    try {
+      const res = await axios.post(`${API}/admin/partners/bulk-delete?admin_key=${adminKey}`, {
+        partner_ids: selectedPartnerIds
+      });
+      showToast(res.data.message || `${res.data.deleted} partner(s) deleted`);
+      setSelectedPartnerIds([]);
+      fetchPartnerStats();
+    } catch (err) {
+      showToast('Error deleting partners: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const handleBulkEmailSend = async () => {
+    if (!bulkEmailSubject.trim() || !bulkEmailMessage.trim()) {
+      showToast('Please fill in subject and message');
+      return;
+    }
+    setSendingBulkEmail(true);
+    try {
+      const res = await axios.post(`${API}/admin/partners/bulk-email?admin_key=${adminKey}`, {
+        partner_ids: selectedPartnerIds,
+        subject: bulkEmailSubject,
+        message: bulkEmailMessage
+      });
+      showToast(res.data.message || `Email sent to ${res.data.sent} partner(s)`);
+      setShowBulkEmailModal(false);
+      setBulkEmailSubject('');
+      setBulkEmailMessage('');
+      setSelectedPartnerIds([]);
+    } catch (err) {
+      showToast('Error sending emails: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setSendingBulkEmail(false);
     }
   };
 
@@ -25050,14 +25116,49 @@ const FinancesPage = ({ adminKey }) => {
 
           {/* Partners Table */}
           <div className="bg-white rounded-lg shadow">
-            <div className="p-4 border-b bg-gray-50">
-              <h2 className="text-sm font-bold text-gray-700">🤝 Partner Companies</h2>
-              <p className="text-xs text-gray-500 mt-1">Revenue from Partner Portal orders</p>
+            <div className="p-4 border-b bg-gray-50 flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-bold text-gray-700">🤝 Partner Companies</h2>
+                <p className="text-xs text-gray-500 mt-1">Revenue from Partner Portal orders</p>
+              </div>
+              {selectedPartnerIds.length > 0 && (
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs text-gray-600 font-medium">{selectedPartnerIds.length} selected</span>
+                  <button
+                    onClick={() => { setShowBulkEmailModal(true); }}
+                    className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center gap-1"
+                  >
+                    📧 Send Email
+                  </button>
+                  <button
+                    onClick={bulkDeletePartners}
+                    className="px-3 py-1.5 bg-red-600 text-white text-xs rounded hover:bg-red-700 flex items-center gap-1"
+                  >
+                    🗑️ Delete Selected
+                  </button>
+                  <button
+                    onClick={() => setSelectedPartnerIds([])}
+                    className="px-2 py-1.5 text-gray-500 text-xs rounded hover:bg-gray-200"
+                    title="Clear selection"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50">
                   <tr>
+                    <th className="px-2 py-3 text-center w-10">
+                      <input
+                        type="checkbox"
+                        checked={selectedPartnerIds.length > 0 && selectedPartnerIds.length === (partnerStats.partners?.filter(p => p.is_real_partner) || []).length}
+                        onChange={toggleSelectAllPartners}
+                        className="rounded border-gray-300"
+                        title="Select all partners"
+                      />
+                    </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Company Name</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Orders Paid</th>
@@ -25072,13 +25173,23 @@ const FinancesPage = ({ adminKey }) => {
                 <tbody className="divide-y">
                   {partnerStats.partners?.length === 0 ? (
                     <tr>
-                      <td colSpan="9" className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan="10" className="px-4 py-8 text-center text-gray-500">
                         No partner orders found
                       </td>
                     </tr>
                   ) : (
                     partnerStats.partners?.map((partner) => (
-                      <tr key={partner.partner_id} className={`hover:bg-gray-50 ${!partner.is_real_partner ? 'bg-orange-50' : ''}`}>
+                      <tr key={partner.partner_id} className={`hover:bg-gray-50 ${!partner.is_real_partner ? 'bg-orange-50' : ''} ${selectedPartnerIds.includes(partner.partner_id) ? 'bg-blue-50' : ''}`}>
+                        <td className="px-2 py-3 text-center">
+                          {partner.is_real_partner && (
+                            <input
+                              type="checkbox"
+                              checked={selectedPartnerIds.includes(partner.partner_id)}
+                              onChange={() => togglePartnerSelection(partner.partner_id)}
+                              className="rounded border-gray-300"
+                            />
+                          )}
+                        </td>
                         <td className="px-4 py-3">
                           <div className="font-medium text-gray-800">
                             {partner.company_name}
@@ -25521,6 +25632,11 @@ const FinancesPage = ({ adminKey }) => {
                               <div className="text-xs text-gray-400">
                                 {new Date(order.created_at).toLocaleDateString()}
                               </div>
+                              {order.coupon_code && (
+                                <div className="text-xs text-green-600 mt-1">
+                                  Coupon: {order.coupon_code} (-{formatCurrency(order.coupon_discount_amount)})
+                                </div>
+                              )}
                             </div>
                           </div>
                           <div className="font-medium text-sm">{formatCurrency(order.total_price)}</div>
@@ -25620,6 +25736,18 @@ const FinancesPage = ({ adminKey }) => {
                           <span className="font-bold text-lg">{formatCurrency(invoice.total_amount)}</span>
                         </div>
                       </div>
+                      {invoice.discount_amount > 0 && (
+                        <div className="mb-2 p-2 bg-green-50 border border-green-200 rounded">
+                          <div className="text-xs text-green-700 font-medium">
+                            Subtotal: {formatCurrency(invoice.subtotal)} | Coupon Discount: -{formatCurrency(invoice.discount_amount)} | Total: {formatCurrency(invoice.total_amount)}
+                          </div>
+                          {invoice.discount_details?.map((d, i) => (
+                            <div key={i} className="text-xs text-green-600 mt-1">
+                              Order {d.order_number}: coupon "{d.coupon_code}" -{formatCurrency(d.discount_amount)}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       <div className="text-xs text-gray-500 mb-2">
                         {invoice.order_ids?.length || 0} orders |
                         {invoice.payment_method && ` Payment: ${invoice.payment_method}`}
@@ -25786,6 +25914,58 @@ const FinancesPage = ({ adminKey }) => {
                 className="px-4 py-2 border rounded-md text-sm hover:bg-gray-100"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Email Modal */}
+      {showBulkEmailModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
+            <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+              <div>
+                <h2 className="font-bold text-gray-800">Send Email to Partners</h2>
+                <p className="text-sm text-gray-500">{selectedPartnerIds.length} partner(s) selected</p>
+              </div>
+              <button onClick={() => setShowBulkEmailModal(false)} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                <input
+                  type="text"
+                  value={bulkEmailSubject}
+                  onChange={(e) => setBulkEmailSubject(e.target.value)}
+                  className="w-full border rounded-md px-3 py-2 text-sm"
+                  placeholder="Email subject..."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+                <textarea
+                  value={bulkEmailMessage}
+                  onChange={(e) => setBulkEmailMessage(e.target.value)}
+                  className="w-full border rounded-md px-3 py-2 text-sm"
+                  rows={6}
+                  placeholder="Write your message here..."
+                />
+              </div>
+            </div>
+            <div className="p-4 border-t bg-gray-50 flex justify-between items-center">
+              <button
+                onClick={() => setShowBulkEmailModal(false)}
+                className="px-4 py-2 border rounded-md text-sm hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkEmailSend}
+                disabled={sendingBulkEmail || !bulkEmailSubject.trim() || !bulkEmailMessage.trim()}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+              >
+                {sendingBulkEmail ? 'Sending...' : `Send to ${selectedPartnerIds.length} Partner(s)`}
               </button>
             </div>
           </div>

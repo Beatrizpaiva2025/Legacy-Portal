@@ -311,9 +311,11 @@ class EmailDeliveryError(Exception):
 class EmailService:
     def __init__(self):
         self.api_key = os.environ.get('RESEND_API_KEY') or os.environ.get('SENDGRID_API_KEY')
-        # For production: use verified domain like "Legacy Translations <noreply@legacytranslations.com>"
-        # For testing: use "Legacy Translations <onboarding@resend.dev>"
-        self.sender_email = os.environ.get('SENDER_EMAIL', 'Legacy Translations <onboarding@resend.dev>')
+        # Use verified domain for production to avoid spam filters
+        # IMPORTANT: Set SENDER_EMAIL env var to your verified domain, e.g.:
+        #   "Legacy Translations <noreply@legacytranslations.com>"
+        # Using onboarding@resend.dev (Resend's test domain) causes emails to land in spam
+        self.sender_email = os.environ.get('SENDER_EMAIL', 'Legacy Translations <noreply@legacytranslations.com>')
         self.reply_to = os.environ.get('REPLY_TO_EMAIL', 'contact@legacytranslations.com')
         # Initialize Resend
         resend.api_key = self.api_key
@@ -2153,6 +2155,7 @@ class TranslationOrderCreate(BaseModel):
     total_price: Optional[float] = None
     shipping_address: Optional[Dict[str, str]] = None
     create_invoice: Optional[bool] = True
+    coupon_code: Optional[str] = None  # Coupon code applied at checkout
 
 class TranslationOrderUpdate(BaseModel):
     translation_status: Optional[str] = None
@@ -2200,9 +2203,11 @@ class PartnerInvoice(BaseModel):
     # Order IDs included in this invoice
     order_ids: List[str] = []
     # Financial info
-    subtotal: float = 0.0
+    subtotal: float = 0.0  # Total before coupon discounts
     tax: float = 0.0
-    total_amount: float = 0.0
+    discount_amount: float = 0.0  # Total coupon discount applied
+    discount_details: Optional[List[Dict]] = None  # Per-order discount breakdown
+    total_amount: float = 0.0  # Final amount after discounts
     # Status
     status: str = "pending"  # pending, paid, partial, overdue, cancelled
     # Payment tracking
@@ -8851,6 +8856,48 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
             effective_tier
         )
 
+        # Apply coupon discount if provided
+        coupon_discount_amount = 0.0
+        coupon_code_applied = None
+        if order_data.coupon_code:
+            coupon = await db.coupons.find_one({
+                "code": {"$regex": f"^{order_data.coupon_code}$", "$options": "i"},
+                "is_active": True
+            })
+            if coupon and coupon["times_used"] < coupon["max_uses"]:
+                # Check partner-specific coupon
+                if coupon.get("partner_id") and coupon["partner_id"] != partner["id"]:
+                    pass  # Skip - coupon not for this partner
+                else:
+                    # Calculate coupon discount
+                    if coupon["discount_type"] == "certified_page":
+                        coupon_discount_amount = CERTIFIED_PAGE_PRICE * coupon["discount_value"]
+                    elif coupon["discount_type"] == "percentage":
+                        coupon_discount_amount = total_price * (coupon["discount_value"] / 100)
+                    elif coupon["discount_type"] == "fixed_amount":
+                        coupon_discount_amount = coupon["discount_value"]
+
+                    # Apply max discount cap
+                    if coupon.get("max_discount") and coupon_discount_amount > coupon["max_discount"]:
+                        coupon_discount_amount = coupon["max_discount"]
+
+                    # Don't exceed order total
+                    coupon_discount_amount = min(round(coupon_discount_amount, 2), total_price)
+
+                    # Apply coupon discount to total price
+                    total_price = round(max(0, total_price - coupon_discount_amount), 2)
+                    coupon_code_applied = coupon["code"]
+
+                    # Mark coupon as used
+                    await db.coupons.update_one(
+                        {"id": coupon["id"]},
+                        {"$set": {
+                            "times_used": coupon["times_used"] + 1,
+                            "used_at": datetime.utcnow()
+                        }}
+                    )
+                    logger.info(f"Coupon '{coupon['code']}' applied: -${coupon_discount_amount} on order for partner {partner['company_name']}")
+
         # Calculate page count
         page_count = max(1, math.ceil(order_data.word_count / 250))
 
@@ -8906,6 +8953,9 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
         order_dict["partner_tier"] = effective_tier
         order_dict["tier_discount_percent"] = int(tier_discount * 100)
         order_dict["discount_amount"] = round(discount_amount, 2)
+        # Store coupon discount info
+        order_dict["coupon_code"] = coupon_code_applied
+        order_dict["coupon_discount_amount"] = round(coupon_discount_amount, 2)
         # Calculate original price based on service type (price without tier discount)
         if order_data.service_type == "standard":
             original_price_per_page = 19.99
@@ -11557,6 +11607,99 @@ async def delete_partner_by_email(email: str, admin_key: str):
         raise HTTPException(status_code=500, detail="Failed to delete partner")
 
 
+class BulkPartnerDeleteRequest(BaseModel):
+    partner_ids: List[str]
+
+@api_router.post("/admin/partners/bulk-delete")
+async def bulk_delete_partners(request: BulkPartnerDeleteRequest, admin_key: str):
+    """Delete multiple partners at once (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") != "admin":
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        deleted = 0
+        failed = []
+        for partner_id in request.partner_ids:
+            partner = await db.partners.find_one({"id": partner_id})
+            if not partner:
+                failed.append({"partner_id": partner_id, "reason": "Not found"})
+                continue
+
+            partner_name = partner.get("company_name", "Unknown")
+            await db.partners.delete_one({"id": partner_id})
+            await db.translation_orders.update_many(
+                {"partner_id": partner_id},
+                {"$set": {"partner_deleted": True, "partner_deleted_at": datetime.utcnow()}}
+            )
+            deleted += 1
+            logger.info(f"Bulk delete: Partner '{partner_name}' (ID: {partner_id}) deleted")
+
+        return {
+            "status": "success",
+            "deleted": deleted,
+            "failed": len(failed),
+            "details": failed,
+            "message": f"{deleted} partner(s) deleted successfully"
+        }
+    except Exception as e:
+        logger.error(f"Error in bulk delete partners: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to bulk delete partners")
+
+
+class BulkPartnerEmailRequest(BaseModel):
+    partner_ids: List[str]
+    subject: str
+    message: str
+
+@api_router.post("/admin/partners/bulk-email")
+async def bulk_email_partners(request: BulkPartnerEmailRequest, admin_key: str):
+    """Send email to multiple partners at once (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        sent = 0
+        failed = []
+        email_service = EmailService()
+
+        for partner_id in request.partner_ids:
+            partner = await db.partners.find_one({"id": partner_id})
+            if not partner or not partner.get("email"):
+                failed.append({"partner_id": partner_id, "reason": "Not found or no email"})
+                continue
+
+            try:
+                html_content = f"""
+                {get_email_header()}
+                <div style="padding: 20px;">
+                    <p>Dear {partner.get('contact_name', partner.get('company_name', 'Partner'))},</p>
+                    <div style="margin: 20px 0; white-space: pre-wrap;">{request.message}</div>
+                    <p>Best regards,<br>Legacy Translations Team</p>
+                </div>
+                {get_email_footer()}
+                """
+                await email_service.send_email(partner["email"], request.subject, html_content)
+                sent += 1
+            except Exception as e:
+                failed.append({"partner_id": partner_id, "email": partner.get("email"), "reason": str(e)})
+                logger.error(f"Failed to send email to partner {partner.get('email')}: {str(e)}")
+
+        return {
+            "status": "success",
+            "sent": sent,
+            "failed": len(failed),
+            "details": failed,
+            "message": f"Email sent to {sent} partner(s)"
+        }
+    except Exception as e:
+        logger.error(f"Error in bulk email partners: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to send bulk emails")
+
+
 @api_router.get("/admin/find-email/{email}")
 async def find_email_in_system(email: str, admin_key: str):
     """Find where an email is registered in the system (admin only)"""
@@ -11778,8 +11921,32 @@ async def create_partner_invoice(invoice_data: PartnerInvoiceCreate, admin_key: 
         if not orders:
             raise HTTPException(status_code=400, detail="No valid orders found")
 
-        subtotal = sum(order.get("total_price", 0) for order in orders)
-        total_amount = subtotal  # No tax for now
+        # Calculate totals including coupon discounts
+        # subtotal = sum of order prices (already includes coupon discount in total_price)
+        # We also track the original prices and discount breakdown
+        total_coupon_discount = 0.0
+        discount_details = []
+        subtotal_before_discounts = 0.0
+
+        for order in orders:
+            order_price = order.get("total_price", 0)
+            coupon_disc = order.get("coupon_discount_amount", 0)
+            coupon_code = order.get("coupon_code")
+            original_price = order.get("original_price", order_price + coupon_disc)
+
+            subtotal_before_discounts += order_price + coupon_disc  # Price before coupon
+            total_coupon_discount += coupon_disc
+
+            if coupon_code and coupon_disc > 0:
+                discount_details.append({
+                    "order_id": order.get("id"),
+                    "order_number": order.get("order_number"),
+                    "coupon_code": coupon_code,
+                    "discount_amount": coupon_disc
+                })
+
+        # total_amount = sum of actual order prices (already discounted)
+        total_amount = sum(order.get("total_price", 0) for order in orders)
 
         # Create invoice
         invoice = PartnerInvoice(
@@ -11787,8 +11954,10 @@ async def create_partner_invoice(invoice_data: PartnerInvoiceCreate, admin_key: 
             partner_company=partner.get("company_name"),
             partner_email=partner.get("email"),
             order_ids=invoice_data.order_ids,
-            subtotal=subtotal,
-            total_amount=total_amount,
+            subtotal=round(subtotal_before_discounts, 2),
+            discount_amount=round(total_coupon_discount, 2),
+            discount_details=discount_details if discount_details else None,
+            total_amount=round(total_amount, 2),
             due_date=datetime.utcnow() + timedelta(days=invoice_data.due_days),
             notes=invoice_data.notes
         )

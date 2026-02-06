@@ -2098,7 +2098,8 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency, refreshPart
         zelle_receipt_id: zelleReceiptId,
         payment_status: paymentMethod === 'zelle' ? 'pending_zelle' : 'pending',
         total_price: quote?.total || 0,
-        shipping_address: (needsPhysicalCopy || formData.service_type === 'rmv') ? shippingAddress : null
+        shipping_address: (needsPhysicalCopy || formData.service_type === 'rmv') ? shippingAddress : null,
+        coupon_code: appliedCoupon?.code || null
       };
 
       const response = await axios.post(`${API}/orders/create?token=${token}`, orderData);
@@ -3617,6 +3618,23 @@ const InvoicesPage = ({ token, t, currency, lang }) => {
                   </div>
                 </div>
 
+                {invoice.discount_amount > 0 && (
+                  <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600">Subtotal:</span>
+                      <span className="text-gray-800">{formatCurrency(invoice.subtotal)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm text-green-700 font-medium">
+                      <span>Coupon Discount:</span>
+                      <span>-{formatCurrency(invoice.discount_amount)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm font-bold border-t border-green-200 mt-1 pt-1">
+                      <span>Total:</span>
+                      <span>{formatCurrency(invoice.total_amount)}</span>
+                    </div>
+                  </div>
+                )}
+
                 <div className="text-sm text-gray-500 mb-4">
                   {invoice.order_ids?.length || 0} {t?.ordersIncluded || 'orders'} |
                   {t?.invoiceNumber || 'Created'}: {new Date(invoice.created_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
@@ -3670,6 +3688,23 @@ const InvoicesPage = ({ token, t, currency, lang }) => {
                 </div>
               </div>
 
+              {selectedInvoice.discount_amount > 0 && (
+                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600">Subtotal:</span>
+                    <span className="text-gray-800">{formatCurrency(selectedInvoice.subtotal)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm text-green-700 font-medium">
+                    <span>Coupon Discount:</span>
+                    <span>-{formatCurrency(selectedInvoice.discount_amount)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm font-bold border-t border-green-200 mt-1 pt-1">
+                    <span>Total Due:</span>
+                    <span>{formatCurrency(selectedInvoice.total_amount)}</span>
+                  </div>
+                </div>
+              )}
+
               <h3 className="font-bold text-gray-700 mb-3">{t?.ordersIncluded || 'Orders Included'}</h3>
               <div className="space-y-2">
                 {invoiceOrders.map((order) => (
@@ -3681,6 +3716,11 @@ const InvoicesPage = ({ token, t, currency, lang }) => {
                           {order.client_name} - {order.translate_from} to {order.translate_to}
                         </div>
                         <div className="text-xs text-gray-400">{new Date(order.created_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}</div>
+                        {order.coupon_code && (
+                          <div className="text-xs text-green-600 mt-1">
+                            Coupon: {order.coupon_code} (-{formatCurrency(order.coupon_discount_amount)})
+                          </div>
+                        )}
                       </div>
                       <div className="font-medium">{formatCurrency(order.total_price)}</div>
                     </div>
