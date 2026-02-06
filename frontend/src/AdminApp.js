@@ -39,13 +39,7 @@ const showToast = (message) => {
 
 // Parse API error messages into user-friendly text
 const parseApiError = (error) => {
-  const status = error?.response?.status;
   const detail = error?.response?.data?.detail || error?.message || String(error);
-
-  // Session expired / invalid token
-  if (status === 401 || detail.includes('Invalid admin key') || detail.includes('Sessão expirada')) {
-    return 'Sessão expirada. Faça login novamente para continuar.';
-  }
   // If the backend already returned a friendly Portuguese message, use it
   if (detail.includes('Saldo insuficiente') || detail.includes('Chave de API') ||
       detail.includes('Limite de requisições') || detail.includes('sobrecarregado')) {
@@ -3161,12 +3155,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       const response = await axios.get(`${API}/translator/messages?admin_key=${adminKey}&translator_id=${user.id}`);
       setTranslatorMessages(response.data.messages || []);
     } catch (err) {
-      if (err.response?.status === 401) {
-        // Session expired - don't keep polling, notify user
-        console.warn('Session expired - stopping message polling');
-        return;
-      }
-      console.error('Failed to fetch translator messages:', err);
+      // Silently ignore errors to avoid console spam
     }
   };
 
@@ -33483,27 +33472,10 @@ function AdminApp() {
     }
   };
 
-  const [sessionExpired, setSessionExpired] = useState(false);
-
-  // Global axios 401 interceptor - detect session expiration
-  useEffect(() => {
-    const interceptor = axios.interceptors.response.use(
-      response => response,
-      error => {
-        if (error.response?.status === 401 && adminKey && !sessionExpired) {
-          setSessionExpired(true);
-        }
-        return Promise.reject(error);
-      }
-    );
-    return () => axios.interceptors.response.eject(interceptor);
-  }, [adminKey, sessionExpired]);
-
   const handleLogout = () => {
     // Clear local state immediately (don't wait for server)
     setAdminKey(null);
     setUser(null);
-    setSessionExpired(false);
     localStorage.removeItem('admin_key');
     localStorage.removeItem('admin_user');
 
@@ -33517,7 +33489,7 @@ function AdminApp() {
 
   // Global invoice notifications fetch
   const fetchGlobalInvoiceNotifications = async () => {
-    if (!adminKey || sessionExpired) return;
+    if (!adminKey) return;
     try {
       const [notifRes, zelleRes] = await Promise.all([
         axios.get(`${API}/admin/invoice-notifications?admin_key=${adminKey}&unread_only=false`),
@@ -33655,40 +33627,18 @@ function AdminApp() {
     return <AdminLogin onLogin={handleLogin} />;
   }
 
-  // Session expired banner component
-  const SessionExpiredBanner = () => sessionExpired ? (
-    <div className="fixed top-0 left-0 right-0 z-[9999] bg-red-600 text-white p-3 text-center shadow-lg">
-      <div className="flex items-center justify-center gap-3">
-        <span className="text-sm font-bold">Sua sessão expirou. Faça login novamente para continuar.</span>
-        <button
-          onClick={handleLogout}
-          className="px-4 py-1 bg-white text-red-600 text-sm font-bold rounded hover:bg-red-100"
-        >
-          Fazer Login
-        </button>
-      </div>
-    </div>
-  ) : null;
-
   // If translation-tool route, render standalone page
   if (isTranslationTool) {
-    return <>
-      <SessionExpiredBanner />
-      <TranslationToolPage adminKey={adminKey} onLogout={handleLogout} user={user} />
-    </>;
+    return <TranslationToolPage adminKey={adminKey} onLogout={handleLogout} user={user} />;
   }
 
   // If in translation workspace, render as full page without admin header
   if (activeTab === 'translation') {
-    return <>
-      <SessionExpiredBanner />
-      <TranslationWorkspace adminKey={adminKey} selectedOrder={selectedOrder} onBack={navigateToProjects} user={user} />
-    </>;
+    return <TranslationWorkspace adminKey={adminKey} selectedOrder={selectedOrder} onBack={navigateToProjects} user={user} />;
   }
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
-      <SessionExpiredBanner />
       <TopBar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
