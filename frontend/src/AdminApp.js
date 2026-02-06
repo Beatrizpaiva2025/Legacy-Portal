@@ -6763,7 +6763,18 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         translation_status: 'pm_upload_ready',
         pm_uploaded_at: new Date().toISOString()
       });
-      showToast(`${pmUploadFiles.length} file(s) uploaded successfully! Status set to READY.`);
+      // Notify admin via email
+      try {
+        await axios.post(`${API}/admin/notify-pm-upload`, {
+          order_id: orderId,
+          admin_key: adminKey,
+          file_count: pmUploadFiles.length,
+          filenames: pmUploadFiles.map(f => f.name)
+        });
+      } catch (notifyErr) {
+        console.warn('Admin notification email failed:', notifyErr);
+      }
+      showToast(`${pmUploadFiles.length} file(s) uploaded and sent to Admin!`);
       setPmUploadFiles([]);
       fetchAssignedOrders();
     } catch (err) {
@@ -27097,7 +27108,18 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         translation_status: 'pm_upload_ready',
         pm_uploaded_at: new Date().toISOString()
       });
-      showToast(`${pmUploadFiles.length} file(s) uploaded successfully! Sent to Admin.`);
+      // Notify admin via email
+      try {
+        await axios.post(`${API}/admin/notify-pm-upload`, {
+          order_id: orderId,
+          admin_key: adminKey,
+          file_count: pmUploadFiles.length,
+          filenames: pmUploadFiles.map(f => f.name)
+        });
+      } catch (notifyErr) {
+        console.warn('Admin notification email failed:', notifyErr);
+      }
+      showToast(`${pmUploadFiles.length} file(s) uploaded and sent to Admin!`);
       setPmUploadFiles([]);
       // Refresh the order data
       try {
