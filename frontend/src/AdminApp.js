@@ -477,10 +477,10 @@ const STATUS_COLORS = {
   'pending_admin_review': 'bg-indigo-100 text-indigo-700',
   'finalized_pending_admin': 'bg-purple-100 text-purple-700',
   'client_review': 'bg-sky-100 text-sky-700',
-  'ready': 'bg-green-100 text-green-700',
+  'ready': 'bg-green-200 text-green-800',
   'delivered': 'bg-blue-100 text-blue-700',
-  'pm_upload_ready': 'bg-emerald-100 text-emerald-700',
-  'final': 'bg-emerald-200 text-emerald-900'
+  'pm_upload_ready': 'bg-green-200 text-green-800',
+  'final': 'bg-blue-100 text-blue-700'
 };
 
 const PAYMENT_COLORS = {
@@ -701,6 +701,13 @@ const AdminLogin = ({ onLogin }) => {
         // New user-based login
         const response = await axios.post(`${API}/admin/auth/login`, { email, password });
         if (response.data && response.data.token) {
+          // Redirect vendor translators to their dedicated portal
+          if (response.data.translator_type === 'vendor') {
+            window.location.href = '/#/vendor';
+            setError('Vendor translators should use the Vendor Translator Portal. Redirecting...');
+            setLoading(false);
+            return;
+          }
           onLogin({
             adminKey: response.data.token,
             token: response.data.token,
@@ -1483,7 +1490,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const isPM = user?.role === 'pm';
   const isTranslator = user?.role === 'translator';
   const isInHouseTranslator = isTranslator && user?.translator_type === 'in_house';
-  const isContractor = isTranslator && user?.translator_type !== 'in_house';  // Contractors have limited DELIVER tab access
+  const isVendorTranslator = isTranslator && user?.translator_type === 'vendor';
+  const isContractor = isTranslator && user?.translator_type === 'contractor';  // Contractors have limited DELIVER tab access
 
   // State
   const [activeSubTab, setActiveSubTab] = useState('start');
@@ -6699,6 +6707,27 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     window.open(`${API}/admin/orders/${orderId}/pm-translation-download?admin_key=${adminKey}`, '_blank');
   };
 
+  // Vendor translators should use the dedicated portal
+  if (isVendorTranslator) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md text-center">
+          <div className="text-5xl mb-4">🌐</div>
+          <h2 className="text-xl font-bold text-gray-800 mb-2">Vendor Translator Portal</h2>
+          <p className="text-sm text-gray-600 mb-6">
+            As a vendor translator, please use the dedicated portal to download source files and upload your translations.
+          </p>
+          <a
+            href="/#/vendor"
+            className="inline-block px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors"
+          >
+            Go to Vendor Portal
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
       {/* Top header bar */}
@@ -6896,6 +6925,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         ].filter(tab => {
           const userRole = user?.role || 'translator';
           // For translators, check translator_type for extended access
+          if (userRole === 'translator' && user?.translator_type === 'vendor') {
+            // Vendor translators should use /#/vendor portal - hide all tabs here
+            return false;
+          }
           if (userRole === 'translator' && user?.translator_type === 'in_house') {
             // In-house translators get access to tabs marked with 'translator_inhouse'
             // But NOT 'translator_contractor' (like REVIEW which is merged into TRANSLATION)
@@ -7263,7 +7296,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             ⏰ Due: {new Date(file.translator_deadline || file.deadline).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
                           </div>
                         )}
-                        {file.internal_notes && (
+                        {isAdmin && file.internal_notes && (
                           <div className="text-[10px] text-sky-600 mt-1">
                             📝 Has instructions
                           </div>
@@ -7394,7 +7427,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                               ⏰ Due: {new Date(order.translator_deadline || order.deadline).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
                             </div>
                           )}
-                          {order.internal_notes && (
+                          {isAdmin && order.internal_notes && (
                             <div className="text-[10px] text-sky-600 mt-1">
                               📝 Has instructions from PM
                             </div>
@@ -7417,8 +7450,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             </div>
           )}
 
-          {/* PM Instructions - Show when project is selected and has internal notes */}
-          {selectedOrderId && assignedOrders.find(o => o.id === selectedOrderId)?.internal_notes && (
+          {/* Internal Notes - Admin only */}
+          {isAdmin && selectedOrderId && assignedOrders.find(o => o.id === selectedOrderId)?.internal_notes && (
             <div className="bg-sky-50 border border-sky-300 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <div className="text-2xl">📝</div>
@@ -9625,12 +9658,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 const currentOrder = assignedOrders.find(o => o.id === selectedOrderId);
                 if (currentOrder?.translation_status === 'pm_upload_ready') {
                   return (
-                    <div className="mb-4 p-3 bg-emerald-50 border border-emerald-300 rounded-lg flex items-center justify-between">
+                    <div className="mb-4 p-3 bg-green-100 border border-green-400 rounded-lg flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="text-emerald-600 text-lg">📤</span>
-                        <span className="text-sm text-emerald-700">A PM has uploaded an external translation. Switch to the <strong>Upload Translation</strong> tab to review.</span>
+                        <span className="text-green-700 text-lg">📤</span>
+                        <span className="text-sm text-green-800">A PM has uploaded an external translation. Switch to the <strong>Upload Translation</strong> tab to review.</span>
                       </div>
-                      <button onClick={() => setActiveSubTab('upload-translation')} className="px-3 py-1 bg-emerald-600 text-white text-xs rounded hover:bg-emerald-700">
+                      <button onClick={() => setActiveSubTab('upload-translation')} className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700">
                         Go to Upload Translation
                       </button>
                     </div>
@@ -9638,10 +9671,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 }
                 if (currentOrder?.translation_status === 'final') {
                   return (
-                    <div className="mb-4 p-4 bg-emerald-50 border-2 border-emerald-300 rounded-lg text-center">
+                    <div className="mb-4 p-4 bg-blue-50 border-2 border-blue-300 rounded-lg text-center">
                       <div className="text-3xl mb-2">🏁</div>
-                      <div className="text-lg font-bold text-emerald-800">FINAL</div>
-                      <p className="text-sm text-emerald-600">This translation has been approved and delivered to the client.</p>
+                      <div className="text-lg font-bold text-blue-800">FINAL</div>
+                      <p className="text-sm text-blue-600">This translation has been approved and delivered to the client.</p>
                     </div>
                   );
                 }
@@ -9772,8 +9805,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     </div>
                     {orderStatus && (
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        orderStatus === 'pm_upload_ready' ? 'bg-emerald-100 text-emerald-700' :
-                        orderStatus === 'final' ? 'bg-emerald-200 text-emerald-900' :
+                        orderStatus === 'pm_upload_ready' ? 'bg-green-200 text-green-800' :
+                        orderStatus === 'final' ? 'bg-blue-100 text-blue-700' :
                         'bg-gray-100 text-gray-600'
                       }`}>
                         {orderStatus === 'pm_upload_ready' ? 'READY' : orderStatus === 'final' ? 'FINAL' : orderStatus}
@@ -9784,18 +9817,18 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
                 {/* FINAL status badge */}
                 {orderStatus === 'final' && (
-                  <div className="bg-emerald-50 border-2 border-emerald-300 rounded-lg p-6 text-center">
+                  <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-6 text-center">
                     <div className="text-5xl mb-3">🏁</div>
-                    <div className="text-xl font-bold text-emerald-800 mb-1">FINAL</div>
-                    <p className="text-sm text-emerald-600">This translation has been approved and delivered to the client.</p>
+                    <div className="text-xl font-bold text-blue-800 mb-1">FINAL</div>
+                    <p className="text-sm text-blue-600">This translation has been approved and delivered to the client.</p>
                     {currentOrder?.completed_at && (
-                      <p className="text-xs text-emerald-500 mt-2">Completed: {new Date(currentOrder.completed_at).toLocaleString()}</p>
+                      <p className="text-xs text-blue-500 mt-2">Completed: {new Date(currentOrder.completed_at).toLocaleString()}</p>
                     )}
                     {hasPmUpload && (
                       <div className="mt-4">
                         <button
                           onClick={() => downloadPmTranslation(selectedOrderId)}
-                          className="px-4 py-2 bg-emerald-600 text-white text-sm rounded hover:bg-emerald-700"
+                          className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
                         >
                           Download Final File ({currentOrder.pm_upload_filename})
                         </button>
@@ -9806,12 +9839,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
                 {/* READY status - show file info + review/accept buttons */}
                 {orderStatus === 'pm_upload_ready' && hasPmUpload && (
-                  <div className="bg-emerald-50 border border-emerald-300 rounded-lg p-4">
+                  <div className="bg-green-100 border border-green-400 rounded-lg p-4">
                     <div className="flex items-center gap-2 mb-3">
-                      <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white text-sm">✓</div>
+                      <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white text-sm">✓</div>
                       <div>
-                        <div className="text-sm font-bold text-emerald-800">Translation Uploaded - READY</div>
-                        <div className="text-xs text-emerald-600">Waiting for admin review and approval</div>
+                        <div className="text-sm font-bold text-green-800">Translation Uploaded - READY</div>
+                        <div className="text-xs text-green-700">Waiting for admin review and approval</div>
                       </div>
                     </div>
                     <div className="bg-white rounded p-3 border mb-3">
@@ -9831,7 +9864,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       <button
                         onClick={() => acceptPmUpload(selectedOrderId)}
                         disabled={pmAcceptLoading}
-                        className="flex-1 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded hover:bg-emerald-700 flex items-center justify-center gap-2 disabled:opacity-50"
+                        className="flex-1 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded hover:bg-green-700 flex items-center justify-center gap-2 disabled:opacity-50"
                       >
                         {pmAcceptLoading ? 'Sending...' : 'Accept & Send to Client'}
                       </button>
@@ -15796,7 +15829,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       'finalized_pending_admin': 'Ready (Admin)',
       'client_review': 'Client Review',
       'ready': 'Ready',
-      'delivered': 'Delivered',
+      'delivered': 'FINAL',
       'pm_upload_ready': 'READY',
       'final': 'FINAL'
     };
@@ -16377,7 +16410,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
             </button>
           )}
           <div className="flex space-x-1">
-            {['all', 'received', 'review', 'client_review', 'ready', 'delivered', 'pm_upload_ready', 'final'].map((s) => (
+            {['all', 'received', 'review', 'client_review', 'ready', 'pm_upload_ready', 'final'].map((s) => (
               <button key={s} onClick={() => setStatusFilter(s)}
                 className={`px-2 py-1 text-[10px] rounded ${statusFilter === s ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
                 {s === 'all' ? 'All' : getStatusLabel(s)}
@@ -17097,6 +17130,17 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             </button>
                           )}
 
+                          {/* Mark as Final - Admin only, for delivered orders */}
+                          {isAdmin && order.translation_status === 'delivered' && (
+                            <button
+                              onClick={() => { updateStatus(order.id, 'final'); setOpenActionsDropdown(null); }}
+                              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-green-50 flex items-center gap-2"
+                            >
+                              <CheckIcon className="w-4 h-4 text-green-500" />
+                              Mark as Final
+                            </button>
+                          )}
+
                           {/* Delete Order - Admin only */}
                           {isAdmin && (
                             <button
@@ -17424,6 +17468,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                               placeholder="Notes visible to client..."
                             />
                           </div>
+                          {isAdmin && (
                           <div>
                             <label className="block text-xs font-medium text-gray-600 mb-1">Internal Notes (Admin only)</label>
                             <textarea
@@ -17434,6 +17479,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                               placeholder="Internal notes..."
                             />
                           </div>
+                          )}
                         </div>
                       </div>
                     </>
@@ -17631,7 +17677,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         ) : (
                           <div className="p-2 bg-gray-50 rounded border text-xs text-gray-400">No client notes</div>
                         )}
-                        {(isAdmin || isPM) && (
+                        {isAdmin && (
                           viewingOrder.internal_notes ? (
                             <div className="p-2 bg-yellow-50 rounded border border-yellow-200">
                               <div className="text-[10px] font-medium text-yellow-600 mb-1">📝 Internal Note:</div>
@@ -17874,17 +17920,17 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
                       {/* FINAL badge */}
                       {viewingOrder.translation_status === 'final' && viewingOrder.pm_upload_filename && (
-                        <div className="p-4 bg-emerald-50 border-2 border-emerald-300 rounded-lg">
+                        <div className="p-4 bg-blue-50 border-2 border-blue-300 rounded-lg">
                           <div className="flex items-center gap-3 mb-2">
                             <span className="text-2xl">🏁</span>
                             <div>
-                              <div className="text-sm font-bold text-emerald-800">FINAL - Delivered to Client</div>
+                              <div className="text-sm font-bold text-blue-800">FINAL - Delivered to Client</div>
                               {viewingOrder.completed_at && (
-                                <div className="text-[10px] text-emerald-600">Completed: {new Date(viewingOrder.completed_at).toLocaleString()}</div>
+                                <div className="text-[10px] text-blue-600">Completed: {new Date(viewingOrder.completed_at).toLocaleString()}</div>
                               )}
                             </div>
                           </div>
-                          <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-emerald-200">
+                          <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-blue-200">
                             <div className="flex items-center gap-2">
                               <span className="text-xl">📎</span>
                               <div>
@@ -17897,7 +17943,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             </div>
                             <button
                               onClick={() => downloadPmTranslationAdmin(viewingOrder.id)}
-                              className="px-3 py-1.5 bg-emerald-600 text-white rounded text-xs hover:bg-emerald-700"
+                              className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
                             >
                               ⬇️ Download
                             </button>
@@ -17907,15 +17953,15 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
                       {/* READY - waiting for review */}
                       {viewingOrder.translation_status === 'pm_upload_ready' && viewingOrder.pm_upload_filename && (
-                        <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-lg">
+                        <div className="p-4 bg-green-100 border border-green-400 rounded-lg">
                           <div className="flex items-center gap-3 mb-3">
-                            <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white text-sm">✓</div>
+                            <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white text-sm">✓</div>
                             <div>
-                              <div className="text-sm font-bold text-emerald-800">Translation READY - Awaiting Review</div>
-                              <div className="text-[10px] text-emerald-600">PM has uploaded an external translation for this project</div>
+                              <div className="text-sm font-bold text-green-800">Translation READY - Awaiting Review</div>
+                              <div className="text-[10px] text-green-700">PM has uploaded an external translation for this project</div>
                             </div>
                           </div>
-                          <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-emerald-200 mb-3">
+                          <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-green-300 mb-3">
                             <div className="flex items-center gap-2">
                               <span className="text-xl">📎</span>
                               <div>
@@ -17935,7 +17981,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           </div>
                           <button
                             onClick={() => acceptPmUploadAdmin(viewingOrder.id)}
-                            className="w-full px-4 py-2.5 bg-emerald-600 text-white text-sm font-bold rounded hover:bg-emerald-700 flex items-center justify-center gap-2"
+                            className="w-full px-4 py-2.5 bg-green-600 text-white text-sm font-bold rounded hover:bg-green-700 flex items-center justify-center gap-2"
                           >
                             ✅ Accept & Send to Client
                           </button>
@@ -18209,7 +18255,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       { status: 'review', label: 'PM Review', icon: '🔍', desc: 'Project Manager reviewing translation' },
                       { status: 'client_review', label: 'Client Review', icon: '👤', desc: 'Client reviewing the translation' },
                       { status: 'ready', label: 'Ready', icon: '✅', desc: 'Translation approved and ready for delivery' },
-                      { status: 'delivered', label: 'Delivered', icon: '📤', desc: 'Sent to client' }
+                      { status: 'delivered', label: 'FINAL', icon: '📤', desc: 'Sent to client' }
                     ].map((step, idx) => {
                       const currentIdx = ['received', 'in_translation', 'review', 'client_review', 'ready', 'delivered'].indexOf(viewingOrder.translation_status);
                       const stepIdx = idx;
@@ -21858,6 +21904,7 @@ const UsersPage = ({ adminKey, user }) => {
                     >
                       <option value="contractor">Contractor (Limited)</option>
                       <option value="in_house">In-House (Full Access)</option>
+                      <option value="vendor">Vendor (Download/Upload Only)</option>
                     </select>
                   </div>
                   <div>
@@ -21951,9 +21998,11 @@ const UsersPage = ({ adminKey, user }) => {
                       <span className={`px-2 py-1 rounded text-xs font-medium ${
                         u.translator_type === 'in_house'
                           ? 'bg-blue-100 text-blue-800'
-                          : 'bg-orange-100 text-orange-800'
+                          : u.translator_type === 'vendor'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-orange-100 text-orange-800'
                       }`}>
-                        {u.translator_type === 'in_house' ? 'In-House' : 'Contractor'}
+                        {u.translator_type === 'in_house' ? 'In-House' : u.translator_type === 'vendor' ? 'Vendor' : 'Contractor'}
                       </span>
                     ) : (
                       <span className="text-gray-400">-</span>
@@ -22108,10 +22157,11 @@ const UsersPage = ({ adminKey, user }) => {
                                   >
                                     <option value="contractor">Contractor (Limitado)</option>
                                     <option value="in_house">In-House (Acesso Completo)</option>
+                                    <option value="vendor">Vendor (Download/Upload)</option>
                                   </select>
                                 ) : (
-                                  <div className={`font-medium ${u.translator_type === 'in_house' ? 'text-blue-600' : 'text-orange-600'}`}>
-                                    {u.translator_type === 'in_house' ? 'In-House' : 'Contractor'}
+                                  <div className={`font-medium ${u.translator_type === 'in_house' ? 'text-blue-600' : u.translator_type === 'vendor' ? 'text-emerald-600' : 'text-orange-600'}`}>
+                                    {u.translator_type === 'in_house' ? 'In-House' : u.translator_type === 'vendor' ? 'Vendor' : 'Contractor'}
                                   </div>
                                 )}
                               </div>
@@ -26295,6 +26345,10 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   // Download package state
   const [downloadingPackagePM, setDownloadingPackagePM] = useState(null); // Order ID being downloaded
 
+  // Delete/bulk delete state
+  const [selectedOrderIds, setSelectedOrderIds] = useState(new Set());
+  const [deletingOrders, setDeletingOrders] = useState(false);
+
   const [stats, setStats] = useState({
     totalProjects: 0,
     inProgress: 0,
@@ -26876,6 +26930,88 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
   const downloadPmTranslationPM = (orderId) => {
     window.open(`${API}/admin/orders/${orderId}/pm-translation-download?admin_key=${adminKey}`, '_blank');
+  };
+
+  // Archive a single order from PM Dashboard (hidden from PM, still visible to admin)
+  const archivePmOrder = async (orderId, orderNumber) => {
+    if (!window.confirm(`Arquivar o projeto ${orderNumber}?\n\nO projeto será removido do seu painel, mas o admin ainda terá acesso.`)) return;
+    try {
+      await axios.post(`${API}/admin/orders/${orderId}/archive?admin_key=${adminKey}`);
+      showToast(`Projeto ${orderNumber} arquivado com sucesso`);
+      fetchDashboardData();
+    } catch (err) {
+      console.error('Failed to archive order:', err);
+      showToast('Erro ao arquivar: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  // Bulk archive selected orders
+  const bulkArchiveOrders = async () => {
+    if (selectedOrderIds.size === 0) {
+      showToast('Selecione os projetos que deseja arquivar');
+      return;
+    }
+    const count = selectedOrderIds.size;
+    if (!window.confirm(`Arquivar ${count} projeto(s)?\n\nOs projetos serão removidos do seu painel, mas o admin ainda terá acesso.`)) return;
+    setDeletingOrders(true);
+    try {
+      const res = await axios.post(`${API}/admin/orders/bulk-archive?admin_key=${adminKey}`, {
+        order_ids: Array.from(selectedOrderIds)
+      });
+      const { archived_count, failed } = res.data;
+      showToast(`${archived_count} projeto(s) arquivado(s)${failed?.length ? `, ${failed.length} falharam` : ''}`);
+      setSelectedOrderIds(new Set());
+      fetchDashboardData();
+    } catch (err) {
+      console.error('Bulk archive failed:', err);
+      showToast('Erro ao arquivar projetos: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setDeletingOrders(false);
+    }
+  };
+
+  // Archive all completed/final/delivered orders
+  const archiveAllCompletedOrders = async () => {
+    const completedOrders = orders.filter(o => ['final', 'delivered'].includes(o.translation_status));
+    if (completedOrders.length === 0) {
+      showToast('Nenhum projeto finalizado para arquivar');
+      return;
+    }
+    if (!window.confirm(`Arquivar TODOS os ${completedOrders.length} projetos finalizados/entregues?\n\nOs projetos serão removidos do seu painel, mas o admin ainda terá acesso.`)) return;
+    setDeletingOrders(true);
+    try {
+      const res = await axios.post(`${API}/admin/orders/bulk-archive?admin_key=${adminKey}`, {
+        order_ids: completedOrders.map(o => o.id)
+      });
+      const { archived_count, failed } = res.data;
+      showToast(`${archived_count} projeto(s) arquivado(s)${failed?.length ? `, ${failed.length} falharam` : ''}`);
+      setSelectedOrderIds(new Set());
+      fetchDashboardData();
+    } catch (err) {
+      console.error('Bulk archive completed failed:', err);
+      showToast('Erro ao arquivar projetos: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setDeletingOrders(false);
+    }
+  };
+
+  // Toggle single order selection
+  const toggleOrderSelection = (orderId) => {
+    setSelectedOrderIds(prev => {
+      const next = new Set(prev);
+      if (next.has(orderId)) next.delete(orderId);
+      else next.add(orderId);
+      return next;
+    });
+  };
+
+  // Toggle all orders selection
+  const toggleSelectAll = () => {
+    if (selectedOrderIds.size === orders.length) {
+      setSelectedOrderIds(new Set());
+    } else {
+      setSelectedOrderIds(new Set(orders.map(o => o.id)));
+    }
   };
 
   // Assign translator to specific document
@@ -28357,11 +28493,39 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
           {/* Recent Projects */}
           <div className="bg-white rounded-lg shadow p-4">
-            <h3 className="text-sm font-bold text-gray-800 mb-3">📋 Recent Projects</h3>
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-sm font-bold text-gray-800">📋 Recent Projects</h3>
+              <div className="flex gap-2">
+                {selectedOrderIds.size > 0 && (
+                  <button
+                    onClick={bulkArchiveOrders}
+                    disabled={deletingOrders}
+                    className="px-3 py-1.5 bg-amber-500 text-white rounded text-xs hover:bg-amber-600 disabled:bg-gray-400 flex items-center gap-1"
+                  >
+                    📦 Arquivar Selecionados ({selectedOrderIds.size})
+                  </button>
+                )}
+                <button
+                  onClick={archiveAllCompletedOrders}
+                  disabled={deletingOrders}
+                  className="px-3 py-1.5 bg-amber-600 text-white rounded text-xs hover:bg-amber-700 disabled:bg-gray-400 flex items-center gap-1"
+                >
+                  {deletingOrders ? 'Arquivando...' : '📦 Arquivar Todos Finalizados'}
+                </button>
+              </div>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b">
+                    <th className="text-center py-2 px-2 w-8">
+                      <input
+                        type="checkbox"
+                        checked={orders.length > 0 && selectedOrderIds.size === orders.length}
+                        onChange={toggleSelectAll}
+                        className="rounded"
+                      />
+                    </th>
                     <th className="text-left py-2 px-2">Code</th>
                     <th className="text-left py-2 px-2">Client</th>
                     <th className="text-left py-2 px-2">Languages</th>
@@ -28372,8 +28536,16 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {orders.slice(0, 10).map(order => (
-                    <tr key={order.id} className="border-b hover:bg-gray-50">
+                  {orders.map(order => (
+                    <tr key={order.id} className={`border-b hover:bg-gray-50 ${selectedOrderIds.has(order.id) ? 'bg-amber-50' : ''}`}>
+                      <td className="py-2 px-2 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedOrderIds.has(order.id)}
+                          onChange={() => toggleOrderSelection(order.id)}
+                          className="rounded"
+                        />
+                      </td>
                       <td className="py-2 px-2">
                         <button
                           onClick={() => viewProjectFiles(order)}
@@ -28452,16 +28624,25 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         {order.deadline ? formatDateLocal(order.deadline) : '-'}
                       </td>
                       <td className="py-2 px-2 text-center">
-                        {(order.translation_ready || ['ready', 'delivered', 'final', 'pending_admin_approval', 'pending_admin_review', 'finalized_pending_admin', 'review', 'pending_pm_review'].includes(order.translation_status)) && (
+                        <div className="flex items-center justify-center gap-1">
+                          {(order.translation_ready || ['ready', 'delivered', 'final', 'pending_admin_approval', 'pending_admin_review', 'finalized_pending_admin', 'review', 'pending_pm_review'].includes(order.translation_status)) && (
+                            <button
+                              onClick={() => downloadOrderPackagePM(order)}
+                              disabled={downloadingPackagePM === order.id}
+                              className="px-2 py-1 bg-purple-500 text-white rounded text-[10px] hover:bg-purple-600 disabled:bg-gray-400 flex items-center gap-1"
+                              title="Download complete translation package"
+                            >
+                              {downloadingPackagePM === order.id ? '...' : '📥 Package'}
+                            </button>
+                          )}
                           <button
-                            onClick={() => downloadOrderPackagePM(order)}
-                            disabled={downloadingPackagePM === order.id}
-                            className="px-2 py-1 bg-purple-500 text-white rounded text-[10px] hover:bg-purple-600 disabled:bg-gray-400 flex items-center gap-1 mx-auto"
-                            title="Download complete translation package"
+                            onClick={() => archivePmOrder(order.id, order.order_number)}
+                            className="px-2 py-1 bg-amber-500 text-white rounded text-[10px] hover:bg-amber-600 flex items-center gap-1"
+                            title="Arquivar projeto"
                           >
-                            {downloadingPackagePM === order.id ? '...' : '📥 Package'}
+                            📦
                           </button>
-                        )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -29945,7 +30126,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   { status: 'in_translation', color: 'bg-yellow-500', count: stats.inProgress },
                   { status: 'review', color: 'bg-blue-500', count: stats.awaitingReview },
                   { status: 'ready', color: 'bg-green-500', count: orders.filter(o => o.translation_status === 'ready').length },
-                  { status: 'delivered', color: 'bg-blue-500', count: orders.filter(o => o.translation_status === 'delivered').length }
+                  { status: 'final', color: 'bg-blue-500', count: orders.filter(o => o.translation_status === 'delivered' || o.translation_status === 'final').length }
                 ].map(item => (
                   item.count > 0 && (
                     <div
@@ -30259,10 +30440,10 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
               >
                 📤 Upload Translation
                 {selectedProject?.translation_status === 'pm_upload_ready' && (
-                  <span className="ml-1.5 inline-block w-2 h-2 bg-emerald-500 rounded-full"></span>
+                  <span className="ml-1.5 inline-block w-2 h-2 bg-green-600 rounded-full"></span>
                 )}
                 {selectedProject?.translation_status === 'final' && (
-                  <span className="ml-1.5 text-[10px] bg-emerald-200 text-emerald-800 px-1.5 py-0.5 rounded font-bold">FINAL</span>
+                  <span className="ml-1.5 text-[10px] bg-blue-200 text-blue-800 px-1.5 py-0.5 rounded font-bold">FINAL</span>
                 )}
               </button>
             </div>
@@ -30275,18 +30456,18 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 <div className="space-y-4">
                   {/* FINAL status */}
                   {selectedProject.translation_status === 'final' && (
-                    <div className="bg-emerald-50 border-2 border-emerald-300 rounded-lg p-6 text-center">
+                    <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-6 text-center">
                       <div className="text-5xl mb-3">🏁</div>
-                      <div className="text-xl font-bold text-emerald-800 mb-1">FINAL</div>
-                      <p className="text-sm text-emerald-600">This translation has been approved by the admin and delivered to the client.</p>
+                      <div className="text-xl font-bold text-blue-800 mb-1">FINAL</div>
+                      <p className="text-sm text-blue-600">This translation has been approved by the admin and delivered to the client.</p>
                       {selectedProject.completed_at && (
-                        <p className="text-xs text-emerald-500 mt-2">Completed: {new Date(selectedProject.completed_at).toLocaleString()}</p>
+                        <p className="text-xs text-blue-500 mt-2">Completed: {new Date(selectedProject.completed_at).toLocaleString()}</p>
                       )}
                       {selectedProject.pm_upload_filename && (
                         <div className="mt-4">
                           <button
                             onClick={() => downloadPmTranslationPM(selectedProject.id)}
-                            className="px-4 py-2 bg-emerald-600 text-white text-sm rounded hover:bg-emerald-700"
+                            className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
                           >
                             Download Final File ({selectedProject.pm_upload_filename})
                           </button>
@@ -30297,12 +30478,12 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
                   {/* READY status - sent to admin, waiting for review */}
                   {selectedProject.translation_status === 'pm_upload_ready' && selectedProject.pm_upload_filename && (
-                    <div className="bg-emerald-50 border border-emerald-300 rounded-lg p-4">
+                    <div className="bg-green-100 border border-green-400 rounded-lg p-4">
                       <div className="flex items-center gap-2 mb-3">
-                        <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white text-sm">✓</div>
+                        <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white text-sm">✓</div>
                         <div>
-                          <div className="text-sm font-bold text-emerald-800">Translation Uploaded - Sent to Admin</div>
-                          <div className="text-xs text-emerald-600">Waiting for admin review and approval</div>
+                          <div className="text-sm font-bold text-green-800">Translation Uploaded - Sent to Admin</div>
+                          <div className="text-xs text-green-700">Waiting for admin review and approval</div>
                         </div>
                       </div>
                       <div className="bg-white rounded p-3 border mb-3">
@@ -30637,6 +30818,7 @@ const SalesControlPage = ({ adminKey }) => {
   const [outreachEmails, setOutreachEmails] = useState([]);
   const [sendingOutreach, setSendingOutreach] = useState(null);
   const [outreachResult, setOutreachResult] = useState(null);
+  const [deletingAcquisition, setDeletingAcquisition] = useState(null);
   const [newGoal, setNewGoal] = useState({
     salesperson_id: '', month: new Date().toISOString().slice(0, 7), target_partners: 10, target_revenue: 5000
   });
@@ -30859,6 +31041,26 @@ const SalesControlPage = ({ adminKey }) => {
     } catch (error) {
       console.error('Error updating acquisition:', error);
       showToast('Erro ao atualizar aquisição');
+    }
+  };
+
+  const handleDeleteAcquisition = async () => {
+    if (!deletingAcquisition) return;
+    try {
+      const res = await fetch(`${API_URL}/api/admin/partner-acquisitions/${deletingAcquisition.id}`, {
+        method: 'DELETE',
+        headers: { 'admin-key': adminKey }
+      });
+      if (res.ok) {
+        showToast('Aquisição deletada com sucesso!');
+        setDeletingAcquisition(null);
+        fetchAllData();
+      } else {
+        showToast('Erro ao deletar aquisição');
+      }
+    } catch (error) {
+      console.error('Error deleting acquisition:', error);
+      showToast('Erro ao deletar aquisição');
     }
   };
 
@@ -31440,6 +31642,13 @@ const SalesControlPage = ({ adminKey }) => {
                             ✓ Pago
                           </span>
                         )}
+                        <button
+                          onClick={() => setDeletingAcquisition(acq)}
+                          className="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
+                          title="Deletar aquisição"
+                        >
+                          Deletar
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -32587,6 +32796,39 @@ const SalesControlPage = ({ adminKey }) => {
                 className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
               >
                 Salvar Alterações
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Acquisition Confirmation Modal */}
+      {deletingAcquisition && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4 text-red-600">
+              Confirmar Exclusão
+            </h3>
+            <p className="text-gray-700 mb-2">
+              Tem certeza que deseja deletar a aquisição do parceiro:
+            </p>
+            <p className="font-semibold text-gray-900 mb-1">{deletingAcquisition.partner_name}</p>
+            <p className="text-sm text-gray-500 mb-4">ID: {deletingAcquisition.id}</p>
+            <p className="text-sm text-red-500 mb-6">
+              Esta ação não pode ser desfeita. Os emails de outreach relacionados também serão removidos.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setDeletingAcquisition(null)}
+                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteAcquisition}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+              >
+                Deletar
               </button>
             </div>
           </div>

@@ -30,7 +30,7 @@ const TRANSLATION_STAGES = {
   'in_translation': { id: 2, name: 'In Translation', icon: '✍️' },
   'review': { id: 3, name: 'Review', icon: '🔍' },
   'ready': { id: 4, name: 'Ready', icon: '📦' },
-  'delivered': { id: 5, name: 'Delivered', icon: '🎉' }
+  'delivered': { id: 5, name: 'Final', icon: '🎉' }
 };
 
 // Payment status colors

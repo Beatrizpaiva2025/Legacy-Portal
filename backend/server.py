@@ -1490,6 +1490,9 @@ def get_order_confirmation_email_template(client_name: str, order_details: dict)
                                                 <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('estimated_delivery', 'N/A')}</td>
                                             </tr>
                                         </table>
+                                        <p style="color: #94a3b8; font-size: 11px; margin: 10px 0 0 0; font-style: italic;">
+                                            * Business days = Monday through Friday, excluding weekends.
+                                        </p>
                                     </td>
                                 </tr>
                             </table>
@@ -2012,7 +2015,7 @@ class AdminUserCreate(BaseModel):
     rate_per_page: Optional[float] = None
     rate_per_word: Optional[float] = None
     language_pairs: Optional[str] = None
-    translator_type: Optional[str] = 'contractor'  # 'in_house' or 'contractor'
+    translator_type: Optional[str] = 'contractor'  # 'in_house', 'contractor', or 'vendor'
 
 class AdminInvitationAccept(BaseModel):
     token: str
@@ -2061,7 +2064,7 @@ class AdminUserResponse(BaseModel):
     token: str
     pages_translated: Optional[int] = 0
     pages_pending_payment: Optional[int] = 0
-    translator_type: Optional[str] = 'contractor'  # 'in_house' or 'contractor'
+    translator_type: Optional[str] = 'contractor'  # 'in_house', 'contractor', or 'vendor'
 
 class AdminUserPublic(BaseModel):
     id: str
@@ -2069,7 +2072,7 @@ class AdminUserPublic(BaseModel):
     name: str
     role: str
     is_active: bool
-    translator_type: Optional[str] = 'contractor'  # 'in_house' or 'contractor'
+    translator_type: Optional[str] = 'contractor'  # 'in_house', 'contractor', or 'vendor'
 
 # Translation Order Models (with invoice tracking)
 class TranslationOrder(BaseModel):
@@ -3238,48 +3241,46 @@ def format_date_ny(dt, fmt="%m/%d/%Y"):
 
 def calculate_client_deadline(source_type: str = "website", created_at: datetime = None) -> datetime:
     """
-    Calculate client deadline based on source type using business days (excluding weekends).
+    Calculate client deadline based on source type.
 
     Args:
         source_type: "website", "whatsapp", or "partner"
         created_at: Order creation time (UTC). If None, uses current time.
 
     Returns:
-        Deadline datetime in UTC (but calculated based on NY timezone business days)
+        Deadline datetime in UTC
 
-    Business days:
-        - Website/WhatsApp: 3 business days
-        - Partner Portal: 2 business days
+    Standard deadlines:
+        - Website/WhatsApp: 3 business days (excluding weekends)
+        - Partner Portal: 48 hours (calendar hours)
     """
     if created_at is None:
         created_at = datetime.utcnow()
 
-    # Convert to New York timezone for business day calculation
+    # Convert to New York timezone for calculation
     ny_time = created_at.replace(tzinfo=ZoneInfo("UTC")).astimezone(NY_TIMEZONE)
 
-    # Determine number of business days based on source
     if source_type == "partner":
-        business_days = 2
-    else:  # website, whatsapp, or other
-        business_days = 3
+        # Partner portal standard: 48 hours (calendar hours, not business days)
+        deadline_ny = ny_time + timedelta(hours=48)
+    else:
+        # Website/WhatsApp: 3 business days (skip weekends)
+        deadline_ny = ny_time
+        days_added = 0
 
-    # Calculate deadline by adding business days (skip weekends)
-    deadline_ny = ny_time
-    days_added = 0
+        while days_added < 3:
+            deadline_ny += timedelta(days=1)
+            # Monday = 0, Sunday = 6; skip Saturday (5) and Sunday (6)
+            if deadline_ny.weekday() < 5:  # It's a weekday
+                days_added += 1
 
-    while days_added < business_days:
-        deadline_ny += timedelta(days=1)
-        # Monday = 0, Sunday = 6; skip Saturday (5) and Sunday (6)
-        if deadline_ny.weekday() < 5:  # It's a weekday
-            days_added += 1
-
-    # Keep the same time as the original request
-    deadline_ny = deadline_ny.replace(
-        hour=ny_time.hour,
-        minute=ny_time.minute,
-        second=ny_time.second,
-        microsecond=0
-    )
+        # Keep the same time as the original request
+        deadline_ny = deadline_ny.replace(
+            hour=ny_time.hour,
+            minute=ny_time.minute,
+            second=ny_time.second,
+            microsecond=0
+        )
 
     # Convert back to UTC for storage
     deadline_utc = deadline_ny.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
@@ -3831,8 +3832,13 @@ def calculate_price_with_tier(word_count: int, service_type: str, urgency: str, 
     return base_price, urgency_fee, total_price, discount_amount
 
 
-def get_estimated_delivery(urgency: str) -> str:
-    """Calculate estimated delivery date in NY timezone"""
+def get_estimated_delivery(urgency: str, source_type: str = "website") -> str:
+    """Calculate estimated delivery date in NY timezone.
+
+    Standard deadlines:
+        - Website/Customer: 3 business days
+        - Partner Portal: 48 hours (2 days)
+    """
     today = datetime.now(NY_TIMEZONE)
 
     if urgency == "urgent":
@@ -3842,8 +3848,19 @@ def get_estimated_delivery(urgency: str) -> str:
         delivery_date = today + timedelta(days=1)
         days_text = "24 hours"
     else:
-        delivery_date = today + timedelta(days=2)
-        days_text = "2 days"
+        if source_type == "partner":
+            # Partner portal standard: 48 hours (2 days)
+            delivery_date = today + timedelta(hours=48)
+            days_text = "2 days"
+        else:
+            # Website/Customer standard: 3 business days
+            delivery_date = today
+            bdays = 0
+            while bdays < 3:
+                delivery_date += timedelta(days=1)
+                if delivery_date.weekday() < 5:  # Monday-Friday
+                    bdays += 1
+            days_text = "3 business days"
 
     formatted_date = delivery_date.strftime("%A, %B %d")
     return f"{formatted_date} ({days_text}) EST"
@@ -8917,7 +8934,7 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
                 "service_type": order.service_type,
                 "urgency": order.urgency,
                 "total_price": order.total_price,
-                "estimated_delivery": get_estimated_delivery(order.urgency)
+                "estimated_delivery": get_estimated_delivery(order.urgency, "partner")
             }
             protemos_response = await protemos_client.create_project(protemos_data)
 
@@ -8940,7 +8957,7 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
                 "translate_to": order.translate_to,
                 "word_count": order.word_count,
                 "urgency": order.urgency,
-                "estimated_delivery": get_estimated_delivery(order.urgency),
+                "estimated_delivery": get_estimated_delivery(order.urgency, "partner"),
                 "base_price": order.base_price,
                 "urgency_fee": order.urgency_fee,
                 "total_price": order.total_price,
@@ -9217,7 +9234,7 @@ async def admin_get_all_orders(
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
     # Get user info for role-based filtering
-    user_role = None
+    user_role = "admin" if admin_key == expected_key else None
     user_id = None
     user_name = None
     if admin_key != expected_key:
@@ -9263,9 +9280,8 @@ async def admin_get_all_orders(
             'ready': ['ready', 'Ready', 'READY', 'pending_admin_approval', 'Pending Admin Approval'],
             'received': ['received', 'Received', 'RECEIVED', 'Quote', 'quote', 'QUOTE'],
             'client_review': ['client_review', 'Client Review', 'CLIENT_REVIEW', 'client review'],
-            'delivered': ['delivered', 'Delivered', 'DELIVERED'],
             'pm_upload_ready': ['pm_upload_ready', 'PM_UPLOAD_READY'],
-            'final': ['final', 'Final', 'FINAL']
+            'final': ['final', 'Final', 'FINAL', 'delivered', 'Delivered', 'DELIVERED']
         }
         if status in status_mappings:
             query["translation_status"] = {"$in": status_mappings[status]}
@@ -9323,6 +9339,11 @@ async def admin_get_all_orders(
     # Calculate total pages
     total_pages = (total_count + limit - 1) // limit
 
+    # Strip internal_notes for non-admin users (admin only)
+    if user_role != "admin":
+        for order in orders:
+            order.pop("internal_notes", None)
+
     return {
         "orders": orders,
         "pagination": {
@@ -9369,8 +9390,11 @@ async def get_my_projects(token: str, admin_key: str):
         # Admin sees all
         orders = await db.translation_orders.find().sort("created_at", -1).to_list(500)
     elif user_role == "pm":
-        # PM sees projects assigned to them
-        orders = await db.translation_orders.find({"assigned_pm_id": user_id}).sort("created_at", -1).to_list(500)
+        # PM sees projects assigned to them (excluding archived)
+        orders = await db.translation_orders.find({
+            "assigned_pm_id": user_id,
+            "archived_by_pm": {"$ne": True}
+        }).sort("created_at", -1).to_list(500)
     elif user_role == "translator":
         # Translator sees projects assigned to them (order-level or file-level, by ID or name)
         tr_name = user.get("name", "")
@@ -9396,6 +9420,11 @@ async def get_my_projects(token: str, admin_key: str):
     for order in orders:
         if '_id' in order:
             del order['_id']
+
+    # Strip internal_notes for non-admin users (admin only)
+    if user_role != "admin":
+        for order in orders:
+            order.pop("internal_notes", None)
 
     # Calculate summary
     total_pending = sum(1 for o in orders if o.get("payment_status") == "pending")
@@ -9768,7 +9797,7 @@ async def admin_create_manual_order(project_data: ManualProjectCreate, admin_key
         if deadline is None:
             source_type = project_data.revenue_source or "website"
             if source_type == "partner":
-                deadline = calculate_client_deadline("partner", created_at)  # 2 business days
+                deadline = calculate_client_deadline("partner", created_at)  # 48 hours
             elif source_type == "whatsapp":
                 deadline = calculate_client_deadline("whatsapp", created_at)  # 3 business days
             else:
@@ -12905,6 +12934,66 @@ async def admin_delete_order(order_id: str, admin_key: str):
         raise HTTPException(status_code=404, detail="Order not found")
 
     return {"status": "success", "message": f"Order {order.get('order_number', order_id)} deleted"}
+
+@api_router.post("/admin/orders/{order_id}/archive")
+async def archive_order_for_pm(order_id: str, admin_key: str):
+    """Archive an order so it's hidden from PM dashboard but still visible to admin."""
+    user = await get_current_admin_user(admin_key)
+    if not user or user.get("role") not in ["admin", "pm"]:
+        is_master = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+        if not is_master:
+            raise HTTPException(status_code=401, detail="Invalid admin key")
+        user = None
+
+    order = await db.translation_orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # PMs can only archive their own assigned projects
+    if user and user.get("role") == "pm":
+        if order.get("assigned_pm_id") != user.get("id"):
+            raise HTTPException(status_code=403, detail="You can only archive projects assigned to you")
+
+    await db.translation_orders.update_one(
+        {"id": order_id},
+        {"$set": {"archived_by_pm": True, "archived_at": datetime.utcnow().isoformat()}}
+    )
+
+    return {"status": "success", "message": f"Order {order.get('order_number', order_id)} archived"}
+
+@api_router.post("/admin/orders/bulk-archive")
+async def bulk_archive_orders(admin_key: str, body: dict = Body(...)):
+    """Bulk archive orders for PM. Projects are hidden from PM but still visible to admin."""
+    user = await get_current_admin_user(admin_key)
+    if not user or user.get("role") not in ["admin", "pm"]:
+        is_master = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+        if not is_master:
+            raise HTTPException(status_code=401, detail="Invalid admin key")
+        user = None
+
+    order_ids = body.get("order_ids", [])
+    if not order_ids:
+        raise HTTPException(status_code=400, detail="No order IDs provided")
+
+    archived_count = 0
+    failed = []
+    for order_id in order_ids:
+        order = await db.translation_orders.find_one({"id": order_id})
+        if not order:
+            failed.append({"id": order_id, "reason": "Not found"})
+            continue
+        # PMs can only archive their own projects
+        if user and user.get("role") == "pm":
+            if order.get("assigned_pm_id") != user.get("id"):
+                failed.append({"id": order_id, "reason": "Not assigned to you"})
+                continue
+        await db.translation_orders.update_one(
+            {"id": order_id},
+            {"$set": {"archived_by_pm": True, "archived_at": datetime.utcnow().isoformat()}}
+        )
+        archived_count += 1
+
+    return {"status": "success", "archived_count": archived_count, "failed": failed}
 
 @api_router.post("/admin/orders/{order_id}/mark-paid")
 async def admin_mark_order_paid(order_id: str, admin_key: str):
@@ -17397,6 +17486,74 @@ async def translator_send_message_to_admin(admin_key: str, request: dict = Body(
     })
 
     return {"status": "success", "message_id": message_id}
+
+
+# ==================== VENDOR TRANSLATOR UPLOAD NOTIFICATION ====================
+@api_router.post("/vendor-translator/notify-upload")
+async def vendor_translator_notify_upload(admin_key: str, request: dict = Body(...)):
+    """Notify PM when vendor translator uploads a translation"""
+    # Validate token
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    order_id = request.get("order_id")
+    order_number = request.get("order_number", "N/A")
+    translator_name = request.get("translator_name", "Vendor Translator")
+    translator_id = request.get("translator_id")
+    filename = request.get("filename", "unknown")
+
+    # Find the order to get the assigned PM
+    order = await db.translation_orders.find_one({"id": order_id})
+    pm_id = order.get("assigned_pm_id") if order else None
+    pm_name = order.get("assigned_pm_name", "PM") if order else "PM"
+
+    now = datetime.utcnow()
+
+    # Create notification for PM (or admin if no PM assigned)
+    notification = {
+        "id": str(uuid.uuid4()),
+        "type": "vendor_translator_upload",
+        "title": f"Translation Uploaded - {order_number}",
+        "message": f"Vendor translator {translator_name} uploaded '{filename}' for order {order_number}. Please review and create the delivery package.",
+        "order_id": order_id,
+        "order_number": order_number,
+        "translator_id": translator_id,
+        "translator_name": translator_name,
+        "filename": filename,
+        "is_read": False,
+        "created_at": now
+    }
+    await db.admin_notifications.insert_one(notification)
+
+    # Also send a translator message to PM/admin so it shows in messaging
+    message = {
+        "id": str(uuid.uuid4()),
+        "type": "translator_to_admin",
+        "from_translator_id": translator_id,
+        "from_translator_name": translator_name,
+        "to_recipient_id": pm_id,
+        "to_recipient_name": pm_name,
+        "to_recipient_role": "pm" if pm_id else "admin",
+        "content": f"[Auto] Translation file '{filename}' uploaded for order {order_number}. Ready for review and package creation.",
+        "read": False,
+        "created_at": now
+    }
+    await db.translator_messages.insert_one(message)
+
+    # Update order status to indicate translation was received
+    if order:
+        await db.translation_orders.update_one(
+            {"id": order_id},
+            {"$set": {
+                "translation_status": "pending_pm_review",
+                "vendor_translation_uploaded_at": now,
+                "vendor_translation_uploaded_by": translator_name
+            }}
+        )
+
+    logger.info(f"Vendor translator {translator_name} uploaded translation for order {order_number}")
+    return {"status": "success", "message": "PM has been notified"}
 
 
 @api_router.get("/messages/unread-count")
@@ -29045,6 +29202,24 @@ async def update_acquisition(acquisition_id: str, request: Request, admin_key: s
         updated["salesperson_name"] = sp["name"] if sp else "Unknown"
 
     return {"success": True, "acquisition": updated}
+
+# Delete acquisition
+@api_router.delete("/admin/partner-acquisitions/{acquisition_id}")
+async def delete_acquisition(acquisition_id: str, admin_key: str = Header(None)):
+    if not admin_key:
+        raise HTTPException(status_code=401, detail="Admin key required")
+
+    acq = await db.partner_acquisitions.find_one({"id": acquisition_id})
+    if not acq:
+        raise HTTPException(status_code=404, detail="Acquisition not found")
+
+    # Delete the acquisition
+    await db.partner_acquisitions.delete_one({"id": acquisition_id})
+
+    # Also delete related outreach emails
+    await db.outreach_emails.delete_many({"acquisition_id": acquisition_id})
+
+    return {"success": True}
 
 # Get sales dashboard stats
 @api_router.get("/admin/sales-dashboard")
