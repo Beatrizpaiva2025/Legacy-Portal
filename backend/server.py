@@ -14849,6 +14849,50 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                 import traceback
                 traceback.print_exc()
 
+                # CRITICAL: Retry certification creation with minimal data so verification page still appears
+                try:
+                    cert_id = f"LT-{datetime.now().strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}"
+                    base_url = os.environ.get("FRONTEND_URL", "https://portal.legacytranslations.com")
+                    verification_url = f"{base_url}/#/verify/{cert_id}"
+
+                    # Minimal certification data so the verification page can still be generated
+                    certification_data = {
+                        "certification_id": cert_id,
+                        "order_id": order_id,
+                        "order_number": order.get("order_number"),
+                        "document_type": order.get("document_type", "Document"),
+                        "source_language": order.get("source_language", ""),
+                        "target_language": order.get("target_language", ""),
+                        "page_count": 1,
+                        "document_hash": "",
+                        "certifier_name": certifier_name if certifier_name not in ["Admin (Self)", "Admin", "Self", None, ""] else "Beatriz Paiva",
+                        "certifier_title": "Legal Representative",
+                        "certifier_credentials": "ATA Member # 275993",
+                        "company_name": "Legacy Translations Inc.",
+                        "company_address": "867 Boylston Street, 5th Floor, #2073, Boston, MA 02116",
+                        "company_phone": "(857) 316-7770",
+                        "company_email": "contact@legacytranslations.com",
+                        "client_name": order.get("client_name", ""),
+                        "certified_at": datetime.utcnow(),
+                        "is_valid": True,
+                        "verification_url": verification_url,
+                        "qr_code_data": None
+                    }
+
+                    # Try to store in DB but don't fail if it doesn't work
+                    try:
+                        await db.certifications.insert_one(certification_data)
+                        logger.info(f"Retry certification succeeded: {cert_id}")
+                    except Exception:
+                        logger.warning(f"Could not store certification in DB, but verification page will still be generated: {cert_id}")
+
+                except Exception as retry_err:
+                    logger.error(f"Retry certification also failed: {str(retry_err)}")
+                    # certification_data remains None - verification page will be skipped
+
+        if include_verification_page and not certification_data:
+            logger.warning(f"VERIFICATION PAGE WILL BE MISSING for order {order.get('order_number')} - certification_data is None")
+
         # ==================== GENERATE COMBINED PDF OR SEPARATE ATTACHMENTS ====================
         if generate_combined_pdf:
             # Generate a single combined PDF with all parts

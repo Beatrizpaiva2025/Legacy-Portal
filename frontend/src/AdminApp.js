@@ -15026,6 +15026,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const openDeliveryModal = async (order) => {
     setDeliveryModalOrder(order);
     setDeliveryStatus('');
+    setDeliveryIncludeVerification(true); // Always reset to include verification page
     setShowDeliveryModal(true);
 
     // Fetch the translation HTML
