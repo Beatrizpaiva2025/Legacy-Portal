@@ -15393,14 +15393,18 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     }
   };
 
-  // Poll for notifications and partner messages
+  // Poll for notifications and partner messages (partner messages admin only)
   useEffect(() => {
     if (adminKey && (isAdmin || isPM)) {
       fetchNotifications();
-      fetchPartnerMessages();
+      if (isAdmin) {
+        fetchPartnerMessages();
+      }
       const interval = setInterval(() => {
         fetchNotifications();
-        fetchPartnerMessages();
+        if (isAdmin) {
+          fetchPartnerMessages();
+        }
       }, 30000); // Every 30 seconds
       return () => clearInterval(interval);
     }
@@ -15900,8 +15904,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         </div>
       )}
 
-      {/* Partner Messages Bell - Discreet message indicator */}
-      {partnerMessages.filter(m => !m.read).length > 0 && (
+      {/* Partner Messages Bell - Discreet message indicator (admin only) */}
+      {isAdmin && partnerMessages.filter(m => !m.read).length > 0 && (
         <div className="fixed bottom-4 right-4 z-40">
           <button
             onClick={() => setShowPartnerMessages(!showPartnerMessages)}
@@ -32911,14 +32915,16 @@ const SalesControlPage = ({ adminKey }) => {
 // ==================== FLOATING CHAT WIDGET ====================
 const FloatingChatWidget = ({ adminKey, user }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [recipientType, setRecipientType] = useState('translator'); // 'translator' or 'partner'
+  const [recipientType, setRecipientType] = useState('translator'); // 'translator', 'partner', or 'pm'
   const [selectedRecipient, setSelectedRecipient] = useState('');
   const [messageContent, setMessageContent] = useState('');
   const [sending, setSending] = useState(false);
   const [translators, setTranslators] = useState([]);
   const [partners, setPartners] = useState([]);
+  const [pms, setPms] = useState([]);
   const [partnerUnreadCount, setPartnerUnreadCount] = useState(0);
   const [externalUnreadCount, setExternalUnreadCount] = useState(0);
+  const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
     if (isOpen) {
@@ -32927,13 +32933,15 @@ const FloatingChatWidget = ({ adminKey, user }) => {
   }, [isOpen, recipientType]);
 
   useEffect(() => {
-    // Fetch unread partner messages count
+    // Fetch unread partner messages count (admin only)
     const fetchUnread = async () => {
       try {
-        // Partner messages
-        const partnerResponse = await axios.get(`${API}/admin/partner-messages?admin_key=${adminKey}&limit=100`);
-        const partnerUnread = (partnerResponse.data.messages || []).filter(m => !m.read).length;
-        setPartnerUnreadCount(partnerUnread);
+        // Partner messages - only for admin
+        if (isAdmin) {
+          const partnerResponse = await axios.get(`${API}/admin/partner-messages?admin_key=${adminKey}&limit=100`);
+          const partnerUnread = (partnerResponse.data.messages || []).filter(m => !m.read).length;
+          setPartnerUnreadCount(partnerUnread);
+        }
 
         // External messages (WhatsApp bot quotes pending review)
         const botResponse = await axios.get(`${API}/bot/quotes?admin_key=${adminKey}&status=pending`);
@@ -32946,13 +32954,16 @@ const FloatingChatWidget = ({ adminKey, user }) => {
     fetchUnread();
     const interval = setInterval(fetchUnread, 30000);
     return () => clearInterval(interval);
-  }, [adminKey]);
+  }, [adminKey, isAdmin]);
 
   const fetchRecipients = async () => {
     try {
       if (recipientType === 'translator') {
         const response = await axios.get(`${API}/admin/users/by-role/translator?admin_key=${adminKey}`);
         setTranslators(response.data || []);
+      } else if (recipientType === 'pm') {
+        const response = await axios.get(`${API}/admin/users/by-role/pm?admin_key=${adminKey}`);
+        setPms(response.data || []);
       } else {
         const response = await axios.get(`${API}/admin/partners?admin_key=${adminKey}`);
         setPartners(response.data.partners || []);
@@ -32972,6 +32983,15 @@ const FloatingChatWidget = ({ adminKey, user }) => {
           translator_id: selectedRecipient,
           translator_name: translator?.name || 'Translator',
           translator_email: translator?.email || '',
+          content: messageContent,
+          admin_name: user?.name || 'Admin'
+        });
+      } else if (recipientType === 'pm') {
+        const pm = pms.find(p => p.id === selectedRecipient);
+        await axios.post(`${API}/admin/translator-messages?admin_key=${adminKey}`, {
+          translator_id: selectedRecipient,
+          translator_name: pm?.name || 'PM',
+          translator_email: pm?.email || '',
           content: messageContent,
           admin_name: user?.name || 'Admin'
         });
@@ -33038,7 +33058,7 @@ const FloatingChatWidget = ({ adminKey, user }) => {
           {/* Header */}
           <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4">
             <h3 className="font-bold text-lg">Send Message</h3>
-            <p className="text-xs text-blue-100">Contact translators or partners</p>
+            <p className="text-xs text-blue-100">Contact translators, PMs{isAdmin ? ' or partners' : ''}</p>
           </div>
 
           {/* Content */}
@@ -33056,6 +33076,17 @@ const FloatingChatWidget = ({ adminKey, user }) => {
                 Translator
               </button>
               <button
+                onClick={() => { setRecipientType('pm'); setSelectedRecipient(''); }}
+                className={`flex-1 py-2 text-sm font-medium transition-colors ${
+                  recipientType === 'pm'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                PM
+              </button>
+              {isAdmin && (
+              <button
                 onClick={() => { setRecipientType('partner'); setSelectedRecipient(''); }}
                 className={`flex-1 py-2 text-sm font-medium transition-colors ${
                   recipientType === 'partner'
@@ -33065,12 +33096,13 @@ const FloatingChatWidget = ({ adminKey, user }) => {
               >
                 Partner
               </button>
+              )}
             </div>
 
             {/* Recipient Select */}
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">
-                Select {recipientType === 'translator' ? 'Translator' : 'Partner'}:
+                Select {recipientType === 'translator' ? 'Translator' : recipientType === 'pm' ? 'PM' : 'Partner'}:
               </label>
               <select
                 value={selectedRecipient}
@@ -33081,6 +33113,10 @@ const FloatingChatWidget = ({ adminKey, user }) => {
                 {recipientType === 'translator'
                   ? translators.map(t => (
                       <option key={t.id} value={t.id}>{t.name}</option>
+                    ))
+                  : recipientType === 'pm'
+                  ? pms.map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
                     ))
                   : partners.map(p => (
                       <option key={p.id} value={p.id}>{p.company_name || p.contact_name}</option>

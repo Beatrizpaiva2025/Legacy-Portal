@@ -16700,9 +16700,9 @@ async def mark_conversation_read(conversation_id: str, token: str):
 
 @api_router.get("/admin/partner-messages")
 async def get_admin_partner_messages(admin_key: str, limit: int = 50):
-    """Get messages sent by partners for admin view"""
+    """Get messages sent by partners - admin only"""
     user_info = await validate_admin_or_user_token(admin_key)
-    if not user_info or user_info.get("role") not in ["admin", "pm", "translator", "contractor", "inhouse"]:
+    if not user_info or user_info.get("role") not in ["admin"]:
         raise HTTPException(status_code=401, detail="Invalid admin key or insufficient permissions")
 
     messages = await db.partner_messages.find().sort("created_at", -1).limit(limit).to_list(limit)
@@ -16717,9 +16717,9 @@ async def get_admin_partner_messages(admin_key: str, limit: int = 50):
 
 @api_router.put("/admin/partner-messages/{message_id}/read")
 async def mark_partner_message_read(message_id: str, admin_key: str):
-    """Mark a partner message as read by admin"""
+    """Mark a partner message as read - admin only"""
     user_info = await validate_admin_or_user_token(admin_key)
-    if not user_info or user_info.get("role") not in ["admin", "pm", "translator", "contractor", "inhouse"]:
+    if not user_info or user_info.get("role") not in ["admin"]:
         raise HTTPException(status_code=401, detail="Invalid admin key or insufficient permissions")
 
     result = await db.partner_messages.update_one(
@@ -16742,9 +16742,9 @@ class ReplyToPartnerRequest(BaseModel):
 
 @api_router.post("/admin/partner-messages/{message_id}/reply")
 async def reply_to_partner_message(message_id: str, request: ReplyToPartnerRequest, admin_key: str):
-    """Admin replies to a partner message via email and stores in portal"""
+    """Admin replies to a partner message via email and stores in portal - admin only"""
     user_info = await validate_admin_or_user_token(admin_key)
-    if not user_info or user_info.get("role") not in ["admin", "pm", "translator", "contractor", "inhouse"]:
+    if not user_info or user_info.get("role") not in ["admin"]:
         raise HTTPException(status_code=401, detail="Invalid admin key or insufficient permissions")
 
     # Get the original message
