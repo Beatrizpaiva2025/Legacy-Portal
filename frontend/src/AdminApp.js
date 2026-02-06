@@ -26906,14 +26906,14 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
   const acceptPmUploadPM = async (orderId) => {
     if (!orderId) return;
-    if (!confirm('Aceitar esta tradução e enviar para o admin? O status será alterado para READY.')) return;
+    if (!confirm('Accept this translation and send to admin for review?')) return;
     setPmAcceptLoading(true);
     try {
       await axios.post(`${API}/admin/accept-pm-upload`, {
         order_id: orderId,
         admin_key: adminKey
       });
-      showToast('Tradução aceita e enviada para o admin!');
+      showToast('Translation accepted and sent to admin for review!');
       // Refresh the order data in selectedProject
       try {
         const resp = await axios.get(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`);
@@ -30459,7 +30459,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-6 text-center">
                       <div className="text-5xl mb-3">🏁</div>
                       <div className="text-xl font-bold text-blue-800 mb-1">FINAL</div>
-                      <p className="text-sm text-blue-600">Esta tradução foi aprovada pelo admin e entregue ao cliente.</p>
+                      <p className="text-sm text-blue-600">This translation has been approved by the admin and delivered to the client.</p>
                       {selectedProject.completed_at && (
                         <p className="text-xs text-blue-500 mt-2">Completed: {new Date(selectedProject.completed_at).toLocaleString()}</p>
                       )}
@@ -30476,13 +30476,13 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     </div>
                   )}
 
-                  {/* READY status - review/accept */}
+                  {/* READY status - sent to admin, waiting for review */}
                   {selectedProject.translation_status === 'pm_upload_ready' && selectedProject.pm_upload_filename && (
                     <div className="bg-green-100 border border-green-400 rounded-lg p-4">
                       <div className="flex items-center gap-2 mb-3">
                         <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white text-sm">✓</div>
                         <div>
-                          <div className="text-sm font-bold text-green-800">Translation Uploaded - READY</div>
+                          <div className="text-sm font-bold text-green-800">Translation Uploaded - Sent to Admin</div>
                           <div className="text-xs text-green-700">Waiting for admin review and approval</div>
                         </div>
                       </div>
@@ -30493,21 +30493,12 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                           <div className="col-span-2"><span className="font-bold text-gray-600">Uploaded:</span> {selectedProject.pm_uploaded_at ? new Date(selectedProject.pm_uploaded_at).toLocaleString() : 'N/A'}</div>
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => downloadPmTranslationPM(selectedProject.id)}
-                          className="flex-1 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700"
-                        >
-                          Open & Review File
-                        </button>
-                        <button
-                          onClick={() => acceptPmUploadPM(selectedProject.id)}
-                          disabled={pmAcceptLoading}
-                          className="flex-1 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded hover:bg-green-700 disabled:opacity-50"
-                        >
-                          {pmAcceptLoading ? 'Sending...' : 'Accept & Send to Admin'}
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => downloadPmTranslationPM(selectedProject.id)}
+                        className="w-full px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700"
+                      >
+                        Download Uploaded File
+                      </button>
                     </div>
                   )}
 
