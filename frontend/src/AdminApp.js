@@ -4774,38 +4774,47 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       return;
     }
 
-    const currentResult = translationResults[selectedResultIndex];
-    if (!currentResult?.translatedText) {
+    // Check if we have any translation
+    if (!translationResults || translationResults.length === 0 || !translationResults[0]?.translatedText) {
       showToast('No translation to proofread');
       return;
     }
 
-    // Extract text from translation (remove HTML tags for proofreading)
-    const translatedText = currentResult.translatedText
-      .replace(/<[^>]*>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
+    // Combine ALL pages' translated text for proofreading
+    const translatedText = translationResults
+      .map((r, idx) => {
+        const text = (r.translatedText || '')
+          .replace(/<[^>]*>/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+        return translationResults.length > 1 ? `[Page ${idx + 1}]\n${text}` : text;
+      })
+      .filter(t => t)
+      .join('\n\n');
 
-    // Get original text (from OCR or extracted)
-    let originalText = ocrResults[selectedResultIndex]?.text ||
-                        currentResult.originalText ||
-                        '';
+    // Combine ALL pages' original text
+    let originalText = translationResults
+      .map((r, idx) => {
+        const text = ocrResults[idx]?.text || r.originalText || '';
+        return translationResults.length > 1 && text ? `[Page ${idx + 1}]\n${text}` : text;
+      })
+      .filter(t => t)
+      .join('\n\n');
 
-    // Check if we have an original image that we can use
-    const originalImage = originalImages[selectedResultIndex];
-    let originalImageBase64 = null;
-
-    if (originalImage?.data) {
-      // Extract base64 from data URL if present
-      if (originalImage.data.startsWith('data:')) {
-        originalImageBase64 = originalImage.data.split(',')[1];
-      } else {
-        originalImageBase64 = originalImage.data;
+    // Collect ALL original images
+    const allOriginalImages = [];
+    originalImages.forEach(img => {
+      if (img?.data) {
+        let imgBase64 = img.data;
+        if (imgBase64.startsWith('data:')) {
+          imgBase64 = imgBase64.split(',')[1];
+        }
+        allOriginalImages.push(imgBase64);
       }
-    }
+    });
 
-    // If no text and no image, show error
-    if (!originalText && !originalImageBase64) {
+    // If no text and no images, show error
+    if (!originalText && allOriginalImages.length === 0) {
       showToast('No original document available for comparison. Please upload the original document in the Original Document section.');
       return;
     }
@@ -4819,8 +4828,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          original_text: originalText || 'See attached image',
-          original_image: originalImageBase64,
+          original_text: originalText || 'See attached images',
+          original_image: allOriginalImages.length === 1 ? allOriginalImages[0] : null,
+          original_images: allOriginalImages.length > 1 ? allOriginalImages : null,
           translated_text: translatedText,
           source_language: sourceLanguage,
           target_language: targetLanguage,
@@ -11414,6 +11424,29 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         <p className="text-xs text-gray-600">{proofreadingResult.observacoes}</p>
                       </div>
                     )}
+
+                    {/* Correction Command - Send instructions to Claude to fix translation */}
+                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        📝 Send Command to Claude (correct/modify translation)
+                      </label>
+                      <div className="flex space-x-2">
+                        <input
+                          type="text"
+                          value={correctionCommand}
+                          onChange={(e) => setCorrectionCommand(e.target.value)}
+                          placeholder='e.g., "Fix formatting" or "Change word X to Y"'
+                          className="flex-1 px-2 py-1.5 text-xs border rounded"
+                        />
+                        <button
+                          onClick={handleApplyCorrection}
+                          disabled={!correctionCommand.trim() || applyingCorrection}
+                          className="px-3 py-1.5 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 disabled:bg-gray-300"
+                        >
+                          {applyingCorrection ? '⏳' : '✨ Apply'}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
 

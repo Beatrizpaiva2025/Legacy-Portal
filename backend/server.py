@@ -19517,6 +19517,7 @@ class ProofreadRequest(BaseModel):
     document_type: str = "General Document"
     claude_api_key: str
     original_image: Optional[str] = None  # Base64 encoded image for vision-based proofreading
+    original_images: Optional[List[str]] = None  # Multiple images for multi-page documents
 
 # Special characters by language
 LANGUAGE_SPECIAL_CHARS = {
@@ -19965,66 +19966,67 @@ Referência de traduções aprovadas - verifique se foram seguidas:
             glossary_and_tm_terms
         )
 
-        # Build the message content based on whether we have an image or just text
-        if request.original_image:
-            # Compress image if too large to avoid Claude API size limits
-            image_data = request.original_image
+        # Collect all original images (single or multiple)
+        all_images = []
+        if request.original_images and len(request.original_images) > 0:
+            all_images = request.original_images
+        elif request.original_image:
+            all_images = [request.original_image]
+
+        # Helper to compress a single image for proofreading
+        def compress_proofread_image(raw_b64: str) -> tuple:
             media_type = "image/png"
             try:
-                # Decode base64 image
-                import io
-                image_bytes = base64.b64decode(image_data)
-                img = Image.open(io.BytesIO(image_bytes))
-
-                # Check if image needs resizing (max 1500px on longest side for API limits)
-                max_dimension = 1500
-                if img.width > max_dimension or img.height > max_dimension:
-                    # Calculate new size maintaining aspect ratio
-                    ratio = min(max_dimension / img.width, max_dimension / img.height)
-                    new_size = (int(img.width * ratio), int(img.height * ratio))
-                    img = img.resize(new_size, Image.Resampling.LANCZOS)
-                    logger.info(f"Resized image from {request.original_image[:50]}... to {new_size}")
-
-                # Convert to RGB if necessary (for JPEG)
-                if img.mode in ('RGBA', 'P'):
-                    img = img.convert('RGB')
-
-                # Compress as JPEG with quality 85
-                buffer = io.BytesIO()
-                img.save(buffer, format='JPEG', quality=85, optimize=True)
-                image_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
-                media_type = "image/jpeg"
-                logger.info(f"Compressed image for proofreading: original ~{len(request.original_image)//1024}KB, compressed ~{len(image_data)//1024}KB")
+                image_bytes = base64.b64decode(raw_b64)
+                compressed_bytes, final_media_type = compress_image_for_claude_api(image_bytes, media_type)
+                return base64.b64encode(compressed_bytes).decode('utf-8'), final_media_type
             except Exception as e:
                 logger.warning(f"Could not compress image, using original: {str(e)}")
-                # Use original image if compression fails
-                image_data = request.original_image
+                return raw_b64, media_type
 
-            # Use Claude Vision API with image
-            user_content = [
-                {
+        # Build the message content based on whether we have images or just text
+        if all_images:
+            user_content = []
+
+            total_pages = len(all_images)
+            if total_pages > 1:
+                user_content.append({
+                    "type": "text",
+                    "text": f"Este DOCUMENTO ORIGINAL em {request.source_language} tem {total_pages} páginas. Analise TODAS as páginas:"
+                })
+            else:
+                user_content.append({
                     "type": "text",
                     "text": f"Este é o DOCUMENTO ORIGINAL em {request.source_language} (veja a imagem anexa):"
-                },
-                {
+                })
+
+            # Add all images
+            for idx, img_b64 in enumerate(all_images):
+                compressed_data, media_type = compress_proofread_image(img_b64)
+                if total_pages > 1:
+                    user_content.append({
+                        "type": "text",
+                        "text": f"--- Página {idx + 1} de {total_pages} ---"
+                    })
+                user_content.append({
                     "type": "image",
                     "source": {
                         "type": "base64",
                         "media_type": media_type,
-                        "data": image_data
+                        "data": compressed_data
                     }
-                },
-                {
-                    "type": "text",
-                    "text": f"""
+                })
+
+            user_content.append({
+                "type": "text",
+                "text": f"""
 === TRADUÇÃO ({request.target_language}) ===
 {request.translated_text}
 === FIM DA TRADUÇÃO ===
 
-Compare a imagem do documento original acima com a tradução fornecida.
-Analise minuciosamente e retorne o JSON com todos os erros encontrados."""
-                }
-            ]
+Compare {'todas as páginas do' if total_pages > 1 else 'a imagem do'} documento original acima com a tradução fornecida.
+Analise minuciosamente TODAS as páginas e retorne o JSON com todos os erros encontrados."""
+            })
             messages = [{"role": "user", "content": user_content}]
         else:
             # Text-only proofreading
