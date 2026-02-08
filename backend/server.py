@@ -12541,11 +12541,7 @@ async def send_invoice_payment_reminder(invoice_id: str, admin_key: str):
         """
 
         # Send email
-        await send_email(
-            to_email=partner_email,
-            subject=subject,
-            html_content=email_html
-        )
+        await email_service.send_email(partner_email, subject, email_html)
 
         # Update invoice with reminder info
         await db.partner_invoices.update_one(
@@ -12719,11 +12715,7 @@ async def send_bulk_invoice_reminders(admin_key: str, days_before_due: int = 3, 
                 </div>
                 """
 
-                await send_email(
-                    to_email=partner_email,
-                    subject=subject,
-                    html_content=email_html
-                )
+                await email_service.send_email(partner_email, subject, email_html)
 
                 # Update invoice
                 await db.partner_invoices.update_one(
