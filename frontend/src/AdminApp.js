@@ -5033,13 +5033,22 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     return { updatedHtml, replaced };
   };
 
+  // Strip trailing parenthetical comments from suggestion text (e.g. "corrected text (explanation...)" -> "corrected text")
+  const stripParentheticalComment = (text) => {
+    if (!text) return text;
+    // Remove trailing parenthetical content: "(any explanation here)" or "(truncated...)"
+    return text.replace(/\s*\([^)]*\.{0,3}\)?\s*$/, '').trim();
+  };
+
   // Apply a single proofreading correction
   const applyProofreadingCorrection = (erro, index) => {
     // Handle both field name conventions - traducao_errada is the incorrect English text to find
     const foundText = (erro.traducao_errada || erro.found || '').trim();
     const suggestionText = (erro.correcao || erro.sugestao || '').trim();
+    // Strip parenthetical comments - they should only appear in observations, not in the applied text
+    const cleanSuggestion = stripParentheticalComment(suggestionText);
 
-    if (!foundText || !suggestionText) {
+    if (!foundText || !cleanSuggestion) {
       showToast('Cannot apply correction: missing original text or suggestion');
       return;
     }
@@ -5047,7 +5056,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     const currentResult = translationResults[selectedResultIndex];
     if (!currentResult?.translatedText) return;
 
-    const result = tryReplaceText(currentResult.translatedText, foundText, suggestionText);
+    const result = tryReplaceText(currentResult.translatedText, foundText, cleanSuggestion);
 
     if (!result.replaced) {
       showToast(`Could not find text to replace: "${foundText.substring(0, 50)}${foundText.length > 50 ? '...' : ''}"\n\nThe text may have been modified or contains special formatting.`);
@@ -5062,7 +5071,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       translatedText: result.updatedHtml,
       appliedCorrections: [...appliedCorrections, {
         original: foundText,
-        corrected: suggestionText,
+        corrected: cleanSuggestion,
         timestamp: Date.now()
       }]
     };
@@ -5097,15 +5106,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       // Handle both field name conventions - traducao_errada is the incorrect English text to find
       const foundText = (erro.traducao_errada || erro.found || '').trim();
       const suggestionText = (erro.correcao || erro.sugestao || '').trim();
+      // Strip parenthetical comments - they should only appear in observations, not in the applied text
+      const cleanSuggestion = stripParentheticalComment(suggestionText);
 
-      if (foundText && suggestionText && !erro.applied) {
-        const result = tryReplaceText(updatedHtml, foundText, suggestionText);
+      if (foundText && cleanSuggestion && !erro.applied) {
+        const result = tryReplaceText(updatedHtml, foundText, cleanSuggestion);
         if (result.replaced) {
           updatedHtml = result.updatedHtml;
           appliedCount++;
           newAppliedCorrections.push({
             original: foundText,
-            corrected: suggestionText,
+            corrected: cleanSuggestion,
             timestamp: Date.now()
           });
           return { ...erro, applied: true };
