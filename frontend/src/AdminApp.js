@@ -1080,7 +1080,7 @@ const TopBar = ({
     { id: 'new-quote', label: 'New Quote', icon: '📝', roles: ['sales'] },
     { id: 'translation', label: 'Translation', icon: '✍️', roles: ['admin', 'pm', 'translator'] },
     { id: 'production', label: 'Reports', icon: '📊', roles: ['admin'] },
-    { id: 'finances', label: 'Finances', icon: '💰', roles: ['admin'] },
+    { id: 'finances', label: 'Partners', icon: '🤝', roles: ['admin'] },
     { id: 'followups', label: 'Follow-ups', icon: '🔔', roles: ['admin'] },
     { id: 'pm-dashboard', label: 'PM Dashboard', icon: '🎯', roles: ['pm'] },
     { id: 'sales-control', label: 'Sales', icon: '📈', roles: ['admin'] },
@@ -23401,7 +23401,7 @@ const FinancesPage = ({ adminKey }) => {
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState('month');
-  const [activeView, setActiveView] = useState('overview'); // overview, expenses, quickbooks, partners, pages
+  const [activeView, setActiveView] = useState('partners'); // overview, expenses, quickbooks, partners, pages
   // Translator payments state
   const [translators, setTranslators] = useState([]);
   const [translatorPayments, setTranslatorPayments] = useState([]);
@@ -23433,6 +23433,9 @@ const FinancesPage = ({ adminKey }) => {
   const [creatingInvoice, setCreatingInvoice] = useState(false);
   const [showInvoicesModal, setShowInvoicesModal] = useState(false);
   const [selectedPartnerInvoices, setSelectedPartnerInvoices] = useState([]);
+  // Partner filter and search state
+  const [partnerFilter, setPartnerFilter] = useState('all'); // all, registered, prospect
+  const [partnerSearchQuery, setPartnerSearchQuery] = useState('');
   // Bulk partner selection state
   const [selectedPartnerIds, setSelectedPartnerIds] = useState([]);
   const [showBulkEmailModal, setShowBulkEmailModal] = useState(false);
@@ -25402,35 +25405,69 @@ const FinancesPage = ({ adminKey }) => {
 
           {/* Partners Table */}
           <div className="bg-white rounded-lg shadow">
-            <div className="p-4 border-b bg-gray-50 flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-bold text-gray-700">🤝 Partner Companies</h2>
-                <p className="text-xs text-gray-500 mt-1">Revenue from Partner Portal orders</p>
+            <div className="p-4 border-b bg-gray-50">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h2 className="text-sm font-bold text-gray-700">🤝 Partner Companies</h2>
+                  <p className="text-xs text-gray-500 mt-1">Revenue from Partner Portal orders</p>
+                </div>
+                {selectedPartnerIds.length > 0 && (
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs text-gray-600 font-medium">{selectedPartnerIds.length} selected</span>
+                    <button
+                      onClick={() => { setShowBulkEmailModal(true); }}
+                      className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center gap-1"
+                    >
+                      📧 Send Email
+                    </button>
+                    <button
+                      onClick={bulkDeletePartners}
+                      className="px-3 py-1.5 bg-red-600 text-white text-xs rounded hover:bg-red-700 flex items-center gap-1"
+                    >
+                      🗑️ Delete Selected
+                    </button>
+                    <button
+                      onClick={() => setSelectedPartnerIds([])}
+                      className="px-2 py-1.5 text-gray-500 text-xs rounded hover:bg-gray-200"
+                      title="Clear selection"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
               </div>
-              {selectedPartnerIds.length > 0 && (
-                <div className="flex items-center space-x-2">
-                  <span className="text-xs text-gray-600 font-medium">{selectedPartnerIds.length} selected</span>
+              {/* Filter Tabs and Search */}
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
                   <button
-                    onClick={() => { setShowBulkEmailModal(true); }}
-                    className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center gap-1"
+                    onClick={() => { setPartnerFilter('all'); setSelectedPartnerIds([]); }}
+                    className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${partnerFilter === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
                   >
-                    📧 Send Email
+                    All ({partnerStats.partners?.length || 0})
                   </button>
                   <button
-                    onClick={bulkDeletePartners}
-                    className="px-3 py-1.5 bg-red-600 text-white text-xs rounded hover:bg-red-700 flex items-center gap-1"
+                    onClick={() => { setPartnerFilter('registered'); setSelectedPartnerIds([]); }}
+                    className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${partnerFilter === 'registered' ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
                   >
-                    🗑️ Delete Selected
+                    Registered ({partnerStats.partners?.filter(p => p.is_real_partner).length || 0})
                   </button>
                   <button
-                    onClick={() => setSelectedPartnerIds([])}
-                    className="px-2 py-1.5 text-gray-500 text-xs rounded hover:bg-gray-200"
-                    title="Clear selection"
+                    onClick={() => { setPartnerFilter('prospect'); setSelectedPartnerIds([]); }}
+                    className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${partnerFilter === 'prospect' ? 'bg-orange-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
                   >
-                    ✕
+                    Prospects ({partnerStats.partners?.filter(p => !p.is_real_partner).length || 0})
                   </button>
                 </div>
-              )}
+                <div className="flex-1 max-w-xs">
+                  <input
+                    type="text"
+                    value={partnerSearchQuery}
+                    onChange={(e) => setPartnerSearchQuery(e.target.value)}
+                    placeholder="Search by name, email, phone..."
+                    className="w-full px-3 py-1.5 border rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -25439,7 +25476,11 @@ const FinancesPage = ({ adminKey }) => {
                     <th className="px-2 py-3 text-center w-10">
                       <input
                         type="checkbox"
-                        checked={selectedPartnerIds.length > 0 && selectedPartnerIds.length === (partnerStats.partners?.filter(p => p.is_real_partner) || []).length}
+                        checked={selectedPartnerIds.length > 0 && selectedPartnerIds.length === (partnerStats.partners?.filter(p => p.is_real_partner && (partnerFilter === 'all' || partnerFilter === 'registered')).filter(p => {
+                          if (!partnerSearchQuery.trim()) return true;
+                          const q = partnerSearchQuery.toLowerCase();
+                          return (p.company_name || '').toLowerCase().includes(q) || (p.email || '').toLowerCase().includes(q) || (p.contact_name || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q);
+                        }) || []).length}
                         onChange={toggleSelectAllPartners}
                         className="rounded border-gray-300"
                         title="Select all partners"
@@ -25457,14 +25498,28 @@ const FinancesPage = ({ adminKey }) => {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {partnerStats.partners?.length === 0 ? (
-                    <tr>
-                      <td colSpan="10" className="px-4 py-8 text-center text-gray-500">
-                        No partner orders found
-                      </td>
-                    </tr>
-                  ) : (
-                    partnerStats.partners?.map((partner) => (
+                  {(() => {
+                    const filteredPartners = (partnerStats.partners || []).filter(p => {
+                      // Filter by type
+                      if (partnerFilter === 'registered' && !p.is_real_partner) return false;
+                      if (partnerFilter === 'prospect' && p.is_real_partner) return false;
+                      // Filter by search query
+                      if (partnerSearchQuery.trim()) {
+                        const q = partnerSearchQuery.toLowerCase();
+                        return (p.company_name || '').toLowerCase().includes(q) || (p.email || '').toLowerCase().includes(q) || (p.contact_name || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q);
+                      }
+                      return true;
+                    });
+                    if (filteredPartners.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan="10" className="px-4 py-8 text-center text-gray-500">
+                            {partnerSearchQuery.trim() ? 'No partners matching your search' : partnerFilter !== 'all' ? `No ${partnerFilter === 'registered' ? 'registered' : 'prospect'} partners found` : 'No partner orders found'}
+                          </td>
+                        </tr>
+                      );
+                    }
+                    return filteredPartners.map((partner) => (
                       <tr key={partner.partner_id} className={`hover:bg-gray-50 ${!partner.is_real_partner ? 'bg-orange-50' : ''} ${selectedPartnerIds.includes(partner.partner_id) ? 'bg-blue-50' : ''}`}>
                         <td className="px-2 py-3 text-center">
                           {partner.is_real_partner && (
@@ -25611,8 +25666,8 @@ const FinancesPage = ({ adminKey }) => {
                           </div>
                         </td>
                       </tr>
-                    ))
-                  )}
+                    ));
+                  })()}
                 </tbody>
               </table>
             </div>
