@@ -24675,29 +24675,53 @@ async def chunk_document_for_translation(original_text: str, original_images: li
     return chunks
 
 
-def compress_image_for_claude_api(img_bytes: bytes, media_type: str = "image/jpeg", max_size: int = 5 * 1024 * 1024) -> tuple:
+def compress_image_for_claude_api(img_bytes: bytes, media_type: str = "image/jpeg", max_size: int = 5 * 1024 * 1024, max_dimension: int = 7900) -> tuple:
     """
-    Compress an image to stay under Claude API's 5MB limit.
+    Compress an image to stay under Claude API's 5MB size limit and 8000px dimension limit.
 
     Args:
         img_bytes: Raw image bytes
         media_type: MIME type of the image
         max_size: Maximum size in bytes (default 5MB)
+        max_dimension: Maximum pixel dimension for width or height (default 7900, API limit is 8000)
 
     Returns:
         tuple: (compressed_bytes, media_type) - always returns JPEG if compression needed
     """
-    # Check if already under limit
-    if len(img_bytes) <= max_size:
-        return img_bytes, media_type
-
     try:
-        # Load image with PIL
+        # Always check pixel dimensions first, even if file size is OK
         img = Image.open(io.BytesIO(img_bytes))
+        needs_resize = img.width > max_dimension or img.height > max_dimension
 
-        # Convert to RGB if necessary (for JPEG output)
-        if img.mode in ('RGBA', 'P', 'LA'):
-            img = img.convert('RGB')
+        if needs_resize:
+            logger.info(f"Image dimensions {img.width}x{img.height} exceed {max_dimension}px limit, resizing...")
+            # Convert to RGB if necessary (for JPEG output)
+            if img.mode in ('RGBA', 'P', 'LA'):
+                img = img.convert('RGB')
+
+            # Calculate new dimensions maintaining aspect ratio
+            ratio = min(max_dimension / img.width, max_dimension / img.height)
+            new_size = (int(img.width * ratio), int(img.height * ratio))
+            img = img.resize(new_size, Image.LANCZOS)
+            logger.info(f"Image resized to {new_size[0]}x{new_size[1]}")
+
+            # Save resized image
+            jpeg_buffer = io.BytesIO()
+            img.save(jpeg_buffer, format='JPEG', quality=85, optimize=True)
+            img_bytes = jpeg_buffer.getvalue()
+            media_type = "image/jpeg"
+
+            # Check if resized image is under size limit
+            if len(img_bytes) <= max_size:
+                return img_bytes, media_type
+        else:
+            # No resize needed - check if file size is already OK
+            if len(img_bytes) <= max_size:
+                return img_bytes, media_type
+
+            # Need to compress - load for processing
+            if img.mode in ('RGBA', 'P', 'LA'):
+                img = img.convert('RGB')
 
         # Try progressively lower quality settings
         quality_levels = [85, 70, 55, 40]
