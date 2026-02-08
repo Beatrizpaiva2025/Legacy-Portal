@@ -31001,7 +31001,7 @@ def get_outreach_first_contact_template() -> str:
                             </p>
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                                 <tr><td align="center" style="padding-bottom: 12px;">
-                                    <a href="https://portal.legacytranslations.com/partner" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #c9a227 0%, #d4af37 100%); color: #1a2a4a; text-decoration: none; padding: 16px 40px; border-radius: 50px; font-size: 15px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(201, 162, 39, 0.4); width: 280px; text-align: center;">REGISTER FOR ACCESS</a>
+                                    <a href="https://portal.legacytranslations.com/#/partner" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #c9a227 0%, #d4af37 100%); color: #1a2a4a; text-decoration: none; padding: 16px 40px; border-radius: 50px; font-size: 15px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(201, 162, 39, 0.4); width: 280px; text-align: center;">REGISTER FOR ACCESS</a>
                                 </td></tr>
                                 <tr><td align="center" style="padding-top: 8px;">
                                     <a href="https://calendly.com/legacytranslations/30min" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); color: #ffffff; text-decoration: none; padding: 14px 40px; border-radius: 50px; font-size: 14px; font-weight: 600; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(26, 42, 74, 0.3); width: 280px; text-align: center;">SCHEDULE A BRIEF CALL</a>
@@ -31051,7 +31051,7 @@ def get_outreach_followup1_template(partner_name: str) -> str:
                             </p>
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                                 <tr><td align="center">
-                                    <a href="https://portal.legacytranslations.com/partner" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 50px; font-size: 15px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(34, 197, 94, 0.4); width: 280px; text-align: center;">CLAIM YOUR FREE TRANSLATION</a>
+                                    <a href="https://portal.legacytranslations.com/#/partner" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 50px; font-size: 15px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(34, 197, 94, 0.4); width: 280px; text-align: center;">CLAIM YOUR FREE TRANSLATION</a>
                                 </td></tr>
                             </table>'''
     signature = get_outreach_signature()
@@ -31105,7 +31105,7 @@ def get_outreach_followup2_template(partner_name: str) -> str:
                             </p>
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                                 <tr><td align="center" style="padding-bottom: 12px;">
-                                    <a href="https://portal.legacytranslations.com/partner" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #c9a227 0%, #d4af37 100%); color: #1a2a4a; text-decoration: none; padding: 16px 40px; border-radius: 50px; font-size: 15px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(201, 162, 39, 0.4); width: 280px; text-align: center;">START YOUR FREE TRIAL</a>
+                                    <a href="https://portal.legacytranslations.com/#/partner" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #c9a227 0%, #d4af37 100%); color: #1a2a4a; text-decoration: none; padding: 16px 40px; border-radius: 50px; font-size: 15px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(201, 162, 39, 0.4); width: 280px; text-align: center;">START YOUR FREE TRIAL</a>
                                 </td></tr>
                                 <tr><td align="center" style="padding-top: 8px;">
                                     <a href="https://calendly.com/legacytranslations/30min" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); color: #ffffff; text-decoration: none; padding: 14px 40px; border-radius: 50px; font-size: 14px; font-weight: 600; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(26, 42, 74, 0.3); width: 280px; text-align: center;">SCHEDULE A QUICK CALL</a>
@@ -31148,7 +31148,7 @@ def get_outreach_followup3_template(partner_name: str) -> str:
                             </p>
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                                 <tr><td align="center">
-                                    <a href="https://portal.legacytranslations.com/partner" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #c9a227 0%, #d4af37 100%); color: #1a2a4a; text-decoration: none; padding: 16px 40px; border-radius: 50px; font-size: 15px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(201, 162, 39, 0.4); width: 280px; text-align: center;">REGISTER FOR FREE TRIAL</a>
+                                    <a href="https://portal.legacytranslations.com/#/partner" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #c9a227 0%, #d4af37 100%); color: #1a2a4a; text-decoration: none; padding: 16px 40px; border-radius: 50px; font-size: 15px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(201, 162, 39, 0.4); width: 280px; text-align: center;">REGISTER FOR FREE TRIAL</a>
                                 </td></tr>
                             </table>'''
     signature = get_outreach_signature()

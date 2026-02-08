@@ -921,7 +921,7 @@ const CustomerLoginPage = ({ onLogin, t }) => {
         <div className="mt-6 pt-6 border-t text-center">
           <p className="text-sm text-gray-500">
             {t.areYouPartner}{' '}
-            <a href="/partner" className="text-teal-600 hover:underline">
+            <a href="/#/partner" className="text-teal-600 hover:underline">
               {t.goToPartnerPortal}
             </a>
           </p>
