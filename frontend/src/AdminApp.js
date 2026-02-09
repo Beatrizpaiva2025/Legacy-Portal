@@ -24076,11 +24076,96 @@ const FinancesPage = ({ adminKey }) => {
   };
 
   const toggleSelectAllPartners = () => {
-    const realPartners = partnerStats.partners?.filter(p => p.is_real_partner) || [];
-    if (selectedPartnerIds.length === realPartners.length) {
+    const isRegisteredPartner = (p) => p.is_real_partner && p.payment_plan_approved && (p.payment_plan === 'biweekly' || p.payment_plan === 'monthly');
+    const visiblePartners = (partnerStats.partners || []).filter(p => {
+      if (partnerFilter === 'registered' && !isRegisteredPartner(p)) return false;
+      if (partnerFilter === 'prospect' && isRegisteredPartner(p)) return false;
+      if (partnerFilter === 'archived' && p.prospect_status !== 'archived') return false;
+      if (partnerFilter === 'prospect' && p.prospect_status === 'archived') return false;
+      if (partnerSearchQuery.trim()) {
+        const q = partnerSearchQuery.toLowerCase();
+        return (p.company_name || '').toLowerCase().includes(q) || (p.email || '').toLowerCase().includes(q) || (p.contact_name || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q);
+      }
+      return true;
+    });
+    const allVisibleSelected = visiblePartners.length > 0 && visiblePartners.every(p => selectedPartnerIds.includes(p.partner_id));
+    if (allVisibleSelected) {
       setSelectedPartnerIds([]);
     } else {
-      setSelectedPartnerIds(realPartners.map(p => p.partner_id));
+      setSelectedPartnerIds(visiblePartners.map(p => p.partner_id));
+    }
+  };
+
+  // Send prospect outreach email (next step in sequence)
+  const sendProspectStepEmail = async (partnerId, companyName, currentStatus) => {
+    const stepMap = { 'new': 'first_contact', 'first_email': 'followup_1', 'follow_up_1': 'followup_2' };
+    const stepLabels = { 'new': '1st Email', 'first_email': 'Follow-up 1', 'follow_up_1': 'Follow-up 2' };
+    const nextStep = stepMap[currentStatus || 'new'];
+    const label = stepLabels[currentStatus || 'new'];
+    if (!nextStep) { showToast('All email steps completed for this prospect'); return; }
+    if (!window.confirm(`Send "${label}" to ${companyName}?`)) return;
+    try {
+      const res = await axios.post(`${API}/admin/partners/${partnerId}/prospect-step?admin_key=${adminKey}`);
+      showToast(res.data.message || `${label} sent successfully!`);
+      fetchPartnerStats();
+    } catch (err) {
+      showToast('Error: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  // Archive prospect (after all follow-ups with no response)
+  const archiveProspect = async (partnerId, companyName) => {
+    if (!window.confirm(`Archive prospect "${companyName}"? It will move to the Archived tab.`)) return;
+    try {
+      await axios.post(`${API}/admin/partners/${partnerId}/archive?admin_key=${adminKey}`);
+      showToast(`${companyName} archived`);
+      fetchPartnerStats();
+    } catch (err) {
+      showToast('Error: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  // Unarchive prospect
+  const unarchiveProspect = async (partnerId, companyName) => {
+    if (!window.confirm(`Unarchive "${companyName}"? It will move back to Prospects.`)) return;
+    try {
+      await axios.post(`${API}/admin/partners/${partnerId}/unarchive?admin_key=${adminKey}`);
+      showToast(`${companyName} unarchived`);
+      fetchPartnerStats();
+    } catch (err) {
+      showToast('Error: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  // Bulk send next prospect step email
+  const bulkSendProspectStep = async () => {
+    if (selectedPartnerIds.length === 0) { showToast('No partners selected'); return; }
+    if (!window.confirm(`Send the next outreach email step to ${selectedPartnerIds.length} prospect(s)?`)) return;
+    try {
+      const res = await axios.post(`${API}/admin/partners/bulk-prospect-step?admin_key=${adminKey}`, {
+        partner_ids: selectedPartnerIds
+      });
+      showToast(res.data.message || 'Emails sent!');
+      setSelectedPartnerIds([]);
+      fetchPartnerStats();
+    } catch (err) {
+      showToast('Error: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  // Bulk archive prospects
+  const bulkArchiveProspects = async () => {
+    if (selectedPartnerIds.length === 0) { showToast('No partners selected'); return; }
+    if (!window.confirm(`Archive ${selectedPartnerIds.length} prospect(s)?`)) return;
+    try {
+      const res = await axios.post(`${API}/admin/partners/bulk-archive?admin_key=${adminKey}`, {
+        partner_ids: selectedPartnerIds
+      });
+      showToast(res.data.message || 'Prospects archived!');
+      setSelectedPartnerIds([]);
+      fetchPartnerStats();
+    } catch (err) {
+      showToast('Error: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -25428,6 +25513,22 @@ const FinancesPage = ({ adminKey }) => {
                 {selectedPartnerIds.length > 0 && (
                   <div className="flex items-center space-x-2">
                     <span className="text-xs text-gray-600 font-medium">{selectedPartnerIds.length} selected</span>
+                    {(partnerFilter === 'prospect') && (
+                      <>
+                        <button
+                          onClick={bulkSendProspectStep}
+                          className="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 flex items-center gap-1"
+                        >
+                          📧 Send Next Step
+                        </button>
+                        <button
+                          onClick={bulkArchiveProspects}
+                          className="px-3 py-1.5 bg-gray-600 text-white text-xs rounded hover:bg-gray-700 flex items-center gap-1"
+                        >
+                          📁 Archive
+                        </button>
+                      </>
+                    )}
                     <button
                       onClick={() => { setShowBulkEmailModal(true); }}
                       className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center gap-1"
@@ -25469,7 +25570,13 @@ const FinancesPage = ({ adminKey }) => {
                     onClick={() => { setPartnerFilter('prospect'); setSelectedPartnerIds([]); }}
                     className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${partnerFilter === 'prospect' ? 'bg-orange-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
                   >
-                    Prospects ({partnerStats.partners?.filter(p => !p.is_real_partner || !p.payment_plan_approved || (p.payment_plan !== 'biweekly' && p.payment_plan !== 'monthly')).length || 0})
+                    Prospects ({partnerStats.partners?.filter(p => (!p.is_real_partner || !p.payment_plan_approved || (p.payment_plan !== 'biweekly' && p.payment_plan !== 'monthly')) && p.prospect_status !== 'archived').length || 0})
+                  </button>
+                  <button
+                    onClick={() => { setPartnerFilter('archived'); setSelectedPartnerIds([]); }}
+                    className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${partnerFilter === 'archived' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                  >
+                    Archived ({partnerStats.partners?.filter(p => p.prospect_status === 'archived').length || 0})
                   </button>
                 </div>
                 <div className="flex-1 max-w-xs">
@@ -25490,12 +25597,7 @@ const FinancesPage = ({ adminKey }) => {
                     <th className="px-2 py-3 text-center w-10">
                       <input
                         type="checkbox"
-                        checked={selectedPartnerIds.length > 0 && selectedPartnerIds.length === (partnerStats.partners?.filter(p => p.is_real_partner && p.payment_plan_approved && (p.payment_plan === 'biweekly' || p.payment_plan === 'monthly')).filter(p => {
-                          if (partnerFilter === 'prospect') return false;
-                          if (!partnerSearchQuery.trim()) return true;
-                          const q = partnerSearchQuery.toLowerCase();
-                          return (p.company_name || '').toLowerCase().includes(q) || (p.email || '').toLowerCase().includes(q) || (p.contact_name || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q);
-                        }) || []).length}
+                        checked={selectedPartnerIds.length > 0}
                         onChange={toggleSelectAllPartners}
                         className="rounded border-gray-300"
                         title="Select all partners"
@@ -25516,9 +25618,10 @@ const FinancesPage = ({ adminKey }) => {
                   {(() => {
                     const isRegisteredPartner = (p) => p.is_real_partner && p.payment_plan_approved && (p.payment_plan === 'biweekly' || p.payment_plan === 'monthly');
                     const filteredPartners = (partnerStats.partners || []).filter(p => {
-                      // Filter by type: Registered = approved biweekly/monthly, Prospect = all others
+                      // Filter by type
                       if (partnerFilter === 'registered' && !isRegisteredPartner(p)) return false;
-                      if (partnerFilter === 'prospect' && isRegisteredPartner(p)) return false;
+                      if (partnerFilter === 'prospect' && (isRegisteredPartner(p) || p.prospect_status === 'archived')) return false;
+                      if (partnerFilter === 'archived' && p.prospect_status !== 'archived') return false;
                       // Filter by search query
                       if (partnerSearchQuery.trim()) {
                         const q = partnerSearchQuery.toLowerCase();
@@ -25540,21 +25643,35 @@ const FinancesPage = ({ adminKey }) => {
                       return (
                       <tr key={partner.partner_id} className={`hover:bg-gray-50 ${!isApproved ? 'bg-orange-50' : ''} ${selectedPartnerIds.includes(partner.partner_id) ? 'bg-blue-50' : ''}`}>
                         <td className="px-2 py-3 text-center">
-                          {isApproved && (
-                            <input
-                              type="checkbox"
-                              checked={selectedPartnerIds.includes(partner.partner_id)}
-                              onChange={() => togglePartnerSelection(partner.partner_id)}
-                              className="rounded border-gray-300"
-                            />
-                          )}
+                          <input
+                            type="checkbox"
+                            checked={selectedPartnerIds.includes(partner.partner_id)}
+                            onChange={() => togglePartnerSelection(partner.partner_id)}
+                            className="rounded border-gray-300"
+                          />
                         </td>
                         <td className="px-4 py-3">
                           <div className="font-medium text-gray-800">
                             {partner.company_name}
                             {!isApproved && (
-                              <span className="ml-2 px-1.5 py-0.5 text-xs bg-orange-200 text-orange-700 rounded" title={!partner.is_real_partner ? 'Not a registered partner - orders created manually or from other sources' : 'Registered but pending biweekly/monthly plan approval'}>
-                                Prospect
+                              <span className={`ml-2 px-1.5 py-0.5 text-xs rounded ${
+                                partner.prospect_status === 'archived' ? 'bg-gray-200 text-gray-600' :
+                                partner.prospect_status === 'follow_up_2' ? 'bg-red-100 text-red-700' :
+                                partner.prospect_status === 'follow_up_1' ? 'bg-yellow-100 text-yellow-700' :
+                                partner.prospect_status === 'first_email' ? 'bg-blue-100 text-blue-700' :
+                                'bg-orange-200 text-orange-700'
+                              }`} title={
+                                partner.prospect_status === 'archived' ? 'Archived - no response after all follow-ups' :
+                                partner.prospect_status === 'follow_up_2' ? 'Follow-up 2 sent - awaiting response' :
+                                partner.prospect_status === 'follow_up_1' ? 'Follow-up 1 sent - awaiting response' :
+                                partner.prospect_status === 'first_email' ? '1st email sent - awaiting response' :
+                                'New prospect - no emails sent yet'
+                              }>
+                                {partner.prospect_status === 'archived' ? 'Archived' :
+                                 partner.prospect_status === 'follow_up_2' ? 'Follow-up 2' :
+                                 partner.prospect_status === 'follow_up_1' ? 'Follow-up 1' :
+                                 partner.prospect_status === 'first_email' ? '1st Email' :
+                                 'New'}
                               </span>
                             )}
                           </div>
@@ -25678,33 +25795,18 @@ const FinancesPage = ({ adminKey }) => {
                               </>
                             ) : (
                               <div className="flex items-center gap-1">
-                                {partner.is_real_partner && partner.email && (
-                                  <button
-                                    onClick={() => sendProspectInvite(partner.partner_id, partner.email, partner.company_name)}
-                                    className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                    title="Send partner registration invite email"
-                                  >
-                                    📧
-                                  </button>
-                                )}
-                                {partner.is_real_partner && (
+                                {partner.prospect_status === 'archived' ? (
                                   <>
                                     <button
-                                      onClick={() => togglePartnerInvoiceUnlock(partner.partner_id, partner.company_name, partner.payment_plan_approved)}
-                                      className={`p-1.5 rounded transition-colors ${
-                                        partner.payment_plan_approved
-                                          ? 'text-green-600 hover:bg-green-50'
-                                          : 'text-amber-600 hover:bg-amber-50'
-                                      }`}
-                                      title={partner.payment_plan_approved ? 'Invoice payments unlocked - Click to lock' : 'Invoice payments locked - Click to unlock'}
+                                      onClick={() => unarchiveProspect(partner.partner_id, partner.company_name)}
+                                      className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                      title="Unarchive - move back to Prospects"
                                     >
-                                      {partner.payment_plan_approved ? '🔓' : '🔒'}
+                                      📤
                                     </button>
                                     <button
                                       onClick={() => {
-                                        if (window.confirm(`Are you sure you want to delete partner "${partner.company_name}"?\n\nThis action cannot be undone.`)) {
-                                          deletePartner(partner.partner_id);
-                                        }
+                                        if (window.confirm(`Delete "${partner.company_name}"?\n\nThis action cannot be undone.`)) deletePartner(partner.partner_id);
                                       }}
                                       className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
                                       title="Delete partner"
@@ -25712,9 +25814,38 @@ const FinancesPage = ({ adminKey }) => {
                                       🗑️
                                     </button>
                                   </>
-                                )}
-                                {!partner.is_real_partner && (
-                                  <span className="text-xs text-gray-400" title="Manual entry - no actions available">-</span>
+                                ) : (
+                                  <>
+                                    {partner.email && (partner.prospect_status || 'new') !== 'follow_up_2' && (
+                                      <button
+                                        onClick={() => sendProspectStepEmail(partner.partner_id, partner.company_name, partner.prospect_status)}
+                                        className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                                        title={`Send ${
+                                          !partner.prospect_status || partner.prospect_status === 'new' ? '1st Email' :
+                                          partner.prospect_status === 'first_email' ? 'Follow-up 1' :
+                                          partner.prospect_status === 'follow_up_1' ? 'Follow-up 2' : 'Next step'
+                                        }`}
+                                      >
+                                        📧
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={() => archiveProspect(partner.partner_id, partner.company_name)}
+                                      className="p-1.5 text-gray-500 hover:bg-gray-100 rounded transition-colors"
+                                      title="Archive prospect"
+                                    >
+                                      📁
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        if (window.confirm(`Delete "${partner.company_name}"?\n\nThis action cannot be undone.`)) deletePartner(partner.partner_id);
+                                      }}
+                                      className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                      title="Delete partner"
+                                    >
+                                      🗑️
+                                    </button>
+                                  </>
                                 )}
                               </div>
                             )}

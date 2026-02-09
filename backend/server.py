@@ -11252,7 +11252,8 @@ async def get_partner_statistics(admin_key: str):
                 "payment_plan_approved": partner.get("payment_plan_approved", False),
                 "total_paid_orders": partner.get("total_paid_orders", 0),
                 "invoice_manually_unlocked": partner.get("invoice_manually_unlocked", False),
-                "is_real_partner": True  # This is a registered partner
+                "is_real_partner": True,  # This is a registered partner
+                "prospect_status": partner.get("prospect_status", "new")
             }
 
     # Track special entries separately
@@ -11580,6 +11581,198 @@ async def send_partner_invite(partner_id: str, admin_key: str):
     except Exception as e:
         logger.error(f"Error sending partner invite: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to send invite email")
+
+
+@api_router.post("/admin/partners/{partner_id}/prospect-step")
+async def send_prospect_step_email(partner_id: str, admin_key: str):
+    """Send the next outreach email step and advance prospect_status"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    partner = await db.partners.find_one({"id": partner_id})
+    if not partner:
+        raise HTTPException(status_code=404, detail="Partner not found")
+
+    partner_email = partner.get("email")
+    if not partner_email:
+        raise HTTPException(status_code=400, detail="Partner has no email address")
+
+    company_name = partner.get("company_name", "Partner")
+    current_status = partner.get("prospect_status", "new")
+
+    step_map = {
+        "new": ("first_contact", "first_email"),
+        "first_email": ("followup_1", "follow_up_1"),
+        "follow_up_1": ("followup_2", "follow_up_2"),
+    }
+
+    if current_status not in step_map:
+        raise HTTPException(status_code=400, detail=f"All email steps already completed (current: {current_status})")
+
+    email_type, next_status = step_map[current_status]
+
+    subjects = {
+        "first_contact": "Certified Translation Services with Digital Verification",
+        "followup_1": f"A free translation for {company_name} — try us risk-free",
+        "followup_2": f"Why firms trust Legacy Translations — plus your free trial",
+    }
+
+    if email_type == "first_contact":
+        html_content = get_outreach_first_contact_template()
+    elif email_type == "followup_1":
+        html_content = get_outreach_followup1_template(company_name)
+    else:
+        html_content = get_outreach_followup2_template(company_name)
+
+    try:
+        email_service = EmailService()
+        await email_service.send_email(partner_email, subjects[email_type], html_content)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
+
+    await db.partners.update_one(
+        {"id": partner_id},
+        {"$set": {
+            "prospect_status": next_status,
+            f"prospect_{email_type}_sent_at": datetime.utcnow().isoformat()
+        }}
+    )
+
+    step_labels = {"first_email": "1st Email", "follow_up_1": "Follow-up 1", "follow_up_2": "Follow-up 2"}
+    return {"success": True, "message": f"{step_labels[next_status]} sent to {company_name}"}
+
+
+@api_router.post("/admin/partners/{partner_id}/archive")
+async def archive_prospect(partner_id: str, admin_key: str):
+    """Archive a prospect partner"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    result = await db.partners.update_one(
+        {"id": partner_id},
+        {"$set": {"prospect_status": "archived", "archived_at": datetime.utcnow().isoformat()}}
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Partner not found")
+    return {"success": True, "message": "Partner archived"}
+
+
+@api_router.post("/admin/partners/{partner_id}/unarchive")
+async def unarchive_prospect(partner_id: str, admin_key: str):
+    """Unarchive a prospect partner - moves back to prospects with current email status"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    partner = await db.partners.find_one({"id": partner_id})
+    if not partner:
+        raise HTTPException(status_code=404, detail="Partner not found")
+
+    # Restore to last email step before archiving
+    previous_status = "new"
+    if partner.get("prospect_followup_2_sent_at") or partner.get("prospect_followup2_sent_at"):
+        previous_status = "follow_up_2"
+    elif partner.get("prospect_followup_1_sent_at") or partner.get("prospect_followup1_sent_at"):
+        previous_status = "follow_up_1"
+    elif partner.get("prospect_first_contact_sent_at"):
+        previous_status = "first_email"
+
+    await db.partners.update_one(
+        {"id": partner_id},
+        {"$set": {"prospect_status": previous_status}, "$unset": {"archived_at": ""}}
+    )
+    return {"success": True, "message": "Partner unarchived"}
+
+
+class BulkPartnerIdsRequest(BaseModel):
+    partner_ids: list
+
+
+@api_router.post("/admin/partners/bulk-prospect-step")
+async def bulk_send_prospect_step(request: BulkPartnerIdsRequest, admin_key: str):
+    """Send next outreach email step to multiple prospects"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    sent = 0
+    skipped = 0
+    failed = 0
+    email_service = EmailService()
+
+    step_map = {
+        "new": ("first_contact", "first_email"),
+        "first_email": ("followup_1", "follow_up_1"),
+        "follow_up_1": ("followup_2", "follow_up_2"),
+    }
+
+    subjects = {
+        "first_contact": "Certified Translation Services with Digital Verification",
+        "followup_1": "A free translation — try us risk-free",
+        "followup_2": "Why firms trust Legacy Translations — plus your free trial",
+    }
+
+    for pid in request.partner_ids:
+        partner = await db.partners.find_one({"id": pid})
+        if not partner or not partner.get("email"):
+            skipped += 1
+            continue
+
+        current_status = partner.get("prospect_status", "new")
+        if current_status not in step_map:
+            skipped += 1
+            continue
+
+        email_type, next_status = step_map[current_status]
+        company_name = partner.get("company_name", "Partner")
+
+        if email_type == "first_contact":
+            html_content = get_outreach_first_contact_template()
+        elif email_type == "followup_1":
+            html_content = get_outreach_followup1_template(company_name)
+        else:
+            html_content = get_outreach_followup2_template(company_name)
+
+        subject = subjects[email_type]
+        if email_type != "first_contact":
+            subject = subject.replace("your firm", company_name)
+
+        try:
+            await email_service.send_email(partner["email"], subject, html_content)
+            await db.partners.update_one(
+                {"id": pid},
+                {"$set": {
+                    "prospect_status": next_status,
+                    f"prospect_{email_type}_sent_at": datetime.utcnow().isoformat()
+                }}
+            )
+            sent += 1
+        except Exception:
+            failed += 1
+
+    return {"success": True, "message": f"Sent: {sent}, Skipped: {skipped}, Failed: {failed}"}
+
+
+@api_router.post("/admin/partners/bulk-archive")
+async def bulk_archive_prospects(request: BulkPartnerIdsRequest, admin_key: str):
+    """Archive multiple prospects at once"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    now = datetime.utcnow().isoformat()
+    result = await db.partners.update_many(
+        {"id": {"$in": request.partner_ids}},
+        {"$set": {"prospect_status": "archived", "archived_at": now}}
+    )
+    return {"success": True, "message": f"{result.modified_count} prospect(s) archived"}
 
 
 @api_router.post("/admin/partners/{partner_id}/toggle-invoice-unlock")
