@@ -2250,6 +2250,8 @@ class PartnerInvoiceCreate(BaseModel):
     due_days: int = 30  # Days until due
     notes: Optional[str] = None
     fixed_due_day: Optional[int] = None  # Day of month for fixed due date (1-28)
+    manual_discount_amount: Optional[float] = None  # Manual discount to apply
+    manual_discount_reason: Optional[str] = None  # Reason for manual discount
 
 class PartnerInvoiceEdit(BaseModel):
     manual_discount_amount: Optional[float] = None  # Manual discount to apply
@@ -9221,6 +9223,64 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
             order_dict["quickbooks_invoice_id"] = quickbooks_invoice_id
             order_dict["quickbooks_invoice_number"] = quickbooks_invoice_number
 
+        # Auto-generate partner invoice for this order
+        partner_invoice_id = None
+        try:
+            # Calculate due date using partner's fixed day or default 30 days
+            fixed_day = partner.get("invoice_fixed_due_day")
+            if fixed_day and 1 <= fixed_day <= 28:
+                now = datetime.utcnow()
+                if now.day < fixed_day:
+                    inv_due_date = now.replace(day=fixed_day, hour=23, minute=59, second=59)
+                else:
+                    if now.month == 12:
+                        inv_due_date = now.replace(year=now.year + 1, month=1, day=fixed_day, hour=23, minute=59, second=59)
+                    else:
+                        inv_due_date = now.replace(month=now.month + 1, day=fixed_day, hour=23, minute=59, second=59)
+            else:
+                inv_due_date = datetime.utcnow() + timedelta(days=30)
+                fixed_day = None
+
+            # Build discount details if coupon was applied
+            inv_discount_details = None
+            if coupon_code_applied and coupon_discount_amount > 0:
+                inv_discount_details = [{
+                    "order_id": order.id,
+                    "order_number": order.order_number,
+                    "coupon_code": coupon_code_applied,
+                    "discount_amount": round(coupon_discount_amount, 2)
+                }]
+
+            auto_invoice = PartnerInvoice(
+                partner_id=partner["id"],
+                partner_company=partner.get("company_name"),
+                partner_email=partner.get("email"),
+                order_ids=[order.id],
+                subtotal=round(total_price + coupon_discount_amount, 2),
+                discount_amount=round(coupon_discount_amount, 2),
+                discount_details=inv_discount_details,
+                total_amount=round(total_price, 2),
+                due_date=inv_due_date,
+                fixed_due_day=fixed_day,
+                partner_tier=effective_tier,
+                tier_discount_percent=int(tier_discount * 100)
+            )
+
+            await db.partner_invoices.insert_one(auto_invoice.dict())
+
+            # Link order to invoice
+            await db.translation_orders.update_one(
+                {"id": order.id},
+                {"$set": {"invoice_id": auto_invoice.id, "invoice_number": auto_invoice.invoice_number}}
+            )
+            order_dict["invoice_id"] = auto_invoice.id
+            order_dict["invoice_number"] = auto_invoice.invoice_number
+            partner_invoice_id = auto_invoice.id
+
+            logger.info(f"Auto-created invoice {auto_invoice.invoice_number} for order {order.order_number} (partner: {partner.get('company_name')})")
+        except Exception as e:
+            logger.error(f"Failed to auto-create partner invoice: {str(e)}")
+
         return {
             "status": "success",
             "order": order_dict,
@@ -12404,6 +12464,15 @@ async def create_partner_invoice(invoice_data: PartnerInvoiceCreate, admin_key: 
         effective_tier = tier_result["effective_tier"]
         tier_discount_pct = int(PARTNER_TIERS[effective_tier]["discount"] * 100)
 
+        # Apply manual discount if provided
+        manual_disc = 0.0
+        if invoice_data.manual_discount_amount and invoice_data.manual_discount_amount > 0:
+            manual_disc = round(invoice_data.manual_discount_amount, 2)
+            if manual_disc > total_amount:
+                raise HTTPException(status_code=400, detail="Discount cannot exceed the invoice total")
+
+        final_amount = round(total_amount - manual_disc, 2)
+
         # Create invoice
         invoice = PartnerInvoice(
             partner_id=invoice_data.partner_id,
@@ -12413,12 +12482,15 @@ async def create_partner_invoice(invoice_data: PartnerInvoiceCreate, admin_key: 
             subtotal=round(subtotal_before_discounts, 2),
             discount_amount=round(total_coupon_discount, 2),
             discount_details=discount_details if discount_details else None,
-            total_amount=round(total_amount, 2),
+            total_amount=final_amount,
             due_date=due_date,
             fixed_due_day=fixed_day,
             notes=invoice_data.notes,
             partner_tier=effective_tier,
-            tier_discount_percent=tier_discount_pct
+            tier_discount_percent=tier_discount_pct,
+            manual_discount_amount=manual_disc,
+            manual_discount_reason=invoice_data.manual_discount_reason or "",
+            original_total_amount=round(total_amount, 2) if manual_disc > 0 else None
         )
 
         await db.partner_invoices.insert_one(invoice.dict())

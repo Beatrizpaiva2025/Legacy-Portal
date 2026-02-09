@@ -23488,6 +23488,8 @@ const FinancesPage = ({ adminKey }) => {
   const [savingInvoiceEdit, setSavingInvoiceEdit] = useState(false);
   const [invoiceFixedDueDay, setInvoiceFixedDueDay] = useState('');
   const [invoiceDueDateMode, setInvoiceDueDateMode] = useState('days');
+  const [invoiceManualDiscount, setInvoiceManualDiscount] = useState('');
+  const [invoiceDiscountReason, setInvoiceDiscountReason] = useState('');
   // Partner filter and search state
   const [partnerFilter, setPartnerFilter] = useState('all'); // all, registered, prospect
   const [partnerSearchQuery, setPartnerSearchQuery] = useState('');
@@ -23764,6 +23766,8 @@ const FinancesPage = ({ adminKey }) => {
     setSelectedOrdersForInvoice([]);
     setInvoiceDueDays(30);
     setInvoiceNotes('');
+    setInvoiceManualDiscount('');
+    setInvoiceDiscountReason('');
     await fetchPartnerOrdersForInvoice(partner.partner_id);
     setShowCreateInvoiceModal(true);
   };
@@ -23789,6 +23793,10 @@ const FinancesPage = ({ adminKey }) => {
       };
       if (invoiceDueDateMode === 'fixed' && invoiceFixedDueDay) {
         invoicePayload.fixed_due_day = parseInt(invoiceFixedDueDay);
+      }
+      if (invoiceManualDiscount && parseFloat(invoiceManualDiscount) > 0) {
+        invoicePayload.manual_discount_amount = parseFloat(invoiceManualDiscount);
+        invoicePayload.manual_discount_reason = invoiceDiscountReason;
       }
       await axios.post(`${API}/admin/partner-invoices/create?admin_key=${adminKey}`, invoicePayload);
       showToast('Invoice created successfully!');
@@ -26338,6 +26346,11 @@ const FinancesPage = ({ adminKey }) => {
                               <div className="text-xs text-gray-400">
                                 {new Date(order.created_at).toLocaleDateString()}
                               </div>
+                              {order.partner_tier && order.partner_tier !== 'standard' && order.discount_amount > 0 && (
+                                <div className="text-xs text-blue-600 mt-1">
+                                  Tier: {order.partner_tier} ({order.tier_discount_percent}% off) - Saved {formatCurrency(order.discount_amount)}
+                                </div>
+                              )}
                               {order.coupon_code && (
                                 <div className="text-xs text-green-600 mt-1">
                                   Coupon: {order.coupon_code} (-{formatCurrency(order.coupon_discount_amount)})
@@ -26349,6 +26362,58 @@ const FinancesPage = ({ adminKey }) => {
                         </div>
                       </div>
                     ))}
+                  </div>
+                  {/* Discount Section */}
+                  <div className="mb-4 p-3 bg-gray-50 border rounded-lg">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Apply Discount</label>
+                    <div className="flex gap-2 mb-2">
+                      {[5, 10, 15, 20, 25].map(pct => (
+                        <button
+                          key={pct}
+                          type="button"
+                          onClick={() => {
+                            const total = partnerOrdersForInvoice.filter(o => selectedOrdersForInvoice.includes(o.id)).reduce((sum, o) => sum + (o.total_price || 0), 0);
+                            setInvoiceManualDiscount((total * pct / 100).toFixed(2));
+                            setInvoiceDiscountReason(`${pct}% partner discount`);
+                          }}
+                          className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-blue-50 hover:border-blue-300 transition-colors"
+                        >
+                          {pct}%
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => { setInvoiceManualDiscount(''); setInvoiceDiscountReason(''); }}
+                        className="px-2 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50 transition-colors"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={invoiceManualDiscount}
+                        onChange={(e) => setInvoiceManualDiscount(e.target.value)}
+                        className="border rounded-md px-3 py-1.5 text-sm"
+                        placeholder="Discount amount..."
+                      />
+                      <input
+                        type="text"
+                        value={invoiceDiscountReason}
+                        onChange={(e) => setInvoiceDiscountReason(e.target.value)}
+                        className="border rounded-md px-3 py-1.5 text-sm"
+                        placeholder="Reason (optional)"
+                      />
+                    </div>
+                    {invoiceManualDiscount && parseFloat(invoiceManualDiscount) > 0 && (
+                      <div className="text-xs text-green-600 mt-1">
+                        New total: {formatCurrency(
+                          partnerOrdersForInvoice.filter(o => selectedOrdersForInvoice.includes(o.id)).reduce((sum, o) => sum + (o.total_price || 0), 0) - parseFloat(invoiceManualDiscount)
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Due Date Mode</label>
@@ -26461,7 +26526,19 @@ const FinancesPage = ({ adminKey }) => {
                     <div key={invoice.id} className="border rounded-lg p-4">
                       <div className="flex items-center justify-between mb-3">
                         <div>
-                          <div className="font-mono font-medium">{invoice.invoice_number}</div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-medium">{invoice.invoice_number}</span>
+                            {invoice.partner_tier && invoice.partner_tier !== 'standard' && (
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${
+                                invoice.partner_tier === 'platinum' ? 'bg-blue-100 text-blue-700' :
+                                invoice.partner_tier === 'gold' ? 'bg-yellow-100 text-yellow-700' :
+                                invoice.partner_tier === 'silver' ? 'bg-slate-100 text-slate-700' :
+                                'bg-amber-100 text-amber-700'
+                              }`}>
+                                {invoice.partner_tier} {invoice.tier_discount_percent ? `(${invoice.tier_discount_percent}% off)` : ''}
+                              </span>
+                            )}
+                          </div>
                           <div className="text-xs text-gray-500">
                             Created: {new Date(invoice.created_at).toLocaleDateString()} |
                             Due: {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : '-'}
@@ -26614,9 +26691,40 @@ const FinancesPage = ({ adminKey }) => {
                 )}
               </div>
 
+              {/* Tier Info Display */}
+              {editingInvoice.partner_tier && editingInvoice.partner_tier !== 'standard' && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-blue-700 capitalize">
+                      Partner Tier: {editingInvoice.partner_tier}
+                    </span>
+                    <span className="text-sm font-bold text-blue-700">
+                      {editingInvoice.tier_discount_percent}% discount applied at order level
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {/* Manual Discount */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Apply Manual Discount ($)</label>
+                {/* Quick discount buttons */}
+                <div className="flex gap-2 mb-2">
+                  {[5, 10, 15, 20, 25].map(pct => (
+                    <button
+                      key={pct}
+                      type="button"
+                      onClick={() => {
+                        const base = editingInvoice.original_total_amount || editingInvoice.total_amount;
+                        setEditInvoiceDiscount((base * pct / 100).toFixed(2));
+                        setEditInvoiceDiscountReason(`${pct}% discount`);
+                      }}
+                      className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-blue-50 hover:border-blue-300 transition-colors"
+                    >
+                      {pct}%
+                    </button>
+                  ))}
+                </div>
                 <input
                   type="number"
                   step="0.01"
