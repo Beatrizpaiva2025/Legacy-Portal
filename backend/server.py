@@ -11775,6 +11775,65 @@ async def bulk_archive_prospects(request: BulkPartnerIdsRequest, admin_key: str)
     return {"success": True, "message": f"{result.modified_count} prospect(s) archived"}
 
 
+class AddProspectRequest(BaseModel):
+    company_name: str
+    contact_name: Optional[str] = ""
+    email: Optional[str] = ""
+    phone: Optional[str] = ""
+
+
+@api_router.post("/admin/partners/add-prospect")
+async def add_prospect(request: AddProspectRequest, admin_key: str):
+    """Add a new prospect partner manually from admin panel (no password/registration required)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    if not request.company_name.strip():
+        raise HTTPException(status_code=400, detail="Company name is required")
+
+    # Check for duplicate email if provided
+    if request.email and request.email.strip():
+        existing = await db.partners.find_one({"email": request.email.strip()})
+        if existing:
+            raise HTTPException(status_code=400, detail=f"A partner with email {request.email} already exists")
+
+    partner_id = str(uuid.uuid4())
+    now = datetime.utcnow()
+
+    prospect_doc = {
+        "id": partner_id,
+        "company_name": request.company_name.strip(),
+        "contact_name": (request.contact_name or "").strip(),
+        "email": (request.email or "").strip(),
+        "phone": (request.phone or "").strip(),
+        "password_hash": "",
+        "payment_plan": "pay_per_order",
+        "default_payment_method": "zelle",
+        "payment_plan_approved": False,
+        "is_active": True,
+        "is_approved": True,
+        "agreed_to_terms": False,
+        "total_orders": 0,
+        "total_paid_orders": 0,
+        "total_revenue": 0.0,
+        "credit_limit": 0.0,
+        "current_balance": 0.0,
+        "prospect_status": "new",
+        "created_at": now.isoformat(),
+        "has_seen_welcome_coupon": False,
+    }
+
+    await db.partners.insert_one(prospect_doc)
+
+    return {
+        "success": True,
+        "message": f"Prospect '{request.company_name.strip()}' added successfully",
+        "partner_id": partner_id
+    }
+
+
 @api_router.post("/admin/partners/{partner_id}/toggle-invoice-unlock")
 async def toggle_partner_invoice_unlock(partner_id: str, admin_key: str, unlock: bool):
     """Manually unlock or lock invoice payments for a partner (admin only)

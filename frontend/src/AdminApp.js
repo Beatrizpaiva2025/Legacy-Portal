@@ -23444,6 +23444,10 @@ const FinancesPage = ({ adminKey }) => {
   const [bulkEmailSubject, setBulkEmailSubject] = useState('');
   const [bulkEmailMessage, setBulkEmailMessage] = useState('');
   const [sendingBulkEmail, setSendingBulkEmail] = useState(false);
+  // Add prospect modal state
+  const [showAddProspectModal, setShowAddProspectModal] = useState(false);
+  const [addProspectForm, setAddProspectForm] = useState({ company_name: '', contact_name: '', email: '', phone: '' });
+  const [addingProspect, setAddingProspect] = useState(false);
   // Invoice payment management state
   const [pendingZelleInvoices, setPendingZelleInvoices] = useState([]);
   const [paymentHistory, setPaymentHistory] = useState([]);
@@ -24208,6 +24212,30 @@ const FinancesPage = ({ adminKey }) => {
       showToast('Error sending emails: ' + (err.response?.data?.detail || err.message));
     } finally {
       setSendingBulkEmail(false);
+    }
+  };
+
+  const handleAddProspect = async () => {
+    if (!addProspectForm.company_name.trim()) {
+      showToast('Company name is required');
+      return;
+    }
+    setAddingProspect(true);
+    try {
+      const res = await axios.post(`${API}/admin/partners/add-prospect?admin_key=${adminKey}`, {
+        company_name: addProspectForm.company_name,
+        contact_name: addProspectForm.contact_name,
+        email: addProspectForm.email,
+        phone: addProspectForm.phone
+      });
+      showToast(res.data.message || 'Prospect added successfully!');
+      setShowAddProspectModal(false);
+      setAddProspectForm({ company_name: '', contact_name: '', email: '', phone: '' });
+      fetchPartnerStats();
+    } catch (err) {
+      showToast('Error adding prospect: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setAddingProspect(false);
     }
   };
 
@@ -25506,9 +25534,18 @@ const FinancesPage = ({ adminKey }) => {
           <div className="bg-white rounded-lg shadow">
             <div className="p-4 border-b bg-gray-50">
               <div className="flex items-center justify-between mb-3">
-                <div>
-                  <h2 className="text-sm font-bold text-gray-700">🤝 Partner Companies</h2>
-                  <p className="text-xs text-gray-500 mt-1">Revenue from Partner Portal orders</p>
+                <div className="flex items-center gap-3">
+                  <div>
+                    <h2 className="text-sm font-bold text-gray-700">🤝 Partner Companies</h2>
+                    <p className="text-xs text-gray-500 mt-1">Revenue from Partner Portal orders</p>
+                  </div>
+                  <button
+                    onClick={() => setShowAddProspectModal(true)}
+                    className="px-3 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700 flex items-center gap-1 font-medium"
+                    title="Add new prospect"
+                  >
+                    + Add Prospect
+                  </button>
                 </div>
                 {selectedPartnerIds.length > 0 && (
                   <div className="flex items-center space-x-2">
@@ -26495,6 +26532,78 @@ const FinancesPage = ({ adminKey }) => {
                 className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
               >
                 {sendingBulkEmail ? 'Sending...' : `Send to ${selectedPartnerIds.length} Partner(s)`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Prospect Modal */}
+      {showAddProspectModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+              <div>
+                <h2 className="font-bold text-gray-800">Add New Prospect</h2>
+                <p className="text-sm text-gray-500">Add a new prospect partner manually</p>
+              </div>
+              <button onClick={() => setShowAddProspectModal(false)} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Company Name *</label>
+                <input
+                  type="text"
+                  value={addProspectForm.company_name}
+                  onChange={(e) => setAddProspectForm({...addProspectForm, company_name: e.target.value})}
+                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="Company name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Contact Name</label>
+                <input
+                  type="text"
+                  value={addProspectForm.contact_name}
+                  onChange={(e) => setAddProspectForm({...addProspectForm, contact_name: e.target.value})}
+                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="Contact person name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={addProspectForm.email}
+                  onChange={(e) => setAddProspectForm({...addProspectForm, email: e.target.value})}
+                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="contact@company.com"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                <input
+                  type="tel"
+                  value={addProspectForm.phone}
+                  onChange={(e) => setAddProspectForm({...addProspectForm, phone: e.target.value})}
+                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="(11) 9999-9999"
+                />
+              </div>
+            </div>
+            <div className="p-4 border-t bg-gray-50 flex justify-between items-center">
+              <button
+                onClick={() => { setShowAddProspectModal(false); setAddProspectForm({ company_name: '', contact_name: '', email: '', phone: '' }); }}
+                className="px-4 py-2 border rounded-md text-sm hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddProspect}
+                disabled={addingProspect || !addProspectForm.company_name.trim()}
+                className="px-4 py-2 bg-green-600 text-white rounded-md text-sm hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+              >
+                {addingProspect ? 'Adding...' : 'Add Prospect'}
               </button>
             </div>
           </div>
