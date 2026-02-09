@@ -410,6 +410,10 @@ const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
     table { border-collapse: collapse; width: 100%; }
     td, th { border: 1px solid #333; padding: 5px 6px; font-size: 10pt; vertical-align: top; }
     /* Translation content: robust table layout for complex documents (birth certificates, etc.) */
+    .translation-content {
+        font-size: 11pt !important;
+        line-height: 1.5 !important;
+    }
     .translation-content table {
         table-layout: fixed;
         width: 100%;
@@ -439,6 +443,17 @@ const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
         word-wrap: break-word;
         overflow-wrap: break-word;
     }
+    /* Normalize heading sizes inside translation content to prevent layout overflow */
+    .translation-content h1 { font-size: 14pt !important; margin: 4px 0 2px 0 !important; line-height: 1.3 !important; }
+    .translation-content h2 { font-size: 12pt !important; margin: 3px 0 2px 0 !important; line-height: 1.3 !important; }
+    .translation-content h3 { font-size: 11pt !important; margin: 2px 0 1px 0 !important; line-height: 1.3 !important; }
+    .translation-content h4,
+    .translation-content h5,
+    .translation-content h6 { font-size: 10pt !important; margin: 2px 0 1px 0 !important; line-height: 1.3 !important; }
+    /* Prevent oversized content from breaking page layout */
+    .translation-content div,
+    .translation-content section,
+    .translation-content article { max-width: 100% !important; }
     .translation-content td p:last-child,
     .translation-content th p:last-child {
         margin-bottom: 0;
@@ -454,7 +469,7 @@ const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
     .paged-translation { width: 100%; border-collapse: collapse; border: none !important; }
     .paged-translation > thead > tr > td,
     .paged-translation > tbody > tr > td { border: none !important; padding: 0 !important; }
-    .paged-translation > thead > tr > td { padding: 5px 0 0 0 !important; }
+    .paged-translation > thead > tr > td { padding: 8px 0 0 0 !important; }
     .paged-translation > thead { display: table-header-group; }
     .paged-translation > tbody { display: table-row-group; }
     /* Avoid breaking inside table rows (bank statements, financial tables) */
@@ -1481,6 +1496,41 @@ const scopeTranslationStyles = (stylesHtml) => {
     });
     return `<style>\n${scopedCss}\n</style>`;
   });
+};
+
+// Normalize translation HTML content for consistent page layout.
+// Strips excessive inline font-sizes, paddings and margins that can break the page layout
+// when content is placed inside the .translation-content wrapper with letterhead.
+const normalizeTranslationHtml = (html) => {
+  if (!html) return html;
+
+  // Cap inline font-size values that are too large (> 14pt or > 18px)
+  let normalized = html.replace(/font-size\s*:\s*(\d+(?:\.\d+)?)(pt|px|em|rem)/gi, (match, size, unit) => {
+    const numSize = parseFloat(size);
+    if (unit.toLowerCase() === 'pt' && numSize > 14) return `font-size: 14pt`;
+    if (unit.toLowerCase() === 'px' && numSize > 18) return `font-size: 18px`;
+    if (unit.toLowerCase() === 'em' && numSize > 1.3) return `font-size: 1.3em`;
+    if (unit.toLowerCase() === 'rem' && numSize > 1.3) return `font-size: 1.3rem`;
+    return match;
+  });
+
+  // Cap excessive line-height values (> 2.0)
+  normalized = normalized.replace(/line-height\s*:\s*(\d+(?:\.\d+)?)\s*(?:;|")/gi, (match, size) => {
+    const numSize = parseFloat(size);
+    if (numSize > 2.0) return match.replace(size, '1.6');
+    return match;
+  });
+
+  // Cap excessive padding and margin values (> 30px or > 0.5in)
+  normalized = normalized.replace(/(padding|margin)(-top|-bottom|-left|-right)?\s*:\s*(\d+(?:\.\d+)?)(px|in|cm)/gi, (match, prop, side, size, unit) => {
+    const numSize = parseFloat(size);
+    if (unit.toLowerCase() === 'px' && numSize > 30) return `${prop}${side || ''}: 30px`;
+    if (unit.toLowerCase() === 'in' && numSize > 0.5) return `${prop}${side || ''}: 0.5in`;
+    if (unit.toLowerCase() === 'cm' && numSize > 1.2) return `${prop}${side || ''}: 1.2cm`;
+    return match;
+  });
+
+  return normalized;
 };
 
 // Reconstruct full HTML document by replacing body content while preserving styles/head.
@@ -6150,20 +6200,21 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     // For mildly overflowing content, JS auto-scale still applies (scale >= 0.55)
     // First page doesn't need page-break since cover ends with one
     if (quickTranslationHtml) {
+      const normalizedQuickHtml = normalizeTranslationHtml(quickTranslationHtml);
       translationPagesHTML = includeLetterhead ? `
     <table class="paged-translation">
-        <thead><tr><td style="padding: 5px 0 0 0;">
+        <thead><tr><td style="padding: 8px 0 0 0;">
             ${letterheadHTML}
         </td></tr></thead>
         <tbody><tr><td>
             <div class="translation-content" style="padding: 0; line-height: 1.5; font-size: 11pt;">
-                ${quickTranslationHtml}
+                ${normalizedQuickHtml}
             </div>
         </td></tr></tbody>
     </table>` : `
     <div style="padding-top: 5px;">
         <div class="translation-content" style="padding: 0; line-height: 1.5; font-size: 11pt;">
-            ${quickTranslationHtml}
+            ${normalizedQuickHtml}
         </div>
     </div>`;
     }
@@ -6704,11 +6755,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     // NOTE: extractBodyForEdit strips <html>/<head>/<style>/<body> wrapper from AI output.
     const translationPagesHTML = translationResults.map((result, index) => {
       const pageBreak = index > 0 ? 'page-break-before: always;' : '';
-      const content = extractBodyForEdit(result.translatedText);
+      const content = normalizeTranslationHtml(extractBodyForEdit(result.translatedText));
       if (includeLetterhead) {
         return `
     <table class="paged-translation" style="${pageBreak}">
-        <thead><tr><td style="padding: 5px 0 0 0;">
+        <thead><tr><td style="padding: 8px 0 0 0;">
             ${letterheadHTML}
         </td></tr></thead>
         <tbody><tr><td>
