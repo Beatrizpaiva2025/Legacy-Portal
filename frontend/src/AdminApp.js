@@ -3454,8 +3454,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               setProcessingStatus(`Converting PDF: page ${pageNum} of ${pdf.numPages}...`);
 
               const page = await pdf.getPage(pageNum);
-              const scale = 3; // Higher scale = better quality (3x for sharp PDF rendering)
-              const viewport = page.getViewport({ scale });
+              let scale = 3; // Higher scale = better quality (3x for sharp PDF rendering)
+              let viewport = page.getViewport({ scale });
+
+              // Ensure no dimension exceeds 7900px (Claude API limit is 8000px)
+              const maxDimension = 7900;
+              if (viewport.width > maxDimension || viewport.height > maxDimension) {
+                const dimensionScale = Math.min(maxDimension / viewport.width, maxDimension / viewport.height);
+                scale = scale * dimensionScale;
+                viewport = page.getViewport({ scale });
+              }
+
               const canvas = document.createElement('canvas');
               const context = canvas.getContext('2d');
               canvas.height = viewport.height;
@@ -3624,8 +3633,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
             for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
               const page = await pdf.getPage(pageNum);
-              const scale = 3;
-              const viewport = page.getViewport({ scale });
+              let scale = 3;
+              let viewport = page.getViewport({ scale });
+
+              // Ensure no dimension exceeds 7900px (Claude API limit is 8000px)
+              const maxDimension = 7900;
+              if (viewport.width > maxDimension || viewport.height > maxDimension) {
+                const dimensionScale = Math.min(maxDimension / viewport.width, maxDimension / viewport.height);
+                scale = scale * dimensionScale;
+                viewport = page.getViewport({ scale });
+              }
+
               const canvas = document.createElement('canvas');
               const context = canvas.getContext('2d');
               canvas.height = viewport.height;
