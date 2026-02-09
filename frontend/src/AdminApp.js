@@ -24307,6 +24307,17 @@ const FinancesPage = ({ adminKey }) => {
     }
   };
 
+  const setPartnerTier = async (partnerId, tier) => {
+    try {
+      await axios.post(`${API}/admin/partners/${partnerId}/set-tier?admin_key=${adminKey}&tier=${tier}`);
+      const tierNames = { standard: 'Standard (auto)', bronze: 'Bronze (10%)', silver: 'Silver (15%)', gold: 'Gold (25%)', platinum: 'Platinum (35%)' };
+      showToast(`Tier set to ${tierNames[tier] || tier}`);
+      fetchPartnerStats();
+    } catch (err) {
+      showToast('Error setting tier: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
   const togglePartnerInvoiceUnlock = async (partnerId, companyName, currentStatus) => {
     const newStatus = !currentStatus;
     const action = newStatus ? 'unlock' : 'lock';
@@ -25701,6 +25712,7 @@ const FinancesPage = ({ adminKey }) => {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Orders Paid</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Orders Pending</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Tier</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Payment Plan</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Received</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Pending</th>
@@ -25805,6 +25817,33 @@ const FinancesPage = ({ adminKey }) => {
                           <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-yellow-100 text-yellow-700">
                             {partner.orders_pending}
                           </span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {partner.is_real_partner ? (
+                            <select
+                              value={partner.tier_override || partner.achieved_tier || 'standard'}
+                              onChange={(e) => {
+                                if (window.confirm(`Set tier for ${partner.company_name} to ${e.target.options[e.target.selectedIndex].text}?`)) {
+                                  setPartnerTier(partner.partner_id, e.target.value);
+                                }
+                              }}
+                              className={`text-xs px-2 py-1 rounded border ${
+                                (partner.tier_override || partner.achieved_tier) === 'platinum' ? 'bg-blue-100 border-blue-300 text-blue-700' :
+                                (partner.tier_override || partner.achieved_tier) === 'gold' ? 'bg-yellow-100 border-yellow-300 text-yellow-700' :
+                                (partner.tier_override || partner.achieved_tier) === 'silver' ? 'bg-slate-100 border-slate-300 text-slate-700' :
+                                (partner.tier_override || partner.achieved_tier) === 'bronze' ? 'bg-amber-100 border-amber-300 text-amber-700' :
+                                'bg-gray-100 border-gray-300 text-gray-700'
+                              }`}
+                            >
+                              <option value="standard">Standard (auto)</option>
+                              <option value="bronze">Bronze (10%)</option>
+                              <option value="silver">Silver (15%)</option>
+                              <option value="gold">Gold (25%)</option>
+                              <option value="platinum">Platinum (35%)</option>
+                            </select>
+                          ) : (
+                            <span className="text-xs text-gray-400">N/A</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-center">
                           {partner.is_real_partner ? (

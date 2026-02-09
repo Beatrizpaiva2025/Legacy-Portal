@@ -2241,6 +2241,8 @@ class PartnerInvoice(BaseModel):
     adjusted_at: Optional[datetime] = None  # When the adjustment was made
     # Fixed due date settings (per-partner preference)
     fixed_due_day: Optional[int] = None  # Day of month for fixed due date (1-28)
+    partner_tier: Optional[str] = None  # Partner's effective tier at invoice creation
+    tier_discount_percent: Optional[int] = None  # Tier discount percentage applied
 
 class PartnerInvoiceCreate(BaseModel):
     partner_id: str
@@ -3641,6 +3643,7 @@ async def get_effective_partner_tier(partner: dict) -> dict:
     partner_id = partner.get("id")
     created_at = partner.get("created_at")
     achieved_tier = partner.get("achieved_tier", "standard")
+    tier_override = partner.get("tier_override")
 
     # Calculate months as partner
     months_as_partner = 0
@@ -3674,6 +3677,12 @@ async def get_effective_partner_tier(partner: dict) -> dict:
         effective_tier = best_3month_tier
         reason = f"Best tier from last 3 months ({best_month_pages} pages)"
 
+    # Apply admin tier override if set
+    if tier_override and tier_override != "standard":
+        effective_tier = get_higher_tier(effective_tier, tier_override)
+        if tier_override == effective_tier and tier_override != best_3month_tier:
+            reason = f"Admin override: tier set to {tier_override}"
+
     # Update achieved tier if current effective is higher
     if compare_tiers(effective_tier, achieved_tier) > 0:
         await db.partners.update_one(
@@ -3694,6 +3703,7 @@ async def get_effective_partner_tier(partner: dict) -> dict:
         "loyalty_lock_active": loyalty_lock_active,
         "months_as_partner": round(months_as_partner, 1),
         "monthly_volumes": monthly_volumes,
+        "tier_override": tier_override,
         "current_volume": current_volume,
         "reason": reason
     }
@@ -11280,7 +11290,9 @@ async def get_partner_statistics(admin_key: str):
                 "total_paid_orders": partner.get("total_paid_orders", 0),
                 "invoice_manually_unlocked": partner.get("invoice_manually_unlocked", False),
                 "is_real_partner": True,  # This is a registered partner
-                "prospect_status": partner.get("prospect_status", "new")
+                "prospect_status": partner.get("prospect_status", "new"),
+                "achieved_tier": partner.get("achieved_tier", "standard"),
+                "tier_override": partner.get("tier_override")
             }
 
     # Track special entries separately
@@ -11512,6 +11524,50 @@ async def set_partner_payment_plan(partner_id: str, admin_key: str, plan: str, s
     except Exception as e:
         logger.error(f"Error setting payment plan: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to set payment plan")
+
+
+@api_router.post("/admin/partners/{partner_id}/set-tier")
+async def set_partner_tier(partner_id: str, admin_key: str, tier: str):
+    """Manually set a partner's tier override (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    valid_tiers = ["standard", "bronze", "silver", "gold", "platinum"]
+    if tier not in valid_tiers:
+        raise HTTPException(status_code=400, detail=f"Invalid tier. Must be one of: {', '.join(valid_tiers)}")
+
+    partner = await db.partners.find_one({"id": partner_id})
+    if not partner:
+        raise HTTPException(status_code=404, detail="Partner not found")
+
+    update_data = {
+        "tier_override": tier if tier != "standard" else None,
+        "tier_override_at": datetime.utcnow(),
+    }
+
+    # Also update achieved_tier if override is higher
+    current_achieved = partner.get("achieved_tier", "standard")
+    if compare_tiers(tier, current_achieved) > 0:
+        update_data["achieved_tier"] = tier
+        update_data["tier_achieved_at"] = datetime.utcnow()
+
+    await db.partners.update_one(
+        {"id": partner_id},
+        {"$set": update_data}
+    )
+
+    tier_names = {"standard": "Standard (auto)", "bronze": "Bronze (10%)", "silver": "Silver (15%)", "gold": "Gold (25%)", "platinum": "Platinum (35%)"}
+
+    logger.info(f"Admin set tier override for partner {partner.get('company_name')} to {tier}")
+
+    return {
+        "success": True,
+        "message": f"Tier set to {tier_names.get(tier, tier)} for {partner.get('company_name')}",
+        "tier": tier,
+        "partner_id": partner_id
+    }
 
 
 @api_router.post("/admin/partners/{partner_id}/send-invite")
@@ -12343,6 +12399,11 @@ async def create_partner_invoice(invoice_data: PartnerInvoiceCreate, admin_key: 
             due_date = datetime.utcnow() + timedelta(days=invoice_data.due_days)
             fixed_day = None
 
+        # Get partner's effective tier for invoice
+        tier_result = await get_effective_partner_tier(partner)
+        effective_tier = tier_result["effective_tier"]
+        tier_discount_pct = int(PARTNER_TIERS[effective_tier]["discount"] * 100)
+
         # Create invoice
         invoice = PartnerInvoice(
             partner_id=invoice_data.partner_id,
@@ -12355,7 +12416,9 @@ async def create_partner_invoice(invoice_data: PartnerInvoiceCreate, admin_key: 
             total_amount=round(total_amount, 2),
             due_date=due_date,
             fixed_due_day=fixed_day,
-            notes=invoice_data.notes
+            notes=invoice_data.notes,
+            partner_tier=effective_tier,
+            tier_discount_percent=tier_discount_pct
         )
 
         await db.partner_invoices.insert_one(invoice.dict())
