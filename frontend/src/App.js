@@ -3609,6 +3609,16 @@ const InvoicesPage = ({ token, t, currency, lang }) => {
                     <div className="text-sm text-gray-500">
                       {t?.dueDate || 'Due Date'}: {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString('en-US', { timeZone: 'America/New_York' }) : '-'}
                     </div>
+                    {invoice.partner_tier && invoice.partner_tier !== 'standard' && (
+                      <span className={`mt-1 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium capitalize ${
+                        invoice.partner_tier === 'platinum' ? 'bg-blue-100 text-blue-700' :
+                        invoice.partner_tier === 'gold' ? 'bg-yellow-100 text-yellow-700' :
+                        invoice.partner_tier === 'silver' ? 'bg-slate-100 text-slate-700' :
+                        'bg-amber-100 text-amber-700'
+                      }`}>
+                        {invoice.partner_tier} {invoice.tier_discount_percent ? `(${invoice.tier_discount_percent}% off)` : ''}
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center space-x-4">
                     <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(invoice.status)}`}>
@@ -3618,16 +3628,26 @@ const InvoicesPage = ({ token, t, currency, lang }) => {
                   </div>
                 </div>
 
-                {invoice.discount_amount > 0 && (
+                {(invoice.discount_amount > 0 || invoice.manual_discount_amount > 0) && (
                   <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">Subtotal:</span>
-                      <span className="text-gray-800">{formatCurrency(invoice.subtotal)}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm text-green-700 font-medium">
-                      <span>Coupon Discount:</span>
-                      <span>-{formatCurrency(invoice.discount_amount)}</span>
-                    </div>
+                    {invoice.discount_amount > 0 && (
+                      <>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">Subtotal:</span>
+                          <span className="text-gray-800">{formatCurrency(invoice.subtotal)}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm text-green-700 font-medium">
+                          <span>Coupon Discount:</span>
+                          <span>-{formatCurrency(invoice.discount_amount)}</span>
+                        </div>
+                      </>
+                    )}
+                    {invoice.manual_discount_amount > 0 && (
+                      <div className="flex items-center justify-between text-sm text-orange-700 font-medium">
+                        <span>{invoice.manual_discount_reason || 'Discount'}:</span>
+                        <span>-{formatCurrency(invoice.manual_discount_amount)}</span>
+                      </div>
+                    )}
                     <div className="flex items-center justify-between text-sm font-bold border-t border-green-200 mt-1 pt-1">
                       <span>Total:</span>
                       <span>{formatCurrency(invoice.total_amount)}</span>
@@ -3688,16 +3708,26 @@ const InvoicesPage = ({ token, t, currency, lang }) => {
                 </div>
               </div>
 
-              {selectedInvoice.discount_amount > 0 && (
+              {(selectedInvoice.discount_amount > 0 || selectedInvoice.manual_discount_amount > 0) && (
                 <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Subtotal:</span>
-                    <span className="text-gray-800">{formatCurrency(selectedInvoice.subtotal)}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm text-green-700 font-medium">
-                    <span>Coupon Discount:</span>
-                    <span>-{formatCurrency(selectedInvoice.discount_amount)}</span>
-                  </div>
+                  {selectedInvoice.discount_amount > 0 && (
+                    <>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">Subtotal:</span>
+                        <span className="text-gray-800">{formatCurrency(selectedInvoice.subtotal)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm text-green-700 font-medium">
+                        <span>Coupon Discount:</span>
+                        <span>-{formatCurrency(selectedInvoice.discount_amount)}</span>
+                      </div>
+                    </>
+                  )}
+                  {selectedInvoice.manual_discount_amount > 0 && (
+                    <div className="flex items-center justify-between text-sm text-orange-700 font-medium">
+                      <span>{selectedInvoice.manual_discount_reason || 'Discount'}:</span>
+                      <span>-{formatCurrency(selectedInvoice.manual_discount_amount)}</span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between text-sm font-bold border-t border-green-200 mt-1 pt-1">
                     <span>Total Due:</span>
                     <span>{formatCurrency(selectedInvoice.total_amount)}</span>
@@ -4255,6 +4285,77 @@ const PaymentPlanPage = ({ token, t, currency }) => {
             </p>
           </div>
         </div>
+      </div>
+
+      {/* How It Works Section */}
+      <div className="mt-8 bg-white rounded-lg shadow-sm border p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+            <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-gray-800">{t?.howItWorks || 'How the Tier Discount Works'}</h2>
+            <p className="text-xs text-gray-500">{t?.howItWorksSubtitle || 'Understand how your discount is calculated and protected'}</p>
+          </div>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-6">
+          {/* Step 1 */}
+          <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="w-7 h-7 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">1</span>
+              <h3 className="font-semibold text-blue-800">{t?.tierStep1Title || 'Volume-Based Tiers'}</h3>
+            </div>
+            <p className="text-sm text-blue-700">
+              {t?.tierStep1Desc || 'Your tier is determined by the number of certified translation pages you submit per month. More pages = higher tier = bigger discount. Discounts apply to Certified and RMV translations only.'}
+            </p>
+          </div>
+
+          {/* Step 2 */}
+          <div className="bg-green-50 rounded-lg p-4 border border-green-100">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="w-7 h-7 bg-green-600 text-white rounded-full flex items-center justify-center text-sm font-bold">2</span>
+              <h3 className="font-semibold text-green-800">{t?.tierStep2Title || 'Best of 3 Months'}</h3>
+            </div>
+            <p className="text-sm text-green-700">
+              {t?.tierStep2Desc || 'We look at your best month out of the last 3 months to determine your tier. So if you had a strong month, you keep that tier for up to 3 months even if your volume drops temporarily.'}
+            </p>
+          </div>
+
+          {/* Step 3 */}
+          <div className="bg-purple-50 rounded-lg p-4 border border-purple-100">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="w-7 h-7 bg-purple-600 text-white rounded-full flex items-center justify-center text-sm font-bold">3</span>
+              <h3 className="font-semibold text-purple-800">{t?.tierStep3Title || 'Loyalty Protection'}</h3>
+            </div>
+            <p className="text-sm text-purple-700">
+              {t?.tierStep3Desc || 'After 6 months as a partner, your Loyalty Lock activates. This means you will never lose your highest achieved tier, even during slow months. Your discount is permanently protected.'}
+            </p>
+          </div>
+        </div>
+
+        {/* Example scenario */}
+        <div className="mt-4 bg-gray-50 rounded-lg p-4 border border-gray-200">
+          <h3 className="font-semibold text-gray-700 mb-2">{t?.tierExample || 'Example'}</h3>
+          <p className="text-sm text-gray-600">
+            {t?.tierExampleDesc || 'If you submit 50 pages in January (Silver tier, 15% off), then 10 pages in February and 15 pages in March — you keep the Silver tier for all 3 months because the system uses your best month (50 pages). After 6 months as a partner, even if all 3 recent months are below 30 pages, you keep Silver permanently thanks to Loyalty Lock.'}
+          </p>
+        </div>
+
+        {tierInfo?.tier_strategy && (
+          <div className="mt-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+            <p className="text-sm text-indigo-700">
+              <span className="font-semibold">{t?.yourStatus || 'Your status'}:</span> {tierInfo.tier_strategy.reason}
+              {tierInfo.tier_strategy.loyalty_lock_active && (
+                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+                  Loyalty Lock Active
+                </span>
+              )}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

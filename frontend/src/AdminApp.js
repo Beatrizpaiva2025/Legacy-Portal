@@ -23479,6 +23479,15 @@ const FinancesPage = ({ adminKey }) => {
   const [creatingInvoice, setCreatingInvoice] = useState(false);
   const [showInvoicesModal, setShowInvoicesModal] = useState(false);
   const [selectedPartnerInvoices, setSelectedPartnerInvoices] = useState([]);
+  const [editingInvoice, setEditingInvoice] = useState(null);
+  const [editInvoiceDiscount, setEditInvoiceDiscount] = useState('');
+  const [editInvoiceDiscountReason, setEditInvoiceDiscountReason] = useState('');
+  const [editInvoiceDueDate, setEditInvoiceDueDate] = useState('');
+  const [editInvoiceFixedDueDay, setEditInvoiceFixedDueDay] = useState('');
+  const [editInvoiceNotes, setEditInvoiceNotes] = useState('');
+  const [savingInvoiceEdit, setSavingInvoiceEdit] = useState(false);
+  const [invoiceFixedDueDay, setInvoiceFixedDueDay] = useState('');
+  const [invoiceDueDateMode, setInvoiceDueDateMode] = useState('days');
   // Partner filter and search state
   const [partnerFilter, setPartnerFilter] = useState('all'); // all, registered, prospect
   const [partnerSearchQuery, setPartnerSearchQuery] = useState('');
@@ -23488,6 +23497,10 @@ const FinancesPage = ({ adminKey }) => {
   const [bulkEmailSubject, setBulkEmailSubject] = useState('');
   const [bulkEmailMessage, setBulkEmailMessage] = useState('');
   const [sendingBulkEmail, setSendingBulkEmail] = useState(false);
+  // Add prospect modal state
+  const [showAddProspectModal, setShowAddProspectModal] = useState(false);
+  const [addProspectForm, setAddProspectForm] = useState({ company_name: '', contact_name: '', email: '', phone: '' });
+  const [addingProspect, setAddingProspect] = useState(false);
   // Invoice payment management state
   const [pendingZelleInvoices, setPendingZelleInvoices] = useState([]);
   const [paymentHistory, setPaymentHistory] = useState([]);
@@ -23768,12 +23781,16 @@ const FinancesPage = ({ adminKey }) => {
     }
     setCreatingInvoice(true);
     try {
-      await axios.post(`${API}/admin/partner-invoices/create?admin_key=${adminKey}`, {
+      const invoicePayload = {
         partner_id: selectedPartnerForInvoice.partner_id,
         order_ids: selectedOrdersForInvoice,
         due_days: invoiceDueDays,
         notes: invoiceNotes
-      });
+      };
+      if (invoiceDueDateMode === 'fixed' && invoiceFixedDueDay) {
+        invoicePayload.fixed_due_day = parseInt(invoiceFixedDueDay);
+      }
+      await axios.post(`${API}/admin/partner-invoices/create?admin_key=${adminKey}`, invoicePayload);
       showToast('Invoice created successfully!');
       setShowCreateInvoiceModal(false);
       fetchPartnerStats();
@@ -23803,6 +23820,50 @@ const FinancesPage = ({ adminKey }) => {
       fetchPartnerStats();
     } catch (err) {
       showToast('Error marking invoice as paid: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const handleOpenEditInvoice = (invoice) => {
+    setEditingInvoice(invoice);
+    setEditInvoiceDiscount('');
+    setEditInvoiceDiscountReason('');
+    setEditInvoiceDueDate(invoice.due_date ? new Date(invoice.due_date).toISOString().split('T')[0] : '');
+    setEditInvoiceFixedDueDay(invoice.fixed_due_day || '');
+    setEditInvoiceNotes(invoice.notes || '');
+  };
+
+  const handleSaveInvoiceEdit = async () => {
+    if (!editingInvoice) return;
+    setSavingInvoiceEdit(true);
+    try {
+      const payload = {};
+      if (editInvoiceDiscount && parseFloat(editInvoiceDiscount) > 0) {
+        payload.manual_discount_amount = parseFloat(editInvoiceDiscount);
+        payload.manual_discount_reason = editInvoiceDiscountReason;
+      }
+      if (editInvoiceDueDate) {
+        payload.new_due_date = editInvoiceDueDate;
+      }
+      if (editInvoiceFixedDueDay && parseInt(editInvoiceFixedDueDay) > 0) {
+        payload.fixed_due_day = parseInt(editInvoiceFixedDueDay);
+      }
+      if (editInvoiceNotes !== (editingInvoice.notes || '')) {
+        payload.notes = editInvoiceNotes;
+      }
+      if (Object.keys(payload).length === 0) {
+        showToast('No changes to save');
+        setSavingInvoiceEdit(false);
+        return;
+      }
+      await axios.put(`${API}/admin/partner-invoices/${editingInvoice.id}/edit?admin_key=${adminKey}`, payload);
+      showToast('Invoice updated successfully!');
+      setEditingInvoice(null);
+      fetchPartnerInvoicesForPartner(selectedPartnerForInvoice.partner_id);
+      fetchPartnerInvoices();
+    } catch (err) {
+      showToast('Error updating invoice: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setSavingInvoiceEdit(false);
     }
   };
 
@@ -24120,11 +24181,96 @@ const FinancesPage = ({ adminKey }) => {
   };
 
   const toggleSelectAllPartners = () => {
-    const realPartners = partnerStats.partners?.filter(p => p.is_real_partner) || [];
-    if (selectedPartnerIds.length === realPartners.length) {
+    const isRegisteredPartner = (p) => p.is_real_partner && p.payment_plan_approved && (p.payment_plan === 'biweekly' || p.payment_plan === 'monthly');
+    const visiblePartners = (partnerStats.partners || []).filter(p => {
+      if (partnerFilter === 'registered' && !isRegisteredPartner(p)) return false;
+      if (partnerFilter === 'prospect' && isRegisteredPartner(p)) return false;
+      if (partnerFilter === 'archived' && p.prospect_status !== 'archived') return false;
+      if (partnerFilter === 'prospect' && p.prospect_status === 'archived') return false;
+      if (partnerSearchQuery.trim()) {
+        const q = partnerSearchQuery.toLowerCase();
+        return (p.company_name || '').toLowerCase().includes(q) || (p.email || '').toLowerCase().includes(q) || (p.contact_name || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q);
+      }
+      return true;
+    });
+    const allVisibleSelected = visiblePartners.length > 0 && visiblePartners.every(p => selectedPartnerIds.includes(p.partner_id));
+    if (allVisibleSelected) {
       setSelectedPartnerIds([]);
     } else {
-      setSelectedPartnerIds(realPartners.map(p => p.partner_id));
+      setSelectedPartnerIds(visiblePartners.map(p => p.partner_id));
+    }
+  };
+
+  // Send prospect outreach email (next step in sequence)
+  const sendProspectStepEmail = async (partnerId, companyName, currentStatus) => {
+    const stepMap = { 'new': 'first_contact', 'first_email': 'followup_1', 'follow_up_1': 'followup_2' };
+    const stepLabels = { 'new': '1st Email', 'first_email': 'Follow-up 1', 'follow_up_1': 'Follow-up 2' };
+    const nextStep = stepMap[currentStatus || 'new'];
+    const label = stepLabels[currentStatus || 'new'];
+    if (!nextStep) { showToast('All email steps completed for this prospect'); return; }
+    if (!window.confirm(`Send "${label}" to ${companyName}?`)) return;
+    try {
+      const res = await axios.post(`${API}/admin/partners/${partnerId}/prospect-step?admin_key=${adminKey}`);
+      showToast(res.data.message || `${label} sent successfully!`);
+      fetchPartnerStats();
+    } catch (err) {
+      showToast('Error: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  // Archive prospect (after all follow-ups with no response)
+  const archiveProspect = async (partnerId, companyName) => {
+    if (!window.confirm(`Archive prospect "${companyName}"? It will move to the Archived tab.`)) return;
+    try {
+      await axios.post(`${API}/admin/partners/${partnerId}/archive?admin_key=${adminKey}`);
+      showToast(`${companyName} archived`);
+      fetchPartnerStats();
+    } catch (err) {
+      showToast('Error: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  // Unarchive prospect
+  const unarchiveProspect = async (partnerId, companyName) => {
+    if (!window.confirm(`Unarchive "${companyName}"? It will move back to Prospects.`)) return;
+    try {
+      await axios.post(`${API}/admin/partners/${partnerId}/unarchive?admin_key=${adminKey}`);
+      showToast(`${companyName} unarchived`);
+      fetchPartnerStats();
+    } catch (err) {
+      showToast('Error: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  // Bulk send next prospect step email
+  const bulkSendProspectStep = async () => {
+    if (selectedPartnerIds.length === 0) { showToast('No partners selected'); return; }
+    if (!window.confirm(`Send the next outreach email step to ${selectedPartnerIds.length} prospect(s)?`)) return;
+    try {
+      const res = await axios.post(`${API}/admin/partners/bulk-prospect-step?admin_key=${adminKey}`, {
+        partner_ids: selectedPartnerIds
+      });
+      showToast(res.data.message || 'Emails sent!');
+      setSelectedPartnerIds([]);
+      fetchPartnerStats();
+    } catch (err) {
+      showToast('Error: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  // Bulk archive prospects
+  const bulkArchiveProspects = async () => {
+    if (selectedPartnerIds.length === 0) { showToast('No partners selected'); return; }
+    if (!window.confirm(`Archive ${selectedPartnerIds.length} prospect(s)?`)) return;
+    try {
+      const res = await axios.post(`${API}/admin/partners/bulk-archive?admin_key=${adminKey}`, {
+        partner_ids: selectedPartnerIds
+      });
+      showToast(res.data.message || 'Prospects archived!');
+      setSelectedPartnerIds([]);
+      fetchPartnerStats();
+    } catch (err) {
+      showToast('Error: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -24170,6 +24316,30 @@ const FinancesPage = ({ adminKey }) => {
     }
   };
 
+  const handleAddProspect = async () => {
+    if (!addProspectForm.company_name.trim()) {
+      showToast('Company name is required');
+      return;
+    }
+    setAddingProspect(true);
+    try {
+      const res = await axios.post(`${API}/admin/partners/add-prospect?admin_key=${adminKey}`, {
+        company_name: addProspectForm.company_name,
+        contact_name: addProspectForm.contact_name,
+        email: addProspectForm.email,
+        phone: addProspectForm.phone
+      });
+      showToast(res.data.message || 'Prospect added successfully!');
+      setShowAddProspectModal(false);
+      setAddProspectForm({ company_name: '', contact_name: '', email: '', phone: '' });
+      fetchPartnerStats();
+    } catch (err) {
+      showToast('Error adding prospect: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setAddingProspect(false);
+    }
+  };
+
   const setPartnerPaymentPlan = async (partnerId, plan) => {
     try {
       await axios.post(`${API}/admin/partners/${partnerId}/set-payment-plan?admin_key=${adminKey}&plan=${plan}&send_notification=true`);
@@ -24178,6 +24348,17 @@ const FinancesPage = ({ adminKey }) => {
       fetchPartnerStats(); // Refresh the list
     } catch (err) {
       showToast('Error setting payment plan: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const setPartnerTier = async (partnerId, tier) => {
+    try {
+      await axios.post(`${API}/admin/partners/${partnerId}/set-tier?admin_key=${adminKey}&tier=${tier}`);
+      const tierNames = { standard: 'Standard (auto)', bronze: 'Bronze (10%)', silver: 'Silver (15%)', gold: 'Gold (25%)', platinum: 'Platinum (35%)' };
+      showToast(`Tier set to ${tierNames[tier] || tier}`);
+      fetchPartnerStats();
+    } catch (err) {
+      showToast('Error setting tier: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -25465,13 +25646,38 @@ const FinancesPage = ({ adminKey }) => {
           <div className="bg-white rounded-lg shadow">
             <div className="p-4 border-b bg-gray-50">
               <div className="flex items-center justify-between mb-3">
-                <div>
-                  <h2 className="text-sm font-bold text-gray-700">🤝 Partner Companies</h2>
-                  <p className="text-xs text-gray-500 mt-1">Revenue from Partner Portal orders</p>
+                <div className="flex items-center gap-3">
+                  <div>
+                    <h2 className="text-sm font-bold text-gray-700">🤝 Partner Companies</h2>
+                    <p className="text-xs text-gray-500 mt-1">Revenue from Partner Portal orders</p>
+                  </div>
+                  <button
+                    onClick={() => setShowAddProspectModal(true)}
+                    className="px-3 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700 flex items-center gap-1 font-medium"
+                    title="Add new prospect"
+                  >
+                    + Add Prospect
+                  </button>
                 </div>
                 {selectedPartnerIds.length > 0 && (
                   <div className="flex items-center space-x-2">
                     <span className="text-xs text-gray-600 font-medium">{selectedPartnerIds.length} selected</span>
+                    {(partnerFilter === 'prospect') && (
+                      <>
+                        <button
+                          onClick={bulkSendProspectStep}
+                          className="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 flex items-center gap-1"
+                        >
+                          📧 Send Next Step
+                        </button>
+                        <button
+                          onClick={bulkArchiveProspects}
+                          className="px-3 py-1.5 bg-gray-600 text-white text-xs rounded hover:bg-gray-700 flex items-center gap-1"
+                        >
+                          📁 Archive
+                        </button>
+                      </>
+                    )}
                     <button
                       onClick={() => { setShowBulkEmailModal(true); }}
                       className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center gap-1"
@@ -25513,7 +25719,13 @@ const FinancesPage = ({ adminKey }) => {
                     onClick={() => { setPartnerFilter('prospect'); setSelectedPartnerIds([]); }}
                     className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${partnerFilter === 'prospect' ? 'bg-orange-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
                   >
-                    Prospects ({partnerStats.partners?.filter(p => !p.is_real_partner || !p.payment_plan_approved || (p.payment_plan !== 'biweekly' && p.payment_plan !== 'monthly')).length || 0})
+                    Prospects ({partnerStats.partners?.filter(p => (!p.is_real_partner || !p.payment_plan_approved || (p.payment_plan !== 'biweekly' && p.payment_plan !== 'monthly')) && p.prospect_status !== 'archived').length || 0})
+                  </button>
+                  <button
+                    onClick={() => { setPartnerFilter('archived'); setSelectedPartnerIds([]); }}
+                    className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${partnerFilter === 'archived' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                  >
+                    Archived ({partnerStats.partners?.filter(p => p.prospect_status === 'archived').length || 0})
                   </button>
                 </div>
                 <div className="flex-1 max-w-xs">
@@ -25534,12 +25746,7 @@ const FinancesPage = ({ adminKey }) => {
                     <th className="px-2 py-3 text-center w-10">
                       <input
                         type="checkbox"
-                        checked={selectedPartnerIds.length > 0 && selectedPartnerIds.length === (partnerStats.partners?.filter(p => p.is_real_partner && p.payment_plan_approved && (p.payment_plan === 'biweekly' || p.payment_plan === 'monthly')).filter(p => {
-                          if (partnerFilter === 'prospect') return false;
-                          if (!partnerSearchQuery.trim()) return true;
-                          const q = partnerSearchQuery.toLowerCase();
-                          return (p.company_name || '').toLowerCase().includes(q) || (p.email || '').toLowerCase().includes(q) || (p.contact_name || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q);
-                        }) || []).length}
+                        checked={selectedPartnerIds.length > 0}
                         onChange={toggleSelectAllPartners}
                         className="rounded border-gray-300"
                         title="Select all partners"
@@ -25549,6 +25756,7 @@ const FinancesPage = ({ adminKey }) => {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Orders Paid</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Orders Pending</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Tier</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Payment Plan</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Received</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Pending</th>
@@ -25560,9 +25768,10 @@ const FinancesPage = ({ adminKey }) => {
                   {(() => {
                     const isRegisteredPartner = (p) => p.is_real_partner && p.payment_plan_approved && (p.payment_plan === 'biweekly' || p.payment_plan === 'monthly');
                     const filteredPartners = (partnerStats.partners || []).filter(p => {
-                      // Filter by type: Registered = approved biweekly/monthly, Prospect = all others
+                      // Filter by type
                       if (partnerFilter === 'registered' && !isRegisteredPartner(p)) return false;
-                      if (partnerFilter === 'prospect' && isRegisteredPartner(p)) return false;
+                      if (partnerFilter === 'prospect' && (isRegisteredPartner(p) || p.prospect_status === 'archived')) return false;
+                      if (partnerFilter === 'archived' && p.prospect_status !== 'archived') return false;
                       // Filter by search query
                       if (partnerSearchQuery.trim()) {
                         const q = partnerSearchQuery.toLowerCase();
@@ -25584,21 +25793,35 @@ const FinancesPage = ({ adminKey }) => {
                       return (
                       <tr key={partner.partner_id} className={`hover:bg-gray-50 ${!isApproved ? 'bg-orange-50' : ''} ${selectedPartnerIds.includes(partner.partner_id) ? 'bg-blue-50' : ''}`}>
                         <td className="px-2 py-3 text-center">
-                          {isApproved && (
-                            <input
-                              type="checkbox"
-                              checked={selectedPartnerIds.includes(partner.partner_id)}
-                              onChange={() => togglePartnerSelection(partner.partner_id)}
-                              className="rounded border-gray-300"
-                            />
-                          )}
+                          <input
+                            type="checkbox"
+                            checked={selectedPartnerIds.includes(partner.partner_id)}
+                            onChange={() => togglePartnerSelection(partner.partner_id)}
+                            className="rounded border-gray-300"
+                          />
                         </td>
                         <td className="px-4 py-3">
                           <div className="font-medium text-gray-800">
                             {partner.company_name}
                             {!isApproved && (
-                              <span className="ml-2 px-1.5 py-0.5 text-xs bg-orange-200 text-orange-700 rounded" title={!partner.is_real_partner ? 'Not a registered partner - orders created manually or from other sources' : 'Registered but pending biweekly/monthly plan approval'}>
-                                Prospect
+                              <span className={`ml-2 px-1.5 py-0.5 text-xs rounded ${
+                                partner.prospect_status === 'archived' ? 'bg-gray-200 text-gray-600' :
+                                partner.prospect_status === 'follow_up_2' ? 'bg-red-100 text-red-700' :
+                                partner.prospect_status === 'follow_up_1' ? 'bg-yellow-100 text-yellow-700' :
+                                partner.prospect_status === 'first_email' ? 'bg-blue-100 text-blue-700' :
+                                'bg-orange-200 text-orange-700'
+                              }`} title={
+                                partner.prospect_status === 'archived' ? 'Archived - no response after all follow-ups' :
+                                partner.prospect_status === 'follow_up_2' ? 'Follow-up 2 sent - awaiting response' :
+                                partner.prospect_status === 'follow_up_1' ? 'Follow-up 1 sent - awaiting response' :
+                                partner.prospect_status === 'first_email' ? '1st email sent - awaiting response' :
+                                'New prospect - no emails sent yet'
+                              }>
+                                {partner.prospect_status === 'archived' ? 'Archived' :
+                                 partner.prospect_status === 'follow_up_2' ? 'Follow-up 2' :
+                                 partner.prospect_status === 'follow_up_1' ? 'Follow-up 1' :
+                                 partner.prospect_status === 'first_email' ? '1st Email' :
+                                 'New'}
                               </span>
                             )}
                           </div>
@@ -25638,6 +25861,33 @@ const FinancesPage = ({ adminKey }) => {
                           <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-yellow-100 text-yellow-700">
                             {partner.orders_pending}
                           </span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {partner.is_real_partner ? (
+                            <select
+                              value={partner.tier_override || partner.achieved_tier || 'standard'}
+                              onChange={(e) => {
+                                if (window.confirm(`Set tier for ${partner.company_name} to ${e.target.options[e.target.selectedIndex].text}?`)) {
+                                  setPartnerTier(partner.partner_id, e.target.value);
+                                }
+                              }}
+                              className={`text-xs px-2 py-1 rounded border ${
+                                (partner.tier_override || partner.achieved_tier) === 'platinum' ? 'bg-blue-100 border-blue-300 text-blue-700' :
+                                (partner.tier_override || partner.achieved_tier) === 'gold' ? 'bg-yellow-100 border-yellow-300 text-yellow-700' :
+                                (partner.tier_override || partner.achieved_tier) === 'silver' ? 'bg-slate-100 border-slate-300 text-slate-700' :
+                                (partner.tier_override || partner.achieved_tier) === 'bronze' ? 'bg-amber-100 border-amber-300 text-amber-700' :
+                                'bg-gray-100 border-gray-300 text-gray-700'
+                              }`}
+                            >
+                              <option value="standard">Standard (auto)</option>
+                              <option value="bronze">Bronze (10%)</option>
+                              <option value="silver">Silver (15%)</option>
+                              <option value="gold">Gold (25%)</option>
+                              <option value="platinum">Platinum (35%)</option>
+                            </select>
+                          ) : (
+                            <span className="text-xs text-gray-400">N/A</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-center">
                           {partner.is_real_partner ? (
@@ -25722,33 +25972,18 @@ const FinancesPage = ({ adminKey }) => {
                               </>
                             ) : (
                               <div className="flex items-center gap-1">
-                                {partner.is_real_partner && partner.email && (
-                                  <button
-                                    onClick={() => sendProspectInvite(partner.partner_id, partner.email, partner.company_name)}
-                                    className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                    title="Send partner registration invite email"
-                                  >
-                                    📧
-                                  </button>
-                                )}
-                                {partner.is_real_partner && (
+                                {partner.prospect_status === 'archived' ? (
                                   <>
                                     <button
-                                      onClick={() => togglePartnerInvoiceUnlock(partner.partner_id, partner.company_name, partner.payment_plan_approved)}
-                                      className={`p-1.5 rounded transition-colors ${
-                                        partner.payment_plan_approved
-                                          ? 'text-green-600 hover:bg-green-50'
-                                          : 'text-amber-600 hover:bg-amber-50'
-                                      }`}
-                                      title={partner.payment_plan_approved ? 'Invoice payments unlocked - Click to lock' : 'Invoice payments locked - Click to unlock'}
+                                      onClick={() => unarchiveProspect(partner.partner_id, partner.company_name)}
+                                      className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                      title="Unarchive - move back to Prospects"
                                     >
-                                      {partner.payment_plan_approved ? '🔓' : '🔒'}
+                                      📤
                                     </button>
                                     <button
                                       onClick={() => {
-                                        if (window.confirm(`Are you sure you want to delete partner "${partner.company_name}"?\n\nThis action cannot be undone.`)) {
-                                          deletePartner(partner.partner_id);
-                                        }
+                                        if (window.confirm(`Delete "${partner.company_name}"?\n\nThis action cannot be undone.`)) deletePartner(partner.partner_id);
                                       }}
                                       className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
                                       title="Delete partner"
@@ -25756,9 +25991,38 @@ const FinancesPage = ({ adminKey }) => {
                                       🗑️
                                     </button>
                                   </>
-                                )}
-                                {!partner.is_real_partner && (
-                                  <span className="text-xs text-gray-400" title="Manual entry - no actions available">-</span>
+                                ) : (
+                                  <>
+                                    {partner.email && (partner.prospect_status || 'new') !== 'follow_up_2' && (
+                                      <button
+                                        onClick={() => sendProspectStepEmail(partner.partner_id, partner.company_name, partner.prospect_status)}
+                                        className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                                        title={`Send ${
+                                          !partner.prospect_status || partner.prospect_status === 'new' ? '1st Email' :
+                                          partner.prospect_status === 'first_email' ? 'Follow-up 1' :
+                                          partner.prospect_status === 'follow_up_1' ? 'Follow-up 2' : 'Next step'
+                                        }`}
+                                      >
+                                        📧
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={() => archiveProspect(partner.partner_id, partner.company_name)}
+                                      className="p-1.5 text-gray-500 hover:bg-gray-100 rounded transition-colors"
+                                      title="Archive prospect"
+                                    >
+                                      📁
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        if (window.confirm(`Delete "${partner.company_name}"?\n\nThis action cannot be undone.`)) deletePartner(partner.partner_id);
+                                      }}
+                                      className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                      title="Delete partner"
+                                    >
+                                      🗑️
+                                    </button>
+                                  </>
                                 )}
                               </div>
                             )}
@@ -26086,30 +26350,66 @@ const FinancesPage = ({ adminKey }) => {
                       </div>
                     ))}
                   </div>
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Due in (days)</label>
-                      <select
-                        value={invoiceDueDays}
-                        onChange={(e) => setInvoiceDueDays(parseInt(e.target.value))}
-                        className="w-full border rounded-md px-3 py-2 text-sm"
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Due Date Mode</label>
+                    <div className="flex space-x-2 mb-2">
+                      <button
+                        onClick={() => { setInvoiceDueDateMode('days'); setInvoiceFixedDueDay(''); }}
+                        className={`px-3 py-1.5 text-xs rounded-md border ${invoiceDueDateMode === 'days' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
                       >
-                        <option value={7}>7 days</option>
-                        <option value={15}>15 days</option>
-                        <option value={30}>30 days</option>
-                        <option value={45}>45 days</option>
-                        <option value={60}>60 days</option>
-                      </select>
+                        Due in X days
+                      </button>
+                      <button
+                        onClick={() => setInvoiceDueDateMode('fixed')}
+                        className={`px-3 py-1.5 text-xs rounded-md border ${invoiceDueDateMode === 'fixed' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+                      >
+                        Fixed day of month
+                      </button>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
-                      <input
-                        type="text"
-                        value={invoiceNotes}
-                        onChange={(e) => setInvoiceNotes(e.target.value)}
-                        className="w-full border rounded-md px-3 py-2 text-sm"
-                        placeholder="Invoice notes..."
-                      />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        {invoiceDueDateMode === 'days' ? (
+                          <>
+                            <label className="block text-xs text-gray-500 mb-1">Due in (days)</label>
+                            <select
+                              value={invoiceDueDays}
+                              onChange={(e) => setInvoiceDueDays(parseInt(e.target.value))}
+                              className="w-full border rounded-md px-3 py-2 text-sm"
+                            >
+                              <option value={7}>7 days</option>
+                              <option value={15}>15 days</option>
+                              <option value={30}>30 days</option>
+                              <option value={45}>45 days</option>
+                              <option value={60}>60 days</option>
+                            </select>
+                          </>
+                        ) : (
+                          <>
+                            <label className="block text-xs text-gray-500 mb-1">Fixed day (1-28)</label>
+                            <select
+                              value={invoiceFixedDueDay}
+                              onChange={(e) => setInvoiceFixedDueDay(e.target.value)}
+                              className="w-full border rounded-md px-3 py-2 text-sm"
+                            >
+                              <option value="">Select day...</option>
+                              {[1,5,10,15,20,25,28].map(d => (
+                                <option key={d} value={d}>Day {d} of each month</option>
+                              ))}
+                            </select>
+                            <p className="text-xs text-gray-400 mt-1">Invoice will be due on this day every month</p>
+                          </>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Notes (optional)</label>
+                        <input
+                          type="text"
+                          value={invoiceNotes}
+                          onChange={(e) => setInvoiceNotes(e.target.value)}
+                          className="w-full border rounded-md px-3 py-2 text-sm"
+                          placeholder="Invoice notes..."
+                        />
+                      </div>
                     </div>
                   </div>
                 </>
@@ -26199,6 +26499,22 @@ const FinancesPage = ({ adminKey }) => {
                           </a>
                         )}
                       </div>
+                      {invoice.manual_discount_amount > 0 && (
+                        <div className="mb-2 p-2 bg-orange-50 border border-orange-200 rounded">
+                          <div className="text-xs text-orange-700 font-medium">
+                            Original Total: {formatCurrency(invoice.original_total_amount)} | Manual Discount: -{formatCurrency(invoice.manual_discount_amount)} | Final: {formatCurrency(invoice.total_amount)}
+                          </div>
+                          {invoice.manual_discount_reason && (
+                            <div className="text-xs text-orange-600 mt-1">Reason: {invoice.manual_discount_reason}</div>
+                          )}
+                          {invoice.adjusted_at && (
+                            <div className="text-xs text-orange-500 mt-1">Adjusted: {new Date(invoice.adjusted_at).toLocaleDateString()}</div>
+                          )}
+                        </div>
+                      )}
+                      {invoice.fixed_due_day && (
+                        <div className="text-xs text-blue-600 mb-2">Fixed due day: {invoice.fixed_due_day}th of each month</div>
+                      )}
                       {invoice.notes && (
                         <div className="text-xs text-gray-600 mb-2">Notes: {invoice.notes}</div>
                       )}
@@ -26235,6 +26551,12 @@ const FinancesPage = ({ adminKey }) => {
                       {invoice.status !== 'paid' && (
                         <div className="flex space-x-2 mt-3">
                           <button
+                            onClick={() => handleOpenEditInvoice(invoice)}
+                            className="px-3 py-1.5 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600"
+                          >
+                            Edit Invoice
+                          </button>
+                          <button
                             onClick={() => handleMarkInvoicePaid(invoice.id, 'zelle')}
                             className="px-3 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700"
                           >
@@ -26265,6 +26587,116 @@ const FinancesPage = ({ adminKey }) => {
                 className="px-4 py-2 border rounded-md text-sm hover:bg-gray-100"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Invoice Modal */}
+      {editingInvoice && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
+            <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+              <div>
+                <h2 className="font-bold text-gray-800">Edit Invoice</h2>
+                <p className="text-sm text-gray-500">{editingInvoice.invoice_number} - {editingInvoice.partner_company}</p>
+              </div>
+              <button onClick={() => setEditingInvoice(null)} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            <div className="p-4 space-y-4">
+              {/* Current Amount */}
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <div className="text-sm text-gray-500">Current Total</div>
+                <div className="text-2xl font-bold">{formatCurrency(editingInvoice.total_amount)}</div>
+                {editingInvoice.original_total_amount && (
+                  <div className="text-xs text-gray-400">Original: {formatCurrency(editingInvoice.original_total_amount)}</div>
+                )}
+              </div>
+
+              {/* Manual Discount */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Apply Manual Discount ($)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={editInvoiceDiscount}
+                  onChange={(e) => setEditInvoiceDiscount(e.target.value)}
+                  className="w-full border rounded-md px-3 py-2 text-sm"
+                  placeholder="e.g. 10.00"
+                />
+                {editInvoiceDiscount && parseFloat(editInvoiceDiscount) > 0 && (
+                  <div className="text-xs text-green-600 mt-1">
+                    New total will be: {formatCurrency((editingInvoice.original_total_amount || editingInvoice.total_amount) - parseFloat(editInvoiceDiscount))}
+                  </div>
+                )}
+              </div>
+
+              {/* Discount Reason */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Discount Reason</label>
+                <input
+                  type="text"
+                  value={editInvoiceDiscountReason}
+                  onChange={(e) => setEditInvoiceDiscountReason(e.target.value)}
+                  className="w-full border rounded-md px-3 py-2 text-sm"
+                  placeholder="e.g. Partner loyalty discount, correction..."
+                />
+              </div>
+
+              {/* Due Date */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+                <input
+                  type="date"
+                  value={editInvoiceDueDate}
+                  onChange={(e) => setEditInvoiceDueDate(e.target.value)}
+                  className="w-full border rounded-md px-3 py-2 text-sm"
+                />
+              </div>
+
+              {/* Fixed Due Day */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Fixed Due Day (partner preference)</label>
+                <select
+                  value={editInvoiceFixedDueDay}
+                  onChange={(e) => setEditInvoiceFixedDueDay(e.target.value)}
+                  className="w-full border rounded-md px-3 py-2 text-sm"
+                >
+                  <option value="">No fixed day</option>
+                  {[1,5,10,15,20,25,28].map(d => (
+                    <option key={d} value={d}>Day {d} of each month</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-400 mt-1">This will also save as the partner's default preference for future invoices</p>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                <input
+                  type="text"
+                  value={editInvoiceNotes}
+                  onChange={(e) => setEditInvoiceNotes(e.target.value)}
+                  className="w-full border rounded-md px-3 py-2 text-sm"
+                  placeholder="Invoice notes..."
+                />
+              </div>
+            </div>
+            <div className="p-4 border-t bg-gray-50 flex justify-end space-x-2">
+              <button
+                onClick={() => setEditingInvoice(null)}
+                className="px-4 py-2 border rounded-md text-sm hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveInvoiceEdit}
+                disabled={savingInvoiceEdit}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:bg-gray-300"
+              >
+                {savingInvoiceEdit ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
           </div>
@@ -26408,6 +26840,78 @@ const FinancesPage = ({ adminKey }) => {
                 className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
               >
                 {sendingBulkEmail ? 'Sending...' : `Send to ${selectedPartnerIds.length} Partner(s)`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Prospect Modal */}
+      {showAddProspectModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+              <div>
+                <h2 className="font-bold text-gray-800">Add New Prospect</h2>
+                <p className="text-sm text-gray-500">Add a new prospect partner manually</p>
+              </div>
+              <button onClick={() => setShowAddProspectModal(false)} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Company Name *</label>
+                <input
+                  type="text"
+                  value={addProspectForm.company_name}
+                  onChange={(e) => setAddProspectForm({...addProspectForm, company_name: e.target.value})}
+                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="Company name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Contact Name</label>
+                <input
+                  type="text"
+                  value={addProspectForm.contact_name}
+                  onChange={(e) => setAddProspectForm({...addProspectForm, contact_name: e.target.value})}
+                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="Contact person name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={addProspectForm.email}
+                  onChange={(e) => setAddProspectForm({...addProspectForm, email: e.target.value})}
+                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="contact@company.com"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                <input
+                  type="tel"
+                  value={addProspectForm.phone}
+                  onChange={(e) => setAddProspectForm({...addProspectForm, phone: e.target.value})}
+                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="(11) 9999-9999"
+                />
+              </div>
+            </div>
+            <div className="p-4 border-t bg-gray-50 flex justify-between items-center">
+              <button
+                onClick={() => { setShowAddProspectModal(false); setAddProspectForm({ company_name: '', contact_name: '', email: '', phone: '' }); }}
+                className="px-4 py-2 border rounded-md text-sm hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddProspect}
+                disabled={addingProspect || !addProspectForm.company_name.trim()}
+                className="px-4 py-2 bg-green-600 text-white rounded-md text-sm hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+              >
+                {addingProspect ? 'Adding...' : 'Add Prospect'}
               </button>
             </div>
           </div>

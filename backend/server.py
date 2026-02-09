@@ -2233,11 +2233,29 @@ class PartnerInvoice(BaseModel):
     # Reminder tracking
     reminder_sent_count: int = 0  # Number of reminders sent
     last_reminder_at: Optional[datetime] = None  # When last reminder was sent
+    # Manual adjustment tracking
+    manual_discount_amount: float = 0.0  # Manual discount applied by admin
+    manual_discount_reason: Optional[str] = None  # Reason for manual discount
+    original_total_amount: Optional[float] = None  # Total before manual discount
+    adjusted_by: Optional[str] = None  # Admin who made the adjustment
+    adjusted_at: Optional[datetime] = None  # When the adjustment was made
+    # Fixed due date settings (per-partner preference)
+    fixed_due_day: Optional[int] = None  # Day of month for fixed due date (1-28)
+    partner_tier: Optional[str] = None  # Partner's effective tier at invoice creation
+    tier_discount_percent: Optional[int] = None  # Tier discount percentage applied
 
 class PartnerInvoiceCreate(BaseModel):
     partner_id: str
     order_ids: List[str]
     due_days: int = 30  # Days until due
+    notes: Optional[str] = None
+    fixed_due_day: Optional[int] = None  # Day of month for fixed due date (1-28)
+
+class PartnerInvoiceEdit(BaseModel):
+    manual_discount_amount: Optional[float] = None  # Manual discount to apply
+    manual_discount_reason: Optional[str] = None  # Reason for the discount
+    new_due_date: Optional[str] = None  # New due date (ISO format)
+    fixed_due_day: Optional[int] = None  # Fixed day of month for due date (1-28)
     notes: Optional[str] = None
 
 class PartnerInvoicePayStripe(BaseModel):
@@ -3625,6 +3643,7 @@ async def get_effective_partner_tier(partner: dict) -> dict:
     partner_id = partner.get("id")
     created_at = partner.get("created_at")
     achieved_tier = partner.get("achieved_tier", "standard")
+    tier_override = partner.get("tier_override")
 
     # Calculate months as partner
     months_as_partner = 0
@@ -3658,6 +3677,12 @@ async def get_effective_partner_tier(partner: dict) -> dict:
         effective_tier = best_3month_tier
         reason = f"Best tier from last 3 months ({best_month_pages} pages)"
 
+    # Apply admin tier override if set
+    if tier_override and tier_override != "standard":
+        effective_tier = get_higher_tier(effective_tier, tier_override)
+        if tier_override == effective_tier and tier_override != best_3month_tier:
+            reason = f"Admin override: tier set to {tier_override}"
+
     # Update achieved tier if current effective is higher
     if compare_tiers(effective_tier, achieved_tier) > 0:
         await db.partners.update_one(
@@ -3678,6 +3703,7 @@ async def get_effective_partner_tier(partner: dict) -> dict:
         "loyalty_lock_active": loyalty_lock_active,
         "months_as_partner": round(months_as_partner, 1),
         "monthly_volumes": monthly_volumes,
+        "tier_override": tier_override,
         "current_volume": current_volume,
         "reason": reason
     }
@@ -6510,18 +6536,22 @@ async def validate_coupon(token: str, code: str, order_total: float = 0):
     if not partner:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
-    # Find coupon (case-insensitive)
+    # Find coupon - prioritize partner-specific coupon, then fall back to global/template
     coupon = await db.coupons.find_one({
         "code": {"$regex": f"^{code}$", "$options": "i"},
-        "is_active": True
+        "is_active": True,
+        "partner_id": partner["id"]
     })
+    if not coupon:
+        # Fall back to global/template coupon (no partner_id)
+        coupon = await db.coupons.find_one({
+            "code": {"$regex": f"^{code}$", "$options": "i"},
+            "is_active": True,
+            "$or": [{"partner_id": None}, {"partner_id": {"$exists": False}}]
+        })
 
     if not coupon:
         raise HTTPException(status_code=404, detail="Invalid coupon code")
-
-    # Check if coupon belongs to this partner (if partner-specific)
-    if coupon.get("partner_id") and coupon["partner_id"] != partner["id"]:
-        raise HTTPException(status_code=400, detail="This coupon is not valid for your account")
 
     # Check usage limits
     if coupon["times_used"] >= coupon["max_uses"]:
@@ -8860,15 +8890,22 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
         coupon_discount_amount = 0.0
         coupon_code_applied = None
         if order_data.coupon_code:
+            # First try to find a partner-specific coupon, then fall back to global/template
             coupon = await db.coupons.find_one({
                 "code": {"$regex": f"^{order_data.coupon_code}$", "$options": "i"},
-                "is_active": True
+                "is_active": True,
+                "partner_id": partner["id"]
             })
+            if not coupon:
+                # Fall back to global/template coupon (no partner_id)
+                coupon = await db.coupons.find_one({
+                    "code": {"$regex": f"^{order_data.coupon_code}$", "$options": "i"},
+                    "is_active": True,
+                    "$or": [{"partner_id": None}, {"partner_id": {"$exists": False}}]
+                })
             if coupon and coupon["times_used"] < coupon["max_uses"]:
-                # Check partner-specific coupon
-                if coupon.get("partner_id") and coupon["partner_id"] != partner["id"]:
-                    pass  # Skip - coupon not for this partner
-                else:
+                # Coupon is already validated for this partner (found by partner_id or global)
+                if True:
                     # Calculate coupon discount
                     if coupon["discount_type"] == "certified_page":
                         coupon_discount_amount = CERTIFIED_PAGE_PRICE * coupon["discount_value"]
@@ -11252,7 +11289,10 @@ async def get_partner_statistics(admin_key: str):
                 "payment_plan_approved": partner.get("payment_plan_approved", False),
                 "total_paid_orders": partner.get("total_paid_orders", 0),
                 "invoice_manually_unlocked": partner.get("invoice_manually_unlocked", False),
-                "is_real_partner": True  # This is a registered partner
+                "is_real_partner": True,  # This is a registered partner
+                "prospect_status": partner.get("prospect_status", "new"),
+                "achieved_tier": partner.get("achieved_tier", "standard"),
+                "tier_override": partner.get("tier_override")
             }
 
     # Track special entries separately
@@ -11486,6 +11526,50 @@ async def set_partner_payment_plan(partner_id: str, admin_key: str, plan: str, s
         raise HTTPException(status_code=500, detail="Failed to set payment plan")
 
 
+@api_router.post("/admin/partners/{partner_id}/set-tier")
+async def set_partner_tier(partner_id: str, admin_key: str, tier: str):
+    """Manually set a partner's tier override (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    valid_tiers = ["standard", "bronze", "silver", "gold", "platinum"]
+    if tier not in valid_tiers:
+        raise HTTPException(status_code=400, detail=f"Invalid tier. Must be one of: {', '.join(valid_tiers)}")
+
+    partner = await db.partners.find_one({"id": partner_id})
+    if not partner:
+        raise HTTPException(status_code=404, detail="Partner not found")
+
+    update_data = {
+        "tier_override": tier if tier != "standard" else None,
+        "tier_override_at": datetime.utcnow(),
+    }
+
+    # Also update achieved_tier if override is higher
+    current_achieved = partner.get("achieved_tier", "standard")
+    if compare_tiers(tier, current_achieved) > 0:
+        update_data["achieved_tier"] = tier
+        update_data["tier_achieved_at"] = datetime.utcnow()
+
+    await db.partners.update_one(
+        {"id": partner_id},
+        {"$set": update_data}
+    )
+
+    tier_names = {"standard": "Standard (auto)", "bronze": "Bronze (10%)", "silver": "Silver (15%)", "gold": "Gold (25%)", "platinum": "Platinum (35%)"}
+
+    logger.info(f"Admin set tier override for partner {partner.get('company_name')} to {tier}")
+
+    return {
+        "success": True,
+        "message": f"Tier set to {tier_names.get(tier, tier)} for {partner.get('company_name')}",
+        "tier": tier,
+        "partner_id": partner_id
+    }
+
+
 @api_router.post("/admin/partners/{partner_id}/send-invite")
 async def send_partner_invite(partner_id: str, admin_key: str):
     """Send a registration/upgrade invite email to a prospect partner"""
@@ -11580,6 +11664,257 @@ async def send_partner_invite(partner_id: str, admin_key: str):
     except Exception as e:
         logger.error(f"Error sending partner invite: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to send invite email")
+
+
+@api_router.post("/admin/partners/{partner_id}/prospect-step")
+async def send_prospect_step_email(partner_id: str, admin_key: str):
+    """Send the next outreach email step and advance prospect_status"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    partner = await db.partners.find_one({"id": partner_id})
+    if not partner:
+        raise HTTPException(status_code=404, detail="Partner not found")
+
+    partner_email = partner.get("email")
+    if not partner_email:
+        raise HTTPException(status_code=400, detail="Partner has no email address")
+
+    company_name = partner.get("company_name", "Partner")
+    current_status = partner.get("prospect_status", "new")
+
+    step_map = {
+        "new": ("first_contact", "first_email"),
+        "first_email": ("followup_1", "follow_up_1"),
+        "follow_up_1": ("followup_2", "follow_up_2"),
+    }
+
+    if current_status not in step_map:
+        raise HTTPException(status_code=400, detail=f"All email steps already completed (current: {current_status})")
+
+    email_type, next_status = step_map[current_status]
+
+    subjects = {
+        "first_contact": "Certified Translation Services with Digital Verification",
+        "followup_1": f"A free translation for {company_name} — try us risk-free",
+        "followup_2": f"Why firms trust Legacy Translations — plus your free trial",
+    }
+
+    if email_type == "first_contact":
+        html_content = get_outreach_first_contact_template()
+    elif email_type == "followup_1":
+        html_content = get_outreach_followup1_template(company_name)
+    else:
+        html_content = get_outreach_followup2_template(company_name)
+
+    try:
+        email_service = EmailService()
+        await email_service.send_email(partner_email, subjects[email_type], html_content)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
+
+    await db.partners.update_one(
+        {"id": partner_id},
+        {"$set": {
+            "prospect_status": next_status,
+            f"prospect_{email_type}_sent_at": datetime.utcnow().isoformat()
+        }}
+    )
+
+    step_labels = {"first_email": "1st Email", "follow_up_1": "Follow-up 1", "follow_up_2": "Follow-up 2"}
+    return {"success": True, "message": f"{step_labels[next_status]} sent to {company_name}"}
+
+
+@api_router.post("/admin/partners/{partner_id}/archive")
+async def archive_prospect(partner_id: str, admin_key: str):
+    """Archive a prospect partner"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    result = await db.partners.update_one(
+        {"id": partner_id},
+        {"$set": {"prospect_status": "archived", "archived_at": datetime.utcnow().isoformat()}}
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Partner not found")
+    return {"success": True, "message": "Partner archived"}
+
+
+@api_router.post("/admin/partners/{partner_id}/unarchive")
+async def unarchive_prospect(partner_id: str, admin_key: str):
+    """Unarchive a prospect partner - moves back to prospects with current email status"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    partner = await db.partners.find_one({"id": partner_id})
+    if not partner:
+        raise HTTPException(status_code=404, detail="Partner not found")
+
+    # Restore to last email step before archiving
+    previous_status = "new"
+    if partner.get("prospect_followup_2_sent_at") or partner.get("prospect_followup2_sent_at"):
+        previous_status = "follow_up_2"
+    elif partner.get("prospect_followup_1_sent_at") or partner.get("prospect_followup1_sent_at"):
+        previous_status = "follow_up_1"
+    elif partner.get("prospect_first_contact_sent_at"):
+        previous_status = "first_email"
+
+    await db.partners.update_one(
+        {"id": partner_id},
+        {"$set": {"prospect_status": previous_status}, "$unset": {"archived_at": ""}}
+    )
+    return {"success": True, "message": "Partner unarchived"}
+
+
+class BulkPartnerIdsRequest(BaseModel):
+    partner_ids: list
+
+
+@api_router.post("/admin/partners/bulk-prospect-step")
+async def bulk_send_prospect_step(request: BulkPartnerIdsRequest, admin_key: str):
+    """Send next outreach email step to multiple prospects"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    sent = 0
+    skipped = 0
+    failed = 0
+    email_service = EmailService()
+
+    step_map = {
+        "new": ("first_contact", "first_email"),
+        "first_email": ("followup_1", "follow_up_1"),
+        "follow_up_1": ("followup_2", "follow_up_2"),
+    }
+
+    subjects = {
+        "first_contact": "Certified Translation Services with Digital Verification",
+        "followup_1": "A free translation — try us risk-free",
+        "followup_2": "Why firms trust Legacy Translations — plus your free trial",
+    }
+
+    for pid in request.partner_ids:
+        partner = await db.partners.find_one({"id": pid})
+        if not partner or not partner.get("email"):
+            skipped += 1
+            continue
+
+        current_status = partner.get("prospect_status", "new")
+        if current_status not in step_map:
+            skipped += 1
+            continue
+
+        email_type, next_status = step_map[current_status]
+        company_name = partner.get("company_name", "Partner")
+
+        if email_type == "first_contact":
+            html_content = get_outreach_first_contact_template()
+        elif email_type == "followup_1":
+            html_content = get_outreach_followup1_template(company_name)
+        else:
+            html_content = get_outreach_followup2_template(company_name)
+
+        subject = subjects[email_type]
+        if email_type != "first_contact":
+            subject = subject.replace("your firm", company_name)
+
+        try:
+            await email_service.send_email(partner["email"], subject, html_content)
+            await db.partners.update_one(
+                {"id": pid},
+                {"$set": {
+                    "prospect_status": next_status,
+                    f"prospect_{email_type}_sent_at": datetime.utcnow().isoformat()
+                }}
+            )
+            sent += 1
+        except Exception:
+            failed += 1
+
+    return {"success": True, "message": f"Sent: {sent}, Skipped: {skipped}, Failed: {failed}"}
+
+
+@api_router.post("/admin/partners/bulk-archive")
+async def bulk_archive_prospects(request: BulkPartnerIdsRequest, admin_key: str):
+    """Archive multiple prospects at once"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    now = datetime.utcnow().isoformat()
+    result = await db.partners.update_many(
+        {"id": {"$in": request.partner_ids}},
+        {"$set": {"prospect_status": "archived", "archived_at": now}}
+    )
+    return {"success": True, "message": f"{result.modified_count} prospect(s) archived"}
+
+
+class AddProspectRequest(BaseModel):
+    company_name: str
+    contact_name: Optional[str] = ""
+    email: Optional[str] = ""
+    phone: Optional[str] = ""
+
+
+@api_router.post("/admin/partners/add-prospect")
+async def add_prospect(request: AddProspectRequest, admin_key: str):
+    """Add a new prospect partner manually from admin panel (no password/registration required)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    if not request.company_name.strip():
+        raise HTTPException(status_code=400, detail="Company name is required")
+
+    # Check for duplicate email if provided
+    if request.email and request.email.strip():
+        existing = await db.partners.find_one({"email": request.email.strip()})
+        if existing:
+            raise HTTPException(status_code=400, detail=f"A partner with email {request.email} already exists")
+
+    partner_id = str(uuid.uuid4())
+    now = datetime.utcnow()
+
+    prospect_doc = {
+        "id": partner_id,
+        "company_name": request.company_name.strip(),
+        "contact_name": (request.contact_name or "").strip(),
+        "email": (request.email or "").strip(),
+        "phone": (request.phone or "").strip(),
+        "password_hash": "",
+        "payment_plan": "pay_per_order",
+        "default_payment_method": "zelle",
+        "payment_plan_approved": False,
+        "is_active": True,
+        "is_approved": True,
+        "agreed_to_terms": False,
+        "total_orders": 0,
+        "total_paid_orders": 0,
+        "total_revenue": 0.0,
+        "credit_limit": 0.0,
+        "current_balance": 0.0,
+        "prospect_status": "new",
+        "created_at": now.isoformat(),
+        "has_seen_welcome_coupon": False,
+    }
+
+    await db.partners.insert_one(prospect_doc)
+
+    return {
+        "success": True,
+        "message": f"Prospect '{request.company_name.strip()}' added successfully",
+        "partner_id": partner_id
+    }
 
 
 @api_router.post("/admin/partners/{partner_id}/toggle-invoice-unlock")
@@ -12044,6 +12379,31 @@ async def create_partner_invoice(invoice_data: PartnerInvoiceCreate, admin_key: 
         # total_amount = sum of actual order prices (already discounted)
         total_amount = sum(order.get("total_price", 0) for order in orders)
 
+        # Calculate due date
+        # If fixed_due_day is provided, use partner's preferred fixed day of month
+        # Otherwise check partner's stored preference, then fall back to due_days
+        fixed_day = invoice_data.fixed_due_day or partner.get("invoice_fixed_due_day")
+        if fixed_day and 1 <= fixed_day <= 28:
+            now = datetime.utcnow()
+            # If the fixed day is in the future this month, use this month
+            # Otherwise use next month
+            if now.day < fixed_day:
+                due_date = now.replace(day=fixed_day, hour=23, minute=59, second=59)
+            else:
+                # Move to next month
+                if now.month == 12:
+                    due_date = now.replace(year=now.year + 1, month=1, day=fixed_day, hour=23, minute=59, second=59)
+                else:
+                    due_date = now.replace(month=now.month + 1, day=fixed_day, hour=23, minute=59, second=59)
+        else:
+            due_date = datetime.utcnow() + timedelta(days=invoice_data.due_days)
+            fixed_day = None
+
+        # Get partner's effective tier for invoice
+        tier_result = await get_effective_partner_tier(partner)
+        effective_tier = tier_result["effective_tier"]
+        tier_discount_pct = int(PARTNER_TIERS[effective_tier]["discount"] * 100)
+
         # Create invoice
         invoice = PartnerInvoice(
             partner_id=invoice_data.partner_id,
@@ -12054,8 +12414,11 @@ async def create_partner_invoice(invoice_data: PartnerInvoiceCreate, admin_key: 
             discount_amount=round(total_coupon_discount, 2),
             discount_details=discount_details if discount_details else None,
             total_amount=round(total_amount, 2),
-            due_date=datetime.utcnow() + timedelta(days=invoice_data.due_days),
-            notes=invoice_data.notes
+            due_date=due_date,
+            fixed_due_day=fixed_day,
+            notes=invoice_data.notes,
+            partner_tier=effective_tier,
+            tier_discount_percent=tier_discount_pct
         )
 
         await db.partner_invoices.insert_one(invoice.dict())
@@ -12108,6 +12471,87 @@ async def delete_partner_invoice(invoice_id: str, admin_key: str):
     except Exception as e:
         logger.error(f"Error deleting invoice: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to delete invoice")
+
+
+@api_router.put("/admin/partner-invoices/{invoice_id}/edit")
+async def edit_partner_invoice(invoice_id: str, edit_data: PartnerInvoiceEdit, admin_key: str):
+    """Edit an existing partner invoice - apply manual discount, change due date, etc."""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        invoice = await db.partner_invoices.find_one({"id": invoice_id})
+        if not invoice:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+
+        if invoice.get("status") == "paid":
+            raise HTTPException(status_code=400, detail="Cannot edit a paid invoice")
+
+        update_fields = {}
+
+        # Apply manual discount
+        if edit_data.manual_discount_amount is not None and edit_data.manual_discount_amount > 0:
+            # Store original total if not already stored (first adjustment)
+            original_total = invoice.get("original_total_amount") or invoice.get("total_amount", 0)
+            new_total = round(original_total - edit_data.manual_discount_amount, 2)
+            if new_total < 0:
+                raise HTTPException(status_code=400, detail="Discount cannot exceed the invoice total")
+
+            update_fields["original_total_amount"] = original_total
+            update_fields["manual_discount_amount"] = round(edit_data.manual_discount_amount, 2)
+            update_fields["manual_discount_reason"] = edit_data.manual_discount_reason or ""
+            update_fields["total_amount"] = new_total
+            update_fields["adjusted_by"] = admin_key[:20]
+            update_fields["adjusted_at"] = datetime.utcnow()
+
+        # Update due date
+        if edit_data.new_due_date:
+            try:
+                new_due = datetime.fromisoformat(edit_data.new_due_date.replace("Z", "+00:00"))
+                update_fields["due_date"] = new_due
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid due date format")
+
+        # Update fixed due day
+        if edit_data.fixed_due_day is not None:
+            if edit_data.fixed_due_day < 1 or edit_data.fixed_due_day > 28:
+                raise HTTPException(status_code=400, detail="Fixed due day must be between 1 and 28")
+            update_fields["fixed_due_day"] = edit_data.fixed_due_day
+            # Also save as partner preference
+            await db.partners.update_one(
+                {"id": invoice.get("partner_id")},
+                {"$set": {"invoice_fixed_due_day": edit_data.fixed_due_day}}
+            )
+
+        # Update notes
+        if edit_data.notes is not None:
+            update_fields["notes"] = edit_data.notes
+
+        if not update_fields:
+            raise HTTPException(status_code=400, detail="No changes provided")
+
+        await db.partner_invoices.update_one(
+            {"id": invoice_id},
+            {"$set": update_fields}
+        )
+
+        updated_invoice = await db.partner_invoices.find_one({"id": invoice_id})
+        if updated_invoice and '_id' in updated_invoice:
+            del updated_invoice['_id']
+
+        logger.info(f"Updated invoice {invoice.get('invoice_number')}: {list(update_fields.keys())}")
+
+        return {
+            "status": "success",
+            "invoice": updated_invoice
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error editing partner invoice: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to edit invoice")
 
 
 @api_router.put("/admin/partner-invoices/{invoice_id}/mark-paid")
