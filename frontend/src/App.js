@@ -1671,6 +1671,9 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency, refreshPart
   const [sendingSupport, setSendingSupport] = useState(false);
   const supportFileInputRef = useRef(null);
 
+  // Tier info for pricing
+  const [tierInfo, setTierInfo] = useState(null);
+
   // Human messaging states
   const [showMessageModal, setShowMessageModal] = useState(false);
   const [messageRecipient, setMessageRecipient] = useState('');
@@ -1705,6 +1708,23 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency, refreshPart
       }
     };
     fetchAvailableCoupons();
+  }, [token]);
+
+  // Fetch tier info for pricing display
+  useEffect(() => {
+    const fetchTierInfo = async () => {
+      if (!token) return;
+      try {
+        const response = await fetch(`${API}/partner/tier-info?token=${token}`);
+        if (response.ok) {
+          const data = await response.json();
+          setTierInfo(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch tier info:', err);
+      }
+    };
+    fetchTierInfo();
   }, [token]);
 
   // Get unique PMs from orders
@@ -1797,7 +1817,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency, refreshPart
     if (uploadedFiles.length > 0) {
       calculateQuote();
     }
-  }, [uploadedFiles, formData.service_type, formData.urgency, needsPhysicalCopy]);
+  }, [uploadedFiles, formData.service_type, formData.urgency, needsPhysicalCopy, tierInfo]);
 
   // Force Portuguese (Brasil) as target language for Sworn Translation
   useEffect(() => {
@@ -1815,25 +1835,39 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency, refreshPart
 
   const calculateQuote = () => {
     let basePrice = 0;
+    let originalPrice = 0;
+    let tierDiscountAmount = 0;
     // Sum individual file pages instead of calculating from total words
     const pages = uploadedFiles.reduce((sum, f) => sum + Math.max(1, Math.ceil(f.wordCount / 250)), 0);
+
+    // Get tier price per page for certified/rmv (only these get tier discounts)
+    const tierPricePerPage = tierInfo?.price_per_page || 24.99;
+    const standardCertifiedPrice = 24.99;
 
     // Price per page based on service type
     switch (formData.service_type) {
       case 'certified':
-        basePrice = pages * 24.99;
+        basePrice = pages * tierPricePerPage;
+        originalPrice = pages * standardCertifiedPrice;
+        tierDiscountAmount = originalPrice - basePrice;
         break;
       case 'standard':
         basePrice = pages * 19.99;
+        originalPrice = basePrice;
         break;
       case 'sworn':
         basePrice = pages * 35.00;
+        originalPrice = basePrice;
         break;
       case 'rmv':
-        basePrice = pages * 24.99;
+        basePrice = pages * tierPricePerPage;
+        originalPrice = pages * standardCertifiedPrice;
+        tierDiscountAmount = originalPrice - basePrice;
         break;
       default:
-        basePrice = pages * 24.99;
+        basePrice = pages * tierPricePerPage;
+        originalPrice = pages * standardCertifiedPrice;
+        tierDiscountAmount = originalPrice - basePrice;
     }
 
     let urgencyFee = 0;
@@ -1848,6 +1882,8 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency, refreshPart
 
     setQuote({
       base_price: basePrice,
+      original_price: originalPrice,
+      tier_discount: tierDiscountAmount,
       urgency_fee: urgencyFee,
       shipping_fee: shippingFee,
       total_price: basePrice + urgencyFee + shippingFee,
@@ -2683,6 +2719,20 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency, refreshPart
         <div className="bg-white rounded-lg shadow-sm p-6 h-fit sticky top-8">
           <h2 className="text-xl font-bold text-teal-600 mb-4">{t.quoteSummary}</h2>
 
+          {/* Tier Badge */}
+          {tierInfo && tierInfo.current_tier !== 'standard' && (
+            <div className="mb-3 p-2 rounded-lg bg-gradient-to-r from-blue-50 to-teal-50 border border-blue-200">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-blue-700 capitalize">
+                  {tierInfo.current_tier} Partner
+                </span>
+                <span className="text-xs font-bold text-green-600">
+                  {tierInfo.discount_percent}% OFF
+                </span>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-3 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-600">{t.service}</span>
@@ -2704,6 +2754,18 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency, refreshPart
                 <span className="text-gray-600">{t.basePrice}</span>
                 <span className="font-medium">{formatPrice(quote?.base_price || 0)}</span>
               </div>
+              {/* Tier Discount Line */}
+              {quote?.tier_discount > 0 && (
+                <div className="flex justify-between text-green-600">
+                  <span>{tierInfo?.current_tier?.charAt(0).toUpperCase() + tierInfo?.current_tier?.slice(1)} Discount ({tierInfo?.discount_percent}%)</span>
+                  <span>-{formatPrice(quote.tier_discount)}</span>
+                </div>
+              )}
+              {quote?.tier_discount > 0 && (
+                <div className="text-xs text-gray-400 text-right">
+                  Original: {formatPrice(quote.original_price)}
+                </div>
+              )}
               {quote?.urgency_fee > 0 && (
                 <div className="flex justify-between text-orange-600">
                   <span>{t.urgencyFee}</span>
@@ -3281,6 +3343,43 @@ const OrdersPage = ({ token, currency }) => {
                       <div className="font-medium">{formatPrice(order.urgency_fee || 0)}</div>
                     </div>
                   </div>
+                  {/* Tier Discount Info */}
+                  {order.partner_tier && order.partner_tier !== 'standard' && order.discount_amount > 0 && (
+                    <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${
+                            order.partner_tier === 'platinum' ? 'bg-blue-100 text-blue-700' :
+                            order.partner_tier === 'gold' ? 'bg-yellow-100 text-yellow-700' :
+                            order.partner_tier === 'silver' ? 'bg-slate-100 text-slate-700' :
+                            'bg-amber-100 text-amber-700'
+                          }`}>
+                            {order.partner_tier}
+                          </span>
+                          <span className="text-sm text-green-700">
+                            Partner Discount ({order.tier_discount_percent}%)
+                          </span>
+                        </div>
+                        <span className="text-sm font-medium text-green-700">
+                          -{formatPrice(order.discount_amount)}
+                        </span>
+                      </div>
+                      {order.original_price && (
+                        <div className="text-xs text-gray-500 mt-1">
+                          Original price: {formatPrice(order.original_price)}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {/* Coupon Discount Info */}
+                  {order.coupon_code && order.coupon_discount_amount > 0 && (
+                    <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-blue-700">Coupon: {order.coupon_code}</span>
+                        <span className="text-sm font-medium text-blue-700">-{formatPrice(order.coupon_discount_amount)}</span>
+                      </div>
+                    </div>
+                  )}
                   {order.reference && (
                     <div className="mt-4">
                       <div className="text-sm text-gray-500">Reference</div>
