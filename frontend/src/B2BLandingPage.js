@@ -485,7 +485,7 @@ Message: ${formData.message}
                   onClick={() => setShowVideo(true)}
                 >
                   <img
-                    src="https://lh3.googleusercontent.com/d/1IPZYgsMZfVMhuqTzUGOmoQ38JDPGqjGq"
+                    src="https://lh3.googleusercontent.com/d/1u9c_NAboQ7CSaX1UiWAy9swQmpZ-KGDp"
                     alt="Legacy Translations B2B presentation"
                     className="w-full h-full object-cover"
                   />
