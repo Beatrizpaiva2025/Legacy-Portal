@@ -340,6 +340,7 @@ const B2BLandingPage = () => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [showVideo, setShowVideo] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -464,18 +465,39 @@ Message: ${formData.message}
             </div>
             <div className="hidden lg:block relative">
               <div className="absolute -inset-4 bg-gradient-to-r from-blue-100 to-slate-100 rounded-3xl transform rotate-3"></div>
-              <div className="relative rounded-2xl shadow-2xl overflow-hidden" style={{ aspectRatio: '16/9' }}>
-                <iframe
-                  width="100%"
-                  height="100%"
-                  src="https://drive.google.com/file/d/1IPZYgsMZfVMhuqTzUGOmoQ38JDPGqjGq/preview"
-                  title="Legacy Translations B2B Video"
-                  frameBorder="0"
-                  allow="autoplay; encrypted-media"
-                  allowFullScreen
-                  style={{ border: 'none' }}
-                ></iframe>
-              </div>
+              {showVideo ? (
+                <div className="relative rounded-2xl shadow-2xl overflow-hidden" style={{ aspectRatio: '16/9' }}>
+                  <iframe
+                    width="100%"
+                    height="100%"
+                    src="https://drive.google.com/file/d/1IPZYgsMZfVMhuqTzUGOmoQ38JDPGqjGq/preview"
+                    title="Legacy Translations B2B Video"
+                    frameBorder="0"
+                    allow="autoplay; encrypted-media"
+                    allowFullScreen
+                    style={{ border: 'none' }}
+                  ></iframe>
+                </div>
+              ) : (
+                <div
+                  className="relative rounded-2xl shadow-2xl overflow-hidden cursor-pointer group"
+                  style={{ aspectRatio: '16/9' }}
+                  onClick={() => setShowVideo(true)}
+                >
+                  <img
+                    src="https://lh3.googleusercontent.com/d/1u9c_NAboQ7CSaX1UiWAy9swQmpZ-KGDp"
+                    alt="Legacy Translations B2B presentation"
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/20 flex items-center justify-center group-hover:bg-black/30 transition-all">
+                    <div className="w-16 h-16 bg-white/90 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <svg className="w-7 h-7 text-slate-800 ml-1" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
