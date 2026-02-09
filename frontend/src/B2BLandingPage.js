@@ -464,15 +464,18 @@ Message: ${formData.message}
             </div>
             <div className="hidden lg:block relative">
               <div className="absolute -inset-4 bg-gradient-to-r from-blue-100 to-slate-100 rounded-3xl transform rotate-3"></div>
-              <video
-                className="relative rounded-2xl shadow-2xl w-full"
-                autoPlay
-                muted
-                loop
-                playsInline
-                preload="auto"
-                src="https://drive.google.com/uc?export=download&id=1IPZYgsMZfVMhuqTzUGOmoQ38JDPGqjGq"
-              />
+              <div className="relative rounded-2xl shadow-2xl overflow-hidden" style={{ aspectRatio: '16/9' }}>
+                <iframe
+                  width="100%"
+                  height="100%"
+                  src="https://drive.google.com/file/d/1IPZYgsMZfVMhuqTzUGOmoQ38JDPGqjGq/preview"
+                  title="Legacy Translations B2B Video"
+                  frameBorder="0"
+                  allow="autoplay; encrypted-media"
+                  allowFullScreen
+                  style={{ border: 'none' }}
+                ></iframe>
+              </div>
             </div>
           </div>
         </div>
