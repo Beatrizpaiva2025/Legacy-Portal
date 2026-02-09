@@ -23435,6 +23435,15 @@ const FinancesPage = ({ adminKey }) => {
   const [creatingInvoice, setCreatingInvoice] = useState(false);
   const [showInvoicesModal, setShowInvoicesModal] = useState(false);
   const [selectedPartnerInvoices, setSelectedPartnerInvoices] = useState([]);
+  const [editingInvoice, setEditingInvoice] = useState(null);
+  const [editInvoiceDiscount, setEditInvoiceDiscount] = useState('');
+  const [editInvoiceDiscountReason, setEditInvoiceDiscountReason] = useState('');
+  const [editInvoiceDueDate, setEditInvoiceDueDate] = useState('');
+  const [editInvoiceFixedDueDay, setEditInvoiceFixedDueDay] = useState('');
+  const [editInvoiceNotes, setEditInvoiceNotes] = useState('');
+  const [savingInvoiceEdit, setSavingInvoiceEdit] = useState(false);
+  const [invoiceFixedDueDay, setInvoiceFixedDueDay] = useState('');
+  const [invoiceDueDateMode, setInvoiceDueDateMode] = useState('days');
   // Partner filter and search state
   const [partnerFilter, setPartnerFilter] = useState('all'); // all, registered, prospect
   const [partnerSearchQuery, setPartnerSearchQuery] = useState('');
@@ -23728,12 +23737,16 @@ const FinancesPage = ({ adminKey }) => {
     }
     setCreatingInvoice(true);
     try {
-      await axios.post(`${API}/admin/partner-invoices/create?admin_key=${adminKey}`, {
+      const invoicePayload = {
         partner_id: selectedPartnerForInvoice.partner_id,
         order_ids: selectedOrdersForInvoice,
         due_days: invoiceDueDays,
         notes: invoiceNotes
-      });
+      };
+      if (invoiceDueDateMode === 'fixed' && invoiceFixedDueDay) {
+        invoicePayload.fixed_due_day = parseInt(invoiceFixedDueDay);
+      }
+      await axios.post(`${API}/admin/partner-invoices/create?admin_key=${adminKey}`, invoicePayload);
       showToast('Invoice created successfully!');
       setShowCreateInvoiceModal(false);
       fetchPartnerStats();
@@ -23763,6 +23776,50 @@ const FinancesPage = ({ adminKey }) => {
       fetchPartnerStats();
     } catch (err) {
       showToast('Error marking invoice as paid: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const handleOpenEditInvoice = (invoice) => {
+    setEditingInvoice(invoice);
+    setEditInvoiceDiscount('');
+    setEditInvoiceDiscountReason('');
+    setEditInvoiceDueDate(invoice.due_date ? new Date(invoice.due_date).toISOString().split('T')[0] : '');
+    setEditInvoiceFixedDueDay(invoice.fixed_due_day || '');
+    setEditInvoiceNotes(invoice.notes || '');
+  };
+
+  const handleSaveInvoiceEdit = async () => {
+    if (!editingInvoice) return;
+    setSavingInvoiceEdit(true);
+    try {
+      const payload = {};
+      if (editInvoiceDiscount && parseFloat(editInvoiceDiscount) > 0) {
+        payload.manual_discount_amount = parseFloat(editInvoiceDiscount);
+        payload.manual_discount_reason = editInvoiceDiscountReason;
+      }
+      if (editInvoiceDueDate) {
+        payload.new_due_date = editInvoiceDueDate;
+      }
+      if (editInvoiceFixedDueDay && parseInt(editInvoiceFixedDueDay) > 0) {
+        payload.fixed_due_day = parseInt(editInvoiceFixedDueDay);
+      }
+      if (editInvoiceNotes !== (editingInvoice.notes || '')) {
+        payload.notes = editInvoiceNotes;
+      }
+      if (Object.keys(payload).length === 0) {
+        showToast('No changes to save');
+        setSavingInvoiceEdit(false);
+        return;
+      }
+      await axios.put(`${API}/admin/partner-invoices/${editingInvoice.id}/edit?admin_key=${adminKey}`, payload);
+      showToast('Invoice updated successfully!');
+      setEditingInvoice(null);
+      fetchPartnerInvoicesForPartner(selectedPartnerForInvoice.partner_id);
+      fetchPartnerInvoices();
+    } catch (err) {
+      showToast('Error updating invoice: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setSavingInvoiceEdit(false);
     }
   };
 
@@ -26210,30 +26267,66 @@ const FinancesPage = ({ adminKey }) => {
                       </div>
                     ))}
                   </div>
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Due in (days)</label>
-                      <select
-                        value={invoiceDueDays}
-                        onChange={(e) => setInvoiceDueDays(parseInt(e.target.value))}
-                        className="w-full border rounded-md px-3 py-2 text-sm"
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Due Date Mode</label>
+                    <div className="flex space-x-2 mb-2">
+                      <button
+                        onClick={() => { setInvoiceDueDateMode('days'); setInvoiceFixedDueDay(''); }}
+                        className={`px-3 py-1.5 text-xs rounded-md border ${invoiceDueDateMode === 'days' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
                       >
-                        <option value={7}>7 days</option>
-                        <option value={15}>15 days</option>
-                        <option value={30}>30 days</option>
-                        <option value={45}>45 days</option>
-                        <option value={60}>60 days</option>
-                      </select>
+                        Due in X days
+                      </button>
+                      <button
+                        onClick={() => setInvoiceDueDateMode('fixed')}
+                        className={`px-3 py-1.5 text-xs rounded-md border ${invoiceDueDateMode === 'fixed' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+                      >
+                        Fixed day of month
+                      </button>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
-                      <input
-                        type="text"
-                        value={invoiceNotes}
-                        onChange={(e) => setInvoiceNotes(e.target.value)}
-                        className="w-full border rounded-md px-3 py-2 text-sm"
-                        placeholder="Invoice notes..."
-                      />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        {invoiceDueDateMode === 'days' ? (
+                          <>
+                            <label className="block text-xs text-gray-500 mb-1">Due in (days)</label>
+                            <select
+                              value={invoiceDueDays}
+                              onChange={(e) => setInvoiceDueDays(parseInt(e.target.value))}
+                              className="w-full border rounded-md px-3 py-2 text-sm"
+                            >
+                              <option value={7}>7 days</option>
+                              <option value={15}>15 days</option>
+                              <option value={30}>30 days</option>
+                              <option value={45}>45 days</option>
+                              <option value={60}>60 days</option>
+                            </select>
+                          </>
+                        ) : (
+                          <>
+                            <label className="block text-xs text-gray-500 mb-1">Fixed day (1-28)</label>
+                            <select
+                              value={invoiceFixedDueDay}
+                              onChange={(e) => setInvoiceFixedDueDay(e.target.value)}
+                              className="w-full border rounded-md px-3 py-2 text-sm"
+                            >
+                              <option value="">Select day...</option>
+                              {[1,5,10,15,20,25,28].map(d => (
+                                <option key={d} value={d}>Day {d} of each month</option>
+                              ))}
+                            </select>
+                            <p className="text-xs text-gray-400 mt-1">Invoice will be due on this day every month</p>
+                          </>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Notes (optional)</label>
+                        <input
+                          type="text"
+                          value={invoiceNotes}
+                          onChange={(e) => setInvoiceNotes(e.target.value)}
+                          className="w-full border rounded-md px-3 py-2 text-sm"
+                          placeholder="Invoice notes..."
+                        />
+                      </div>
                     </div>
                   </div>
                 </>
@@ -26323,6 +26416,22 @@ const FinancesPage = ({ adminKey }) => {
                           </a>
                         )}
                       </div>
+                      {invoice.manual_discount_amount > 0 && (
+                        <div className="mb-2 p-2 bg-orange-50 border border-orange-200 rounded">
+                          <div className="text-xs text-orange-700 font-medium">
+                            Original Total: {formatCurrency(invoice.original_total_amount)} | Manual Discount: -{formatCurrency(invoice.manual_discount_amount)} | Final: {formatCurrency(invoice.total_amount)}
+                          </div>
+                          {invoice.manual_discount_reason && (
+                            <div className="text-xs text-orange-600 mt-1">Reason: {invoice.manual_discount_reason}</div>
+                          )}
+                          {invoice.adjusted_at && (
+                            <div className="text-xs text-orange-500 mt-1">Adjusted: {new Date(invoice.adjusted_at).toLocaleDateString()}</div>
+                          )}
+                        </div>
+                      )}
+                      {invoice.fixed_due_day && (
+                        <div className="text-xs text-blue-600 mb-2">Fixed due day: {invoice.fixed_due_day}th of each month</div>
+                      )}
                       {invoice.notes && (
                         <div className="text-xs text-gray-600 mb-2">Notes: {invoice.notes}</div>
                       )}
@@ -26359,6 +26468,12 @@ const FinancesPage = ({ adminKey }) => {
                       {invoice.status !== 'paid' && (
                         <div className="flex space-x-2 mt-3">
                           <button
+                            onClick={() => handleOpenEditInvoice(invoice)}
+                            className="px-3 py-1.5 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600"
+                          >
+                            Edit Invoice
+                          </button>
+                          <button
                             onClick={() => handleMarkInvoicePaid(invoice.id, 'zelle')}
                             className="px-3 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700"
                           >
@@ -26389,6 +26504,116 @@ const FinancesPage = ({ adminKey }) => {
                 className="px-4 py-2 border rounded-md text-sm hover:bg-gray-100"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Invoice Modal */}
+      {editingInvoice && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
+            <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+              <div>
+                <h2 className="font-bold text-gray-800">Edit Invoice</h2>
+                <p className="text-sm text-gray-500">{editingInvoice.invoice_number} - {editingInvoice.partner_company}</p>
+              </div>
+              <button onClick={() => setEditingInvoice(null)} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            <div className="p-4 space-y-4">
+              {/* Current Amount */}
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <div className="text-sm text-gray-500">Current Total</div>
+                <div className="text-2xl font-bold">{formatCurrency(editingInvoice.total_amount)}</div>
+                {editingInvoice.original_total_amount && (
+                  <div className="text-xs text-gray-400">Original: {formatCurrency(editingInvoice.original_total_amount)}</div>
+                )}
+              </div>
+
+              {/* Manual Discount */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Apply Manual Discount ($)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={editInvoiceDiscount}
+                  onChange={(e) => setEditInvoiceDiscount(e.target.value)}
+                  className="w-full border rounded-md px-3 py-2 text-sm"
+                  placeholder="e.g. 10.00"
+                />
+                {editInvoiceDiscount && parseFloat(editInvoiceDiscount) > 0 && (
+                  <div className="text-xs text-green-600 mt-1">
+                    New total will be: {formatCurrency((editingInvoice.original_total_amount || editingInvoice.total_amount) - parseFloat(editInvoiceDiscount))}
+                  </div>
+                )}
+              </div>
+
+              {/* Discount Reason */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Discount Reason</label>
+                <input
+                  type="text"
+                  value={editInvoiceDiscountReason}
+                  onChange={(e) => setEditInvoiceDiscountReason(e.target.value)}
+                  className="w-full border rounded-md px-3 py-2 text-sm"
+                  placeholder="e.g. Partner loyalty discount, correction..."
+                />
+              </div>
+
+              {/* Due Date */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+                <input
+                  type="date"
+                  value={editInvoiceDueDate}
+                  onChange={(e) => setEditInvoiceDueDate(e.target.value)}
+                  className="w-full border rounded-md px-3 py-2 text-sm"
+                />
+              </div>
+
+              {/* Fixed Due Day */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Fixed Due Day (partner preference)</label>
+                <select
+                  value={editInvoiceFixedDueDay}
+                  onChange={(e) => setEditInvoiceFixedDueDay(e.target.value)}
+                  className="w-full border rounded-md px-3 py-2 text-sm"
+                >
+                  <option value="">No fixed day</option>
+                  {[1,5,10,15,20,25,28].map(d => (
+                    <option key={d} value={d}>Day {d} of each month</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-400 mt-1">This will also save as the partner's default preference for future invoices</p>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                <input
+                  type="text"
+                  value={editInvoiceNotes}
+                  onChange={(e) => setEditInvoiceNotes(e.target.value)}
+                  className="w-full border rounded-md px-3 py-2 text-sm"
+                  placeholder="Invoice notes..."
+                />
+              </div>
+            </div>
+            <div className="p-4 border-t bg-gray-50 flex justify-end space-x-2">
+              <button
+                onClick={() => setEditingInvoice(null)}
+                className="px-4 py-2 border rounded-md text-sm hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveInvoiceEdit}
+                disabled={savingInvoiceEdit}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:bg-gray-300"
+              >
+                {savingInvoiceEdit ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
           </div>

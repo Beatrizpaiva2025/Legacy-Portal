@@ -2233,11 +2233,27 @@ class PartnerInvoice(BaseModel):
     # Reminder tracking
     reminder_sent_count: int = 0  # Number of reminders sent
     last_reminder_at: Optional[datetime] = None  # When last reminder was sent
+    # Manual adjustment tracking
+    manual_discount_amount: float = 0.0  # Manual discount applied by admin
+    manual_discount_reason: Optional[str] = None  # Reason for manual discount
+    original_total_amount: Optional[float] = None  # Total before manual discount
+    adjusted_by: Optional[str] = None  # Admin who made the adjustment
+    adjusted_at: Optional[datetime] = None  # When the adjustment was made
+    # Fixed due date settings (per-partner preference)
+    fixed_due_day: Optional[int] = None  # Day of month for fixed due date (1-28)
 
 class PartnerInvoiceCreate(BaseModel):
     partner_id: str
     order_ids: List[str]
     due_days: int = 30  # Days until due
+    notes: Optional[str] = None
+    fixed_due_day: Optional[int] = None  # Day of month for fixed due date (1-28)
+
+class PartnerInvoiceEdit(BaseModel):
+    manual_discount_amount: Optional[float] = None  # Manual discount to apply
+    manual_discount_reason: Optional[str] = None  # Reason for the discount
+    new_due_date: Optional[str] = None  # New due date (ISO format)
+    fixed_due_day: Optional[int] = None  # Fixed day of month for due date (1-28)
     notes: Optional[str] = None
 
 class PartnerInvoicePayStripe(BaseModel):
@@ -12296,6 +12312,26 @@ async def create_partner_invoice(invoice_data: PartnerInvoiceCreate, admin_key: 
         # total_amount = sum of actual order prices (already discounted)
         total_amount = sum(order.get("total_price", 0) for order in orders)
 
+        # Calculate due date
+        # If fixed_due_day is provided, use partner's preferred fixed day of month
+        # Otherwise check partner's stored preference, then fall back to due_days
+        fixed_day = invoice_data.fixed_due_day or partner.get("invoice_fixed_due_day")
+        if fixed_day and 1 <= fixed_day <= 28:
+            now = datetime.utcnow()
+            # If the fixed day is in the future this month, use this month
+            # Otherwise use next month
+            if now.day < fixed_day:
+                due_date = now.replace(day=fixed_day, hour=23, minute=59, second=59)
+            else:
+                # Move to next month
+                if now.month == 12:
+                    due_date = now.replace(year=now.year + 1, month=1, day=fixed_day, hour=23, minute=59, second=59)
+                else:
+                    due_date = now.replace(month=now.month + 1, day=fixed_day, hour=23, minute=59, second=59)
+        else:
+            due_date = datetime.utcnow() + timedelta(days=invoice_data.due_days)
+            fixed_day = None
+
         # Create invoice
         invoice = PartnerInvoice(
             partner_id=invoice_data.partner_id,
@@ -12306,7 +12342,8 @@ async def create_partner_invoice(invoice_data: PartnerInvoiceCreate, admin_key: 
             discount_amount=round(total_coupon_discount, 2),
             discount_details=discount_details if discount_details else None,
             total_amount=round(total_amount, 2),
-            due_date=datetime.utcnow() + timedelta(days=invoice_data.due_days),
+            due_date=due_date,
+            fixed_due_day=fixed_day,
             notes=invoice_data.notes
         )
 
@@ -12360,6 +12397,87 @@ async def delete_partner_invoice(invoice_id: str, admin_key: str):
     except Exception as e:
         logger.error(f"Error deleting invoice: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to delete invoice")
+
+
+@api_router.put("/admin/partner-invoices/{invoice_id}/edit")
+async def edit_partner_invoice(invoice_id: str, edit_data: PartnerInvoiceEdit, admin_key: str):
+    """Edit an existing partner invoice - apply manual discount, change due date, etc."""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        invoice = await db.partner_invoices.find_one({"id": invoice_id})
+        if not invoice:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+
+        if invoice.get("status") == "paid":
+            raise HTTPException(status_code=400, detail="Cannot edit a paid invoice")
+
+        update_fields = {}
+
+        # Apply manual discount
+        if edit_data.manual_discount_amount is not None and edit_data.manual_discount_amount > 0:
+            # Store original total if not already stored (first adjustment)
+            original_total = invoice.get("original_total_amount") or invoice.get("total_amount", 0)
+            new_total = round(original_total - edit_data.manual_discount_amount, 2)
+            if new_total < 0:
+                raise HTTPException(status_code=400, detail="Discount cannot exceed the invoice total")
+
+            update_fields["original_total_amount"] = original_total
+            update_fields["manual_discount_amount"] = round(edit_data.manual_discount_amount, 2)
+            update_fields["manual_discount_reason"] = edit_data.manual_discount_reason or ""
+            update_fields["total_amount"] = new_total
+            update_fields["adjusted_by"] = admin_key[:20]
+            update_fields["adjusted_at"] = datetime.utcnow()
+
+        # Update due date
+        if edit_data.new_due_date:
+            try:
+                new_due = datetime.fromisoformat(edit_data.new_due_date.replace("Z", "+00:00"))
+                update_fields["due_date"] = new_due
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid due date format")
+
+        # Update fixed due day
+        if edit_data.fixed_due_day is not None:
+            if edit_data.fixed_due_day < 1 or edit_data.fixed_due_day > 28:
+                raise HTTPException(status_code=400, detail="Fixed due day must be between 1 and 28")
+            update_fields["fixed_due_day"] = edit_data.fixed_due_day
+            # Also save as partner preference
+            await db.partners.update_one(
+                {"id": invoice.get("partner_id")},
+                {"$set": {"invoice_fixed_due_day": edit_data.fixed_due_day}}
+            )
+
+        # Update notes
+        if edit_data.notes is not None:
+            update_fields["notes"] = edit_data.notes
+
+        if not update_fields:
+            raise HTTPException(status_code=400, detail="No changes provided")
+
+        await db.partner_invoices.update_one(
+            {"id": invoice_id},
+            {"$set": update_fields}
+        )
+
+        updated_invoice = await db.partner_invoices.find_one({"id": invoice_id})
+        if updated_invoice and '_id' in updated_invoice:
+            del updated_invoice['_id']
+
+        logger.info(f"Updated invoice {invoice.get('invoice_number')}: {list(update_fields.keys())}")
+
+        return {
+            "status": "success",
+            "invoice": updated_invoice
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error editing partner invoice: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to edit invoice")
 
 
 @api_router.put("/admin/partner-invoices/{invoice_id}/mark-paid")

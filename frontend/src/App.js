@@ -3618,16 +3618,26 @@ const InvoicesPage = ({ token, t, currency, lang }) => {
                   </div>
                 </div>
 
-                {invoice.discount_amount > 0 && (
+                {(invoice.discount_amount > 0 || invoice.manual_discount_amount > 0) && (
                   <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">Subtotal:</span>
-                      <span className="text-gray-800">{formatCurrency(invoice.subtotal)}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm text-green-700 font-medium">
-                      <span>Coupon Discount:</span>
-                      <span>-{formatCurrency(invoice.discount_amount)}</span>
-                    </div>
+                    {invoice.discount_amount > 0 && (
+                      <>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">Subtotal:</span>
+                          <span className="text-gray-800">{formatCurrency(invoice.subtotal)}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm text-green-700 font-medium">
+                          <span>Coupon Discount:</span>
+                          <span>-{formatCurrency(invoice.discount_amount)}</span>
+                        </div>
+                      </>
+                    )}
+                    {invoice.manual_discount_amount > 0 && (
+                      <div className="flex items-center justify-between text-sm text-orange-700 font-medium">
+                        <span>{invoice.manual_discount_reason || 'Discount'}:</span>
+                        <span>-{formatCurrency(invoice.manual_discount_amount)}</span>
+                      </div>
+                    )}
                     <div className="flex items-center justify-between text-sm font-bold border-t border-green-200 mt-1 pt-1">
                       <span>Total:</span>
                       <span>{formatCurrency(invoice.total_amount)}</span>
@@ -3688,16 +3698,26 @@ const InvoicesPage = ({ token, t, currency, lang }) => {
                 </div>
               </div>
 
-              {selectedInvoice.discount_amount > 0 && (
+              {(selectedInvoice.discount_amount > 0 || selectedInvoice.manual_discount_amount > 0) && (
                 <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Subtotal:</span>
-                    <span className="text-gray-800">{formatCurrency(selectedInvoice.subtotal)}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm text-green-700 font-medium">
-                    <span>Coupon Discount:</span>
-                    <span>-{formatCurrency(selectedInvoice.discount_amount)}</span>
-                  </div>
+                  {selectedInvoice.discount_amount > 0 && (
+                    <>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">Subtotal:</span>
+                        <span className="text-gray-800">{formatCurrency(selectedInvoice.subtotal)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm text-green-700 font-medium">
+                        <span>Coupon Discount:</span>
+                        <span>-{formatCurrency(selectedInvoice.discount_amount)}</span>
+                      </div>
+                    </>
+                  )}
+                  {selectedInvoice.manual_discount_amount > 0 && (
+                    <div className="flex items-center justify-between text-sm text-orange-700 font-medium">
+                      <span>{selectedInvoice.manual_discount_reason || 'Discount'}:</span>
+                      <span>-{formatCurrency(selectedInvoice.manual_discount_amount)}</span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between text-sm font-bold border-t border-green-200 mt-1 pt-1">
                     <span>Total Due:</span>
                     <span>{formatCurrency(selectedInvoice.total_amount)}</span>
