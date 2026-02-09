@@ -6526,18 +6526,22 @@ async def validate_coupon(token: str, code: str, order_total: float = 0):
     if not partner:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
-    # Find coupon (case-insensitive)
+    # Find coupon - prioritize partner-specific coupon, then fall back to global/template
     coupon = await db.coupons.find_one({
         "code": {"$regex": f"^{code}$", "$options": "i"},
-        "is_active": True
+        "is_active": True,
+        "partner_id": partner["id"]
     })
+    if not coupon:
+        # Fall back to global/template coupon (no partner_id)
+        coupon = await db.coupons.find_one({
+            "code": {"$regex": f"^{code}$", "$options": "i"},
+            "is_active": True,
+            "$or": [{"partner_id": None}, {"partner_id": {"$exists": False}}]
+        })
 
     if not coupon:
         raise HTTPException(status_code=404, detail="Invalid coupon code")
-
-    # Check if coupon belongs to this partner (if partner-specific)
-    if coupon.get("partner_id") and coupon["partner_id"] != partner["id"]:
-        raise HTTPException(status_code=400, detail="This coupon is not valid for your account")
 
     # Check usage limits
     if coupon["times_used"] >= coupon["max_uses"]:
@@ -8876,15 +8880,22 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
         coupon_discount_amount = 0.0
         coupon_code_applied = None
         if order_data.coupon_code:
+            # First try to find a partner-specific coupon, then fall back to global/template
             coupon = await db.coupons.find_one({
                 "code": {"$regex": f"^{order_data.coupon_code}$", "$options": "i"},
-                "is_active": True
+                "is_active": True,
+                "partner_id": partner["id"]
             })
+            if not coupon:
+                # Fall back to global/template coupon (no partner_id)
+                coupon = await db.coupons.find_one({
+                    "code": {"$regex": f"^{order_data.coupon_code}$", "$options": "i"},
+                    "is_active": True,
+                    "$or": [{"partner_id": None}, {"partner_id": {"$exists": False}}]
+                })
             if coupon and coupon["times_used"] < coupon["max_uses"]:
-                # Check partner-specific coupon
-                if coupon.get("partner_id") and coupon["partner_id"] != partner["id"]:
-                    pass  # Skip - coupon not for this partner
-                else:
+                # Coupon is already validated for this partner (found by partner_id or global)
+                if True:
                     # Calculate coupon discount
                     if coupon["discount_type"] == "certified_page":
                         coupon_discount_amount = CERTIFIED_PAGE_PRICE * coupon["discount_value"]
