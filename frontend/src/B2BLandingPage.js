@@ -464,18 +464,15 @@ Message: ${formData.message}
             </div>
             <div className="hidden lg:block relative">
               <div className="absolute -inset-4 bg-gradient-to-r from-blue-100 to-slate-100 rounded-3xl transform rotate-3"></div>
-              <div className="relative rounded-2xl shadow-2xl overflow-hidden" style={{ aspectRatio: '16/9' }}>
-                <iframe
-                  width="100%"
-                  height="100%"
-                  src="https://app.heygen.com/embedded-player/823581eaea4c45a1b2b3ee95dac8916a"
-                  title="HeyGen video player"
-                  frameBorder="0"
-                  allow="encrypted-media; fullscreen;"
-                  allowFullScreen
-                  style={{ border: 'none' }}
-                ></iframe>
-              </div>
+              <video
+                className="relative rounded-2xl shadow-2xl w-full"
+                autoPlay
+                muted
+                loop
+                playsInline
+                preload="auto"
+                src="/hero-video.mp4"
+              />
             </div>
           </div>
         </div>
