@@ -11486,6 +11486,102 @@ async def set_partner_payment_plan(partner_id: str, admin_key: str, plan: str, s
         raise HTTPException(status_code=500, detail="Failed to set payment plan")
 
 
+@api_router.post("/admin/partners/{partner_id}/send-invite")
+async def send_partner_invite(partner_id: str, admin_key: str):
+    """Send a registration/upgrade invite email to a prospect partner"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        partner = await db.partners.find_one({"id": partner_id})
+        if not partner:
+            raise HTTPException(status_code=404, detail="Partner not found")
+
+        partner_email = partner.get("email")
+        if not partner_email:
+            raise HTTPException(status_code=400, detail="Partner has no email address")
+
+        company_name = partner.get("company_name", "Partner")
+        contact_name = partner.get("contact_name") or partner.get("name", "Partner")
+        invite_count = partner.get("invite_sent_count", 0) + 1
+        is_followup = invite_count > 1
+
+        if is_followup:
+            subject = f"Follow-up: Partner Registration Invite - Legacy Translations"
+            greeting = f"<p>We're reaching out again because we'd love to have <strong>{company_name}</strong> as a registered partner!"
+        else:
+            subject = f"You're Invited: Become a Registered Partner - Legacy Translations"
+            greeting = f"<p>We'd love to invite <strong>{company_name}</strong> to become a registered partner with Legacy Translations!</p>"
+
+        email_html = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); padding: 30px; text-align: center;">
+                <h1 style="color: white; margin: 0;">{'Welcome Back!' if is_followup else 'Partner Invitation'}</h1>
+            </div>
+            <div style="padding: 30px; background: #f9fafb;">
+                <p>Dear {contact_name},</p>
+                {greeting}
+
+                <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                    <h3 style="margin-top: 0; color: #1e40af;">Why Become a Registered Partner?</h3>
+                    <ul style="color: #374151; line-height: 1.8;">
+                        <li><strong>Biweekly/Monthly Invoicing</strong> - No more pay-per-order</li>
+                        <li><strong>Volume Discounts</strong> - Better rates as you grow</li>
+                        <li><strong>Dedicated Portal</strong> - Manage orders, invoices & translations</li>
+                        <li><strong>Priority Support</strong> - Faster turnaround times</li>
+                        <li><strong>Free Certified Page</strong> - On your first order!</li>
+                    </ul>
+                </div>
+
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="https://portal.legacytranslations.com/#/partner-register"
+                       style="display: inline-block; background: #1e40af; color: white; padding: 14px 35px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
+                        Register as Partner
+                    </a>
+                </div>
+
+                <p style="color: #6b7280; font-size: 14px;">
+                    Already have an account? <a href="https://portal.legacytranslations.com/#/partner">Log in here</a> to upgrade your payment plan.
+                </p>
+
+                <p style="color: #6b7280; font-size: 14px;">
+                    Questions? Contact us at <a href="mailto:contact@legacytranslations.com">contact@legacytranslations.com</a>.
+                </p>
+            </div>
+            <div style="background: #1f2937; padding: 20px; text-align: center;">
+                <p style="color: #9ca3af; margin: 0; font-size: 12px;">
+                    &copy; {datetime.now().year} Legacy Translations. All rights reserved.
+                </p>
+            </div>
+        </div>
+        """
+
+        await email_service.send_email(partner_email, subject, email_html)
+
+        # Track invite sent
+        await db.partners.update_one(
+            {"id": partner_id},
+            {"$set": {
+                "last_invite_sent_at": datetime.utcnow(),
+                "invite_sent_count": invite_count
+            }}
+        )
+
+        logger.info(f"Sent partner invite #{invite_count} to {company_name} ({partner_email})")
+        return {
+            "status": "success",
+            "message": f"{'Follow-up invite' if is_followup else 'Invite'} sent to {partner_email}",
+            "invite_count": invite_count
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error sending partner invite: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to send invite email")
+
+
 @api_router.post("/admin/partners/{partner_id}/toggle-invoice-unlock")
 async def toggle_partner_invoice_unlock(partner_id: str, admin_key: str, unlock: bool):
     """Manually unlock or lock invoice payments for a partner (admin only)

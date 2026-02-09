@@ -40,23 +40,25 @@ const showToast = (message) => {
 // Parse API error messages into user-friendly text
 const parseApiError = (error) => {
   const detail = error?.response?.data?.detail || error?.message || String(error);
-  // If the backend already returned a friendly Portuguese message, use it
-  if (detail.includes('Saldo insuficiente') || detail.includes('Chave de API') ||
+  // If the backend already returned a friendly message, use it
+  if (detail.includes('Insufficient balance') || detail.includes('API Key') ||
+      detail.includes('Rate limit') || detail.includes('overloaded') ||
+      detail.includes('Saldo insuficiente') || detail.includes('Chave de API') ||
       detail.includes('Limite de requisições') || detail.includes('sobrecarregado')) {
     return detail;
   }
   // Fallback: parse raw JSON error from Anthropic API
   if (detail.includes('credit balance') || detail.includes('billing')) {
-    return 'Saldo insuficiente na API do Claude. Verifique seus créditos em console.anthropic.com → Plans & Billing.';
+    return 'Insufficient balance on Claude API. Check your credits at console.anthropic.com → Plans & Billing.';
   }
   if (detail.includes('authentication_error') || detail.includes('invalid x-api-key')) {
-    return 'Chave de API inválida ou expirada. Verifique a chave nas configurações (Settings → API Key).';
+    return 'Invalid or expired API key. Check the key in Settings → API Key.';
   }
   if (detail.includes('rate_limit')) {
-    return 'Limite de requisições excedido. Aguarde alguns segundos e tente novamente.';
+    return 'Rate limit exceeded. Please wait a few seconds and try again.';
   }
   if (detail.includes('overloaded')) {
-    return 'O servidor da API está sobrecarregado. Tente novamente em alguns instantes.';
+    return 'The API server is overloaded. Please try again in a few moments.';
   }
   return detail;
 };
@@ -1876,8 +1878,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       `
     },
     'rmv-formulario': {
-      name: "RMV Formulário",
-      description: 'Tradução CNH',
+      name: "RMV Form",
+      description: 'CNH Translation',
       category: 'rmv-forms',
       isForm: true,
       formHTML: `
@@ -2979,11 +2981,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     try {
       const assetData = { [assetType]: value };
       await axios.put(`${API}/admin/shared-assets?admin_key=${adminKey}`, assetData);
-      setProcessingStatus(`✅ ${assetType === 'logo_left' ? 'Left logo' : assetType === 'logo_right' ? 'Center logo' : assetType === 'logo_stamp' ? 'Stamp' : assetType === 'signature_image' ? 'Signature' : assetType} salvo!`);
+      setProcessingStatus(`✅ ${assetType === 'logo_left' ? 'Left logo' : assetType === 'logo_right' ? 'Center logo' : assetType === 'logo_stamp' ? 'Stamp' : assetType === 'signature_image' ? 'Signature' : assetType} saved!`);
       return true;
     } catch (error) {
       console.error('Error saving asset:', error);
-      setProcessingStatus(`❌ Falha ao salvar ${assetType}`);
+      setProcessingStatus(`❌ Failed to save ${assetType}`);
       return false;
     }
   };
@@ -3409,17 +3411,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
   // Delete project document (Admin only - for project modal)
   const deleteProjectDocument = async (docId, filename) => {
-    if (!confirm(`Tem certeza que deseja excluir "${filename}"? Esta ação não pode ser desfeita.`)) {
+    if (!confirm(`Are you sure you want to delete "${filename}"? This action cannot be undone.`)) {
       return;
     }
     try {
       await axios.delete(`${API}/admin/order-documents/${docId}?admin_key=${adminKey}`);
-      showToast(`Documento "${filename}" excluído com sucesso`);
+      showToast(`Document "${filename}" deleted successfully`);
       // Update local state to remove the deleted document
       setProjectDocuments(prev => prev.filter(doc => doc.id !== docId));
     } catch (err) {
       console.error('Failed to delete document:', err);
-      showToast('Erro ao excluir documento');
+      showToast('Error deleting document');
     }
   };
 
@@ -4198,7 +4200,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const testApiKey = async () => {
     const keyToTest = claudeApiKey;
     if (!keyToTest) {
-      setProcessingStatus('❌ Nenhuma chave de API configurada para testar.');
+      setProcessingStatus('❌ No API key configured to test.');
       return;
     }
     setProcessingStatus('🔄 Testando chave de API...');
@@ -4213,7 +4215,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       }
     } catch (err) {
       const msg = err.response?.data?.detail || err.message;
-      setProcessingStatus(`❌ Erro ao testar: ${msg}`);
+      setProcessingStatus(`❌ Error testing: ${msg}`);
     }
   };
 
@@ -4226,15 +4228,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       const response = await axios.get(`${API}/admin/settings/api-key/diagnose?admin_key=${adminKey}`);
       setDiagnosisResult(response.data);
       if (response.data.sources?.length === 0) {
-        setProcessingStatus('❌ Nenhuma chave de API encontrada no sistema.');
+        setProcessingStatus('❌ No API key found in the system.');
       } else {
         const anyOk = response.data.sources.some(s => s.test_ok);
         setProcessingStatus(anyOk
-          ? '✅ Diagnóstico concluído - chave válida encontrada!'
-          : '❌ Diagnóstico concluído - nenhuma chave válida encontrada.');
+          ? '✅ Diagnosis complete - valid key found!'
+          : '❌ Diagnosis complete - no valid key found.');
       }
     } catch (err) {
-      setProcessingStatus(`❌ Erro no diagnóstico: ${err.response?.data?.detail || err.message}`);
+      setProcessingStatus(`❌ Diagnosis error: ${err.response?.data?.detail || err.message}`);
     }
   };
 
@@ -4894,7 +4896,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       const escapedText = error.text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
       // Create tooltip with error details
-      const tooltipText = `Tipo: ${error.type} | Severidade: ${error.severity} | Sugestão: ${error.suggestion}`.replace(/"/g, '&quot;');
+      const tooltipText = `Type: ${error.type} | Severity: ${error.severity} | Suggestion: ${error.suggestion}`.replace(/"/g, '&quot;');
 
       // Use simple global replace (case insensitive) - only replace first occurrence to avoid duplicates
       const regex = new RegExp(escapedText, 'i');
@@ -5488,7 +5490,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       setActiveSubTab('review');
     } catch (error) {
       console.error('Translation error:', error);
-      setProcessingStatus(`❌ Erro na tradução: ${parseApiError(error)}`);
+      setProcessingStatus(`❌ Translation error: ${parseApiError(error)}`);
     } finally {
       setIsProcessing(false);
     }
@@ -5550,7 +5552,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       setProcessingStatus(`✅ Translation completed! ${totalPages} page(s) translated.`);
     } catch (error) {
       console.error('Translation error:', error);
-      setProcessingStatus(`❌ Erro na tradução: ${parseApiError(error)}`);
+      setProcessingStatus(`❌ Translation error: ${parseApiError(error)}`);
     } finally {
       setIsProcessing(false);
     }
@@ -6240,7 +6242,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       const printWindow = window.open('', 'PDFPreview', `width=${windowWidth},height=${windowHeight},left=${left},top=${top},scrollbars=yes,resizable=yes`);
 
       if (!printWindow || printWindow.closed || typeof printWindow.closed === 'undefined') {
-        alert('⚠️ Pop-up bloqueado!\n\nPor favor, permita pop-ups para este site:\n1. Clique no ícone de pop-up bloqueado na barra de endereço\n2. Selecione "Sempre permitir pop-ups"\n3. Tente novamente');
+        alert('⚠️ Pop-up blocked!\n\nPlease allow pop-ups for this site:\n1. Click the blocked pop-up icon in the address bar\n2. Select "Always allow pop-ups"\n3. Try again');
         setQuickPackageLoading(false);
         setQuickPackageProgress('');
         return;
@@ -7234,7 +7236,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               <div className="flex items-center gap-2">
                 <span className="text-sm">{claudeApiKey ? '🟢' : '🔴'}</span>
                 <span className={`text-xs font-bold ${claudeApiKey ? 'text-green-800' : 'text-red-800'}`}>
-                  Claude API Key: {claudeApiKey ? 'Configurada' : 'Não configurada'}
+                  Claude API Key: {claudeApiKey ? 'Configured' : 'Not configured'}
                 </span>
                 {claudeApiKey && (
                   <span className="text-[10px] text-gray-500">({claudeApiKey.slice(0, 7)}...{claudeApiKey.slice(-4)})</span>
@@ -7253,7 +7255,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   onClick={() => setShowApiKey(!showApiKey)}
                   className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
                 >
-                  {showApiKey ? 'Fechar' : 'Alterar Chave'}
+                  {showApiKey ? 'Close' : 'Change Key'}
                 </button>
               </div>
             </div>
@@ -7270,13 +7272,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   onClick={saveApiKey}
                   className="px-3 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700"
                 >
-                  Salvar
+                  Save
                 </button>
               </div>
             )}
             {!claudeApiKey && (
               <p className="text-[10px] text-red-600 mt-1">
-                Configure sua chave de API do Claude para usar a tradução por IA. Obtenha em console.anthropic.com
+                Configure your Claude API key to use AI translation. Get it at console.anthropic.com
               </p>
             )}
             {/* Diagnose button */}
@@ -8495,7 +8497,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <input ref={logoLeftInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'left')} className="hidden" />
                 <div className="flex justify-center gap-1 mt-1">
                   {user?.role === 'admin' && <button onClick={() => logoLeftInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>}
-                  {user?.role === 'admin' && logoLeft && <button onClick={() => saveAssetToBackend('logo_left', logoLeft)} className="px-1.5 py-0.5 bg-green-500 text-white text-[9px] rounded hover:bg-green-600">Salvar</button>}
+                  {user?.role === 'admin' && logoLeft && <button onClick={() => saveAssetToBackend('logo_left', logoLeft)} className="px-1.5 py-0.5 bg-green-500 text-white text-[9px] rounded hover:bg-green-600">Save</button>}
                   {user?.role === 'admin' && logoLeft && <button onClick={() => removeLogo('left')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
                 </div>
               </div>
@@ -8513,7 +8515,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <input ref={logoRightInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'right')} className="hidden" />
                 <div className="flex justify-center gap-1 mt-1">
                   {user?.role === 'admin' && <button onClick={() => logoRightInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>}
-                  {user?.role === 'admin' && logoRight && <button onClick={() => saveAssetToBackend('logo_right', logoRight)} className="px-1.5 py-0.5 bg-green-500 text-white text-[9px] rounded hover:bg-green-600">Salvar</button>}
+                  {user?.role === 'admin' && logoRight && <button onClick={() => saveAssetToBackend('logo_right', logoRight)} className="px-1.5 py-0.5 bg-green-500 text-white text-[9px] rounded hover:bg-green-600">Save</button>}
                   {user?.role === 'admin' && logoRight && <button onClick={() => removeLogo('right')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
                 </div>
               </div>
@@ -8531,7 +8533,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <input ref={logoStampInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'stamp')} className="hidden" />
                 <div className="flex justify-center gap-1 mt-1">
                   {user?.role === 'admin' && <button onClick={() => logoStampInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>}
-                  {user?.role === 'admin' && logoStamp && <button onClick={() => saveAssetToBackend('logo_stamp', logoStamp)} className="px-1.5 py-0.5 bg-green-500 text-white text-[9px] rounded hover:bg-green-600">Salvar</button>}
+                  {user?.role === 'admin' && logoStamp && <button onClick={() => saveAssetToBackend('logo_stamp', logoStamp)} className="px-1.5 py-0.5 bg-green-500 text-white text-[9px] rounded hover:bg-green-600">Save</button>}
                   {user?.role === 'admin' && logoStamp && <button onClick={() => removeLogo('stamp')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
                 </div>
               </div>
@@ -8549,7 +8551,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <input ref={signatureInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'signature')} className="hidden" />
                 <div className="flex justify-center gap-1 mt-1">
                   {user?.role === 'admin' && <button onClick={() => signatureInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>}
-                  {user?.role === 'admin' && signatureImage && <button onClick={() => saveAssetToBackend('signature_image', signatureImage)} className="px-1.5 py-0.5 bg-green-500 text-white text-[9px] rounded hover:bg-green-600">Salvar</button>}
+                  {user?.role === 'admin' && signatureImage && <button onClick={() => saveAssetToBackend('signature_image', signatureImage)} className="px-1.5 py-0.5 bg-green-500 text-white text-[9px] rounded hover:bg-green-600">Save</button>}
                   {user?.role === 'admin' && signatureImage && <button onClick={() => removeLogo('signature')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
                 </div>
               </div>
@@ -11282,13 +11284,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         Total: <strong>{proofreadingResult.total_erros || 0}</strong>
                       </span>
                       <span className="px-2 py-1 bg-red-100 text-red-700 rounded">
-                        Críticos: <strong>{proofreadingResult.criticos || 0}</strong>
+                        Critical: <strong>{proofreadingResult.criticos || 0}</strong>
                       </span>
                       <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">
-                        Altos: <strong>{proofreadingResult.altos || 0}</strong>
+                        High: <strong>{proofreadingResult.altos || 0}</strong>
                       </span>
                       <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded">
-                        Médios: <strong>{proofreadingResult.medios || 0}</strong>
+                        Medium: <strong>{proofreadingResult.medios || 0}</strong>
                       </span>
                       <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">
                         Baixos: <strong>{proofreadingResult.baixos || 0}</strong>
@@ -11315,9 +11317,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                 <th className="px-2 py-2 text-left font-medium text-gray-600">Severidade</th>
                                 <th className="px-2 py-2 text-left font-medium text-gray-600">Tipo</th>
                                 <th className="px-2 py-2 text-left font-medium text-gray-600">Original</th>
-                                <th className="px-2 py-2 text-left font-medium text-gray-600">Encontrado</th>
-                                <th className="px-2 py-2 text-left font-medium text-gray-600">Sugestão</th>
-                                <th className="px-2 py-2 text-center font-medium text-gray-600">Ação</th>
+                                <th className="px-2 py-2 text-left font-medium text-gray-600">Found</th>
+                                <th className="px-2 py-2 text-left font-medium text-gray-600">Suggestion</th>
+                                <th className="px-2 py-2 text-center font-medium text-gray-600">Action</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -17283,8 +17285,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               {/* PM column - Admin only */}
               {isAdmin && <th className="px-3 py-3 text-left font-semibold text-gray-700">PM</th>}
               <th className="px-3 py-3 text-left font-semibold text-gray-700">Translator</th>
-              <th className="px-3 py-3 text-left font-semibold text-gray-700" title="Prazo do Tradutor - Data de retorno da tradução (EST)">TR Deadline <span className="text-xs font-normal text-gray-400">(EST)</span></th>
-              <th className="px-3 py-3 text-left font-semibold text-gray-700" title="Prazo do Cliente - Data de entrega ao cliente (EST)">Client Deadline <span className="text-xs font-normal text-gray-400">(EST)</span></th>
+              <th className="px-3 py-3 text-left font-semibold text-gray-700" title="Translator Deadline - Translation return date (EST)">TR Deadline <span className="text-xs font-normal text-gray-400">(EST)</span></th>
+              <th className="px-3 py-3 text-left font-semibold text-gray-700" title="Client Deadline - Delivery date to client (EST)">Client Deadline <span className="text-xs font-normal text-gray-400">(EST)</span></th>
               <th className="px-3 py-3 text-left font-semibold text-gray-700">Status</th>
               {/* Translation Ready column - shows when translation is complete */}
               <th className="px-3 py-3 text-center font-semibold text-gray-700">Translation</th>
@@ -18372,7 +18374,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                 <button
                                   onClick={() => deleteOrderDocument(doc.id, doc.filename)}
                                   className="px-2 py-1.5 bg-red-500 text-white rounded text-xs hover:bg-red-600"
-                                  title="Excluir documento"
+                                  title="Delete document"
                                 >
                                   🗑️
                                 </button>
@@ -18534,7 +18536,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                     }
                                   }}
                                   className="w-4 h-4 mr-3 text-purple-600 bg-white border-gray-300 rounded focus:ring-purple-500 cursor-pointer"
-                                  title="Selecionar para enviar ao cliente"
+                                  title="Select to send to client"
                                 />
                               )}
                               <span className="text-2xl mr-3">📗</span>
@@ -18575,27 +18577,27 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                               <div className="flex flex-col gap-2">
                                 <button
                                   onClick={async () => {
-                                    if (confirm('Aceitar esta tradução e marcar como pronta para envio?')) {
+                                    if (confirm('Accept this translation and mark as ready for delivery?')) {
                                       try {
                                         await axios.put(`${API}/admin/orders/${viewingOrder.id}?admin_key=${adminKey}`, {
                                           translation_status: 'ready',
                                           translation_ready_at: new Date().toISOString()
                                         });
-                                        showToast('Tradução aceita! Agora você pode enviar para o cliente.');
+                                        showToast('Translation accepted! You can now deliver to the client.');
                                         setViewingOrder(prev => ({ ...prev, translation_status: 'ready' }));
                                         fetchOrders();
                                       } catch (err) {
                                         console.error('Failed to update status:', err);
-                                        showToast('Erro ao atualizar status');
+                                        showToast('Error updating status');
                                       }
                                     }
                                   }}
                                   className="w-full px-4 py-3 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg flex items-center justify-center gap-2 transition-colors"
                                 >
-                                  ✅ Aceitar Tradução
+                                  ✅ Accept Translation
                                 </button>
                                 <p className="text-[10px] text-gray-500 text-center">
-                                  Após aceitar, você poderá enviar o email ao cliente com a tradução
+                                  After accepting, you can send the email to the client with the translation
                                 </p>
                               </div>
                             )}
@@ -18606,8 +18608,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                 <div className="flex items-center gap-2 mb-2">
                                   <span className="text-2xl">📧</span>
                                   <div>
-                                    <div className="text-sm font-medium text-purple-800">Tradução Aceita!</div>
-                                    <div className="text-[10px] text-purple-600">Pronto para enviar ao cliente</div>
+                                    <div className="text-sm font-medium text-purple-800">Translation Accepted!</div>
+                                    <div className="text-[10px] text-purple-600">Ready to send to client</div>
                                   </div>
                                 </div>
                                 <div className="flex flex-col gap-2">
@@ -18615,9 +18617,9 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                   <div className="flex items-center justify-between text-xs text-purple-700 bg-purple-100 px-2 py-1 rounded">
                                     <span>
                                       {selectedDocsForDelivery.length > 0 ? (
-                                        <span>{selectedDocsForDelivery.length} arquivo(s) selecionado(s) para envio</span>
+                                        <span>{selectedDocsForDelivery.length} file(s) selected for delivery</span>
                                       ) : (
-                                        <span className="text-orange-600">Selecione os arquivos acima para enviar</span>
+                                        <span className="text-orange-600">Select files above to send</span>
                                       )}
                                     </span>
                                     <div className="flex gap-1">
@@ -18649,7 +18651,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                   <button
                                     onClick={async () => {
                                       if (selectedDocsForDelivery.length === 0) {
-                                        showToast('Por favor, selecione pelo menos um arquivo para enviar ao cliente.');
+                                        showToast('Please select at least one file to send to the client.');
                                         return;
                                       }
                                       const bccInput = document.getElementById('bcc-email-input');
@@ -18659,7 +18661,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                         .map(d => d.filename)
                                         .join('\n  - ');
 
-                                      if (confirm(`Enviar tradução para ${viewingOrder.client_email}?\n\nArquivos selecionados:\n  - ${selectedFilenames}${bccEmail ? `\n\nCópia (BCC): ${bccEmail}` : ''}`)) {
+                                      if (confirm(`Send translation to ${viewingOrder.client_email}?\n\nSelected files:\n  - ${selectedFilenames}${bccEmail ? `\n\nCopy (BCC): ${bccEmail}` : ''}`)) {
                                         try {
                                           await axios.post(`${API}/admin/orders/${viewingOrder.id}/deliver?admin_key=${adminKey}`, {
                                             bcc_email: bccEmail,
@@ -18674,12 +18676,12 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                               additional_document_ids: selectedDocsForDelivery
                                             }
                                           });
-                                          showToast(`Tradução enviada para o cliente!\n\n${selectedDocsForDelivery.length} arquivo(s) enviado(s).` + (bccEmail ? `\n\nCópia (BCC): ${bccEmail}` : ''));
+                                          showToast(`Translation sent to client!\n\n${selectedDocsForDelivery.length} file(s) delivered.` + (bccEmail ? `\n\nCopy (BCC): ${bccEmail}` : ''));
                                           setViewingOrder(prev => ({ ...prev, translation_status: 'delivered' }));
                                           fetchOrders();
                                         } catch (err) {
                                           console.error('Failed to deliver:', err);
-                                          showToast('Erro ao enviar para o cliente');
+                                          showToast('Error delivering to client');
                                         }
                                       }
                                     }}
@@ -18694,7 +18696,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                     Enviar Email ao Cliente
                                   </button>
                                   <div className="text-[10px] text-purple-600 text-center">
-                                    Será enviado para: <strong>{viewingOrder.client_email}</strong>
+                                    Will be sent to: <strong>{viewingOrder.client_email}</strong>
                                   </div>
                                 </div>
                               </div>
@@ -19974,7 +19976,7 @@ const FollowupsPage = ({ adminKey }) => {
       showToast(`Follow-up automatico ${newEnabled ? 'ativado' : 'desativado'}`);
       fetchFollowupStatus();
     } catch (err) {
-      showToast('Erro ao alterar follow-up automatico');
+      showToast('Error changing automatic follow-up');
       console.error(err);
     } finally {
       setTogglingAuto(false);
@@ -19989,7 +19991,7 @@ const FollowupsPage = ({ adminKey }) => {
       await axios.post(`${API}/admin/quotes/exclude-from-followup?admin_key=${adminKey}&quote_id=${quoteId}&quote_type=${quoteType}`);
       fetchFollowupStatus();
     } catch (err) {
-      showToast('Erro ao excluir cliente do follow-up');
+      showToast('Error removing client from follow-up');
       console.error(err);
     }
   };
@@ -20321,7 +20323,7 @@ const FollowupsPage = ({ adminKey }) => {
               </div>
               <div className="p-6 overflow-y-auto max-h-[60vh]">
                 {getClientsForStage(selectedStage).length === 0 ? (
-                  <p className="text-center text-gray-500 py-8">Nenhum cliente nesta categoria</p>
+                  <p className="text-center text-gray-500 py-8">No clients in this category</p>
                 ) : (
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50">
@@ -20351,9 +20353,9 @@ const FollowupsPage = ({ adminKey }) => {
                             <button
                               onClick={() => excludeFromFollowup(client.id, client.type)}
                               className="px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 text-xs font-medium"
-                              title="Remover do follow-up automatico"
+                              title="Remove from automatic follow-up"
                             >
-                              Excluir
+                              Remove
                             </button>
                           </td>
                         </tr>
@@ -20367,7 +20369,7 @@ const FollowupsPage = ({ adminKey }) => {
                   onClick={() => setShowModal(false)}
                   className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
                 >
-                  Fechar
+                  Close
                 </button>
               </div>
             </div>
@@ -22179,7 +22181,7 @@ const UsersPage = ({ adminKey, user }) => {
 
   // Delete document
   const handleDeleteDocument = async (userId, docId) => {
-    if (!window.confirm('Excluir este document?')) return;
+    if (!window.confirm('Delete this document?')) return;
     try {
       await axios.delete(`${API}/admin/users/${userId}/documents/${docId}?admin_key=${adminKey}`);
       await fetchUserDocuments(userId);
@@ -22512,7 +22514,7 @@ const UsersPage = ({ adminKey, user }) => {
                       onClick={() => toggleExpandUser(u.id)}
                       className="text-blue-600 hover:text-blue-800 text-xs"
                     >
-                      {expandedUser === u.id ? 'Fechar' : 'Ver Perfil'}
+                      {expandedUser === u.id ? 'Close' : 'View Profile'}
                     </button>
                     {u.invitation_pending && (
                       <button
@@ -22567,13 +22569,13 @@ const UsersPage = ({ adminKey, user }) => {
                                   disabled={savingUser}
                                   className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-400"
                                 >
-                                  {savingUser ? '⏳...' : '✓ Salvar'}
+                                  {savingUser ? '⏳...' : '✓ Save'}
                                 </button>
                                 <button
                                   onClick={cancelEditUser}
                                   className="px-2 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600"
                                 >
-                                  ✕ Cancelar
+                                  ✕ Cancel
                                 </button>
                               </div>
                             )}
@@ -23932,6 +23934,18 @@ const FinancesPage = ({ adminKey }) => {
       fetchPartnerInvoices();
     } catch (err) {
       showToast('Error sending bulk reminders: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  // Send prospect invite email to encourage partner registration
+  const sendProspectInvite = async (partnerId, partnerEmail, companyName) => {
+    if (!window.confirm(`Send a partner registration invite to ${companyName} (${partnerEmail})?`)) return;
+    try {
+      const response = await axios.post(`${API}/admin/partners/${partnerId}/send-invite?admin_key=${adminKey}`);
+      showToast(response.data.message || 'Invite sent successfully!');
+      fetchPartnerStats();
+    } catch (err) {
+      showToast('Error sending invite: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -25449,13 +25463,13 @@ const FinancesPage = ({ adminKey }) => {
                     onClick={() => { setPartnerFilter('registered'); setSelectedPartnerIds([]); }}
                     className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${partnerFilter === 'registered' ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
                   >
-                    Registered ({partnerStats.partners?.filter(p => p.is_real_partner).length || 0})
+                    Registered ({partnerStats.partners?.filter(p => p.is_real_partner && p.payment_plan_approved && (p.payment_plan === 'biweekly' || p.payment_plan === 'monthly')).length || 0})
                   </button>
                   <button
                     onClick={() => { setPartnerFilter('prospect'); setSelectedPartnerIds([]); }}
                     className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${partnerFilter === 'prospect' ? 'bg-orange-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
                   >
-                    Prospects ({partnerStats.partners?.filter(p => !p.is_real_partner).length || 0})
+                    Prospects ({partnerStats.partners?.filter(p => !p.is_real_partner || !p.payment_plan_approved || (p.payment_plan !== 'biweekly' && p.payment_plan !== 'monthly')).length || 0})
                   </button>
                 </div>
                 <div className="flex-1 max-w-xs">
@@ -25476,7 +25490,8 @@ const FinancesPage = ({ adminKey }) => {
                     <th className="px-2 py-3 text-center w-10">
                       <input
                         type="checkbox"
-                        checked={selectedPartnerIds.length > 0 && selectedPartnerIds.length === (partnerStats.partners?.filter(p => p.is_real_partner && (partnerFilter === 'all' || partnerFilter === 'registered')).filter(p => {
+                        checked={selectedPartnerIds.length > 0 && selectedPartnerIds.length === (partnerStats.partners?.filter(p => p.is_real_partner && p.payment_plan_approved && (p.payment_plan === 'biweekly' || p.payment_plan === 'monthly')).filter(p => {
+                          if (partnerFilter === 'prospect') return false;
                           if (!partnerSearchQuery.trim()) return true;
                           const q = partnerSearchQuery.toLowerCase();
                           return (p.company_name || '').toLowerCase().includes(q) || (p.email || '').toLowerCase().includes(q) || (p.contact_name || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q);
@@ -25499,10 +25514,11 @@ const FinancesPage = ({ adminKey }) => {
                 </thead>
                 <tbody className="divide-y">
                   {(() => {
+                    const isRegisteredPartner = (p) => p.is_real_partner && p.payment_plan_approved && (p.payment_plan === 'biweekly' || p.payment_plan === 'monthly');
                     const filteredPartners = (partnerStats.partners || []).filter(p => {
-                      // Filter by type
-                      if (partnerFilter === 'registered' && !p.is_real_partner) return false;
-                      if (partnerFilter === 'prospect' && p.is_real_partner) return false;
+                      // Filter by type: Registered = approved biweekly/monthly, Prospect = all others
+                      if (partnerFilter === 'registered' && !isRegisteredPartner(p)) return false;
+                      if (partnerFilter === 'prospect' && isRegisteredPartner(p)) return false;
                       // Filter by search query
                       if (partnerSearchQuery.trim()) {
                         const q = partnerSearchQuery.toLowerCase();
@@ -25519,10 +25535,12 @@ const FinancesPage = ({ adminKey }) => {
                         </tr>
                       );
                     }
-                    return filteredPartners.map((partner) => (
-                      <tr key={partner.partner_id} className={`hover:bg-gray-50 ${!partner.is_real_partner ? 'bg-orange-50' : ''} ${selectedPartnerIds.includes(partner.partner_id) ? 'bg-blue-50' : ''}`}>
+                    return filteredPartners.map((partner) => {
+                      const isApproved = isRegisteredPartner(partner);
+                      return (
+                      <tr key={partner.partner_id} className={`hover:bg-gray-50 ${!isApproved ? 'bg-orange-50' : ''} ${selectedPartnerIds.includes(partner.partner_id) ? 'bg-blue-50' : ''}`}>
                         <td className="px-2 py-3 text-center">
-                          {partner.is_real_partner && (
+                          {isApproved && (
                             <input
                               type="checkbox"
                               checked={selectedPartnerIds.includes(partner.partner_id)}
@@ -25534,9 +25552,9 @@ const FinancesPage = ({ adminKey }) => {
                         <td className="px-4 py-3">
                           <div className="font-medium text-gray-800">
                             {partner.company_name}
-                            {!partner.is_real_partner && (
-                              <span className="ml-2 px-1.5 py-0.5 text-xs bg-orange-200 text-orange-700 rounded" title="This is not a registered partner - orders created manually or from other sources">
-                                Not Registered
+                            {!isApproved && (
+                              <span className="ml-2 px-1.5 py-0.5 text-xs bg-orange-200 text-orange-700 rounded" title={!partner.is_real_partner ? 'Not a registered partner - orders created manually or from other sources' : 'Registered but pending biweekly/monthly plan approval'}>
+                                Prospect
                               </span>
                             )}
                           </div>
@@ -25611,7 +25629,7 @@ const FinancesPage = ({ adminKey }) => {
                         </td>
                         <td className="px-4 py-3 text-center">
                           <div className="flex items-center justify-center space-x-1">
-                            {partner.is_real_partner ? (
+                            {isApproved ? (
                               <>
                                 <button
                                   onClick={() => handleOpenCreateInvoice(partner)}
@@ -25659,15 +25677,54 @@ const FinancesPage = ({ adminKey }) => {
                                 </button>
                               </>
                             ) : (
-                              <span className="text-xs text-gray-400" title="Actions not available for non-registered entries">
-                                -
-                              </span>
+                              <div className="flex items-center gap-1">
+                                {partner.is_real_partner && partner.email && (
+                                  <button
+                                    onClick={() => sendProspectInvite(partner.partner_id, partner.email, partner.company_name)}
+                                    className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                    title="Send partner registration invite email"
+                                  >
+                                    📧
+                                  </button>
+                                )}
+                                {partner.is_real_partner && (
+                                  <>
+                                    <button
+                                      onClick={() => togglePartnerInvoiceUnlock(partner.partner_id, partner.company_name, partner.payment_plan_approved)}
+                                      className={`p-1.5 rounded transition-colors ${
+                                        partner.payment_plan_approved
+                                          ? 'text-green-600 hover:bg-green-50'
+                                          : 'text-amber-600 hover:bg-amber-50'
+                                      }`}
+                                      title={partner.payment_plan_approved ? 'Invoice payments unlocked - Click to lock' : 'Invoice payments locked - Click to unlock'}
+                                    >
+                                      {partner.payment_plan_approved ? '🔓' : '🔒'}
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        if (window.confirm(`Are you sure you want to delete partner "${partner.company_name}"?\n\nThis action cannot be undone.`)) {
+                                          deletePartner(partner.partner_id);
+                                        }
+                                      }}
+                                      className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                      title="Delete partner"
+                                    >
+                                      🗑️
+                                    </button>
+                                  </>
+                                )}
+                                {!partner.is_real_partner && (
+                                  <span className="text-xs text-gray-400" title="Manual entry - no actions available">-</span>
+                                )}
+                              </div>
                             )}
                           </div>
                         </td>
                       </tr>
-                    ));
+                    );
+                    })
                   })()}
+
                 </tbody>
               </table>
             </div>
@@ -27682,7 +27739,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       fetchDashboardData();
     } catch (err) {
       console.error('Failed to archive order:', err);
-      showToast('Erro ao arquivar: ' + (err.response?.data?.detail || err.message));
+      showToast('Error archiving: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -27705,7 +27762,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       fetchDashboardData();
     } catch (err) {
       console.error('Bulk archive failed:', err);
-      showToast('Erro ao arquivar projetos: ' + (err.response?.data?.detail || err.message));
+      showToast('Error archiving projects: ' + (err.response?.data?.detail || err.message));
     } finally {
       setDeletingOrders(false);
     }
@@ -27715,7 +27772,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   const archiveAllCompletedOrders = async () => {
     const completedOrders = orders.filter(o => ['final', 'delivered'].includes(o.translation_status));
     if (completedOrders.length === 0) {
-      showToast('Nenhum projeto finalizado para arquivar');
+      showToast('No completed projects to archive');
       return;
     }
     if (!window.confirm(`Arquivar TODOS os ${completedOrders.length} projetos finalizados/entregues?\n\nOs projetos serão removidos do seu painel, mas o admin ainda terá acesso.`)) return;
@@ -27730,7 +27787,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       fetchDashboardData();
     } catch (err) {
       console.error('Bulk archive completed failed:', err);
-      showToast('Erro ao arquivar projetos: ' + (err.response?.data?.detail || err.message));
+      showToast('Error archiving projects: ' + (err.response?.data?.detail || err.message));
     } finally {
       setDeletingOrders(false);
     }
@@ -31456,7 +31513,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                           <button
                             onClick={() => deleteProjectDocument(doc.id, doc.filename)}
                             className="px-2 py-1.5 bg-red-500 text-white rounded text-xs hover:bg-red-600"
-                            title="Excluir documento"
+                            title="Delete document"
                           >
                             🗑️
                           </button>
@@ -31526,7 +31583,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 onClick={() => { setSelectedProject(null); setProjectTrDeadline({ date: '', time: '17:00' }); setProjectModalTab('files'); setPmUploadFiles([]); }}
                 className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
               >
-                Fechar
+                Close
               </button>
             </div>
           </div>
@@ -31688,7 +31745,7 @@ const SalesControlPage = ({ adminKey }) => {
   };
 
   const handleInviteSalesperson = async (id) => {
-    if (!window.confirm('Enviar email de convite para este vendedor?')) return;
+    if (!window.confirm('Send invitation email to this salesperson?')) return;
     try {
       const res = await fetch(`${API_URL}/api/admin/salespeople/${id}/invite`, {
         method: 'POST',
@@ -31696,14 +31753,14 @@ const SalesControlPage = ({ adminKey }) => {
       });
       const data = await res.json();
       if (res.ok) {
-        showToast(`Convite enviado! Link: ${data.invite_link}`);
+        showToast(`Invite sent! Link: ${data.invite_link}`);
         fetchAllData();
       } else {
-        showToast(data.detail || 'Falha ao enviar convite');
+        showToast(data.detail || 'Failed to send invite');
       }
     } catch (error) {
       console.error('Error inviting salesperson:', error);
-      showToast('Erro ao enviar convite');
+      showToast('Error sending invite');
     }
   };
 
@@ -31719,7 +31776,7 @@ const SalesControlPage = ({ adminKey }) => {
       }
     } catch (error) {
       console.error('Error approving commission:', error);
-      showToast('Erro ao aprovar comissão');
+      showToast('Error approving commission');
     }
   };
 
@@ -31746,7 +31803,7 @@ const SalesControlPage = ({ adminKey }) => {
       }
     } catch (error) {
       console.error('Error processing payment:', error);
-      showToast('Erro ao processar pagamento');
+      showToast('Error processing payment');
     }
   };
 
@@ -31795,11 +31852,11 @@ const SalesControlPage = ({ adminKey }) => {
         setEditAcquisitionForm({});
         fetchAllData();
       } else {
-        showToast('Erro ao atualizar aquisição');
+        showToast('Error updating acquisition');
       }
     } catch (error) {
       console.error('Error updating acquisition:', error);
-      showToast('Erro ao atualizar aquisição');
+      showToast('Error updating acquisition');
     }
   };
 
@@ -31811,15 +31868,15 @@ const SalesControlPage = ({ adminKey }) => {
         headers: { 'admin-key': adminKey }
       });
       if (res.ok) {
-        showToast('Aquisição deletada com sucesso!');
+        showToast('Acquisition deleted successfully!');
         setDeletingAcquisition(null);
         fetchAllData();
       } else {
-        showToast('Erro ao deletar aquisição');
+        showToast('Error deleting acquisition');
       }
     } catch (error) {
       console.error('Error deleting acquisition:', error);
-      showToast('Erro ao deletar aquisição');
+      showToast('Error deleting acquisition');
     }
   };
 
@@ -31843,23 +31900,23 @@ const SalesControlPage = ({ adminKey }) => {
   };
 
   const outreachLabels = {
-    'not_contacted': { label: 'Não contatado', color: 'bg-gray-100 text-gray-600', dot: 'bg-gray-400' },
-    'first_contact': { label: '1o Contato enviado', color: 'bg-blue-100 text-blue-700', dot: 'bg-blue-500' },
-    'followup_1': { label: 'Follow-up 1 enviado', color: 'bg-yellow-100 text-yellow-700', dot: 'bg-yellow-500' },
-    'followup_2': { label: 'Follow-up 2 enviado', color: 'bg-orange-100 text-orange-700', dot: 'bg-orange-500' },
-    'followup_3': { label: 'Sequência completa', color: 'bg-green-100 text-green-700', dot: 'bg-green-500' }
+    'not_contacted': { label: 'Not Contacted', color: 'bg-gray-100 text-gray-600', dot: 'bg-gray-400' },
+    'first_contact': { label: '1st Contact Sent', color: 'bg-blue-100 text-blue-700', dot: 'bg-blue-500' },
+    'followup_1': { label: 'Follow-up 1 Sent', color: 'bg-yellow-100 text-yellow-700', dot: 'bg-yellow-500' },
+    'followup_2': { label: 'Follow-up 2 Sent', color: 'bg-orange-100 text-orange-700', dot: 'bg-orange-500' },
+    'followup_3': { label: 'Sequence Complete', color: 'bg-green-100 text-green-700', dot: 'bg-green-500' }
   };
 
   const nextStepLabels = {
-    'first_contact': 'Enviar 1o Contato',
-    'followup_1': 'Enviar Follow-up 1 (Dia 3)',
-    'followup_2': 'Enviar Follow-up 2 (Dia 7)',
-    'followup_3': 'Enviar Follow-up 3 (Dia 14)'
+    'first_contact': 'Send 1st Contact',
+    'followup_1': 'Send Follow-up 1 (Day 3)',
+    'followup_2': 'Send Follow-up 2 (Day 7)',
+    'followup_3': 'Send Follow-up 3 (Day 14)'
   };
 
   const handleSendOutreach = async (acq, emailType) => {
     if (!acq.partner_email) {
-      showToast('Este parceiro não tem email cadastrado. Edite para adicionar.');
+      showToast('This partner has no registered email. Edit to add one.');
       return;
     }
     setSendingOutreach(acq.id + '_' + emailType);
@@ -31876,13 +31933,13 @@ const SalesControlPage = ({ adminKey }) => {
       });
       const data = await res.json();
       if (res.ok) {
-        showToast(`Email enviado para ${acq.partner_name}!`);
+        showToast(`Email sent to ${acq.partner_name}!`);
         fetchAllData();
       } else {
-        showToast(data.detail || 'Erro ao enviar email');
+        showToast(data.detail || 'Error sending email');
       }
     } catch (error) {
-      showToast('Erro ao enviar email');
+      showToast('Error sending email');
     }
     setSendingOutreach(null);
   };
@@ -31894,10 +31951,10 @@ const SalesControlPage = ({ adminKey }) => {
       return nextStep === emailType;
     });
     if (eligible.length === 0) {
-      showToast('Nenhum parceiro elegível para este envio.');
+      showToast('No eligible partners for this send.');
       return;
     }
-    if (!window.confirm(`Enviar "${nextStepLabels[emailType]}" para ${eligible.length} parceiro(s)?`)) return;
+    if (!window.confirm(`Send "${nextStepLabels[emailType]}" to ${eligible.length} partner(s)?`)) return;
     setSendingOutreach('bulk_' + emailType);
     try {
       const res = await fetch(`${API_URL}/api/admin/outreach/send-bulk`, {
@@ -31911,11 +31968,11 @@ const SalesControlPage = ({ adminKey }) => {
       const data = await res.json();
       if (res.ok) {
         setOutreachResult(data);
-        showToast(`Enviados: ${data.sent} | Ignorados: ${data.skipped} | Falhas: ${data.failed}`);
+        showToast(`Sent: ${data.sent} | Skipped: ${data.skipped} | Failed: ${data.failed}`);
         fetchAllData();
       }
     } catch (error) {
-      showToast('Erro ao enviar emails em lote');
+      showToast('Error sending bulk emails');
     }
     setSendingOutreach(null);
   };
@@ -32196,7 +32253,7 @@ const SalesControlPage = ({ adminKey }) => {
                               showToast('Link copiado!\n' + link);
                             }}
                             className="text-xs text-purple-500 hover:text-purple-700"
-                            title="Copiar link de referral"
+                            title="Copy referral link"
                           >
                             📋
                           </button>
@@ -32369,7 +32426,7 @@ const SalesControlPage = ({ adminKey }) => {
                         <button
                           onClick={() => setViewingAcquisition(acq)}
                           className="px-2 py-1 bg-gray-500 text-white text-xs rounded hover:bg-gray-600"
-                          title="Ver detalhes do parceiro"
+                          title="View partner details"
                         >
                           Ver Detalhes
                         </button>
@@ -32377,7 +32434,7 @@ const SalesControlPage = ({ adminKey }) => {
                           <button
                             onClick={() => handleEditAcquisition(acq)}
                             className="px-2 py-1 bg-orange-500 text-white text-xs rounded hover:bg-orange-600"
-                            title="Editar dados da aquisição"
+                            title="Edit acquisition data"
                           >
                             Editar
                           </button>
@@ -32386,14 +32443,14 @@ const SalesControlPage = ({ adminKey }) => {
                           <button
                             onClick={() => handleApproveCommission(acq.id)}
                             className="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
-                            title="Aprovar e notificar vendedor"
+                            title="Approve and notify salesperson"
                           >
                             ✓ Aprovar
                           </button>
                         )}
                         {acq.commission_status === 'approved' && (
                           <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded">
-                            Aguardando pagamento
+                            Awaiting payment
                           </span>
                         )}
                         {acq.commission_status === 'paid' && (
@@ -32404,7 +32461,7 @@ const SalesControlPage = ({ adminKey }) => {
                         <button
                           onClick={() => setDeletingAcquisition(acq)}
                           className="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
-                          title="Deletar aquisição"
+                          title="Delete acquisition"
                         >
                           Deletar
                         </button>
@@ -32417,7 +32474,7 @@ const SalesControlPage = ({ adminKey }) => {
             {acquisitions.length === 0 && (
               <div className="text-center py-12 text-gray-400">
                 <p className="text-4xl mb-2">🤝</p>
-                <p>Nenhuma aquisição registrada ainda</p>
+                <p>No acquisitions registered yet</p>
               </div>
             )}
           </div>
@@ -32444,7 +32501,7 @@ const SalesControlPage = ({ adminKey }) => {
 
               {/* Bulk Actions */}
               <div className="border-t pt-4">
-                <p className="text-sm text-gray-500 mb-3">Envio em lote (apenas parceiros com email cadastrado e elegíveis para o próximo passo):</p>
+                <p className="text-sm text-gray-500 mb-3">Bulk send (only partners with registered email and eligible for the next step):</p>
                 <div className="flex flex-wrap gap-2">
                   <button
                     onClick={() => handleSendBulkOutreach('first_contact')}
@@ -32481,13 +32538,13 @@ const SalesControlPage = ({ adminKey }) => {
               {outreachResult && (
                 <div className="mt-4 p-4 bg-gray-50 rounded-lg">
                   <div className="flex justify-between items-center mb-2">
-                    <h5 className="font-medium text-gray-700">Resultado do envio em lote</h5>
-                    <button onClick={() => setOutreachResult(null)} className="text-gray-400 hover:text-gray-600 text-sm">Fechar</button>
+                    <h5 className="font-medium text-gray-700">Bulk send results</h5>
+                    <button onClick={() => setOutreachResult(null)} className="text-gray-400 hover:text-gray-600 text-sm">Close</button>
                   </div>
                   <div className="flex gap-4 text-sm mb-2">
-                    <span className="text-green-600 font-medium">Enviados: {outreachResult.sent}</span>
-                    <span className="text-gray-500">Ignorados: {outreachResult.skipped}</span>
-                    <span className="text-red-500">Falhas: {outreachResult.failed}</span>
+                    <span className="text-green-600 font-medium">Sent: {outreachResult.sent}</span>
+                    <span className="text-gray-500">Skipped: {outreachResult.skipped}</span>
+                    <span className="text-red-500">Failed: {outreachResult.failed}</span>
                   </div>
                   {outreachResult.details && outreachResult.details.length > 0 && (
                     <div className="max-h-40 overflow-y-auto text-xs text-gray-500">
@@ -32495,7 +32552,7 @@ const SalesControlPage = ({ adminKey }) => {
                         <div key={i} className="flex gap-2 py-1 border-b border-gray-100">
                           <span className="font-medium">{d.partner}</span>
                           <span className={d.status === 'sent' ? 'text-green-600' : d.status === 'skipped' ? 'text-yellow-600' : 'text-red-600'}>
-                            {d.status === 'sent' ? 'Enviado' : d.status === 'skipped' ? `Ignorado (${d.reason})` : `Falha (${d.reason})`}
+                            {d.status === 'sent' ? 'Sent' : d.status === 'skipped' ? `Skipped (${d.reason})` : `Failed (${d.reason})`}
                           </span>
                         </div>
                       ))}
@@ -32574,7 +32631,7 @@ const SalesControlPage = ({ adminKey }) => {
           {goals.length === 0 && (
             <div className="text-center py-12 text-gray-400 bg-white rounded-xl">
               <p className="text-4xl mb-2">🎯</p>
-              <p>Nenhuma meta definida. Defina metas para seus vendedores!</p>
+              <p>No goals set. Set goals for your salespeople!</p>
             </div>
           )}
         </div>
@@ -32644,7 +32701,7 @@ const SalesControlPage = ({ adminKey }) => {
             {ranking.length === 0 && (
               <div className="text-center py-12 text-gray-400">
                 <p className="text-4xl mb-2">🏆</p>
-                <p>Nenhum vendedor ativo ainda.</p>
+                <p>No active salespeople yet.</p>
               </div>
             )}
           </div>
@@ -32670,7 +32727,7 @@ const SalesControlPage = ({ adminKey }) => {
                       </div>
                       <div className="text-right">
                         <p className="text-2xl font-bold text-green-600">${sp.total_amount.toFixed(2)}</p>
-                        <p className="text-xs text-gray-400">{sp.acquisitions.length} parceiros</p>
+                        <p className="text-xs text-gray-400">{sp.acquisitions.length} partners</p>
                       </div>
                     </div>
                     <div className="flex gap-2 flex-wrap mb-3">
@@ -32692,7 +32749,7 @@ const SalesControlPage = ({ adminKey }) => {
             ) : (
               <div className="text-center py-8 text-gray-400">
                 <p className="text-4xl mb-2">✅</p>
-                <p>Nenhuma comissão pendente de pagamento!</p>
+                <p>No commissions pending payment!</p>
                 <p className="text-sm">Aprove comissões na aba Aquisições primeiro.</p>
               </div>
             )}
@@ -32737,7 +32794,7 @@ const SalesControlPage = ({ adminKey }) => {
             ) : (
               <div className="text-center py-8 text-gray-400">
                 <p className="text-4xl mb-2">📜</p>
-                <p>Nenhum pagamento realizado ainda.</p>
+                <p>No payments made yet.</p>
               </div>
             )}
           </div>
@@ -32797,7 +32854,7 @@ const SalesControlPage = ({ adminKey }) => {
                 onClick={() => setShowPaymentModal(null)}
                 className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
               >
-                Cancelar
+                Cancel
               </button>
               <button
                 onClick={() => handleProcessPayment(showPaymentModal)}
@@ -32868,7 +32925,7 @@ const SalesControlPage = ({ adminKey }) => {
                     onChange={(e) => setNewSalesperson({...newSalesperson, commission_type: e.target.value})}
                     className="w-full px-2 py-1.5 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                   >
-                    <option value="tier">Por Tier ($50-150/parceiro)</option>
+                    <option value="tier">Per Tier ($50-150/partner)</option>
                     <option value="fixed">Valor Fixo por Parceiro</option>
                     <option value="percentage">Percentual sobre Vendas</option>
                     <option value="referral_plus_commission">Bônus Referral + Comissão %</option>
@@ -32979,7 +33036,7 @@ const SalesControlPage = ({ adminKey }) => {
                 onClick={() => setShowAddSalesperson(false)}
                 className="px-3 py-1.5 text-gray-600 hover:bg-gray-100 rounded-lg text-sm"
               >
-                Cancelar
+                Cancel
               </button>
               <button
                 onClick={handleAddSalesperson}
@@ -33001,8 +33058,8 @@ const SalesControlPage = ({ adminKey }) => {
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
                 <span className="text-3xl">✅</span>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900">Salesperson Criado!</h3>
-              <p className="text-gray-600 mt-1">{createdSalesperson.name} foi cadastrado com sucesso.</p>
+              <h3 className="text-lg font-semibold text-gray-900">Salesperson Created!</h3>
+              <p className="text-gray-600 mt-1">{createdSalesperson.name} was registered successfully.</p>
             </div>
 
             <div className="bg-gray-50 rounded-lg p-4 mb-4">
@@ -33039,11 +33096,11 @@ const SalesControlPage = ({ adminKey }) => {
                   }}
                   className="px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm"
                 >
-                  📋 Copiar
+                  📋 Copy
                 </button>
               </div>
               <p className="text-xs text-gray-500 mt-2">
-                Envie este link para o salesperson. Quando um parceiro se cadastrar usando este link, será automaticamente vinculado a {createdSalesperson.name}.
+                Send this link to the salesperson. When a partner registers using this link, they will be automatically linked to {createdSalesperson.name}.
               </p>
             </div>
 
@@ -33051,7 +33108,7 @@ const SalesControlPage = ({ adminKey }) => {
               onClick={() => setCreatedSalesperson(null)}
               className="w-full px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900"
             >
-              Fechar
+              Close
             </button>
           </div>
         </div>
@@ -33265,7 +33322,7 @@ const SalesControlPage = ({ adminKey }) => {
                   value={newAcquisition.partner_email}
                   onChange={(e) => setNewAcquisition({...newAcquisition, partner_email: e.target.value})}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="contato@parceiro.com"
+                  placeholder="contact@partner.com"
                 />
               </div>
               <div>
@@ -33285,7 +33342,7 @@ const SalesControlPage = ({ adminKey }) => {
                   value={newAcquisition.partner_website}
                   onChange={(e) => setNewAcquisition({...newAcquisition, partner_website: e.target.value})}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="https://www.parceiro.com"
+                  placeholder="https://www.partner.com"
                 />
               </div>
               <div>
@@ -33295,7 +33352,7 @@ const SalesControlPage = ({ adminKey }) => {
                   value={newAcquisition.partner_id}
                   onChange={(e) => setNewAcquisition({...newAcquisition, partner_id: e.target.value})}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="Opcional - ID do parceiro no sistema"
+                  placeholder="Optional - Partner ID in system"
                 />
               </div>
               <div>
@@ -33395,7 +33452,7 @@ const SalesControlPage = ({ adminKey }) => {
 
               {(!viewingAcquisition.partner_email && !viewingAcquisition.partner_phone) && (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                  <p className="text-sm text-yellow-700">Nenhum dado de contato cadastrado. Clique em "Editar" para adicionar email e telefone do parceiro.</p>
+                  <p className="text-sm text-yellow-700">No contact data registered. Click "Edit" to add the partner's email and phone.</p>
                 </div>
               )}
 
@@ -33444,7 +33501,7 @@ const SalesControlPage = ({ adminKey }) => {
                 onClick={() => setViewingAcquisition(null)}
                 className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
               >
-                Fechar
+                Close
               </button>
             </div>
           </div>
@@ -33485,7 +33542,7 @@ const SalesControlPage = ({ adminKey }) => {
                   value={editAcquisitionForm.partner_email}
                   onChange={(e) => setEditAcquisitionForm({...editAcquisitionForm, partner_email: e.target.value})}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="contato@parceiro.com"
+                  placeholder="contact@partner.com"
                 />
               </div>
               <div>
@@ -33505,7 +33562,7 @@ const SalesControlPage = ({ adminKey }) => {
                   value={editAcquisitionForm.partner_website}
                   onChange={(e) => setEditAcquisitionForm({...editAcquisitionForm, partner_website: e.target.value})}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="https://www.parceiro.com"
+                  placeholder="https://www.partner.com"
                 />
               </div>
               <div>
@@ -33515,7 +33572,7 @@ const SalesControlPage = ({ adminKey }) => {
                   value={editAcquisitionForm.partner_id}
                   onChange={(e) => setEditAcquisitionForm({...editAcquisitionForm, partner_id: e.target.value})}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="ID do parceiro no sistema"
+                  placeholder="Partner ID in system"
                 />
               </div>
               <div>
@@ -33538,7 +33595,7 @@ const SalesControlPage = ({ adminKey }) => {
                   onChange={(e) => setEditAcquisitionForm({...editAcquisitionForm, notes: e.target.value})}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   rows={3}
-                  placeholder="Notas sobre a aquisição..."
+                  placeholder="Notes about the acquisition..."
                 />
               </div>
             </div>
@@ -33547,14 +33604,14 @@ const SalesControlPage = ({ adminKey }) => {
                 onClick={() => { setEditingAcquisition(null); setEditAcquisitionForm({}); }}
                 className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
               >
-                Cancelar
+                Cancel
               </button>
               <button
                 onClick={handleUpdateAcquisition}
                 disabled={!editAcquisitionForm.partner_name}
                 className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
               >
-                Salvar Alterações
+                Save Changes
               </button>
             </div>
           </div>
@@ -33566,10 +33623,10 @@ const SalesControlPage = ({ adminKey }) => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-full max-w-md">
             <h3 className="text-lg font-semibold mb-4 text-red-600">
-              Confirmar Exclusão
+              Confirm Deletion
             </h3>
             <p className="text-gray-700 mb-2">
-              Tem certeza que deseja deletar a aquisição do parceiro:
+              Are you sure you want to delete the acquisition for partner:
             </p>
             <p className="font-semibold text-gray-900 mb-1">{deletingAcquisition.partner_name}</p>
             <p className="text-sm text-gray-500 mb-4">ID: {deletingAcquisition.id}</p>
@@ -33581,7 +33638,7 @@ const SalesControlPage = ({ adminKey }) => {
                 onClick={() => setDeletingAcquisition(null)}
                 className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
               >
-                Cancelar
+                Cancel
               </button>
               <button
                 onClick={handleDeleteAcquisition}
