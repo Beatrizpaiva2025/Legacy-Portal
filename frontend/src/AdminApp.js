@@ -7269,7 +7269,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             </div>
           )}
 
-          {/* API Key Status & Configuration */}
+          {/* API Key Status & Configuration - Only visible to Admin */}
+          {isAdmin && (
           <div className={`border rounded-lg p-3 ${claudeApiKey ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -7350,6 +7351,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               </div>
             )}
           </div>
+          )}
 
           {/* Upload Document Section - Compact */}
           <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-3">
