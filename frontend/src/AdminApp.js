@@ -6182,7 +6182,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
     // Letterhead for all pages - Same style as cover
     const letterheadHTML = `
-        <div style="width: 100%; margin-bottom: 6px; padding-bottom: 4px; overflow: hidden;">
+        <div style="width: 100%; margin-bottom: 8px; overflow: hidden;">
             <div style="float: left; width: 128px;">
                 ${logoLeft
                   ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
@@ -6199,7 +6199,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
-        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 8px;"></div>`;
+        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>`;
 
     // Extract translation styles to include in print document (preserves formatting)
     const quickTranslationStyles = extractStylesFromHtml(quickTranslationHtml);
@@ -6739,7 +6739,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     // Letterhead for all pages - Same style as cover
     // Uses !important on critical float/layout properties to prevent AI translation CSS from breaking layout
     const letterheadHTML = `
-        <div style="width: 100% !important; margin-bottom: 6px; padding-bottom: 4px; overflow: hidden !important; position: relative !important;">
+        <div style="width: 100% !important; margin-bottom: 8px; overflow: hidden !important; position: relative !important;">
             <div style="float: left !important; width: 128px !important;">
                 ${logoLeft
                   ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
@@ -6756,7 +6756,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
-        <div style="clear: both !important; width: 100% !important; height: 2px; background: #93c5fd; margin-bottom: 8px;"></div>`;
+        <div style="clear: both !important; width: 100% !important; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>`;
 
     // Extract translation styles and SCOPE them to .translation-content to prevent
     // AI-generated global CSS from breaking letterhead/cover layout
