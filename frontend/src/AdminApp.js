@@ -32224,6 +32224,7 @@ const SalesControlPage = ({ adminKey }) => {
   const [loading, setLoading] = useState(true);
   const [showAddSalesperson, setShowAddSalesperson] = useState(false);
   const [showAddAcquisition, setShowAddAcquisition] = useState(false);
+  const [acquisitionSearchQuery, setAcquisitionSearchQuery] = useState('');
   const [showSetGoal, setShowSetGoal] = useState(false);
   const [editingSalesperson, setEditingSalesperson] = useState(null);
   const [ranking, setRanking] = useState([]);
@@ -32383,7 +32384,7 @@ const SalesControlPage = ({ adminKey }) => {
         headers: { 'admin-key': adminKey }
       });
       if (res.ok) {
-        showToast('Comissão aprovada! Vendedor será notificado.');
+        showToast('Commission approved! Salesperson will be notified.');
         fetchAllData();
       }
     } catch (error) {
@@ -32408,7 +32409,7 @@ const SalesControlPage = ({ adminKey }) => {
       });
 
       if (res.ok) {
-        showToast(`Pagamento de $${spData.total_amount.toFixed(2)} processado! Vendedor notificado.`);
+        showToast(`Payment of $${spData.total_amount.toFixed(2)} processed! Salesperson notified.`);
         setShowPaymentModal(null);
         setPaymentForm({ method: 'bank_transfer', reference: '', notes: '' });
         fetchAllData();
@@ -32459,7 +32460,7 @@ const SalesControlPage = ({ adminKey }) => {
         body: JSON.stringify(editAcquisitionForm)
       });
       if (res.ok) {
-        showToast('Aquisição atualizada com sucesso!');
+        showToast('Acquisition updated successfully!');
         setEditingAcquisition(null);
         setEditAcquisitionForm({});
         fetchAllData();
@@ -32673,11 +32674,11 @@ const SalesControlPage = ({ adminKey }) => {
       <div className="flex gap-2 mb-6 border-b border-gray-200 overflow-x-auto">
         {[
           { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-          { id: 'salespeople', label: 'Vendedores', icon: '👥' },
-          { id: 'acquisitions', label: 'Aquisições', icon: '🤝' },
-          { id: 'goals', label: 'Metas', icon: '🎯' },
+          { id: 'salespeople', label: 'Salespeople', icon: '👥' },
+          { id: 'acquisitions', label: 'Acquisitions', icon: '🤝' },
+          { id: 'goals', label: 'Goals', icon: '🎯' },
           { id: 'ranking', label: 'Ranking', icon: '🏆' },
-          { id: 'payments', label: 'Pagamentos', icon: '💳' }
+          { id: 'payments', label: 'Payments', icon: '💳' }
         ].map(tab => (
           <button
             key={tab.id}
@@ -32862,7 +32863,7 @@ const SalesControlPage = ({ adminKey }) => {
                             onClick={() => {
                               const link = `${window.location.origin}/#/partner?ref=${sp.referral_code}`;
                               navigator.clipboard.writeText(link);
-                              showToast('Link copiado!\n' + link);
+                              showToast('Link copied!\n' + link);
                             }}
                             className="text-xs text-purple-500 hover:text-purple-700"
                             title="Copy referral link"
@@ -32950,33 +32951,64 @@ const SalesControlPage = ({ adminKey }) => {
       {activeTab === 'acquisitions' && (
         <div>
           <div className="flex justify-between items-center mb-4">
-            <h3 className="font-semibold text-gray-700">Aquisições de Parceiros ({acquisitions.length})</h3>
-            <button
-              onClick={() => setShowAddAcquisition(true)}
-              className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2"
-              disabled={salespeople.length === 0}
-            >
-              <span>🤝</span> Registrar Aquisição
-            </button>
+            <h3 className="font-semibold text-gray-700">Partner Acquisitions ({acquisitions.length})</h3>
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="text"
+                  value={acquisitionSearchQuery}
+                  onChange={(e) => setAcquisitionSearchQuery(e.target.value)}
+                  placeholder="Search by name, email, salesperson..."
+                  className="w-72 pl-9 pr-3 py-1.5 border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {acquisitionSearchQuery && (
+                  <button
+                    onClick={() => setAcquisitionSearchQuery('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+              <button
+                onClick={() => setShowAddAcquisition(true)}
+                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2"
+                disabled={salespeople.length === 0}
+              >
+                <span>🤝</span> Register Acquisition
+              </button>
+            </div>
           </div>
 
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Data</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Parceiro</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Date</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Partner</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Email</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Tier</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Vendedor</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Comissão</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Salesperson</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Commission</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Outreach</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Ações</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {acquisitions.map(acq => (
+                {acquisitions.filter(acq => {
+                  if (!acquisitionSearchQuery.trim()) return true;
+                  const q = acquisitionSearchQuery.toLowerCase();
+                  return (acq.partner_name || '').toLowerCase().includes(q) ||
+                    (acq.partner_email || '').toLowerCase().includes(q) ||
+                    (acq.salesperson_name || '').toLowerCase().includes(q) ||
+                    (acq.partner_id || '').toLowerCase().includes(q) ||
+                    (acq.partner_tier || '').toLowerCase().includes(q) ||
+                    (acq.commission_status || '').toLowerCase().includes(q);
+                }).map(acq => (
                   <tr key={acq.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-sm text-gray-600">{acq.acquisition_date}</td>
                     <td className="px-4 py-3">
@@ -32989,8 +33021,8 @@ const SalesControlPage = ({ adminKey }) => {
                           {acq.partner_email.length > 25 ? acq.partner_email.substring(0, 25) + '...' : acq.partner_email}
                         </a>
                       ) : (
-                        <span className="text-xs text-red-500 bg-red-50 px-2 py-1 rounded cursor-pointer" onClick={() => handleEditAcquisition(acq)} title="Clique para adicionar email">
-                          Sem email
+                        <span className="text-xs text-red-500 bg-red-50 px-2 py-1 rounded cursor-pointer" onClick={() => handleEditAcquisition(acq)} title="Click to add email">
+                          No email
                         </span>
                       )}
                     </td>
@@ -33005,7 +33037,7 @@ const SalesControlPage = ({ adminKey }) => {
                     </td>
                     <td className="px-4 py-3">
                       <span className={`px-2 py-1 rounded text-xs font-medium ${statusColors[acq.commission_status]}`}>
-                        {acq.commission_status === 'pending' ? 'Pendente' : acq.commission_status === 'approved' ? 'Aprovado' : 'Pago'}
+                        {acq.commission_status === 'pending' ? 'Pending' : acq.commission_status === 'approved' ? 'Approved' : 'Paid'}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -33026,7 +33058,7 @@ const SalesControlPage = ({ adminKey }) => {
                                 className="px-2 py-1 bg-indigo-500 text-white text-xs rounded hover:bg-indigo-600 disabled:opacity-50"
                                 title={nextStepLabels[nextStep]}
                               >
-                                {sendingOutreach === acq.id + '_' + nextStep ? 'Enviando...' : nextStepLabels[nextStep]}
+                                {sendingOutreach === acq.id + '_' + nextStep ? 'Sending...' : nextStepLabels[nextStep]}
                               </button>
                             )}
                           </div>
@@ -33040,7 +33072,7 @@ const SalesControlPage = ({ adminKey }) => {
                           className="px-2 py-1 bg-gray-500 text-white text-xs rounded hover:bg-gray-600"
                           title="View partner details"
                         >
-                          Ver Detalhes
+                          View Details
                         </button>
                         {acq.commission_status === 'pending' && (
                           <button
@@ -33048,7 +33080,7 @@ const SalesControlPage = ({ adminKey }) => {
                             className="px-2 py-1 bg-orange-500 text-white text-xs rounded hover:bg-orange-600"
                             title="Edit acquisition data"
                           >
-                            Editar
+                            Edit
                           </button>
                         )}
                         {acq.commission_status === 'pending' && (
@@ -33057,7 +33089,7 @@ const SalesControlPage = ({ adminKey }) => {
                             className="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
                             title="Approve and notify salesperson"
                           >
-                            ✓ Aprovar
+                            ✓ Approve
                           </button>
                         )}
                         {acq.commission_status === 'approved' && (
@@ -33067,7 +33099,7 @@ const SalesControlPage = ({ adminKey }) => {
                         )}
                         {acq.commission_status === 'paid' && (
                           <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded">
-                            ✓ Pago
+                            ✓ Paid
                           </span>
                         )}
                         <button
@@ -33075,7 +33107,7 @@ const SalesControlPage = ({ adminKey }) => {
                           className="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
                           title="Delete acquisition"
                         >
-                          Deletar
+                          Delete
                         </button>
                       </div>
                     </td>
@@ -33095,7 +33127,7 @@ const SalesControlPage = ({ adminKey }) => {
           {acquisitions.length > 0 && (
             <div className="mt-6 bg-white rounded-xl shadow-sm p-6">
               <h4 className="font-semibold text-gray-700 mb-4 flex items-center gap-2">
-                <span>📧</span> Painel de Outreach
+                <span>📧</span> Outreach Panel
               </h4>
 
               {/* Stats */}
@@ -33120,28 +33152,28 @@ const SalesControlPage = ({ adminKey }) => {
                     disabled={sendingOutreach === 'bulk_first_contact'}
                     className="px-4 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 disabled:opacity-50 transition-colors"
                   >
-                    {sendingOutreach === 'bulk_first_contact' ? 'Enviando...' : `Enviar 1o Contato (${acquisitions.filter(a => a.partner_email && getNextOutreachStep(a.id) === 'first_contact').length})`}
+                    {sendingOutreach === 'bulk_first_contact' ? 'Sending...' : `Send 1st Contact (${acquisitions.filter(a => a.partner_email && getNextOutreachStep(a.id) === 'first_contact').length})`}
                   </button>
                   <button
                     onClick={() => handleSendBulkOutreach('followup_1')}
                     disabled={sendingOutreach === 'bulk_followup_1'}
                     className="px-4 py-2 bg-yellow-500 text-white text-sm rounded-lg hover:bg-yellow-600 disabled:opacity-50 transition-colors"
                   >
-                    {sendingOutreach === 'bulk_followup_1' ? 'Enviando...' : `Follow-up 1 (${acquisitions.filter(a => a.partner_email && getNextOutreachStep(a.id) === 'followup_1').length})`}
+                    {sendingOutreach === 'bulk_followup_1' ? 'Sending...' : `Follow-up 1 (${acquisitions.filter(a => a.partner_email && getNextOutreachStep(a.id) === 'followup_1').length})`}
                   </button>
                   <button
                     onClick={() => handleSendBulkOutreach('followup_2')}
                     disabled={sendingOutreach === 'bulk_followup_2'}
                     className="px-4 py-2 bg-orange-500 text-white text-sm rounded-lg hover:bg-orange-600 disabled:opacity-50 transition-colors"
                   >
-                    {sendingOutreach === 'bulk_followup_2' ? 'Enviando...' : `Follow-up 2 (${acquisitions.filter(a => a.partner_email && getNextOutreachStep(a.id) === 'followup_2').length})`}
+                    {sendingOutreach === 'bulk_followup_2' ? 'Sending...' : `Follow-up 2 (${acquisitions.filter(a => a.partner_email && getNextOutreachStep(a.id) === 'followup_2').length})`}
                   </button>
                   <button
                     onClick={() => handleSendBulkOutreach('followup_3')}
                     disabled={sendingOutreach === 'bulk_followup_3'}
                     className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
                   >
-                    {sendingOutreach === 'bulk_followup_3' ? 'Enviando...' : `Follow-up 3 (${acquisitions.filter(a => a.partner_email && getNextOutreachStep(a.id) === 'followup_3').length})`}
+                    {sendingOutreach === 'bulk_followup_3' ? 'Sending...' : `Follow-up 3 (${acquisitions.filter(a => a.partner_email && getNextOutreachStep(a.id) === 'followup_3').length})`}
                   </button>
                 </div>
               </div>
@@ -33175,15 +33207,15 @@ const SalesControlPage = ({ adminKey }) => {
 
               {/* Recommended Sequence */}
               <div className="mt-4 p-4 bg-indigo-50 rounded-lg">
-                <p className="text-sm font-medium text-indigo-700 mb-2">Sequência recomendada:</p>
+                <p className="text-sm font-medium text-indigo-700 mb-2">Recommended sequence:</p>
                 <div className="flex items-center gap-2 text-xs text-indigo-600">
-                  <span className="bg-blue-200 px-2 py-1 rounded">Dia 0: 1o Contato</span>
+                  <span className="bg-blue-200 px-2 py-1 rounded">Day 0: 1st Contact</span>
                   <span>→</span>
-                  <span className="bg-yellow-200 px-2 py-1 rounded">Dia 3: Follow-up 1</span>
+                  <span className="bg-yellow-200 px-2 py-1 rounded">Day 3: Follow-up 1</span>
                   <span>→</span>
-                  <span className="bg-orange-200 px-2 py-1 rounded">Dia 7: Follow-up 2</span>
+                  <span className="bg-orange-200 px-2 py-1 rounded">Day 7: Follow-up 2</span>
                   <span>→</span>
-                  <span className="bg-green-200 px-2 py-1 rounded">Dia 14: Follow-up 3</span>
+                  <span className="bg-green-200 px-2 py-1 rounded">Day 14: Follow-up 3</span>
                 </div>
               </div>
             </div>
@@ -33254,22 +33286,22 @@ const SalesControlPage = ({ adminKey }) => {
         <div className="space-y-6">
           <div className="bg-gradient-to-r from-yellow-500 via-yellow-400 to-amber-500 rounded-xl p-6 text-white">
             <h2 className="text-2xl font-bold flex items-center gap-3">
-              <span className="text-4xl">🏆</span> Ranking de Vendedores
+              <span className="text-4xl">🏆</span> Salesperson Ranking
             </h2>
-            <p className="text-yellow-100 mt-2">Desempenho do mês atual</p>
+            <p className="text-yellow-100 mt-2">Current month performance</p>
           </div>
 
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Posição</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Vendedor</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Este Mês</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Meta</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Progresso</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Total Ganho</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Pendente</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Position</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Salesperson</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">This Month</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Target</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Progress</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Total Earned</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Pending</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -33326,7 +33358,7 @@ const SalesControlPage = ({ adminKey }) => {
           {/* Pending Payments Section */}
           <div className="bg-white rounded-xl shadow-sm p-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <span>⏳</span> Comissões Pendentes de Pagamento
+              <span>⏳</span> Commissions Pending Payment
             </h3>
             {pendingPayments.length > 0 ? (
               <div className="space-y-4">
@@ -33353,7 +33385,7 @@ const SalesControlPage = ({ adminKey }) => {
                       onClick={() => setShowPaymentModal(sp)}
                       className="w-full py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 font-medium"
                     >
-                      💳 Processar Pagamento
+                      💳 Process Payment
                     </button>
                   </div>
                 ))}
@@ -33362,7 +33394,7 @@ const SalesControlPage = ({ adminKey }) => {
               <div className="text-center py-8 text-gray-400">
                 <p className="text-4xl mb-2">✅</p>
                 <p>No commissions pending payment!</p>
-                <p className="text-sm">Aprove comissões na aba Aquisições primeiro.</p>
+                <p className="text-sm">Approve commissions in the Acquisitions tab first.</p>
               </div>
             )}
           </div>
@@ -33370,25 +33402,25 @@ const SalesControlPage = ({ adminKey }) => {
           {/* Payment History Section */}
           <div className="bg-white rounded-xl shadow-sm p-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <span>📜</span> Histórico de Pagamentos
+              <span>📜</span> Payment History
             </h3>
             {paymentHistory.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Data</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Vendedor</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Valor</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Método</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Referência</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Date</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Salesperson</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Amount</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Method</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Reference</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {paymentHistory.map(payment => (
                       <tr key={payment.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 text-sm text-gray-600">
-                          {new Date(payment.paid_at).toLocaleDateString('pt-BR')}
+                          {new Date(payment.paid_at).toLocaleDateString('en-US')}
                         </td>
                         <td className="px-4 py-3 font-medium text-gray-800">{payment.salesperson_name}</td>
                         <td className="px-4 py-3 font-semibold text-green-600">${payment.total_amount.toFixed(2)}</td>
@@ -33421,43 +33453,43 @@ const SalesControlPage = ({ adminKey }) => {
               <span>💳</span> Processar Pagamento
             </h3>
             <div className="bg-green-50 rounded-lg p-4 mb-4">
-              <p className="text-sm text-gray-600">Vendedor:</p>
+              <p className="text-sm text-gray-600">Salesperson:</p>
               <p className="font-semibold text-gray-800">{showPaymentModal.salesperson_name}</p>
               <p className="text-3xl font-bold text-green-600 mt-2">${showPaymentModal.total_amount.toFixed(2)}</p>
-              <p className="text-xs text-gray-500">{showPaymentModal.acquisitions.length} comissões</p>
+              <p className="text-xs text-gray-500">{showPaymentModal.acquisitions.length} commissions</p>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Método de Pagamento</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
                 <select
                   value={paymentForm.method}
                   onChange={(e) => setPaymentForm({...paymentForm, method: e.target.value})}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500"
                 >
-                  <option value="bank_transfer">Transferência Bancária</option>
+                  <option value="bank_transfer">Bank Transfer</option>
                   <option value="zelle">Zelle</option>
                   <option value="paypal">PayPal</option>
-                  <option value="check">Cheque</option>
+                  <option value="check">Check</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Referência/Comprovante</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Reference/Receipt</label>
                 <input
                   type="text"
                   value={paymentForm.reference}
                   onChange={(e) => setPaymentForm({...paymentForm, reference: e.target.value})}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500"
-                  placeholder="ID da transação, número do cheque, etc."
+                  placeholder="Transaction ID, check number, etc."
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Observações</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
                 <textarea
                   value={paymentForm.notes}
                   onChange={(e) => setPaymentForm({...paymentForm, notes: e.target.value})}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500"
                   rows={2}
-                  placeholder="Notas adicionais..."
+                  placeholder="Additional notes..."
                 />
               </div>
             </div>
@@ -33472,7 +33504,7 @@ const SalesControlPage = ({ adminKey }) => {
                 onClick={() => handleProcessPayment(showPaymentModal)}
                 className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
               >
-                Confirmar Pagamento
+                Confirm Payment
               </button>
             </div>
           </div>
@@ -33531,21 +33563,21 @@ const SalesControlPage = ({ adminKey }) => {
                   </div>
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-xs font-medium text-gray-700 mb-0.5">Tipo de Comissão</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-0.5">Commission Type</label>
                   <select
                     value={newSalesperson.commission_type}
                     onChange={(e) => setNewSalesperson({...newSalesperson, commission_type: e.target.value})}
                     className="w-full px-2 py-1.5 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                   >
                     <option value="tier">Per Tier ($50-150/partner)</option>
-                    <option value="fixed">Valor Fixo por Parceiro</option>
-                    <option value="percentage">Percentual sobre Vendas</option>
-                    <option value="referral_plus_commission">Bônus Referral + Comissão %</option>
+                    <option value="fixed">Fixed Amount per Partner</option>
+                    <option value="percentage">Percentage on Sales</option>
+                    <option value="referral_plus_commission">Referral Bonus + Commission %</option>
                   </select>
                 </div>
                 {newSalesperson.commission_type === 'fixed' && (
                   <div className="col-span-2">
-                    <label className="block text-xs font-medium text-gray-700 mb-0.5">Comissão Fixa ($)</label>
+                    <label className="block text-xs font-medium text-gray-700 mb-0.5">Fixed Commission ($)</label>
                     <input
                       type="number"
                       value={newSalesperson.commission_rate}
@@ -33557,7 +33589,7 @@ const SalesControlPage = ({ adminKey }) => {
                 )}
                 {newSalesperson.commission_type === 'percentage' && (
                   <div className="col-span-2">
-                    <label className="block text-xs font-medium text-gray-700 mb-0.5">Comissão (%)</label>
+                    <label className="block text-xs font-medium text-gray-700 mb-0.5">Commission (%)</label>
                     <input
                       type="number"
                       value={newSalesperson.commission_rate}
@@ -33573,7 +33605,7 @@ const SalesControlPage = ({ adminKey }) => {
                 {newSalesperson.commission_type === 'referral_plus_commission' && (
                   <>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-0.5">Bônus Referral ($)</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-0.5">Referral Bonus ($)</label>
                       <input
                         type="number"
                         value={newSalesperson.referral_bonus}
@@ -33583,7 +33615,7 @@ const SalesControlPage = ({ adminKey }) => {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-0.5">Comissão (%)</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-0.5">Commission (%)</label>
                       <input
                         type="number"
                         value={newSalesperson.commission_rate}
@@ -33608,7 +33640,7 @@ const SalesControlPage = ({ adminKey }) => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-0.5">Meta Mensal</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-0.5">Monthly Target</label>
                   <input
                     type="number"
                     value={newSalesperson.monthly_target}
@@ -33618,7 +33650,7 @@ const SalesControlPage = ({ adminKey }) => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-0.5">Idioma</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-0.5">Language</label>
                   <select
                     value={newSalesperson.preferred_language}
                     onChange={(e) => setNewSalesperson({...newSalesperson, preferred_language: e.target.value})}
@@ -33655,7 +33687,7 @@ const SalesControlPage = ({ adminKey }) => {
                 disabled={!newSalesperson.name || !newSalesperson.email}
                 className="px-3 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 text-sm"
               >
-                Adicionar
+                Add
               </button>
             </div>
           </div>
@@ -33675,7 +33707,7 @@ const SalesControlPage = ({ adminKey }) => {
             </div>
 
             <div className="bg-gray-50 rounded-lg p-4 mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Código de Referral</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Referral Code</label>
               <div className="flex items-center gap-2">
                 <code className="flex-1 bg-white px-3 py-2 rounded border text-lg font-mono font-bold text-blue-600">
                   {createdSalesperson.referral_code}
@@ -33683,7 +33715,7 @@ const SalesControlPage = ({ adminKey }) => {
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(createdSalesperson.referral_code);
-                    showToast('Código copiado!');
+                    showToast('Code copied!');
                   }}
                   className="px-3 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm"
                 >
@@ -33693,7 +33725,7 @@ const SalesControlPage = ({ adminKey }) => {
             </div>
 
             <div className="bg-blue-50 rounded-lg p-4 mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Link de Referral para Parceiros</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Partner Referral Link</label>
               <div className="flex items-center gap-2">
                 <input
                   type="text"
@@ -33704,7 +33736,7 @@ const SalesControlPage = ({ adminKey }) => {
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(`${window.location.origin}/#/partner/login?ref=${createdSalesperson.referral_code}`);
-                    showToast('Link copiado!');
+                    showToast('Link copied!');
                   }}
                   className="px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm"
                 >
@@ -33891,7 +33923,7 @@ const SalesControlPage = ({ adminKey }) => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <span>🤝</span> Registrar Aquisição de Parceiro
+              <span>🤝</span> Register Partner Acquisition
             </h3>
             <div className="space-y-4">
               <div>
@@ -33908,7 +33940,7 @@ const SalesControlPage = ({ adminKey }) => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Parceiro *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Partner Name *</label>
                 <input
                   type="text"
                   value={newAcquisition.partner_name}
@@ -33918,17 +33950,17 @@ const SalesControlPage = ({ adminKey }) => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Contato</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Contact Name</label>
                 <input
                   type="text"
                   value={newAcquisition.partner_contact_name}
                   onChange={(e) => setNewAcquisition({...newAcquisition, partner_contact_name: e.target.value})}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="Nome da pessoa de contato"
+                  placeholder="Contact person name"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email do Parceiro</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Partner Email</label>
                 <input
                   type="email"
                   value={newAcquisition.partner_email}
@@ -33938,7 +33970,7 @@ const SalesControlPage = ({ adminKey }) => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Telefone do Parceiro</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Partner Phone</label>
                 <input
                   type="tel"
                   value={newAcquisition.partner_phone}
@@ -34016,7 +34048,7 @@ const SalesControlPage = ({ adminKey }) => {
           <div className="bg-white rounded-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-start mb-4">
               <h3 className="text-lg font-semibold flex items-center gap-2">
-                Detalhes da Aquisição
+                Acquisition Details
               </h3>
               <span className={`px-3 py-1 rounded-full text-white text-xs font-medium ${tierColors[viewingAcquisition.partner_tier]}`}>
                 {viewingAcquisition.partner_tier === 'platinum' ? '💎' : viewingAcquisition.partner_tier === 'gold' ? '🥇' : viewingAcquisition.partner_tier === 'silver' ? '🥈' : '🥉'} {viewingAcquisition.partner_tier}
@@ -34025,15 +34057,15 @@ const SalesControlPage = ({ adminKey }) => {
 
             <div className="space-y-4">
               <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="text-sm font-semibold text-gray-500 uppercase mb-3">Dados do Parceiro</h4>
+                <h4 className="text-sm font-semibold text-gray-500 uppercase mb-3">Partner Data</h4>
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-500">Nome da Empresa:</span>
+                    <span className="text-sm text-gray-500">Company Name:</span>
                     <span className="text-sm font-medium text-gray-800">{viewingAcquisition.partner_name}</span>
                   </div>
                   {viewingAcquisition.partner_contact_name && (
                     <div className="flex justify-between">
-                      <span className="text-sm text-gray-500">Nome do Contato:</span>
+                      <span className="text-sm text-gray-500">Contact Name:</span>
                       <span className="text-sm font-medium text-gray-800">{viewingAcquisition.partner_contact_name}</span>
                     </div>
                   )}
@@ -34045,7 +34077,7 @@ const SalesControlPage = ({ adminKey }) => {
                   )}
                   {viewingAcquisition.partner_phone && (
                     <div className="flex justify-between">
-                      <span className="text-sm text-gray-500">Telefone:</span>
+                      <span className="text-sm text-gray-500">Phone:</span>
                       <a href={`tel:${viewingAcquisition.partner_phone}`} className="text-sm font-medium text-blue-600 hover:underline">{viewingAcquisition.partner_phone}</a>
                     </div>
                   )}
@@ -34069,24 +34101,24 @@ const SalesControlPage = ({ adminKey }) => {
               )}
 
               <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="text-sm font-semibold text-gray-500 uppercase mb-3">Informações da Aquisição</h4>
+                <h4 className="text-sm font-semibold text-gray-500 uppercase mb-3">Acquisition Information</h4>
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-500">Data:</span>
+                    <span className="text-sm text-gray-500">Date:</span>
                     <span className="text-sm font-medium text-gray-800">{viewingAcquisition.acquisition_date}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-500">Vendedor:</span>
+                    <span className="text-sm text-gray-500">Salesperson:</span>
                     <span className="text-sm font-medium text-gray-800">{viewingAcquisition.salesperson_name}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-500">Comissão:</span>
+                    <span className="text-sm text-gray-500">Commission:</span>
                     <span className="text-sm font-semibold text-green-600">${viewingAcquisition.commission_paid}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-500">Status:</span>
                     <span className={`px-2 py-1 rounded text-xs font-medium ${statusColors[viewingAcquisition.commission_status]}`}>
-                      {viewingAcquisition.commission_status === 'pending' ? 'Pendente' : viewingAcquisition.commission_status === 'approved' ? 'Aprovado' : 'Pago'}
+                      {viewingAcquisition.commission_status === 'pending' ? 'Pending' : viewingAcquisition.commission_status === 'approved' ? 'Approved' : 'Paid'}
                     </span>
                   </div>
                 </div>
@@ -34094,7 +34126,7 @@ const SalesControlPage = ({ adminKey }) => {
 
               {viewingAcquisition.notes && (
                 <div className="bg-gray-50 rounded-lg p-4">
-                  <h4 className="text-sm font-semibold text-gray-500 uppercase mb-2">Notas</h4>
+                  <h4 className="text-sm font-semibold text-gray-500 uppercase mb-2">Notes</h4>
                   <p className="text-sm text-gray-700">{viewingAcquisition.notes}</p>
                 </div>
               )}
@@ -34106,7 +34138,7 @@ const SalesControlPage = ({ adminKey }) => {
                   onClick={() => { handleEditAcquisition(viewingAcquisition); setViewingAcquisition(null); }}
                   className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
                 >
-                  Editar
+                  Edit
                 </button>
               )}
               <button
@@ -34125,11 +34157,11 @@ const SalesControlPage = ({ adminKey }) => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              Editar Aquisição - {editingAcquisition.partner_name}
+              Edit Acquisition - {editingAcquisition.partner_name}
             </h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Parceiro *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Partner Name *</label>
                 <input
                   type="text"
                   value={editAcquisitionForm.partner_name}
@@ -34138,17 +34170,17 @@ const SalesControlPage = ({ adminKey }) => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Contato</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Contact Name</label>
                 <input
                   type="text"
                   value={editAcquisitionForm.partner_contact_name}
                   onChange={(e) => setEditAcquisitionForm({...editAcquisitionForm, partner_contact_name: e.target.value})}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="Nome da pessoa de contato"
+                  placeholder="Contact person name"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email do Parceiro</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Partner Email</label>
                 <input
                   type="email"
                   value={editAcquisitionForm.partner_email}
@@ -34158,7 +34190,7 @@ const SalesControlPage = ({ adminKey }) => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Telefone do Parceiro</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Partner Phone</label>
                 <input
                   type="tel"
                   value={editAcquisitionForm.partner_phone}
@@ -34188,7 +34220,7 @@ const SalesControlPage = ({ adminKey }) => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tier do Parceiro *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Partner Tier *</label>
                 <select
                   value={editAcquisitionForm.partner_tier}
                   onChange={(e) => setEditAcquisitionForm({...editAcquisitionForm, partner_tier: e.target.value})}
@@ -34201,7 +34233,7 @@ const SalesControlPage = ({ adminKey }) => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Notas</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
                 <textarea
                   value={editAcquisitionForm.notes}
                   onChange={(e) => setEditAcquisitionForm({...editAcquisitionForm, notes: e.target.value})}
@@ -34243,7 +34275,7 @@ const SalesControlPage = ({ adminKey }) => {
             <p className="font-semibold text-gray-900 mb-1">{deletingAcquisition.partner_name}</p>
             <p className="text-sm text-gray-500 mb-4">ID: {deletingAcquisition.id}</p>
             <p className="text-sm text-red-500 mb-6">
-              Esta ação não pode ser desfeita. Os emails de outreach relacionados também serão removidos.
+              This action cannot be undone. Related outreach emails will also be removed.
             </p>
             <div className="flex justify-end gap-3">
               <button
@@ -34256,7 +34288,7 @@ const SalesControlPage = ({ adminKey }) => {
                 onClick={handleDeleteAcquisition}
                 className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
               >
-                Deletar
+                Delete
               </button>
             </div>
           </div>
