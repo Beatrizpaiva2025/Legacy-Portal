@@ -1335,7 +1335,7 @@ TRADUX · contact@tradux.online
 
 def generate_tradux_certification_id() -> str:
     """Generate unique TRADUX certification ID"""
-    return f"TX-{datetime.now().strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}"
+    return f"TX-{datetime.now(ZoneInfo('America/New_York')).strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}"
 
 
 def generate_translation_html_for_email(order: dict) -> str:
@@ -2295,7 +2295,7 @@ class ManualProjectCreate(BaseModel):
 
 # Document Certification Model
 class DocumentCertification(BaseModel):
-    certification_id: str = Field(default_factory=lambda: f"LT-{datetime.now().strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}")
+    certification_id: str = Field(default_factory=lambda: f"LT-{datetime.now(ZoneInfo('America/New_York')).strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}")
     order_id: Optional[str] = None
     order_number: Optional[str] = None
     # Document info
@@ -2316,7 +2316,7 @@ class DocumentCertification(BaseModel):
     # Client info
     client_name: Optional[str] = None
     # Timestamps
-    certified_at: datetime = Field(default_factory=datetime.utcnow)
+    certified_at: datetime = Field(default_factory=lambda: datetime.now(ZoneInfo('America/New_York')))
     expires_at: Optional[datetime] = None  # Optional expiration
     # Status
     is_valid: bool = True
@@ -14211,7 +14211,7 @@ async def generate_combined_delivery_pdf(
     source_lang = order.get("translation_source_language") or order.get("translate_from") or order.get("source_language") or "Portuguese"
     target_lang = order.get("translation_target_language") or order.get("translate_to") or order.get("target_language") or "English"
     client_name = order.get("client_name", "")
-    translation_date = datetime.utcnow().strftime("%B %d, %Y")
+    translation_date = get_ny_now().strftime("%B %d, %Y")
 
     # ==================== PAGE 1: COVER PAGE / CERTIFICATE ====================
     if include_certificate:
@@ -14564,7 +14564,7 @@ async def generate_combined_delivery_pdf(
         verification_url = certification_data.get("verification_url", "")
         qr_code_data = certification_data.get("qr_code_data", "")
         document_hash = certification_data.get("document_hash", "")[:20]
-        certified_date = datetime.utcnow().strftime("%B %d, %Y")
+        certified_date = get_ny_now().strftime("%B %d, %Y")
 
         # Header banner background
         page.draw_rect(fitz.Rect(0, 0, page_width, 100), color=blue_color, fill=blue_color)
@@ -14708,7 +14708,7 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
         if include_verification_page:
             try:
                 # Generate certification ID
-                cert_id = f"LT-{datetime.now().strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}"
+                cert_id = f"LT-{get_ny_now().strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}"
 
                 # Create document hash from translation content
                 translation_content = order.get('translation_html', '') or 'Translation Content'
@@ -14744,7 +14744,7 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                     "company_phone": "(857) 316-7770",
                     "company_email": "contact@legacytranslations.com",
                     "client_name": order.get("client_name", ""),
-                    "certified_at": datetime.utcnow(),
+                    "certified_at": get_ny_now(),
                     "is_valid": True,
                     "verification_url": verification_url,
                     "qr_code_data": qr_code_data
@@ -14757,7 +14757,7 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                 logger.info(f"Created certification for delivery: {cert_id}")
 
                 # Generate verification page HTML
-                certified_date = datetime.utcnow().strftime('%B %d, %Y')
+                certified_date = get_ny_now().strftime('%B %d, %Y')
                 # Get document info with fallbacks (orders may have different field names)
                 doc_type = order.get("translation_document_type") or order.get("document_type") or "Document"
                 src_lang = order.get("translation_source_language") or order.get("translate_from") or order.get("source_language") or "Portuguese"
@@ -15020,7 +15020,7 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
 
                 # CRITICAL: Retry certification creation with minimal data so verification page still appears
                 try:
-                    cert_id = f"LT-{datetime.now().strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}"
+                    cert_id = f"LT-{get_ny_now().strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}"
                     base_url = os.environ.get("FRONTEND_URL", "https://portal.legacytranslations.com")
                     verification_url = f"{base_url}/#/verify/{cert_id}"
 
@@ -15042,7 +15042,7 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                         "company_phone": "(857) 316-7770",
                         "company_email": "contact@legacytranslations.com",
                         "client_name": order.get("client_name", ""),
-                        "certified_at": datetime.utcnow(),
+                        "certified_at": get_ny_now(),
                         "is_valid": True,
                         "verification_url": verification_url,
                         "qr_code_data": None
@@ -15438,7 +15438,7 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                 document_type = order.get("translation_document_type") or order.get("document_type") or "Document"
                 source_lang = order.get("translation_source_language") or order.get("translate_from") or order.get("source_language") or "Portuguese"
                 target_lang = order.get("translation_target_language") or order.get("translate_to") or order.get("target_language") or "English"
-                translation_date = datetime.utcnow().strftime("%B %d, %Y")
+                translation_date = get_ny_now().strftime("%B %d, %Y")
 
                 # ==================== PAGE 1: CERTIFICATE OF ACCURACY ====================
                 if include_certificate:
@@ -27346,7 +27346,7 @@ async def client_approve_translation(token: str, feedback: Optional[str] = None)
     if is_tradux:
         certification_id = generate_tradux_certification_id()
     else:
-        certification_id = f"LT-{datetime.now().strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}"
+        certification_id = f"LT-{get_ny_now().strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}"
 
     # Generate QR code for verification
     base_url = os.environ.get("FRONTEND_URL", "https://portal.legacytranslations.com")
@@ -27371,7 +27371,7 @@ async def client_approve_translation(token: str, feedback: Optional[str] = None)
         "certifier_title": "Professional Translation Services" if is_tradux else "Certified Translator",
         "company_name": "TRADUX" if is_tradux else "Legacy Translations Inc.",
         "client_name": order.get("client_name"),
-        "certified_at": datetime.utcnow(),
+        "certified_at": get_ny_now(),
         "is_valid": True,
         "verification_url": verification_url,
         "qr_code_data": qr_code_base64,
@@ -28361,7 +28361,7 @@ async def create_certification(data: CertificationCreate, admin_key: str):
 
     try:
         # Generate certification ID
-        cert_id = f"LT-{datetime.now().strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}"
+        cert_id = f"LT-{get_ny_now().strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}"
 
         # Create document hash from content
         document_hash = hashlib.sha256(data.document_content.encode('utf-8')).hexdigest()
@@ -28396,7 +28396,7 @@ async def create_certification(data: CertificationCreate, admin_key: str):
             "company_phone": data.company_phone,
             "company_email": data.company_email,
             "client_name": data.client_name,
-            "certified_at": datetime.utcnow(),
+            "certified_at": get_ny_now(),
             "is_valid": True,
             "verification_url": verification_url,
             "qr_code_data": qr_code_data
