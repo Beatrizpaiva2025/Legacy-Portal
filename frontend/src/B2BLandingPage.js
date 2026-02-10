@@ -487,13 +487,19 @@ Message: ${formData.message}
                   <img
                     src="https://lh3.googleusercontent.com/d/1u9c_NAboQ7CSaX1UiWAy9swQmpZ-KGDp"
                     alt="Legacy Translations B2B presentation"
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
-                  <div className="absolute inset-0 bg-black/20 flex items-center justify-center group-hover:bg-black/30 transition-all">
-                    <div className="w-16 h-16 bg-white/90 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <svg className="w-7 h-7 text-slate-800 ml-1" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-6 pt-12">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-white/90 rounded-full flex items-center justify-center flex-shrink-0">
+                        <svg className="w-5 h-5 text-blue-900 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-white font-semibold text-sm">Watch Our Presentation</p>
+                        <p className="text-white/70 text-xs">1 min · Learn about our services</p>
+                      </div>
                     </div>
                   </div>
                 </div>
