@@ -486,7 +486,7 @@ const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
     .paged-translation { width: 100%; border-collapse: collapse; border: none !important; }
     .paged-translation > thead > tr > td,
     .paged-translation > tbody > tr > td { border: none !important; padding: 0 !important; }
-    .paged-translation > thead > tr > td { padding: 12px 0 0 0 !important; }
+    .paged-translation > thead > tr > td { padding: 0 !important; }
     .paged-translation > thead { display: table-header-group; }
     .paged-translation > tbody { display: table-row-group; }
     /* Avoid breaking inside table rows (bank statements, financial tables) */
@@ -6184,7 +6184,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
     // Letterhead for all pages - Same style as cover
     const letterheadHTML = `
-        <div style="width: 100%; margin-bottom: 6px; padding-bottom: 4px; overflow: hidden;">
+        <div style="width: 100%; margin-bottom: 8px; overflow: hidden;">
             <div style="float: left; width: 128px;">
                 ${logoLeft
                   ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
@@ -6201,7 +6201,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
-        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 8px;"></div>`;
+        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>`;
 
     // Extract translation styles to include in print document (preserves formatting)
     const quickTranslationStyles = extractStylesFromHtml(quickTranslationHtml);
@@ -6220,7 +6220,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       const normalizedQuickHtml = normalizeTranslationHtml(quickTranslationHtml);
       translationPagesHTML = includeLetterhead ? `
     <table class="paged-translation">
-        <thead><tr><td style="padding: 12px 0 0 0;">
+        <thead><tr><td style="padding: 0;">
             ${letterheadHTML}
         </td></tr></thead>
         <tbody><tr><td>
@@ -6287,7 +6287,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     </div>
                     <div style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; overflow: hidden;">
                         <span style="float: left; font-size: 11px; color: #64748b;">Certified Date:</span>
-                        <span style="float: right; font-size: 11px; font-weight: 600; color: #1e293b;">${new Date(certData.certified_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                        <span style="float: right; font-size: 11px; font-weight: 600; color: #1e293b;">${new Date(certData.certified_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/New_York' })}</span>
                     </div>
                     <div style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; overflow: hidden;">
                         <span style="float: left; font-size: 11px; color: #64748b;">Document Hash:</span>
@@ -6741,7 +6741,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     // Letterhead for all pages - Same style as cover
     // Uses !important on critical float/layout properties to prevent AI translation CSS from breaking layout
     const letterheadHTML = `
-        <div style="width: 100% !important; margin-bottom: 6px; padding-bottom: 4px; overflow: hidden !important; position: relative !important;">
+        <div style="width: 100% !important; margin-bottom: 8px; overflow: hidden !important; position: relative !important;">
             <div style="float: left !important; width: 128px !important;">
                 ${logoLeft
                   ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
@@ -6758,7 +6758,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
-        <div style="clear: both !important; width: 100% !important; height: 2px; background: #93c5fd; margin-bottom: 8px;"></div>`;
+        <div style="clear: both !important; width: 100% !important; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>`;
 
     // Extract translation styles and SCOPE them to .translation-content to prevent
     // AI-generated global CSS from breaking letterhead/cover layout
@@ -6776,7 +6776,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       if (includeLetterhead) {
         return `
     <table class="paged-translation" style="${pageBreak}">
-        <thead><tr><td style="padding: 12px 0 0 0;">
+        <thead><tr><td style="padding: 0;">
             ${letterheadHTML}
         </td></tr></thead>
         <tbody><tr><td>
@@ -6825,7 +6825,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     </div>
                     <div style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; overflow: hidden;">
                         <span style="float: left; font-size: 11px; color: #64748b;">Certified Date:</span>
-                        <span style="float: right; font-size: 11px; font-weight: 600; color: #1e293b;">${new Date(certData.certified_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                        <span style="float: right; font-size: 11px; font-weight: 600; color: #1e293b;">${new Date(certData.certified_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/New_York' })}</span>
                     </div>
                     <div style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; overflow: hidden;">
                         <span style="float: left; font-size: 11px; color: #64748b;">Document Hash:</span>
@@ -14986,7 +14986,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       const documentType = DOCUMENT_TYPES.find(d => d.value === orderData.document_type)?.label || orderData.document_type || 'Document';
       const sourceLanguage = orderData.translate_from || orderData.source_language || 'Portuguese';
       const targetLanguage = orderData.translate_to || orderData.target_language || 'English';
-      const translationDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      const translationDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/New_York' });
 
       // Letterhead HTML
       const letterheadHTML = `
@@ -28193,7 +28193,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       const documentType = DOCUMENT_TYPES.find(d => d.value === orderData.document_type)?.label || orderData.document_type || 'Document';
       const sourceLanguage = orderData.translate_from || orderData.source_language || 'Portuguese';
       const targetLanguage = orderData.translate_to || orderData.target_language || 'English';
-      const translationDateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      const translationDateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/New_York' });
 
       // Letterhead HTML
       const letterheadHTML = `
@@ -29214,7 +29214,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     </div>
                     <div class="verification-row">
                         <span class="verification-label">Issue Date:</span>
-                        <span class="verification-value">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                        <span class="verification-value">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/New_York' })}</span>
                     </div>
                     <div class="verification-row">
                         <span class="verification-label">Page Count:</span>
@@ -29270,7 +29270,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     </div>
                     <div class="verification-row">
                         <span class="verification-label">Issue Date:</span>
-                        <span class="verification-value">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                        <span class="verification-value">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/New_York' })}</span>
                     </div>
                 </div>
             </div>
@@ -29305,7 +29305,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     </div>
                     <div class="verification-row">
                         <span class="verification-label">Issue Date:</span>
-                        <span class="verification-value">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                        <span class="verification-value">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/New_York' })}</span>
                     </div>
                 </div>
             </div>
