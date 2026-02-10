@@ -335,7 +335,72 @@ const TRANSLATIONS = {
     paymentViaInvoice: 'Payment via invoice (Net 30)',
     pageInfo: '1 page = 250 words max',
     invoiceNotAvailable: 'Invoice payment available after 10 paid orders',
-    invoiceBlocked: 'Invoice payment not yet available'
+    invoiceBlocked: 'Invoice payment not yet available',
+    // Tier Discount - How It Works
+    certifiedTranslationNote: 'Prices for Certified Translation services',
+    howItWorks: 'How the Tier Discount Works',
+    howItWorksSubtitle: 'Understand how your discount is calculated and protected',
+    tierStep1Title: 'Volume-Based Tiers',
+    tierStep1Desc: 'Your tier is determined by the number of certified translation pages you submit per month. More pages = higher tier = bigger discount. Discounts apply to Certified and RMV translations only.',
+    tierStep2Title: 'Best of 3 Months',
+    tierStep2Desc: 'We look at your best month out of the last 3 months to determine your tier. So if you had a strong month, you keep that tier for up to 3 months even if your volume drops temporarily.',
+    tierStep3Title: 'Loyalty Protection',
+    tierStep3Desc: 'After 6 months as a partner, your Loyalty Lock activates. This means you will never lose your highest achieved tier, even during slow months. Your discount is permanently protected.',
+    tierExample: 'Example',
+    tierExampleDesc: 'If you submit 50 pages in January (Silver tier, 15% off), then 10 pages in February and 15 pages in March — you keep the Silver tier for all 3 months because the system uses your best month (50 pages). After 6 months as a partner, even if all 3 recent months are below 30 pages, you keep Silver permanently thanks to Loyalty Lock.',
+    yourStatus: 'Your status',
+    loyaltyLockActive: 'Loyalty Lock Active',
+    // Orders Page
+    myOrdersTitle: 'My Orders',
+    orderService: 'Service',
+    orderCreated: 'Created',
+    orderBasePrice: 'Base Price',
+    orderUrgencyFee: 'Urgency Fee',
+    orderCertified: 'Certified',
+    orderStandard: 'Standard',
+    orderSworn: 'Sworn',
+    orderRmvCertified: 'RMV Certified',
+    partnerDiscount: 'Partner Discount',
+    originalPrice: 'Original price',
+    download: 'Download',
+    noDocumentsUploaded: 'No documents uploaded for this order',
+    // Invoices Page
+    subtotal: 'Subtotal',
+    couponDiscount: 'Coupon Discount',
+    totalDue: 'Total Due',
+    zellePaymentInstructions: 'Zelle Payment Instructions',
+    processingPayment: 'Processing...',
+    uploading: 'Uploading...',
+    submitZellePayment: 'Submit Zelle Payment',
+    close: 'Close',
+    approved: 'Approved',
+    // Messages Page
+    messagesTitle: 'Messages',
+    conversations: 'Conversations',
+    systemNotifications: 'System Notifications',
+    noConversations: 'No conversations',
+    conversationsEmptyMsg: 'Your messages with Legacy Translations will appear here',
+    noNotifications: 'No notifications',
+    notificationsEmptyMsg: 'System notifications will appear here',
+    replied: 'Replied',
+    read: 'Read',
+    // Chat Widget
+    chatContactUs: 'Contact Us',
+    chatSubheader: 'Send a message to Legacy Translations',
+    chatNewMessage: 'New Message',
+    chatInbox: 'Inbox',
+    chatMessageSent: 'Message sent successfully!',
+    chatViewAllMessages: 'You can view all your messages in the',
+    chatMessagesSection: 'Messages section',
+    chatYourMessage: 'Your Message:',
+    chatPlaceholder: 'How can we help you?',
+    chatSending: 'Sending...',
+    chatSendMessage: 'Send Message',
+    chatNoReplies: 'No replies yet',
+    chatAdmin: 'Admin',
+    chatViewAll: 'View all messages',
+    // Password validation
+    passwordMinLength: 'Password must be at least 6 characters'
   },
   es: {
     // Login
@@ -591,7 +656,72 @@ const TRANSLATIONS = {
     paymentViaInvoice: 'Pago via factura (Net 30)',
     pageInfo: '1 página = 250 palabras máx.',
     invoiceNotAvailable: 'Pago por factura disponible después de 10 pedidos pagados',
-    invoiceBlocked: 'Pago por factura aún no disponible'
+    invoiceBlocked: 'Pago por factura aún no disponible',
+    // Tier Discount - How It Works
+    certifiedTranslationNote: 'Precios para servicios de Traducción Certificada',
+    howItWorks: 'Cómo Funciona el Descuento por Nivel',
+    howItWorksSubtitle: 'Entienda cómo se calcula y protege su descuento',
+    tierStep1Title: 'Niveles por Volumen',
+    tierStep1Desc: 'Su nivel está determinado por la cantidad de páginas de traducción certificada que envía por mes. Más páginas = nivel más alto = mayor descuento. Los descuentos aplican solo a traducciones Certificadas y RMV.',
+    tierStep2Title: 'Mejor de 3 Meses',
+    tierStep2Desc: 'Evaluamos su mejor mes de los últimos 3 meses para determinar su nivel. Así, si tuvo un mes fuerte, mantiene ese nivel hasta por 3 meses aunque su volumen baje temporalmente.',
+    tierStep3Title: 'Protección por Lealtad',
+    tierStep3Desc: 'Después de 6 meses como partner, se activa su Bloqueo de Lealtad. Esto significa que nunca perderá su nivel más alto alcanzado, incluso en meses lentos. Su descuento está protegido permanentemente.',
+    tierExample: 'Ejemplo',
+    tierExampleDesc: 'Si envía 50 páginas en enero (nivel Silver, 15% de descuento), luego 10 páginas en febrero y 15 en marzo — mantiene el nivel Silver los 3 meses porque el sistema usa su mejor mes (50 páginas). Después de 6 meses como partner, aunque los 3 meses recientes estén por debajo de 30 páginas, mantiene Silver permanentemente gracias al Bloqueo de Lealtad.',
+    yourStatus: 'Su estado',
+    loyaltyLockActive: 'Bloqueo de Lealtad Activo',
+    // Orders Page
+    myOrdersTitle: 'Mis Pedidos',
+    orderService: 'Servicio',
+    orderCreated: 'Creado',
+    orderBasePrice: 'Precio Base',
+    orderUrgencyFee: 'Cargo por Urgencia',
+    orderCertified: 'Certificada',
+    orderStandard: 'Estándar',
+    orderSworn: 'Jurada',
+    orderRmvCertified: 'Certificada RMV',
+    partnerDiscount: 'Descuento de Partner',
+    originalPrice: 'Precio original',
+    download: 'Descargar',
+    noDocumentsUploaded: 'No se subieron documentos para este pedido',
+    // Invoices Page
+    subtotal: 'Subtotal',
+    couponDiscount: 'Descuento de Cupón',
+    totalDue: 'Total a Pagar',
+    zellePaymentInstructions: 'Instrucciones de Pago con Zelle',
+    processingPayment: 'Procesando...',
+    uploading: 'Subiendo...',
+    submitZellePayment: 'Enviar Pago con Zelle',
+    close: 'Cerrar',
+    approved: 'Aprobado',
+    // Messages Page
+    messagesTitle: 'Mensajes',
+    conversations: 'Conversaciones',
+    systemNotifications: 'Notificaciones del Sistema',
+    noConversations: 'Sin conversaciones',
+    conversationsEmptyMsg: 'Sus mensajes con Legacy Translations aparecerán aquí',
+    noNotifications: 'Sin notificaciones',
+    notificationsEmptyMsg: 'Las notificaciones del sistema aparecerán aquí',
+    replied: 'Respondido',
+    read: 'Leído',
+    // Chat Widget
+    chatContactUs: 'Contáctenos',
+    chatSubheader: 'Envíe un mensaje a Legacy Translations',
+    chatNewMessage: 'Nuevo Mensaje',
+    chatInbox: 'Bandeja de Entrada',
+    chatMessageSent: '¡Mensaje enviado exitosamente!',
+    chatViewAllMessages: 'Puede ver todos sus mensajes en la sección de',
+    chatMessagesSection: 'Mensajes',
+    chatYourMessage: 'Su Mensaje:',
+    chatPlaceholder: '¿Cómo podemos ayudarle?',
+    chatSending: 'Enviando...',
+    chatSendMessage: 'Enviar Mensaje',
+    chatNoReplies: 'Sin respuestas aún',
+    chatAdmin: 'Admin',
+    chatViewAll: 'Ver todos los mensajes',
+    // Password validation
+    passwordMinLength: 'La contraseña debe tener al menos 6 caracteres'
   },
   pt: {
     // Login
@@ -847,7 +977,72 @@ const TRANSLATIONS = {
     paymentViaInvoice: 'Pagamento via fatura (Net 30)',
     pageInfo: '1 página = 250 palavras máx.',
     invoiceNotAvailable: 'Pagamento por fatura disponível após 10 pedidos pagos',
-    invoiceBlocked: 'Pagamento por fatura ainda não disponível'
+    invoiceBlocked: 'Pagamento por fatura ainda não disponível',
+    // Tier Discount - How It Works
+    certifiedTranslationNote: 'Preços para serviços de Tradução Certificada',
+    howItWorks: 'Como Funciona o Desconto por Nível',
+    howItWorksSubtitle: 'Entenda como seu desconto é calculado e protegido',
+    tierStep1Title: 'Níveis por Volume',
+    tierStep1Desc: 'Seu nível é determinado pela quantidade de páginas de tradução certificada que você envia por mês. Mais páginas = nível mais alto = maior desconto. Os descontos se aplicam apenas a traduções Certificadas e RMV.',
+    tierStep2Title: 'Melhor dos 3 Meses',
+    tierStep2Desc: 'Avaliamos seu melhor mês dos últimos 3 meses para determinar seu nível. Então, se você teve um mês forte, mantém esse nível por até 3 meses mesmo que seu volume caia temporariamente.',
+    tierStep3Title: 'Proteção por Fidelidade',
+    tierStep3Desc: 'Após 6 meses como parceiro, seu Bloqueio de Fidelidade é ativado. Isso significa que você nunca perderá seu nível mais alto alcançado, mesmo em meses fracos. Seu desconto está protegido permanentemente.',
+    tierExample: 'Exemplo',
+    tierExampleDesc: 'Se você enviar 50 páginas em janeiro (nível Silver, 15% de desconto), depois 10 páginas em fevereiro e 15 em março — você mantém o nível Silver nos 3 meses porque o sistema usa seu melhor mês (50 páginas). Após 6 meses como parceiro, mesmo que os 3 meses recentes estejam abaixo de 30 páginas, você mantém Silver permanentemente graças ao Bloqueio de Fidelidade.',
+    yourStatus: 'Seu status',
+    loyaltyLockActive: 'Bloqueio de Fidelidade Ativo',
+    // Orders Page
+    myOrdersTitle: 'Meus Pedidos',
+    orderService: 'Serviço',
+    orderCreated: 'Criado',
+    orderBasePrice: 'Preço Base',
+    orderUrgencyFee: 'Taxa de Urgência',
+    orderCertified: 'Certificada',
+    orderStandard: 'Padrão',
+    orderSworn: 'Juramentada',
+    orderRmvCertified: 'Certificada RMV',
+    partnerDiscount: 'Desconto de Parceiro',
+    originalPrice: 'Preço original',
+    download: 'Baixar',
+    noDocumentsUploaded: 'Nenhum documento enviado para este pedido',
+    // Invoices Page
+    subtotal: 'Subtotal',
+    couponDiscount: 'Desconto de Cupom',
+    totalDue: 'Total a Pagar',
+    zellePaymentInstructions: 'Instruções de Pagamento via Zelle',
+    processingPayment: 'Processando...',
+    uploading: 'Enviando...',
+    submitZellePayment: 'Enviar Pagamento via Zelle',
+    close: 'Fechar',
+    approved: 'Aprovado',
+    // Messages Page
+    messagesTitle: 'Mensagens',
+    conversations: 'Conversas',
+    systemNotifications: 'Notificações do Sistema',
+    noConversations: 'Sem conversas',
+    conversationsEmptyMsg: 'Suas mensagens com a Legacy Translations aparecerão aqui',
+    noNotifications: 'Sem notificações',
+    notificationsEmptyMsg: 'Notificações do sistema aparecerão aqui',
+    replied: 'Respondido',
+    read: 'Lido',
+    // Chat Widget
+    chatContactUs: 'Fale Conosco',
+    chatSubheader: 'Envie uma mensagem para a Legacy Translations',
+    chatNewMessage: 'Nova Mensagem',
+    chatInbox: 'Caixa de Entrada',
+    chatMessageSent: 'Mensagem enviada com sucesso!',
+    chatViewAllMessages: 'Você pode ver todas as suas mensagens na seção de',
+    chatMessagesSection: 'Mensagens',
+    chatYourMessage: 'Sua Mensagem:',
+    chatPlaceholder: 'Como podemos ajudá-lo?',
+    chatSending: 'Enviando...',
+    chatSendMessage: 'Enviar Mensagem',
+    chatNoReplies: 'Sem respostas ainda',
+    chatAdmin: 'Admin',
+    chatViewAll: 'Ver todas as mensagens',
+    // Password validation
+    passwordMinLength: 'A senha deve ter pelo menos 6 caracteres'
   }
 };
 
@@ -3037,7 +3232,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency, refreshPart
               <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
                 <span className="text-2xl">💬</span>
               </div>
-              <h2 className="text-xl font-bold text-gray-800">How can we help you?</h2>
+              <h2 className="text-xl font-bold text-gray-800">{t?.chatPlaceholder || 'How can we help you?'}</h2>
               <p className="text-gray-600 text-sm">Send a message to your team</p>
             </div>
 
@@ -3103,7 +3298,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency, refreshPart
                     disabled={sendingMessage || !messageRecipient || !messageContent.trim()}
                     className="px-6 py-2 bg-purple-600 text-white rounded-md font-semibold hover:bg-purple-700 disabled:bg-gray-300 transition-colors"
                   >
-                    {sendingMessage ? 'Sending...' : '📤 Send Message'}
+                    {sendingMessage ? (t?.chatSending || 'Sending...') : `📤 ${t?.chatSendMessage || 'Send Message'}`}
                   </button>
                 </div>
               </div>
@@ -3255,7 +3450,7 @@ const OrdersPage = ({ token, currency }) => {
   return (
     <div className="p-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">My Orders</h1>
+        <h1 className="text-2xl font-bold text-gray-800">{t?.myOrdersTitle || 'My Orders'}</h1>
         <div className="flex gap-2">
           {['all', 'pending', 'paid', 'overdue'].map((f) => (
             <button
@@ -3321,25 +3516,25 @@ const OrdersPage = ({ token, currency }) => {
                 <div className="border-t bg-gray-50 p-6">
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
-                      <div className="text-sm text-gray-500">Service</div>
+                      <div className="text-sm text-gray-500">{t?.orderService || 'Service'}</div>
                       <div className="font-medium">
-                        {order.service_type === 'certified' && 'Certified'}
-                        {order.service_type === 'standard' && 'Standard'}
-                        {order.service_type === 'sworn' && 'Sworn'}
-                        {order.service_type === 'rmv' && 'RMV Certified'}
+                        {order.service_type === 'certified' && (t?.orderCertified || 'Certified')}
+                        {order.service_type === 'standard' && (t?.orderStandard || 'Standard')}
+                        {order.service_type === 'sworn' && (t?.orderSworn || 'Sworn')}
+                        {order.service_type === 'rmv' && (t?.orderRmvCertified || 'RMV Certified')}
                         {!['certified', 'standard', 'sworn', 'rmv'].includes(order.service_type) && order.service_type}
                       </div>
                     </div>
                     <div>
-                      <div className="text-sm text-gray-500">Created</div>
+                      <div className="text-sm text-gray-500">{t?.orderCreated || 'Created'}</div>
                       <div className="font-medium">{new Date(order.created_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}</div>
                     </div>
                     <div>
-                      <div className="text-sm text-gray-500">Base Price</div>
+                      <div className="text-sm text-gray-500">{t?.orderBasePrice || 'Base Price'}</div>
                       <div className="font-medium">{formatPrice(order.base_price || 0)}</div>
                     </div>
                     <div>
-                      <div className="text-sm text-gray-500">Urgency Fee</div>
+                      <div className="text-sm text-gray-500">{t?.orderUrgencyFee || 'Urgency Fee'}</div>
                       <div className="font-medium">{formatPrice(order.urgency_fee || 0)}</div>
                     </div>
                   </div>
@@ -3357,7 +3552,7 @@ const OrdersPage = ({ token, currency }) => {
                             {order.partner_tier}
                           </span>
                           <span className="text-sm text-green-700">
-                            Partner Discount ({order.tier_discount_percent}%)
+                            {t?.partnerDiscount || 'Partner Discount'} ({order.tier_discount_percent}%)
                           </span>
                         </div>
                         <span className="text-sm font-medium text-green-700">
@@ -3366,7 +3561,7 @@ const OrdersPage = ({ token, currency }) => {
                       </div>
                       {order.original_price && (
                         <div className="text-xs text-gray-500 mt-1">
-                          Original price: {formatPrice(order.original_price)}
+                          {t?.originalPrice || 'Original price'}: {formatPrice(order.original_price)}
                         </div>
                       )}
                     </div>
@@ -3375,7 +3570,7 @@ const OrdersPage = ({ token, currency }) => {
                   {order.coupon_code && order.coupon_discount_amount > 0 && (
                     <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-blue-700">Coupon: {order.coupon_code}</span>
+                        <span className="text-sm text-blue-700">{t?.coupon || 'Coupon'}: {order.coupon_code}</span>
                         <span className="text-sm font-medium text-blue-700">-{formatPrice(order.coupon_discount_amount)}</span>
                       </div>
                     </div>
@@ -3449,14 +3644,14 @@ const OrdersPage = ({ token, currency }) => {
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                               </svg>
-                              <span>Download</span>
+                              <span>{t?.download || 'Download'}</span>
                             </button>
                           </div>
                         ))}
                       </div>
                     ) : (
                       <div className="text-gray-500 text-sm p-3 bg-white rounded-lg border border-gray-200">
-                        No documents uploaded for this order
+                        {t?.noDocumentsUploaded || 'No documents uploaded for this order'}
                       </div>
                     )}
                   </div>
@@ -3491,7 +3686,7 @@ const OrdersPage = ({ token, currency }) => {
             <div className="p-4 border-b bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-t-lg">
               <div className="flex justify-between items-center">
                 <div>
-                  <h3 className="font-bold text-lg">Send Message</h3>
+                  <h3 className="font-bold text-lg">{t?.chatSendMessage || 'Send Message'}</h3>
                   <p className="text-sm opacity-80">Order: #{messageOrder.order_number}</p>
                 </div>
                 <button
@@ -3503,7 +3698,7 @@ const OrdersPage = ({ token, currency }) => {
               </div>
             </div>
             <div className="p-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Your Message:</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{t?.chatYourMessage || 'Your Message:'}</label>
               <textarea
                 value={messageContent}
                 onChange={(e) => setMessageContent(e.target.value)}
@@ -3530,10 +3725,10 @@ const OrdersPage = ({ token, currency }) => {
                 {sendingMessage ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    Sending...
+                    {t?.chatSending || 'Sending...'}
                   </>
                 ) : (
-                  <>Send Message</>
+                  <>{t?.chatSendMessage || 'Send Message'}</>
                 )}
               </button>
             </div>
@@ -3732,18 +3927,18 @@ const InvoicesPage = ({ token, t, currency, lang }) => {
                     {invoice.discount_amount > 0 && (
                       <>
                         <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600">Subtotal:</span>
+                          <span className="text-gray-600">{t?.subtotal || 'Subtotal'}:</span>
                           <span className="text-gray-800">{formatCurrency(invoice.subtotal)}</span>
                         </div>
                         <div className="flex items-center justify-between text-sm text-green-700 font-medium">
-                          <span>Coupon Discount:</span>
+                          <span>{t?.couponDiscount || 'Coupon Discount'}:</span>
                           <span>-{formatCurrency(invoice.discount_amount)}</span>
                         </div>
                       </>
                     )}
                     {invoice.manual_discount_amount > 0 && (
                       <div className="flex items-center justify-between text-sm text-orange-700 font-medium">
-                        <span>{invoice.manual_discount_reason || 'Discount'}:</span>
+                        <span>{invoice.manual_discount_reason || (t?.discount || 'Discount')}:</span>
                         <span>-{formatCurrency(invoice.manual_discount_amount)}</span>
                       </div>
                     )}
@@ -3812,23 +4007,23 @@ const InvoicesPage = ({ token, t, currency, lang }) => {
                   {selectedInvoice.discount_amount > 0 && (
                     <>
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-600">Subtotal:</span>
+                        <span className="text-gray-600">{t?.subtotal || 'Subtotal'}:</span>
                         <span className="text-gray-800">{formatCurrency(selectedInvoice.subtotal)}</span>
                       </div>
                       <div className="flex items-center justify-between text-sm text-green-700 font-medium">
-                        <span>Coupon Discount:</span>
+                        <span>{t?.couponDiscount || 'Coupon Discount'}:</span>
                         <span>-{formatCurrency(selectedInvoice.discount_amount)}</span>
                       </div>
                     </>
                   )}
                   {selectedInvoice.manual_discount_amount > 0 && (
                     <div className="flex items-center justify-between text-sm text-orange-700 font-medium">
-                      <span>{selectedInvoice.manual_discount_reason || 'Discount'}:</span>
+                      <span>{selectedInvoice.manual_discount_reason || (t?.discount || 'Discount')}:</span>
                       <span>-{formatCurrency(selectedInvoice.manual_discount_amount)}</span>
                     </div>
                   )}
                   <div className="flex items-center justify-between text-sm font-bold border-t border-green-200 mt-1 pt-1">
-                    <span>Total Due:</span>
+                    <span>{t?.totalDue || 'Total Due'}:</span>
                     <span>{formatCurrency(selectedInvoice.total_amount)}</span>
                   </div>
                 </div>
@@ -3868,7 +4063,7 @@ const InvoicesPage = ({ token, t, currency, lang }) => {
                 onClick={() => setSelectedInvoice(null)}
                 className="px-4 py-2 border rounded-lg hover:bg-gray-100"
               >
-                Close
+                {t?.close || 'Close'}
               </button>
               {selectedInvoice.status !== 'paid' && (
                 <button
@@ -3932,14 +4127,14 @@ const InvoicesPage = ({ token, t, currency, lang }) => {
                   disabled={submittingPayment}
                   className="w-full py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-medium disabled:bg-gray-300"
                 >
-                  {submittingPayment ? 'Processing...' : `${t?.payNow || 'Pay'} ${formatCurrency(selectedInvoice.total_amount)}`}
+                  {submittingPayment ? (t?.processingPayment || 'Processing...') : `${t?.payNow || 'Pay'} ${formatCurrency(selectedInvoice.total_amount)}`}
                 </button>
               )}
 
               {paymentMethod === 'zelle' && (
                 <div className="space-y-4">
                   <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                    <div className="text-sm font-medium text-purple-800 mb-2">Zelle Payment Instructions:</div>
+                    <div className="text-sm font-medium text-purple-800 mb-2">{t?.zellePaymentInstructions || 'Zelle Payment Instructions'}:</div>
                     <div className="text-sm text-purple-700">
                       {t?.zelleInstructions || 'Send payment via Zelle to: payments@legacytranslations.com'}
                     </div>
@@ -3959,7 +4154,7 @@ const InvoicesPage = ({ token, t, currency, lang }) => {
                       disabled={uploadingReceipt}
                     />
                     {uploadingReceipt && (
-                      <div className="text-sm text-gray-500 mt-1">Uploading...</div>
+                      <div className="text-sm text-gray-500 mt-1">{t?.uploading || 'Uploading...'}</div>
                     )}
                     {zelleReceipt && (
                       <div className="text-sm text-green-600 mt-1">
@@ -3973,7 +4168,7 @@ const InvoicesPage = ({ token, t, currency, lang }) => {
                     disabled={!zelleReceipt || submittingPayment}
                     className="w-full py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium disabled:bg-gray-300"
                   >
-                    {submittingPayment ? 'Submitting...' : 'Submit Zelle Payment'}
+                    {submittingPayment ? (t?.submitting || 'Submitting...') : (t?.submitZellePayment || 'Submit Zelle Payment')}
                   </button>
                 </div>
               )}
@@ -4130,7 +4325,7 @@ const PaymentPlanPage = ({ token, t, currency }) => {
               <div>
                 <div className="text-xl font-semibold text-gray-800">{getPlanDisplayName(qualification?.current_plan)}</div>
                 {qualification?.plan_approved && qualification?.current_plan !== 'pay_per_order' && (
-                  <span className="inline-block mt-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">Approved</span>
+                  <span className="inline-block mt-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">{t?.approved || 'Approved'}</span>
                 )}
               </div>
             </div>
@@ -4449,7 +4644,7 @@ const PaymentPlanPage = ({ token, t, currency }) => {
               <span className="font-semibold">{t?.yourStatus || 'Your status'}:</span> {tierInfo.tier_strategy.reason}
               {tierInfo.tier_strategy.loyalty_lock_active && (
                 <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
-                  Loyalty Lock Active
+                  {t?.loyaltyLockActive || 'Loyalty Lock Active'}
                 </span>
               )}
             </p>
@@ -4634,7 +4829,7 @@ const MessagesPage = ({ token }) => {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Messages</h1>
+      <h1 className="text-2xl font-bold text-gray-800 mb-6">{t?.messagesTitle || 'Messages'}</h1>
 
       {/* Tab Navigation */}
       <div className="flex border-b mb-6">
@@ -4646,7 +4841,7 @@ const MessagesPage = ({ token }) => {
               : 'border-transparent text-gray-500 hover:text-gray-700'
           }`}
         >
-          Conversations
+          {t?.conversations || 'Conversations'}
           {unreadConversations > 0 && (
             <span className="ml-2 px-2 py-0.5 bg-red-500 text-white text-xs rounded-full">
               {unreadConversations}
@@ -4661,7 +4856,7 @@ const MessagesPage = ({ token }) => {
               : 'border-transparent text-gray-500 hover:text-gray-700'
           }`}
         >
-          System Notifications
+          {t?.systemNotifications || 'System Notifications'}
           {unreadSystemMessages > 0 && (
             <span className="ml-2 px-2 py-0.5 bg-red-500 text-white text-xs rounded-full">
               {unreadSystemMessages}
@@ -4676,8 +4871,8 @@ const MessagesPage = ({ token }) => {
           {groupedConversations.length === 0 ? (
             <div className="bg-white rounded-lg shadow-sm p-8 text-center">
               <div className="text-4xl mb-4">💬</div>
-              <h2 className="text-xl font-semibold text-gray-800 mb-2">No conversations</h2>
-              <p className="text-gray-600">Your messages with Legacy Translations will appear here</p>
+              <h2 className="text-xl font-semibold text-gray-800 mb-2">{t?.noConversations || 'No conversations'}</h2>
+              <p className="text-gray-600">{t?.conversationsEmptyMsg || 'Your messages with Legacy Translations will appear here'}</p>
             </div>
           ) : (
             <div className="bg-white rounded-lg shadow-sm overflow-hidden">
@@ -4738,7 +4933,7 @@ const MessagesPage = ({ token }) => {
                     <div className="flex-shrink-0 mr-3 flex items-center space-x-1">
                       {group.lastMessage?.replied && (
                         <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">
-                          Replied
+                          {t?.replied || 'Replied'}
                         </span>
                       )}
                     </div>
@@ -4797,7 +4992,7 @@ const MessagesPage = ({ token }) => {
                                     <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                     </svg>
-                                    Replied
+                                    {t?.replied || 'Replied'}
                                   </span>
                                 )}
                                 {msg.direction === 'received' && msg.read && (
@@ -4805,7 +5000,7 @@ const MessagesPage = ({ token }) => {
                                     <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                     </svg>
-                                    Read
+                                    {t?.read || 'Read'}
                                   </span>
                                 )}
                               </div>
@@ -4828,8 +5023,8 @@ const MessagesPage = ({ token }) => {
           {systemMessages.length === 0 ? (
             <div className="bg-white rounded-lg shadow-sm p-8 text-center">
               <div className="text-4xl mb-4">✉️</div>
-              <h2 className="text-xl font-semibold text-gray-800 mb-2">No notifications</h2>
-              <p className="text-gray-600">System notifications will appear here</p>
+              <h2 className="text-xl font-semibold text-gray-800 mb-2">{t?.noNotifications || 'No notifications'}</h2>
+              <p className="text-gray-600">{t?.notificationsEmptyMsg || 'System notifications will appear here'}</p>
             </div>
           ) : (
             <div className="bg-white rounded-lg shadow-sm overflow-hidden">
@@ -4893,7 +5088,7 @@ const ResetPasswordPage = ({ resetToken, onSuccess, onCancel, t }) => {
     }
 
     if (newPassword.length < 6) {
-      setError('Password must be at least 6 characters');
+      setError(t?.passwordMinLength || 'Password must be at least 6 characters');
       return;
     }
 
@@ -5212,8 +5407,8 @@ const PartnerFloatingChatWidget = ({ token, partner, onNavigateToMessages }) => 
         <div className="fixed bottom-24 right-6 w-80 bg-white rounded-lg shadow-2xl z-50 overflow-hidden border border-gray-200">
           {/* Header */}
           <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4">
-            <h3 className="font-bold text-lg">Contact Us</h3>
-            <p className="text-xs text-blue-100">Send a message to Legacy Translations</p>
+            <h3 className="font-bold text-lg">{t?.chatContactUs || 'Contact Us'}</h3>
+            <p className="text-xs text-blue-100">{t?.chatSubheader || 'Send a message to Legacy Translations'}</p>
           </div>
 
           {/* Tab Toggle */}
@@ -5222,13 +5417,13 @@ const PartnerFloatingChatWidget = ({ token, partner, onNavigateToMessages }) => 
               onClick={() => setShowNotifications(false)}
               className={`flex-1 py-2 text-sm font-medium ${!showNotifications ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600' : 'text-gray-600'}`}
             >
-              New Message
+              {t?.chatNewMessage || 'New Message'}
             </button>
             <button
               onClick={() => setShowNotifications(true)}
               className={`flex-1 py-2 text-sm font-medium relative ${showNotifications ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600' : 'text-gray-600'}`}
             >
-              Inbox
+              {t?.chatInbox || 'Inbox'}
               {unreadCount > 0 && (
                 <span className="ml-1 px-1.5 py-0.5 bg-red-500 text-white text-xs rounded-full">
                   {unreadCount}
@@ -5243,9 +5438,9 @@ const PartnerFloatingChatWidget = ({ token, partner, onNavigateToMessages }) => 
               <div className="space-y-4">
                 {messageSent && (
                   <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                    <p className="text-green-700 text-sm font-medium">Message sent successfully!</p>
+                    <p className="text-green-700 text-sm font-medium">{t?.chatMessageSent || 'Message sent successfully!'}</p>
                     <p className="text-green-600 text-xs mt-1">
-                      You can view all your messages in the{' '}
+                      {t?.chatViewAllMessages || 'You can view all your messages in the'}{' '}
                       <button
                         onClick={() => {
                           setIsOpen(false);
@@ -5253,17 +5448,17 @@ const PartnerFloatingChatWidget = ({ token, partner, onNavigateToMessages }) => 
                         }}
                         className="underline hover:text-green-800"
                       >
-                        Messages section
+                        {t?.chatMessagesSection || 'Messages section'}
                       </button>
                     </p>
                   </div>
                 )}
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Your Message:</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">{t?.chatYourMessage || 'Your Message:'}</label>
                   <textarea
                     value={messageContent}
                     onChange={(e) => setMessageContent(e.target.value)}
-                    placeholder="How can we help you?"
+                    placeholder={t?.chatPlaceholder || 'How can we help you?'}
                     className="w-full border rounded-lg px-3 py-2 text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     rows={4}
                   />
@@ -5276,14 +5471,14 @@ const PartnerFloatingChatWidget = ({ token, partner, onNavigateToMessages }) => 
                   {sending ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      Sending...
+                      {t?.chatSending || 'Sending...'}
                     </>
                   ) : (
                     <>
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                       </svg>
-                      Send Message
+                      {t?.chatSendMessage || 'Send Message'}
                     </>
                   )}
                 </button>
@@ -5293,7 +5488,7 @@ const PartnerFloatingChatWidget = ({ token, partner, onNavigateToMessages }) => 
                 {conversations.filter(c => c.direction === 'received').length === 0 ? (
                   <div className="text-center text-gray-500 py-4">
                     <div className="text-2xl mb-2">📭</div>
-                    <p className="text-sm">No replies yet</p>
+                    <p className="text-sm">{t?.chatNoReplies || 'No replies yet'}</p>
                   </div>
                 ) : (
                   conversations.filter(c => c.direction === 'received').slice(0, 5).map((conv) => (
@@ -5302,7 +5497,7 @@ const PartnerFloatingChatWidget = ({ token, partner, onNavigateToMessages }) => 
                       className="p-3 rounded-lg border bg-gray-50 border-gray-200"
                     >
                       <div className="mb-1">
-                        <span className="text-xs font-medium text-blue-700">{conv.from_admin_name || 'Admin'}</span>
+                        <span className="text-xs font-medium text-blue-700">{conv.from_admin_name || (t?.chatAdmin || 'Admin')}</span>
                       </div>
                       {conv.original_message_content && (
                         <p className="text-[10px] text-gray-500 italic mb-1">Re: {conv.original_message_content.substring(0, 50)}...</p>
@@ -5322,7 +5517,7 @@ const PartnerFloatingChatWidget = ({ token, partner, onNavigateToMessages }) => 
                     }}
                     className="w-full text-center text-sm text-blue-600 hover:underline py-2"
                   >
-                    View all messages
+                    {t?.chatViewAll || 'View all messages'}
                   </button>
                 )}
               </div>
