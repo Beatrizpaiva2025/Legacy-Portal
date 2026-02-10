@@ -3188,13 +3188,14 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           const docs = docsResponse.data.documents || [];
           // For orders matched via file_translator_ids (individual file assignments),
           // only show files assigned to this translator
+          const isOrderLevelAssigned = order.assigned_translator_id === user.id
+            || order.assigned_translator === user.name
+            || order.assigned_translator_name === user.name;
           const isFileLevel = order.file_translator_ids && order.file_translator_ids.includes(user.id)
-            && order.assigned_translator_id !== user.id
-            && order.assigned_translator !== user.name
-            && order.assigned_translator_name !== user.name;
+            && !isOrderLevelAssigned;
           for (const doc of docs) {
-            // Skip files not assigned to this translator for file-level assignments
-            if (isFileLevel && doc.assigned_translator_id && doc.assigned_translator_id !== user.id) {
+            // For file-level assignments: only show files explicitly assigned to this translator
+            if (isFileLevel && doc.assigned_translator_id !== user.id) {
               continue;
             }
             allFiles.push({
@@ -18603,7 +18604,26 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         <tr className="border-b">
                           <td className="py-2 font-medium text-gray-600">Translator</td>
                           <td className="py-2">
-                            {viewingOrder.assigned_translator_name || viewingOrder.assigned_translator || '-'}
+                            {(() => {
+                              const names = [];
+                              if (viewingOrder.assigned_translator_name || viewingOrder.assigned_translator) {
+                                names.push(viewingOrder.assigned_translator_name || viewingOrder.assigned_translator);
+                              }
+                              if (viewingOrder.file_translator_names && viewingOrder.file_translator_names.length > 0) {
+                                for (const n of viewingOrder.file_translator_names) {
+                                  if (n && !names.includes(n)) names.push(n);
+                                }
+                              }
+                              if (names.length > 1) {
+                                return (
+                                  <span>
+                                    <span className="font-bold text-purple-700">MULTIPLE ({names.length})</span>
+                                    <span className="ml-1 text-xs text-gray-500">({names.join(', ')})</span>
+                                  </span>
+                                );
+                              }
+                              return names[0] || '-';
+                            })()}
                             {viewingOrder.translator_assignment_status && (
                               <span
                                 onClick={() => {
@@ -19181,12 +19201,35 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   </div>
 
                   {/* Translator Assignment Status */}
-                  {(viewingOrder.assigned_translator_name || viewingOrder.assigned_translator) && (
+                  {(viewingOrder.assigned_translator_name || viewingOrder.assigned_translator || (viewingOrder.file_translator_names && viewingOrder.file_translator_names.length > 0)) && (
                     <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
                       <div className="text-xs font-medium text-blue-700 mb-2">Translator Assignment</div>
                       <div className="flex items-center justify-between">
                         <div>
-                          <div className="text-sm">{viewingOrder.assigned_translator_name || viewingOrder.assigned_translator}</div>
+                          {(() => {
+                            const names = [];
+                            if (viewingOrder.assigned_translator_name || viewingOrder.assigned_translator) {
+                              names.push(viewingOrder.assigned_translator_name || viewingOrder.assigned_translator);
+                            }
+                            if (viewingOrder.file_translator_names && viewingOrder.file_translator_names.length > 0) {
+                              for (const n of viewingOrder.file_translator_names) {
+                                if (n && !names.includes(n)) names.push(n);
+                              }
+                            }
+                            if (names.length > 1) {
+                              return (
+                                <div>
+                                  <div className="text-sm font-bold text-purple-700">MULTIPLE ({names.length})</div>
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {names.map((n, i) => (
+                                      <span key={i} className="text-[10px] px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded border border-purple-200">{n}</span>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return <div className="text-sm">{names[0] || '-'}</div>;
+                          })()}
                           <div className={`text-xs mt-1 ${
                             viewingOrder.translator_assignment_status === 'accepted' ? 'text-green-600' :
                             viewingOrder.translator_assignment_status === 'declined' ? 'text-red-600' :
@@ -28853,6 +28896,14 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         assigned_translator_id: translatorId,
         assigned_translator_name: translatorName
       });
+
+      // Also track this translator on the order so they can see the project when they log in
+      if (selectedProject?.id) {
+        await axios.put(`${API}/admin/orders/${selectedProject.id}/add-file-translator?admin_key=${adminKey}`, {
+          translator_id: translatorId,
+          translator_name: translatorName
+        });
+      }
     } catch (err) {
       console.error('Failed to assign translator:', err);
       setFileAssignments(prev => {
@@ -30384,63 +30435,98 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                       <td className="py-2 px-2">{order.client_name}</td>
                       <td className="py-2 px-2">{order.translate_from} → {order.translate_to}</td>
                       <td className="py-2 px-2">
-                        {(order.assigned_translator_name || order.assigned_translator) ? (
-                          <div className="flex flex-col gap-1">
-                            <span
-                              onClick={() => openAssignTranslatorModal(order)}
-                              className="text-xs text-green-700 font-medium cursor-pointer hover:text-green-900 hover:underline"
-                              title="Click to change translator"
-                            >
-                              {order.assigned_translator_name || order.assigned_translator}
-                            </span>
-                            {order.translator_assignment_status === 'pending' && (
-                              <span
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (confirm('Mark translator as Accepted?')) {
-                                    updateTranslatorAssignmentStatus(order.id, 'accepted');
-                                  }
-                                }}
-                                className="text-[10px] px-1.5 py-0.5 bg-yellow-50 text-yellow-600 rounded w-fit border border-yellow-200 cursor-pointer hover:bg-yellow-100"
-                                title="Click to mark as Accepted"
-                              >
-                                Pending
-                              </span>
-                            )}
-                            {order.translator_assignment_status === 'accepted' && (
-                              <span
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (confirm('Change status back to Pending?')) {
-                                    updateTranslatorAssignmentStatus(order.id, 'pending');
-                                  }
-                                }}
-                                className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 rounded w-fit cursor-pointer hover:bg-green-200"
-                                title="Click to change status"
-                              >
-                                ✓ Accepted
-                              </span>
-                            )}
-                            {order.translator_assignment_status === 'declined' && (
-                              <div className="flex flex-col gap-1">
-                                <span className="text-[10px] px-1.5 py-0.5 bg-red-100 text-red-700 rounded w-fit">✕ Declined</span>
-                                <button
+                        {(() => {
+                          // Determine all assigned translators (order-level + file-level)
+                          const allTranslatorNames = [];
+                          if (order.assigned_translator_name || order.assigned_translator) {
+                            allTranslatorNames.push(order.assigned_translator_name || order.assigned_translator);
+                          }
+                          if (order.file_translator_names && order.file_translator_names.length > 0) {
+                            for (const name of order.file_translator_names) {
+                              if (name && !allTranslatorNames.includes(name)) {
+                                allTranslatorNames.push(name);
+                              }
+                            }
+                          }
+                          const isMultiple = allTranslatorNames.length > 1;
+
+                          return allTranslatorNames.length > 0 ? (
+                            <div className="flex flex-col gap-1">
+                              {isMultiple ? (
+                                <div>
+                                  <span
+                                    onClick={() => openAssignTranslatorModal(order)}
+                                    className="text-xs text-purple-700 font-bold cursor-pointer hover:text-purple-900 hover:underline"
+                                    title={`Assigned translators: ${allTranslatorNames.join(', ')}\nClick to manage`}
+                                  >
+                                    MULTIPLE ({allTranslatorNames.length})
+                                  </span>
+                                  <div className="flex flex-wrap gap-0.5 mt-1">
+                                    {allTranslatorNames.map((name, i) => (
+                                      <span key={i} className="text-[9px] px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded border border-purple-200">
+                                        {name}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : (
+                                <span
                                   onClick={() => openAssignTranslatorModal(order)}
-                                  className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 flex items-center gap-1 w-fit"
+                                  className="text-xs text-green-700 font-medium cursor-pointer hover:text-green-900 hover:underline"
+                                  title="Click to change translator"
                                 >
-                                  🔄 Reassign
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => openAssignTranslatorModal(order)}
-                            className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-[10px] hover:bg-blue-200 flex items-center gap-1"
-                          >
-                            📧 Email Invite
-                          </button>
-                        )}
+                                  {allTranslatorNames[0]}
+                                </span>
+                              )}
+                              {order.translator_assignment_status === 'pending' && (
+                                <span
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (confirm('Mark translator as Accepted?')) {
+                                      updateTranslatorAssignmentStatus(order.id, 'accepted');
+                                    }
+                                  }}
+                                  className="text-[10px] px-1.5 py-0.5 bg-yellow-50 text-yellow-600 rounded w-fit border border-yellow-200 cursor-pointer hover:bg-yellow-100"
+                                  title="Click to mark as Accepted"
+                                >
+                                  Pending
+                                </span>
+                              )}
+                              {order.translator_assignment_status === 'accepted' && (
+                                <span
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (confirm('Change status back to Pending?')) {
+                                      updateTranslatorAssignmentStatus(order.id, 'pending');
+                                    }
+                                  }}
+                                  className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 rounded w-fit cursor-pointer hover:bg-green-200"
+                                  title="Click to change status"
+                                >
+                                  ✓ Accepted
+                                </span>
+                              )}
+                              {order.translator_assignment_status === 'declined' && (
+                                <div className="flex flex-col gap-1">
+                                  <span className="text-[10px] px-1.5 py-0.5 bg-red-100 text-red-700 rounded w-fit">✕ Declined</span>
+                                  <button
+                                    onClick={() => openAssignTranslatorModal(order)}
+                                    className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 flex items-center gap-1 w-fit"
+                                  >
+                                    🔄 Reassign
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => openAssignTranslatorModal(order)}
+                              className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-[10px] hover:bg-blue-200 flex items-center gap-1"
+                            >
+                              📧 Email Invite
+                            </button>
+                          );
+                        })()}
                       </td>
                       <td className="py-2 px-2">
                         <span className={`px-2 py-0.5 rounded text-[10px] ${STATUS_COLORS[order.translation_status] || 'bg-gray-100'}`}>
