@@ -335,6 +335,21 @@ const generatePdfWithHash = async (htmlContent, filename, options = {}) => {
       }));
     }
 
+    // Auto-scale translation content if it overflows the page width
+    // This ensures large documents fit within the page boundaries
+    const translationContents = iframeDoc.querySelectorAll('.translation-content');
+    translationContents.forEach(el => {
+      const parent = el.parentElement;
+      if (parent && el.scrollWidth > parent.clientWidth + 5) {
+        const scale = parent.clientWidth / el.scrollWidth;
+        if (scale < 1 && scale >= 0.5) {
+          el.style.transform = `scale(${scale})`;
+          el.style.transformOrigin = 'top left';
+          el.style.width = `${100 / scale}%`;
+        }
+      }
+    });
+
     // Extra delay for rendering
     await new Promise(resolve => setTimeout(resolve, 500));
 
@@ -411,8 +426,8 @@ const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
     td, th { border: 1px solid #333; padding: 5px 6px; font-size: 10pt; vertical-align: top; }
     /* Translation content: robust table layout for complex documents (birth certificates, etc.) */
     .translation-content {
-        font-size: 11pt !important;
-        line-height: 1.5 !important;
+        font-size: 10.5pt !important;
+        line-height: 1.4 !important;
     }
     .translation-content table {
         table-layout: fixed;
@@ -469,7 +484,7 @@ const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
     .paged-translation { width: 100%; border-collapse: collapse; border: none !important; }
     .paged-translation > thead > tr > td,
     .paged-translation > tbody > tr > td { border: none !important; padding: 0 !important; }
-    .paged-translation > thead > tr > td { padding: 8px 0 0 0 !important; }
+    .paged-translation > thead > tr > td { padding: 12px 0 0 0 !important; }
     .paged-translation > thead { display: table-header-group; }
     .paged-translation > tbody { display: table-row-group; }
     /* Avoid breaking inside table rows (bank statements, financial tables) */
@@ -498,7 +513,7 @@ const getLetterheadHTML = (logoLeft, logoRight) => `
         </td>
     </tr>
 </table>
-<div style="width: 100%; height: 2px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 12px;"></div>`;
+<div style="width: 100%; height: 2px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 8px;"></div>`;
 
 // ==================== CONSTANTS ====================
 const STATUS_COLORS = {
@@ -6167,7 +6182,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
     // Letterhead for all pages - Same style as cover
     const letterheadHTML = `
-        <div style="width: 100%; margin-bottom: 2px; padding-bottom: 2px; overflow: hidden;">
+        <div style="width: 100%; margin-bottom: 6px; padding-bottom: 4px; overflow: hidden;">
             <div style="float: left; width: 128px;">
                 ${logoLeft
                   ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
@@ -6184,7 +6199,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
-        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 12px;"></div>`;
+        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 8px;"></div>`;
 
     // Extract translation styles to include in print document (preserves formatting)
     const quickTranslationStyles = extractStylesFromHtml(quickTranslationHtml);
@@ -6203,17 +6218,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       const normalizedQuickHtml = normalizeTranslationHtml(quickTranslationHtml);
       translationPagesHTML = includeLetterhead ? `
     <table class="paged-translation">
-        <thead><tr><td style="padding: 8px 0 0 0;">
+        <thead><tr><td style="padding: 12px 0 0 0;">
             ${letterheadHTML}
         </td></tr></thead>
         <tbody><tr><td>
-            <div class="translation-content" style="padding: 0; line-height: 1.5; font-size: 11pt;">
+            <div class="translation-content" style="padding: 0; line-height: 1.4; font-size: 10.5pt;">
                 ${normalizedQuickHtml}
             </div>
         </td></tr></tbody>
     </table>` : `
     <div style="padding-top: 5px;">
-        <div class="translation-content" style="padding: 0; line-height: 1.5; font-size: 11pt;">
+        <div class="translation-content" style="padding: 0; line-height: 1.4; font-size: 10.5pt;">
             ${normalizedQuickHtml}
         </div>
     </div>`;
@@ -6724,7 +6739,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     // Letterhead for all pages - Same style as cover
     // Uses !important on critical float/layout properties to prevent AI translation CSS from breaking layout
     const letterheadHTML = `
-        <div style="width: 100% !important; margin-bottom: 2px; padding-bottom: 2px; overflow: hidden !important; position: relative !important;">
+        <div style="width: 100% !important; margin-bottom: 6px; padding-bottom: 4px; overflow: hidden !important; position: relative !important;">
             <div style="float: left !important; width: 128px !important;">
                 ${logoLeft
                   ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
@@ -6741,7 +6756,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
-        <div style="clear: both !important; width: 100% !important; height: 2px; background: #93c5fd; margin-bottom: 12px;"></div>`;
+        <div style="clear: both !important; width: 100% !important; height: 2px; background: #93c5fd; margin-bottom: 8px;"></div>`;
 
     // Extract translation styles and SCOPE them to .translation-content to prevent
     // AI-generated global CSS from breaking letterhead/cover layout
@@ -6759,11 +6774,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       if (includeLetterhead) {
         return `
     <table class="paged-translation" style="${pageBreak}">
-        <thead><tr><td style="padding: 8px 0 0 0;">
+        <thead><tr><td style="padding: 12px 0 0 0;">
             ${letterheadHTML}
         </td></tr></thead>
         <tbody><tr><td>
-            <div class="translation-content" style="padding: 0; line-height: 1.5; font-size: 11pt;">
+            <div class="translation-content" style="padding: 0; line-height: 1.4; font-size: 10.5pt;">
                 ${content}
             </div>
         </td></tr></tbody>
@@ -6771,7 +6786,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       } else {
         return `
     <div style="${pageBreak} padding-top: 5px;">
-        <div class="translation-content" style="padding: 0; line-height: 1.5; font-size: 11pt;">
+        <div class="translation-content" style="padding: 0; line-height: 1.4; font-size: 10.5pt;">
             ${content}
         </div>
     </div>`;
