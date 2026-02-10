@@ -88,19 +88,29 @@ const VendorLogin = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-500 via-teal-600 to-cyan-700 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-        {/* Header */}
-        <div className="bg-gradient-to-b from-emerald-500 to-teal-600 py-8 px-4 text-center">
+        {/* Blue Header with Globe */}
+        <div className="bg-gradient-to-b from-blue-500 to-blue-600 py-8 px-4 text-center">
+          {/* Globe Icon */}
           <div className="mb-3">
-            <div className="w-16 h-16 mx-auto bg-white/20 rounded-full flex items-center justify-center">
-              <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+            <div className="w-16 h-16 mx-auto">
+              <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="50" cy="50" r="45" fill="#4FC3F7"/>
+                <ellipse cx="50" cy="50" rx="18" ry="45" stroke="white" strokeWidth="1.5" fill="none"/>
+                <line x1="5" y1="50" x2="95" y2="50" stroke="white" strokeWidth="1.5"/>
+                <ellipse cx="50" cy="28" rx="38" ry="10" stroke="white" strokeWidth="1.5" fill="none"/>
+                <ellipse cx="50" cy="72" rx="38" ry="10" stroke="white" strokeWidth="1.5" fill="none"/>
+                {/* Land masses */}
+                <path d="M28 32 Q34 26 46 30 Q52 34 48 44 Q42 48 34 44 Q28 38 28 32Z" fill="#4CAF50"/>
+                <path d="M56 22 Q68 18 76 26 Q80 36 72 42 Q62 40 54 34 Q50 28 56 22Z" fill="#4CAF50"/>
+                <path d="M22 54 Q30 50 42 54 Q48 60 44 70 Q34 74 26 68 Q18 62 22 54Z" fill="#4CAF50"/>
+                <path d="M58 56 Q70 52 80 60 Q84 70 76 76 Q64 78 56 72 Q52 64 58 56Z" fill="#4CAF50"/>
               </svg>
             </div>
           </div>
           <h1 className="text-xl font-semibold text-white">Legacy Translations</h1>
-          <p className="text-emerald-100 text-sm mt-1">Vendor Translator Portal</p>
+          <p className="text-blue-100 text-sm mt-1">Vendor Translator Portal</p>
         </div>
 
         {/* Form */}
@@ -120,7 +130,7 @@ const VendorLogin = ({ onLogin }) => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                 placeholder="your@email.com"
                 required
               />
@@ -131,7 +141,7 @@ const VendorLogin = ({ onLogin }) => {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                 placeholder="Your password"
                 required
               />
@@ -139,7 +149,7 @@ const VendorLogin = ({ onLogin }) => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+              className="w-full py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg font-medium transition-all disabled:opacity-50"
             >
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
@@ -326,27 +336,37 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Top Bar */}
-      <div className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white px-6 py-3 shadow-md">
+    <div className="min-h-screen bg-gray-100">
+      {/* Top Bar - Blue with Globe Logo */}
+      <div className="bg-slate-800 text-white px-6 py-2 shadow-md">
         <div className="flex items-center justify-between max-w-6xl mx-auto">
           <div className="flex items-center gap-3">
-            <svg className="w-7 h-7 text-emerald-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-            </svg>
+            <div className="w-8 h-8">
+              <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="50" cy="50" r="45" fill="#4FC3F7"/>
+                <ellipse cx="50" cy="50" rx="18" ry="45" stroke="white" strokeWidth="1.5" fill="none"/>
+                <line x1="5" y1="50" x2="95" y2="50" stroke="white" strokeWidth="1.5"/>
+                <ellipse cx="50" cy="28" rx="38" ry="10" stroke="white" strokeWidth="1.5" fill="none"/>
+                <ellipse cx="50" cy="72" rx="38" ry="10" stroke="white" strokeWidth="1.5" fill="none"/>
+                <path d="M28 32 Q34 26 46 30 Q52 34 48 44 Q42 48 34 44 Q28 38 28 32Z" fill="#4CAF50"/>
+                <path d="M56 22 Q68 18 76 26 Q80 36 72 42 Q62 40 54 34 Q50 28 56 22Z" fill="#4CAF50"/>
+                <path d="M22 54 Q30 50 42 54 Q48 60 44 70 Q34 74 26 68 Q18 62 22 54Z" fill="#4CAF50"/>
+                <path d="M58 56 Q70 52 80 60 Q84 70 76 76 Q64 78 56 72 Q52 64 58 56Z" fill="#4CAF50"/>
+              </svg>
+            </div>
             <div>
-              <h1 className="text-lg font-semibold">Legacy Translations</h1>
-              <p className="text-emerald-200 text-xs">Vendor Translator Portal</p>
+              <h1 className="text-sm font-semibold">Legacy Translations</h1>
+              <p className="text-slate-400 text-[10px]">Vendor Translator Portal</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right">
-              <p className="text-sm font-medium">{user.name}</p>
-              <p className="text-xs text-emerald-200">{user.email}</p>
+              <p className="text-xs font-medium">{user.name}</p>
+              <p className="text-[10px] text-slate-400">{user.email}</p>
             </div>
             <button
               onClick={onLogout}
-              className="px-3 py-1.5 bg-white/15 hover:bg-white/25 rounded text-sm transition-colors"
+              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded text-xs font-medium transition-colors"
             >
               Logout
             </button>
@@ -363,7 +383,7 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
 
         {loading ? (
           <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-600 mx-auto mb-3"></div>
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-3"></div>
             <p className="text-gray-500">Loading projects...</p>
           </div>
         ) : projects.length === 0 ? (
@@ -377,7 +397,7 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
             {/* Project List */}
             <div className="lg:col-span-1">
               <div className="bg-white rounded-xl shadow-sm border">
-                <div className="px-4 py-3 border-b bg-gray-50 rounded-t-xl">
+                <div className="px-4 py-3 border-b bg-slate-50 rounded-t-xl">
                   <h3 className="text-sm font-semibold text-gray-700">Projects ({projects.length})</h3>
                 </div>
                 <div className="divide-y max-h-[70vh] overflow-y-auto">
@@ -393,7 +413,7 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
                           isPending
                             ? 'bg-yellow-50 opacity-80'
                             : selectedProject?.id === project.id
-                              ? 'bg-emerald-50 border-l-4 border-l-emerald-500'
+                              ? 'bg-blue-50 border-l-4 border-l-blue-500'
                               : 'hover:bg-gray-50'
                         }`}
                       >
@@ -405,7 +425,7 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
                           </div>
                         )}
                         <div className="flex items-center justify-between mb-1">
-                          <span className="font-bold text-emerald-700 text-sm">{project.order_number}</span>
+                          <span className="font-bold text-blue-700 text-sm">{project.order_number}</span>
                           <span className={`text-[10px] px-2 py-0.5 rounded font-medium ${
                             project.translation_status === 'in_translation' ? 'bg-blue-100 text-blue-700' :
                             project.translation_status === 'received' ? 'bg-yellow-100 text-yellow-700' :
@@ -420,7 +440,7 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
                           {project.document_type || 'Document'} &bull; {project.page_count || 1} page(s)
                         </div>
                         {(project.translator_deadline || project.deadline) && (
-                          <div className="text-[10px] text-emerald-600 mt-1 font-medium">
+                          <div className="text-[10px] text-blue-600 mt-1 font-medium">
                             Due: {formatDate(project.translator_deadline || project.deadline)}
                           </div>
                         )}
@@ -464,7 +484,7 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
                       </div>
                       <div>
                         <span className="text-gray-500 text-xs block">Deadline</span>
-                        <span className="font-medium text-emerald-700">
+                        <span className="font-medium text-blue-700">
                           {formatDate(selectedProject.translator_deadline || selectedProject.deadline)}
                         </span>
                       </div>
@@ -479,8 +499,8 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
 
                   {/* Source Files - Download */}
                   <div className="bg-white rounded-xl shadow-sm border">
-                    <div className="px-5 py-3 border-b bg-gray-50 rounded-t-xl flex items-center gap-2">
-                      <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="px-5 py-3 border-b bg-slate-50 rounded-t-xl flex items-center gap-2">
+                      <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                       </svg>
                       <h4 className="text-sm font-semibold text-gray-700">Source Files (Download)</h4>
@@ -488,7 +508,7 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
                     <div className="p-5">
                       {loadingFiles ? (
                         <div className="text-center py-4">
-                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-600 mx-auto"></div>
+                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
                         </div>
                       ) : projectFiles.length === 0 ? (
                         <p className="text-sm text-gray-500 text-center py-4">No source files available for download.</p>
@@ -497,8 +517,8 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
                           {projectFiles.map(doc => (
                             <div key={doc.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
                               <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
-                                  <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                                   </svg>
                                 </div>
@@ -510,7 +530,7 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
                               <button
                                 onClick={() => downloadFile(doc)}
                                 disabled={downloading[doc.id]}
-                                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
                               >
                                 {downloading[doc.id] ? (
                                   <>
@@ -535,8 +555,8 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
 
                   {/* Upload Translation */}
                   <div className="bg-white rounded-xl shadow-sm border">
-                    <div className="px-5 py-3 border-b bg-gray-50 rounded-t-xl flex items-center gap-2">
-                      <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="px-5 py-3 border-b bg-slate-50 rounded-t-xl flex items-center gap-2">
+                      <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                       </svg>
                       <h4 className="text-sm font-semibold text-gray-700">Upload Translation</h4>
@@ -568,8 +588,8 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
                           <div
                             className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors ${
                               uploadFile
-                                ? 'border-emerald-400 bg-emerald-50'
-                                : 'border-gray-300 hover:border-emerald-400 hover:bg-emerald-50/50'
+                                ? 'border-blue-400 bg-blue-50'
+                                : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50/50'
                             }`}
                             onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                             onDrop={(e) => {
@@ -582,12 +602,12 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
                           >
                             {uploadFile ? (
                               <div>
-                                <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                                  <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                                   </svg>
                                 </div>
-                                <p className="text-sm font-medium text-emerald-700">{uploadFile.name}</p>
+                                <p className="text-sm font-medium text-blue-700">{uploadFile.name}</p>
                                 <p className="text-xs text-gray-500 mt-1">{(uploadFile.size / 1024 / 1024).toFixed(2)} MB</p>
                                 <button
                                   onClick={() => setUploadFile(null)}
@@ -602,7 +622,7 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                                 </svg>
                                 <p className="text-sm text-gray-600 mb-1">Drag and drop your file here, or</p>
-                                <label className="inline-block px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded-lg cursor-pointer transition-colors">
+                                <label className="inline-block px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg cursor-pointer transition-colors">
                                   Browse Files
                                   <input
                                     type="file"
@@ -623,7 +643,7 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
                             <button
                               onClick={handleUpload}
                               disabled={uploading}
-                              className="mt-4 w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                              className="mt-4 w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                             >
                               {uploading ? (
                                 <>
