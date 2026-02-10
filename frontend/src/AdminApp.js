@@ -484,7 +484,7 @@ const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
     .paged-translation { width: 100%; border-collapse: collapse; border: none !important; }
     .paged-translation > thead > tr > td,
     .paged-translation > tbody > tr > td { border: none !important; padding: 0 !important; }
-    .paged-translation > thead > tr > td { padding: 12px 0 0 0 !important; }
+    .paged-translation > thead > tr > td { padding: 0 !important; }
     .paged-translation > thead { display: table-header-group; }
     .paged-translation > tbody { display: table-row-group; }
     /* Avoid breaking inside table rows (bank statements, financial tables) */
@@ -6218,7 +6218,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       const normalizedQuickHtml = normalizeTranslationHtml(quickTranslationHtml);
       translationPagesHTML = includeLetterhead ? `
     <table class="paged-translation">
-        <thead><tr><td style="padding: 12px 0 0 0;">
+        <thead><tr><td style="padding: 0;">
             ${letterheadHTML}
         </td></tr></thead>
         <tbody><tr><td>
@@ -6285,7 +6285,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     </div>
                     <div style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; overflow: hidden;">
                         <span style="float: left; font-size: 11px; color: #64748b;">Certified Date:</span>
-                        <span style="float: right; font-size: 11px; font-weight: 600; color: #1e293b;">${new Date(certData.certified_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                        <span style="float: right; font-size: 11px; font-weight: 600; color: #1e293b;">${new Date(certData.certified_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/New_York' })}</span>
                     </div>
                     <div style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; overflow: hidden;">
                         <span style="float: left; font-size: 11px; color: #64748b;">Document Hash:</span>
@@ -6774,7 +6774,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       if (includeLetterhead) {
         return `
     <table class="paged-translation" style="${pageBreak}">
-        <thead><tr><td style="padding: 12px 0 0 0;">
+        <thead><tr><td style="padding: 0;">
             ${letterheadHTML}
         </td></tr></thead>
         <tbody><tr><td>
@@ -6823,7 +6823,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     </div>
                     <div style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; overflow: hidden;">
                         <span style="float: left; font-size: 11px; color: #64748b;">Certified Date:</span>
-                        <span style="float: right; font-size: 11px; font-weight: 600; color: #1e293b;">${new Date(certData.certified_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                        <span style="float: right; font-size: 11px; font-weight: 600; color: #1e293b;">${new Date(certData.certified_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/New_York' })}</span>
                     </div>
                     <div style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; overflow: hidden;">
                         <span style="float: left; font-size: 11px; color: #64748b;">Document Hash:</span>
@@ -14984,7 +14984,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       const documentType = DOCUMENT_TYPES.find(d => d.value === orderData.document_type)?.label || orderData.document_type || 'Document';
       const sourceLanguage = orderData.translate_from || orderData.source_language || 'Portuguese';
       const targetLanguage = orderData.translate_to || orderData.target_language || 'English';
-      const translationDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      const translationDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/New_York' });
 
       // Letterhead HTML
       const letterheadHTML = `
@@ -27469,7 +27469,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       const documentType = DOCUMENT_TYPES.find(d => d.value === orderData.document_type)?.label || orderData.document_type || 'Document';
       const sourceLanguage = orderData.translate_from || orderData.source_language || 'Portuguese';
       const targetLanguage = orderData.translate_to || orderData.target_language || 'English';
-      const translationDateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      const translationDateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/New_York' });
 
       // Letterhead HTML
       const letterheadHTML = `
@@ -28490,7 +28490,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     </div>
                     <div class="verification-row">
                         <span class="verification-label">Issue Date:</span>
-                        <span class="verification-value">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                        <span class="verification-value">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/New_York' })}</span>
                     </div>
                     <div class="verification-row">
                         <span class="verification-label">Page Count:</span>
@@ -28546,7 +28546,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     </div>
                     <div class="verification-row">
                         <span class="verification-label">Issue Date:</span>
-                        <span class="verification-value">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                        <span class="verification-value">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/New_York' })}</span>
                     </div>
                 </div>
             </div>
@@ -28581,7 +28581,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     </div>
                     <div class="verification-row">
                         <span class="verification-label">Issue Date:</span>
-                        <span class="verification-value">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                        <span class="verification-value">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/New_York' })}</span>
                     </div>
                 </div>
             </div>
