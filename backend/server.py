@@ -14554,6 +14554,8 @@ class TranslationData(BaseModel):
     submitted_by: Optional[str] = None
     submitted_by_role: Optional[str] = None
     translator_notes: Optional[str] = None  # Notes from translator to PM
+    batch_file_ids: Optional[List[str]] = None  # File IDs included in batch translation
+    batch_file_info: Optional[List[dict]] = None  # File metadata for batch translation
 
 @api_router.post("/admin/orders/{order_id}/translation")
 async def admin_save_translation(order_id: str, data: TranslationData, admin_key: str):
@@ -14606,36 +14608,63 @@ async def admin_save_translation(order_id: str, data: TranslationData, admin_key
         status_message = "Translation saved and sent to Admin for review"
         translation_ready = True
 
+    # Build update fields
+    update_fields = {
+        "translation_html": data.translation_html,
+        "translation_original_text": data.translation_original_text or "",
+        "translation_source_language": data.source_language,
+        "translation_target_language": data.target_language,
+        "translation_document_type": data.document_type,
+        "translation_translator_name": data.translator_name,
+        "translation_date": data.translation_date,
+        "translation_include_cover": data.include_cover,
+        "translation_page_format": data.page_format,
+        "translation_type_setting": data.translation_type,
+        "translation_original_images": data.original_images,
+        "translation_logo_left": data.logo_left,
+        "translation_logo_right": data.logo_right,
+        "translation_logo_stamp": data.logo_stamp,
+        "translation_signature_image": data.signature_image,
+        "translation_status": new_status,
+        "translation_sent_to": destination,
+        "translation_ready": translation_ready,
+        "translation_ready_at": datetime.utcnow().isoformat(),
+        "translation_submitted_by": data.submitted_by or (current_user.get("name") if current_user else "Admin"),
+        "translation_submitted_by_role": data.submitted_by_role or (current_user.get("role") if current_user else "admin"),
+        "translator_notes": data.translator_notes or ""
+    }
+
+    # Store batch translation metadata if present
+    if data.batch_file_ids:
+        update_fields["batch_file_ids"] = data.batch_file_ids
+        update_fields["batch_file_info"] = data.batch_file_info or []
+
     # Update order with translation data
     await db.translation_orders.update_one(
         {"id": order_id},
-        {"$set": {
-            "translation_html": data.translation_html,
-            "translation_original_text": data.translation_original_text or "",
-            "translation_source_language": data.source_language,
-            "translation_target_language": data.target_language,
-            "translation_document_type": data.document_type,
-            "translation_translator_name": data.translator_name,
-            "translation_date": data.translation_date,
-            "translation_include_cover": data.include_cover,
-            "translation_page_format": data.page_format,
-            "translation_type_setting": data.translation_type,
-            "translation_original_images": data.original_images,
-            "translation_logo_left": data.logo_left,
-            "translation_logo_right": data.logo_right,
-            "translation_logo_stamp": data.logo_stamp,
-            "translation_signature_image": data.signature_image,
-            "translation_status": new_status,
-            "translation_sent_to": destination,
-            "translation_ready": translation_ready,
-            "translation_ready_at": datetime.utcnow().isoformat(),
-            "translation_submitted_by": data.submitted_by or (current_user.get("name") if current_user else "Admin"),
-            "translation_submitted_by_role": data.submitted_by_role or (current_user.get("role") if current_user else "admin"),
-            "translator_notes": data.translator_notes or ""
-        }}
+        {"$set": update_fields}
     )
 
     logger.info(f"Translation saved for order {order_id}, sent to {destination}, status: {new_status}")
+
+    # Update file statuses for batch-translated files
+    if data.batch_file_ids and len(data.batch_file_ids) > 0:
+        batch_status = "review" if destination != "save" else "in_translation"
+        for file_id in data.batch_file_ids:
+            try:
+                await db.order_documents.update_one(
+                    {"id": file_id},
+                    {"$set": {
+                        "status": batch_status,
+                        "translation_status": batch_status,
+                        "batch_translated": True,
+                        "batch_translated_at": datetime.utcnow().isoformat(),
+                        "batch_translated_by": data.submitted_by or (current_user.get("name") if current_user else "Admin")
+                    }}
+                )
+            except Exception as e:
+                logger.error(f"Failed to update batch file status for {file_id}: {str(e)}")
+        logger.info(f"Updated batch file statuses for {len(data.batch_file_ids)} files in order {order_id}")
 
     # Save translation to order_documents when it's being sent (not just saved as draft)
     # This ensures the delivery flow can find it via order_documents query
@@ -18684,6 +18713,9 @@ async def admin_get_order_documents(order_id: str, admin_key: str):
             "assignment_status": doc.get("assignment_status"),
             "page_group_id": doc.get("page_group_id"),
             "page_number": doc.get("page_number"),
+            "status": doc.get("status"),
+            "translation_status": doc.get("translation_status"),
+            "batch_translated": doc.get("batch_translated", False),
         })
 
     for doc in docs_manual:
@@ -18711,6 +18743,9 @@ async def admin_get_order_documents(order_id: str, admin_key: str):
             "assignment_status": doc.get("assignment_status"),
             "page_group_id": doc.get("page_group_id"),
             "page_number": doc.get("page_number"),
+            "status": doc.get("status"),
+            "translation_status": doc.get("translation_status"),
+            "batch_translated": doc.get("batch_translated", False),
         })
 
     return {"documents": all_docs, "count": len(all_docs)}

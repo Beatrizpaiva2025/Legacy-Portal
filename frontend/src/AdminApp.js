@@ -1602,6 +1602,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [pageGroupSelections, setPageGroupSelections] = useState({}); // { docId: pageNumber }
   const [savingPageGroup, setSavingPageGroup] = useState(false);
 
+  // Batch translation state
+  const [batchSelectMode, setBatchSelectMode] = useState(false); // Toggle batch selection mode
+  const [batchSelectedFileIds, setBatchSelectedFileIds] = useState(new Set()); // Set of selected file IDs for batch translation
+
   // Translator messages
   const [translatorMessages, setTranslatorMessages] = useState([]);
   const [showTranslatorMessages, setShowTranslatorMessages] = useState(false);
@@ -3750,6 +3754,117 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
   };
 
+  // Load batch selected files into the workspace (for batch translation)
+  const loadBatchFiles = async () => {
+    const selectedIds = Array.from(batchSelectedFileIds);
+    if (selectedIds.length === 0) return;
+
+    const batchFiles = allProjectFiles.filter(f => selectedIds.includes(f.id));
+    if (batchFiles.length === 0) return;
+
+    // All files must be from the same order
+    const orderIds = [...new Set(batchFiles.map(f => f.order_id))];
+    if (orderIds.length > 1) {
+      showToast('All files must be from the same project to batch translate.');
+      return;
+    }
+
+    // Set order context from first file
+    const order = assignedOrders.find(o => o.id === batchFiles[0].order_id);
+    if (order) {
+      setSelectedOrderId(order.id);
+      setOrderNumber(order.order_number);
+      if (order.translate_from) setSourceLanguage(order.translate_from);
+      if (order.translate_to) setTargetLanguage(order.translate_to);
+    }
+
+    setProcessingStatus(`Loading ${batchFiles.length} files for batch translation...`);
+    const allImages = [];
+
+    for (let i = 0; i < batchFiles.length; i++) {
+      const file = batchFiles[i];
+      setProcessingStatus(`Loading file ${i + 1} of ${batchFiles.length}: "${file.filename}"...`);
+
+      try {
+        const downloadResponse = await axios.get(
+          `${API}/admin/order-documents/${file.id}/download?admin_key=${adminKey}`
+        );
+
+        if (downloadResponse.data.file_data) {
+          const contentType = downloadResponse.data.content_type || 'application/pdf';
+          const base64Data = downloadResponse.data.file_data;
+
+          if (contentType === 'application/pdf' || file.filename?.toLowerCase().endsWith('.pdf')) {
+            const binaryString = atob(base64Data);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let j = 0; j < binaryString.length; j++) {
+              bytes[j] = binaryString.charCodeAt(j);
+            }
+            const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+              const page = await pdf.getPage(pageNum);
+              let scale = 3;
+              let viewport = page.getViewport({ scale });
+
+              const maxDimension = 7900;
+              if (viewport.width > maxDimension || viewport.height > maxDimension) {
+                const dimensionScale = Math.min(maxDimension / viewport.width, maxDimension / viewport.height);
+                scale = scale * dimensionScale;
+                viewport = page.getViewport({ scale });
+              }
+
+              const canvas = document.createElement('canvas');
+              const context = canvas.getContext('2d');
+              canvas.height = viewport.height;
+              canvas.width = viewport.width;
+              await page.render({ canvasContext: context, viewport }).promise;
+              const base64Image = canvas.toDataURL('image/png').split(',')[1];
+              allImages.push({
+                filename: `${file.filename}_page_${pageNum}.png`,
+                data: base64Image,
+                type: 'image/png',
+                sourceFileId: file.id,
+                sourceFilename: file.filename
+              });
+            }
+          } else {
+            allImages.push({
+              filename: file.filename,
+              data: base64Data,
+              type: contentType,
+              sourceFileId: file.id,
+              sourceFilename: file.filename
+            });
+          }
+        }
+      } catch (err) {
+        console.error(`Failed to load batch file ${file.filename}:`, err);
+      }
+    }
+
+    if (allImages.length > 0) {
+      setOriginalImages(allImages);
+      setSelectedFileId(batchFiles[0].id);
+      // Store batch info for later saving
+      window.__batchTranslationFileIds = selectedIds;
+      window.__batchTranslationFileInfo = batchFiles.map(f => ({
+        id: f.id,
+        filename: f.filename,
+        order_id: f.order_id,
+        order_number: f.order_number
+      }));
+      setProcessingStatus(`${allImages.length} page(s) loaded from ${batchFiles.length} files (batch translation)`);
+      showToast(`${allImages.length} page(s) loaded from ${batchFiles.length} files`);
+      setBatchSelectMode(false);
+      setBatchSelectedFileIds(new Set());
+      if (activeSubTab === 'start') {
+        setActiveSubTab('translate');
+      }
+    } else {
+      setProcessingStatus('No images could be loaded from selected files');
+    }
+  };
+
   // Load document from order (legacy - loads first file automatically)
   const loadOrderDocument = async (order) => {
     await selectProject(order);
@@ -3779,6 +3894,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             filename: orderData.translation_document_type || 'Translation',
             originalText: orderData.translation_original_text || ''
           }]);
+
+          // Restore batch translation info if present
+          if (orderData.batch_file_ids && orderData.batch_file_ids.length > 0) {
+            window.__batchTranslationFileIds = orderData.batch_file_ids;
+            window.__batchTranslationFileInfo = orderData.batch_file_info || [];
+          } else {
+            window.__batchTranslationFileIds = null;
+            window.__batchTranslationFileInfo = null;
+          }
 
           // Also set OCR results if original text is available
           if (orderData.translation_original_text) {
@@ -3945,8 +4069,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         origImages = originalImages.map(img => ({ filename: img.filename, data: img.data, type: img.type || 'image/png' }));
       }
 
-      // Send to backend with destination info
-      const response = await axios.post(`${API}/admin/orders/${selectedOrderId}/translation?admin_key=${adminKey}`, {
+      // Build payload with optional batch info
+      const translationPayload = {
         translation_html: translationHTML,
         translation_original_text: originalText,
         source_language: sourceLanguage,
@@ -3965,7 +4089,16 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         send_to: destination, // 'save', 'pm', 'ready', 'deliver'
         submitted_by: user?.name || 'Unknown',
         submitted_by_role: user?.role || 'unknown'
-      });
+      };
+
+      // Include batch translation file info if available
+      if (window.__batchTranslationFileIds && window.__batchTranslationFileIds.length > 0) {
+        translationPayload.batch_file_ids = window.__batchTranslationFileIds;
+        translationPayload.batch_file_info = window.__batchTranslationFileInfo || [];
+      }
+
+      // Send to backend with destination info
+      const response = await axios.post(`${API}/admin/orders/${selectedOrderId}/translation?admin_key=${adminKey}`, translationPayload);
 
       const destinationLabels = {
         'save': 'Saved',
@@ -3981,6 +4114,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
       if (response.data.status === 'success' || response.data.success) {
         const isTranslator = user?.role === 'translator';
+
+        // Clear batch translation info after successful submit (not save)
+        if (destination !== 'save' && window.__batchTranslationFileIds) {
+          window.__batchTranslationFileIds = null;
+          window.__batchTranslationFileInfo = null;
+        }
 
         if (destination === 'save') {
           showToast('✅ Translation saved successfully!');
@@ -7689,7 +7828,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     </button>
                   </div>
                   {/* Group Pages Toggle */}
-                  {viewMode === 'files' && allProjectFiles.length > 1 && (
+                  {viewMode === 'files' && allProjectFiles.length > 1 && !batchSelectMode && (
                     <button
                       onClick={() => {
                         setPageGroupMode(!pageGroupMode);
@@ -7703,6 +7842,23 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       title="Group multiple pages/images into a single translation"
                     >
                       {pageGroupMode ? '✕ Cancel' : '🔗 Group Pages'}
+                    </button>
+                  )}
+                  {/* Batch Translate Toggle */}
+                  {viewMode === 'files' && allProjectFiles.length > 1 && !pageGroupMode && (
+                    <button
+                      onClick={() => {
+                        setBatchSelectMode(!batchSelectMode);
+                        if (batchSelectMode) setBatchSelectedFileIds(new Set());
+                      }}
+                      className={`px-3 py-1 text-xs rounded-md transition-all ${
+                        batchSelectMode
+                          ? 'bg-indigo-500 text-white shadow'
+                          : 'bg-white border border-indigo-300 text-indigo-600 hover:bg-indigo-50'
+                      }`}
+                      title="Select multiple files to translate together in batch"
+                    >
+                      {batchSelectMode ? '✕ Cancel' : '📑 Batch Translate'}
                     </button>
                   )}
                 </div>
@@ -7731,6 +7887,52 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 </div>
               )}
 
+              {/* Batch Translation Toolbar */}
+              {batchSelectMode && viewMode === 'files' && (
+                <div className="mb-3 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-indigo-700">
+                      <strong>Batch Translation:</strong> Select 2 or more files to translate them all together. All files must be from the same project.
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-indigo-600">
+                        {batchSelectedFileIds.size} file(s) selected
+                      </span>
+                      <button
+                        onClick={() => {
+                          // Select all files from the same order as the first selected file
+                          if (batchSelectedFileIds.size > 0) {
+                            const firstId = Array.from(batchSelectedFileIds)[0];
+                            const firstFile = allProjectFiles.find(f => f.id === firstId);
+                            if (firstFile) {
+                              const sameOrderFiles = allProjectFiles.filter(f => f.order_id === firstFile.order_id && !f.page_group_id);
+                              setBatchSelectedFileIds(new Set(sameOrderFiles.map(f => f.id)));
+                            }
+                          } else {
+                            // Select all ungrouped files from the first order
+                            const orders = [...new Set(allProjectFiles.map(f => f.order_id))];
+                            if (orders.length > 0) {
+                              const sameOrderFiles = allProjectFiles.filter(f => f.order_id === orders[0] && !f.page_group_id);
+                              setBatchSelectedFileIds(new Set(sameOrderFiles.map(f => f.id)));
+                            }
+                          }
+                        }}
+                        className="px-2 py-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 text-xs rounded transition-colors"
+                      >
+                        Select All
+                      </button>
+                      <button
+                        onClick={loadBatchFiles}
+                        disabled={batchSelectedFileIds.size < 2}
+                        className="px-3 py-1.5 bg-indigo-500 hover:bg-indigo-600 disabled:bg-gray-300 text-white text-xs rounded-md transition-colors font-medium"
+                      >
+                        Load {batchSelectedFileIds.size} Files for Translation
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {loadingAssigned ? (
                 <div className="text-center py-4 text-gray-500 text-sm">Loading...</div>
               ) : viewMode === 'files' ? (
@@ -7751,6 +7953,19 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         key={file.id || idx}
                         onClick={async () => {
                           if (pageGroupMode) return; // Don't load files in grouping mode
+                          // In batch mode, toggle selection
+                          if (batchSelectMode) {
+                            setBatchSelectedFileIds(prev => {
+                              const next = new Set(prev);
+                              if (next.has(file.id)) {
+                                next.delete(file.id);
+                              } else {
+                                next.add(file.id);
+                              }
+                              return next;
+                            });
+                            return;
+                          }
                           // If file is part of a group, load all group files
                           if (file.page_group_id) {
                             await loadPageGroup(file.page_group_id);
@@ -7768,7 +7983,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           await loadProjectFile(file);
                         }}
                         className={`p-3 rounded-lg cursor-pointer transition-all border ${
-                          pageGroupMode && pageGroupSelections[file.id] > 0
+                          batchSelectMode && batchSelectedFileIds.has(file.id)
+                            ? 'bg-indigo-50 border-indigo-400 shadow-md ring-2 ring-indigo-300'
+                            : pageGroupMode && pageGroupSelections[file.id] > 0
                             ? 'bg-orange-50 border-orange-400 shadow-md ring-2 ring-orange-300'
                             : file.page_group_id
                             ? 'bg-purple-50 border-purple-300 hover:border-purple-500 hover:shadow'
@@ -7777,6 +7994,31 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             : 'bg-white border-gray-200 hover:border-blue-400 hover:shadow'
                         }`}
                       >
+                        {/* Batch Selection Checkbox */}
+                        {batchSelectMode && !file.page_group_id && (
+                          <div className="mb-2 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={batchSelectedFileIds.has(file.id)}
+                              onChange={() => {
+                                setBatchSelectedFileIds(prev => {
+                                  const next = new Set(prev);
+                                  if (next.has(file.id)) {
+                                    next.delete(file.id);
+                                  } else {
+                                    next.add(file.id);
+                                  }
+                                  return next;
+                                });
+                              }}
+                              className="w-4 h-4 text-indigo-600 rounded border-indigo-300 focus:ring-indigo-500"
+                            />
+                            <span className="text-[10px] text-indigo-600 font-medium">
+                              {batchSelectedFileIds.has(file.id) ? 'Selected for batch' : 'Select for batch translation'}
+                            </span>
+                          </div>
+                        )}
+
                         {/* Page Grouping Input */}
                         {pageGroupMode && !file.page_group_id && (
                           <div className="mb-2 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
@@ -7838,6 +8080,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                              file.file_status}
                           </span>
                         </div>
+                        {file.batch_translated && (
+                          <div className="mb-1">
+                            <span className="text-[10px] px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full font-medium">
+                              📑 Batch translated
+                            </span>
+                          </div>
+                        )}
                         <div className="text-[10px] text-gray-500 mb-1">
                           Project: <span className="font-medium text-blue-600">{file.order_number}</span>
                         </div>
@@ -10556,6 +10805,25 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         <div className="bg-white rounded shadow p-4">
           <h2 className="text-sm font-bold mb-2">📋 Review Translation</h2>
 
+          {/* Batch Translation Info Banner */}
+          {window.__batchTranslationFileInfo && window.__batchTranslationFileInfo.length > 0 && (
+            <div className="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-indigo-600 font-bold text-xs">📑 Batch Translation</span>
+                <span className="text-[10px] px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full">
+                  {window.__batchTranslationFileInfo.length} files
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {window.__batchTranslationFileInfo.map((file, idx) => (
+                  <span key={idx} className="text-[10px] px-2 py-1 bg-white border border-indigo-200 rounded text-indigo-700">
+                    {idx + 1}. {file.filename}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Upload Translation */}
           <div className="mb-4 p-3 bg-gray-50 rounded-lg border">
             <label className="flex items-center justify-center px-4 py-2 bg-green-500 text-white text-sm rounded cursor-pointer hover:bg-green-600 transition">
@@ -11091,6 +11359,25 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               </button>
             )}
           </div>
+
+          {/* Batch Translation Info Banner */}
+          {window.__batchTranslationFileInfo && window.__batchTranslationFileInfo.length > 0 && (
+            <div className="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-indigo-600 font-bold text-xs">📑 Batch Translation</span>
+                <span className="text-[10px] px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full">
+                  {window.__batchTranslationFileInfo.length} files
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {window.__batchTranslationFileInfo.map((file, idx) => (
+                  <span key={idx} className="text-[10px] px-2 py-1 bg-white border border-indigo-200 rounded text-indigo-700">
+                    {idx + 1}. {file.filename}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           {translationResults.length > 0 ? (
             <>
