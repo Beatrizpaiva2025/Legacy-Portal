@@ -88,19 +88,29 @@ const VendorLogin = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-500 via-teal-600 to-cyan-700 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-        {/* Header */}
-        <div className="bg-gradient-to-b from-emerald-500 to-teal-600 py-8 px-4 text-center">
+        {/* Blue Header with Globe */}
+        <div className="bg-gradient-to-b from-blue-500 to-blue-600 py-8 px-4 text-center">
+          {/* Globe Icon */}
           <div className="mb-3">
-            <div className="w-16 h-16 mx-auto bg-white/20 rounded-full flex items-center justify-center">
-              <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+            <div className="w-16 h-16 mx-auto">
+              <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="50" cy="50" r="45" fill="#4FC3F7"/>
+                <ellipse cx="50" cy="50" rx="18" ry="45" stroke="white" strokeWidth="1.5" fill="none"/>
+                <line x1="5" y1="50" x2="95" y2="50" stroke="white" strokeWidth="1.5"/>
+                <ellipse cx="50" cy="28" rx="38" ry="10" stroke="white" strokeWidth="1.5" fill="none"/>
+                <ellipse cx="50" cy="72" rx="38" ry="10" stroke="white" strokeWidth="1.5" fill="none"/>
+                {/* Land masses */}
+                <path d="M28 32 Q34 26 46 30 Q52 34 48 44 Q42 48 34 44 Q28 38 28 32Z" fill="#4CAF50"/>
+                <path d="M56 22 Q68 18 76 26 Q80 36 72 42 Q62 40 54 34 Q50 28 56 22Z" fill="#4CAF50"/>
+                <path d="M22 54 Q30 50 42 54 Q48 60 44 70 Q34 74 26 68 Q18 62 22 54Z" fill="#4CAF50"/>
+                <path d="M58 56 Q70 52 80 60 Q84 70 76 76 Q64 78 56 72 Q52 64 58 56Z" fill="#4CAF50"/>
               </svg>
             </div>
           </div>
           <h1 className="text-xl font-semibold text-white">Legacy Translations</h1>
-          <p className="text-emerald-100 text-sm mt-1">Vendor Translator Portal</p>
+          <p className="text-blue-100 text-sm mt-1">Vendor Translator Portal</p>
         </div>
 
         {/* Form */}
@@ -120,7 +130,7 @@ const VendorLogin = ({ onLogin }) => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                 placeholder="your@email.com"
                 required
               />
@@ -131,7 +141,7 @@ const VendorLogin = ({ onLogin }) => {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                 placeholder="Your password"
                 required
               />
@@ -139,7 +149,7 @@ const VendorLogin = ({ onLogin }) => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+              className="w-full py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg font-medium transition-all disabled:opacity-50"
             >
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
