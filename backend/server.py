@@ -18970,6 +18970,30 @@ async def admin_download_order_document(doc_id: str, admin_key: str):
 
     raise HTTPException(status_code=404, detail="Document not found")
 
+@api_router.put("/admin/orders/{order_id}/add-file-translator")
+async def add_file_translator_to_order(order_id: str, admin_key: str, data: dict = Body(...)):
+    """Add a translator to file_translator_ids/names so they can see the project"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+    if user_info.get("role") not in ["admin", "pm"]:
+        raise HTTPException(status_code=403, detail="Only admin or PM can assign translators")
+
+    translator_id = data.get("translator_id")
+    translator_name = data.get("translator_name")
+    if not translator_id:
+        raise HTTPException(status_code=400, detail="translator_id is required")
+
+    await db.translation_orders.update_one(
+        {"id": order_id},
+        {"$addToSet": {
+            "file_translator_ids": translator_id,
+            "file_translator_names": translator_name or ""
+        }}
+    )
+    return {"success": True, "message": f"Translator {translator_name} added to project"}
+
+
 @api_router.patch("/admin/order-documents/{doc_id}")
 async def admin_update_order_document(doc_id: str, admin_key: str, update_data: dict = Body(...)):
     """Admin/PM: Update document metadata (e.g., assign translator to specific document)"""
