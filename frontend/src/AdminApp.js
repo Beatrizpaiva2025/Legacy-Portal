@@ -407,6 +407,59 @@ const sanitizeErrorMessage = (errorMsg) => {
   return sanitized;
 };
 
+// ==================== TEXT REPLACEMENT UTILITIES ====================
+// Used by both TranslationWorkspace and PMDashboard for applying proofreading corrections
+const tryReplaceText = (html, foundText, suggestionText) => {
+  let updatedHtml = html;
+  let replaced = false;
+
+  // Strategy 1: Try exact match (case insensitive)
+  const escapedText = foundText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const exactRegex = new RegExp(escapedText, 'gi');
+
+  if (exactRegex.test(html)) {
+    updatedHtml = html.replace(exactRegex, suggestionText);
+    replaced = true;
+  }
+
+  // Strategy 2: Try matching with flexible whitespace
+  if (!replaced) {
+    const flexiblePattern = foundText
+      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      .replace(/\s+/g, '\\s*(?:<[^>]*>)?\\s*');
+    const flexibleRegex = new RegExp(flexiblePattern, 'gi');
+
+    if (flexibleRegex.test(html)) {
+      updatedHtml = html.replace(flexibleRegex, suggestionText);
+      replaced = true;
+    }
+  }
+
+  // Strategy 3: Try finding words individually
+  if (!replaced) {
+    const words = foundText.split(/\s+/).filter(w => w.length > 2);
+    if (words.length > 0) {
+      const wordPattern = words
+        .map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+        .join('(?:[^<]*(?:<[^>]*>[^<]*)*?)');
+      const wordRegex = new RegExp(wordPattern, 'gi');
+
+      if (wordRegex.test(html)) {
+        updatedHtml = html.replace(wordRegex, suggestionText);
+        replaced = true;
+      }
+    }
+  }
+
+  return { updatedHtml, replaced };
+};
+
+// Strip trailing parenthetical comments from suggestion text
+const stripParentheticalComment = (text) => {
+  if (!text) return text;
+  return text.replace(/\s*\([^)]*\.{0,3}\)?\s*$/, '').trim();
+};
+
 // ==================== UNIFIED CSS STYLES FOR PDF GENERATION ====================
 // SIMPLIFIED - Uses inline styles in HTML for maximum reliability
 const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
@@ -5221,59 +5274,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     setTimeout(() => {
       setHighlightedPmErrorIndex(null);
     }, 3000);
-  };
-
-  // Helper function to try replacing text with multiple strategies
-  const tryReplaceText = (html, foundText, suggestionText) => {
-    let updatedHtml = html;
-    let replaced = false;
-
-    // Strategy 1: Try exact match (case insensitive)
-    const escapedText = foundText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const exactRegex = new RegExp(escapedText, 'gi');
-
-    if (exactRegex.test(html)) {
-      updatedHtml = html.replace(exactRegex, suggestionText);
-      replaced = true;
-    }
-
-    // Strategy 2: Try matching with flexible whitespace
-    if (!replaced) {
-      const flexiblePattern = foundText
-        .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-        .replace(/\s+/g, '\\s*(?:<[^>]*>)?\\s*');
-      const flexibleRegex = new RegExp(flexiblePattern, 'gi');
-
-      if (flexibleRegex.test(html)) {
-        updatedHtml = html.replace(flexibleRegex, suggestionText);
-        replaced = true;
-      }
-    }
-
-    // Strategy 3: Try finding words individually
-    if (!replaced) {
-      const words = foundText.split(/\s+/).filter(w => w.length > 2);
-      if (words.length > 0) {
-        const wordPattern = words
-          .map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-          .join('(?:[^<]*(?:<[^>]*>[^<]*)*?)');
-        const wordRegex = new RegExp(wordPattern, 'gi');
-
-        if (wordRegex.test(html)) {
-          updatedHtml = html.replace(wordRegex, suggestionText);
-          replaced = true;
-        }
-      }
-    }
-
-    return { updatedHtml, replaced };
-  };
-
-  // Strip trailing parenthetical comments from suggestion text (e.g. "corrected text (explanation...)" -> "corrected text")
-  const stripParentheticalComment = (text) => {
-    if (!text) return text;
-    // Remove trailing parenthetical content: "(any explanation here)" or "(truncated...)"
-    return text.replace(/\s*\([^)]*\.{0,3}\)?\s*$/, '').trim();
   };
 
   // Apply a single proofreading correction
@@ -28517,12 +28517,158 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
   // PM Review edit mode
   const [pmReviewEditMode, setPmReviewEditMode] = useState(false);
+  // PM Convert to HTML state
+  const [pmConverting, setPmConverting] = useState(false);
 
   // PM Proofreading error highlight state
   const [highlightedPmErrorIndex, setHighlightedPmErrorIndex] = useState(null);
 
   const handlePmErrorRowClick = (errorIndex, foundText) => {
+    if (!foundText) return;
+
     setHighlightedPmErrorIndex(errorIndex === highlightedPmErrorIndex ? null : errorIndex);
+
+    // Find and scroll to the text in the translation preview
+    setTimeout(() => {
+      const translationPreview = document.querySelector('.pm-translation-preview');
+      if (translationPreview) {
+        // Remove any previous highlights
+        const existingMarks = translationPreview.querySelectorAll('mark[data-pm-highlight]');
+        existingMarks.forEach(mark => {
+          const parent = mark.parentNode;
+          parent.replaceChild(document.createTextNode(mark.textContent), mark);
+          parent.normalize();
+        });
+
+        // Try to find and highlight the text
+        const content = translationPreview.innerHTML;
+        if (content.toLowerCase().includes(foundText.toLowerCase())) {
+          const escapedText = foundText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const regex = new RegExp(`(${escapedText})`, 'gi');
+          translationPreview.innerHTML = content.replace(
+            regex,
+            '<mark data-pm-highlight="true" style="background-color: #fef3c7; border: 2px solid #f59e0b; padding: 2px 4px; border-radius: 3px;">$1</mark>'
+          );
+          const mark = translationPreview.querySelector('mark[data-pm-highlight]');
+          if (mark) {
+            mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }
+      }
+    }, 100);
+
+    // Clear the highlight after 5 seconds
+    setTimeout(() => {
+      setHighlightedPmErrorIndex(null);
+      const translationPreview = document.querySelector('.pm-translation-preview');
+      if (translationPreview) {
+        const existingMarks = translationPreview.querySelectorAll('mark[data-pm-highlight]');
+        existingMarks.forEach(mark => {
+          const parent = mark.parentNode;
+          parent.replaceChild(document.createTextNode(mark.textContent), mark);
+          parent.normalize();
+        });
+      }
+    }, 5000);
+  };
+
+  // Apply a single proofreading correction in PM Dashboard
+  const applyPmProofreadingCorrection = (erro, index) => {
+    const foundText = (erro.traducao_errada || erro.found || '').trim();
+    const suggestionText = (erro.correcao || erro.sugestao || '').trim();
+    const cleanSuggestion = stripParentheticalComment(suggestionText);
+
+    if (!foundText || !cleanSuggestion) {
+      showToast('Cannot apply correction: missing original text or suggestion');
+      return;
+    }
+
+    // Get current translation HTML from PM state
+    let currentHtml = '';
+    if (translatedContent?.html) {
+      currentHtml = translatedContent.html;
+    } else if (pmTranslationHtml) {
+      currentHtml = pmTranslationHtml;
+    } else {
+      showToast('No translation content available to apply corrections');
+      return;
+    }
+
+    const result = tryReplaceText(currentHtml, foundText, cleanSuggestion);
+
+    if (!result.replaced) {
+      showToast(`Could not find text to replace: "${foundText.substring(0, 50)}${foundText.length > 50 ? '...' : ''}"\n\nThe text may have been modified or contains special formatting.`);
+      return;
+    }
+
+    // Update the appropriate translation state
+    if (translatedContent?.html) {
+      setTranslatedContent({ ...translatedContent, html: result.updatedHtml });
+    } else {
+      setPmTranslationHtml(result.updatedHtml);
+    }
+
+    // Mark this error as applied in proofreading result
+    if (proofreadingResult?.erros) {
+      const updatedErrors = [...proofreadingResult.erros];
+      updatedErrors[index] = { ...updatedErrors[index], applied: true };
+      setProofreadingResult({ ...proofreadingResult, erros: updatedErrors });
+    }
+
+    showToast('Correction applied successfully!');
+  };
+
+  // Apply all proofreading corrections at once in PM Dashboard
+  const applyAllPmProofreadingCorrections = () => {
+    if (!proofreadingResult?.erros || proofreadingResult.erros.length === 0) return;
+
+    // Get current translation HTML from PM state
+    let currentHtml = '';
+    if (translatedContent?.html) {
+      currentHtml = translatedContent.html;
+    } else if (pmTranslationHtml) {
+      currentHtml = pmTranslationHtml;
+    } else {
+      showToast('No translation content available to apply corrections');
+      return;
+    }
+
+    let updatedHtml = currentHtml;
+    let appliedCount = 0;
+
+    const updatedErrors = proofreadingResult.erros.map(erro => {
+      const foundText = (erro.traducao_errada || erro.found || '').trim();
+      const suggestionText = (erro.correcao || erro.sugestao || '').trim();
+      const cleanSuggestion = stripParentheticalComment(suggestionText);
+
+      if (foundText && cleanSuggestion && !erro.applied) {
+        const result = tryReplaceText(updatedHtml, foundText, cleanSuggestion);
+        if (result.replaced) {
+          updatedHtml = result.updatedHtml;
+          appliedCount++;
+          return { ...erro, applied: true };
+        }
+      }
+      return erro;
+    });
+
+    if (appliedCount === 0) {
+      showToast('No corrections could be applied. The text may have been modified or contains special formatting.');
+      return;
+    }
+
+    // Update the appropriate translation state
+    if (translatedContent?.html) {
+      setTranslatedContent({ ...translatedContent, html: updatedHtml });
+    } else {
+      setPmTranslationHtml(updatedHtml);
+    }
+
+    // Update proofreading result
+    setProofreadingResult({ ...proofreadingResult, erros: updatedErrors });
+
+    setProcessingStatus(`✅ ${appliedCount} correction(s) applied successfully!`);
+    setTimeout(() => setProcessingStatus(''), 3000);
   };
 
   // Translator Assignment Modal state (for email invites)
@@ -29538,21 +29684,86 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     for (const file of selectedFiles) {
       const fileName = file.name.toLowerCase();
 
-      // PDF - store directly
+      // PDF - extract text and convert to HTML using pdfjs-dist
       if (fileName.endsWith('.pdf')) {
-        setProcessingStatus(`Loading PDF: ${file.name}`);
-        const reader = new FileReader();
-        const result = await new Promise((resolve, reject) => {
-          reader.onload = (e) => resolve(e.target.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
-        const base64 = result.split(',')[1] || result;
-        allImages.push({
-          filename: file.name,
-          data: base64,
-          type: 'application/pdf'
-        });
+        setProcessingStatus(`Converting PDF to text: ${file.name}...`);
+        try {
+          const arrayBuffer = await file.arrayBuffer();
+          const typedArray = new Uint8Array(arrayBuffer);
+          const pdf = await pdfjsLib.getDocument({ data: typedArray }).promise;
+          let extractedPages = [];
+
+          for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+            setProcessingStatus(`Extracting text from PDF page ${pageNum}/${pdf.numPages}...`);
+            const page = await pdf.getPage(pageNum);
+            const textContent = await page.getTextContent();
+
+            // Build text preserving line structure
+            let pageText = '';
+            let lastY = null;
+            for (const item of textContent.items) {
+              if (item.str === undefined) continue;
+              const y = Math.round(item.transform[5]);
+              if (lastY !== null && Math.abs(y - lastY) > 5) {
+                pageText += '\n';
+              } else if (lastY !== null && pageText.length > 0 && !pageText.endsWith(' ') && !pageText.endsWith('\n')) {
+                pageText += ' ';
+              }
+              pageText += item.str;
+              lastY = y;
+            }
+            if (pageText.trim()) {
+              extractedPages.push(pageText.trim());
+            }
+          }
+
+          // If text was extracted, convert to HTML
+          if (extractedPages.length > 0 && extractedPages.some(p => p.length > 20)) {
+            const pagesHtml = extractedPages.map((pageText, idx) => {
+              const paragraphs = pageText.split('\n').filter(l => l.trim());
+              const htmlParagraphs = paragraphs.map(p => `<p style="margin:4px 0;font-family:'Times New Roman',serif;font-size:12pt;">${p.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`).join('\n');
+              if (extractedPages.length > 1) {
+                return `<div style="margin-bottom:20px;padding-bottom:15px;${idx < extractedPages.length - 1 ? 'border-bottom:1px dashed #ccc;' : ''}"><p style="font-size:10px;color:#888;margin-bottom:8px;">Page ${idx + 1}</p>${htmlParagraphs}</div>`;
+              }
+              return htmlParagraphs;
+            }).join('\n');
+            htmlContent = `<div style="font-family:'Times New Roman',serif;line-height:1.6;">${pagesHtml}</div>`;
+            setProcessingStatus(`✅ PDF converted: ${extractedPages.length} page(s) with text extracted`);
+          } else {
+            // Scanned PDF - no text found, store as images for later OCR conversion
+            setProcessingStatus(`PDF has no extractable text (scanned). Storing as images. Use "Convert to HTML" button for OCR.`);
+
+            // Also store as base64 for the convert button
+            const reader = new FileReader();
+            const result = await new Promise((resolve, reject) => {
+              reader.onload = (e) => resolve(e.target.result);
+              reader.onerror = reject;
+              reader.readAsDataURL(file);
+            });
+            const base64 = result.split(',')[1] || result;
+            allImages.push({
+              filename: file.name,
+              data: base64,
+              type: 'application/pdf'
+            });
+          }
+        } catch (err) {
+          console.error('PDF text extraction error:', err);
+          // Fallback: store as base64
+          setProcessingStatus(`PDF text extraction failed. Storing as file. Use "Convert to HTML" for OCR.`);
+          const reader = new FileReader();
+          const result = await new Promise((resolve, reject) => {
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+          const base64 = result.split(',')[1] || result;
+          allImages.push({
+            filename: file.name,
+            data: base64,
+            type: 'application/pdf'
+          });
+        }
       }
       // HTML file
       else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
@@ -29567,7 +29778,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       // Word document
       else if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
         try {
-          setProcessingStatus(`Converting Word document: ${file.name}`);
+          setProcessingStatus(`Converting Word document: ${file.name}...`);
           const arrayBuffer = await file.arrayBuffer();
           const result = await mammoth.convertToHtml({ arrayBuffer });
           // Post-process: add inline styles to tables for robust rendering
@@ -29579,9 +29790,12 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
           convertedHtml = convertedHtml.replace(/<th(?=[>\s])/g,
             '<th style="vertical-align:top;word-wrap:break-word;overflow-wrap:break-word;overflow:hidden;padding:3px 5px;font-weight:bold;"');
           htmlContent = convertedHtml;
+          if (!htmlContent || htmlContent.trim().length < 10) {
+            showToast(`Word document "${file.name}" produced empty or very short content. The file may be image-based.`);
+          }
         } catch (err) {
           console.error('Word conversion error:', err);
-          showToast(`Error converting Word document: ${file.name}`);
+          showToast(`Error converting Word document: ${file.name}. Try saving as .docx format.`);
         }
       }
       // Plain text
@@ -29614,42 +29828,89 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     setPmTranslationFiles(allImages);
     setPmTranslationHtml(htmlContent);
 
-    // Also populate translationResults for the REVIEW editor
-    const newResults = [];
+    // Also set translatedContent for the review panel if HTML was extracted
     if (htmlContent) {
-      newResults.push({
-        translatedText: htmlContent,
-        originalText: '',
-        filename: 'uploaded_translation'
-      });
-    }
-    if (allImages.length > 0) {
-      allImages.forEach((img, idx) => {
-        const imgHtml = `<div style="text-align:center;"><img src="data:${img.type || 'image/png'};base64,${img.data}" style="max-width:100%; height:auto;" alt="Translation page ${idx + 1}" /></div>`;
-        newResults.push({
-          translatedText: imgHtml,
-          originalText: '',
-          filename: img.filename || `page_${idx + 1}`
-        });
-      });
-    }
-    if (newResults.length > 0) {
-      setTranslationResults(newResults);
+      setTranslatedContent({ html: htmlContent, filename: 'uploaded_translation' });
     }
 
-    // Also populate Quick Package variables for DELIVER tab
-    setQuickTranslationFiles(allImages);
-    if (htmlContent) {
-      setQuickTranslationHtml(htmlContent);
-      setQuickTranslationType('html');
-    } else if (allImages.length > 0) {
-      setQuickTranslationType('images');
-    }
-
-    setProcessingStatus('✅ Translation uploaded successfully!');
-    setTimeout(() => setProcessingStatus(''), 3000);
+    setProcessingStatus(htmlContent
+      ? '✅ Translation uploaded and converted to HTML successfully!'
+      : allImages.length > 0
+        ? '⚠️ Translation uploaded as images. Use "Convert to HTML" button to extract text for proofreading.'
+        : '✅ Translation uploaded successfully!');
+    setTimeout(() => setProcessingStatus(''), 5000);
 
     event.target.value = '';
+  };
+
+  // Convert uploaded PDF/image files to HTML using backend OCR
+  const handlePmConvertToHtml = async () => {
+    if (pmConverting) return;
+
+    // Get files to convert - from pmTranslationFiles (images/PDFs) or translatedContent (PDF)
+    const filesToConvert = [];
+    if (pmTranslationFiles.length > 0) {
+      pmTranslationFiles.forEach(f => filesToConvert.push(f));
+    } else if (translatedContent && !translatedContent.html) {
+      filesToConvert.push(translatedContent);
+    }
+
+    if (filesToConvert.length === 0) {
+      showToast('No files to convert. Upload a PDF or image first.');
+      return;
+    }
+
+    setPmConverting(true);
+    setProcessingStatus('Converting to HTML via OCR...');
+
+    try {
+      let allHtml = [];
+
+      for (let i = 0; i < filesToConvert.length; i++) {
+        const file = filesToConvert[i];
+        setProcessingStatus(`OCR processing file ${i + 1}/${filesToConvert.length}: ${file.filename || 'document'}...`);
+
+        const response = await axios.post(`${API}/admin/ocr?admin_key=${adminKey}`, {
+          file_base64: file.data,
+          file_type: file.type || 'application/pdf',
+          filename: file.filename || 'document',
+          use_claude: false,
+          preserve_layout: true
+        });
+
+        if (response.data.status === 'success' || response.data.text) {
+          const text = response.data.text || '';
+          if (text.trim()) {
+            // Use html from OCR if available, otherwise create from text
+            if (response.data.html) {
+              allHtml.push(response.data.html);
+            } else {
+              const paragraphs = text.split('\n').filter(l => l.trim());
+              const htmlParagraphs = paragraphs.map(p =>
+                `<p style="margin:4px 0;font-family:'Times New Roman',serif;font-size:12pt;">${p.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`
+              ).join('\n');
+              allHtml.push(htmlParagraphs);
+            }
+          }
+        }
+      }
+
+      if (allHtml.length > 0) {
+        const finalHtml = `<div style="font-family:'Times New Roman',serif;line-height:1.6;">${allHtml.join('\n<hr style="border:none;border-top:1px dashed #ccc;margin:20px 0;"/>\n')}</div>`;
+        setPmTranslationHtml(finalHtml);
+        setTranslatedContent({ html: finalHtml, filename: 'converted_translation' });
+        setPmTranslationFiles([]); // Clear image files since we now have HTML
+        setProcessingStatus('✅ Conversion complete! Translation text is now available for proofreading.');
+      } else {
+        setProcessingStatus('⚠️ OCR could not extract text. The document may need a different approach.');
+      }
+    } catch (err) {
+      console.error('OCR conversion error:', err);
+      setProcessingStatus(`❌ Conversion failed: ${parseApiError(err)}`);
+    } finally {
+      setPmConverting(false);
+      setTimeout(() => setProcessingStatus(''), 5000);
+    }
   };
 
   // Generate PM Package (same format as Quick Package)
@@ -31707,13 +31968,28 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                           </span>
                         }
                       </h4>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 flex-wrap">
                         {(translatedContent?.html || pmTranslationHtml) && (
                           <button
                             onClick={() => setPmReviewEditMode(!pmReviewEditMode)}
                             className={`px-2 py-1 text-xs rounded ${pmReviewEditMode ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
                           >
                             {pmReviewEditMode ? 'Preview' : 'Edit'}
+                          </button>
+                        )}
+                        {/* Convert to HTML button - shows when files are images/PDF without HTML */}
+                        {(pmTranslationFiles.length > 0 || (translatedContent && !translatedContent.html)) && !pmTranslationHtml && (
+                          <button
+                            onClick={handlePmConvertToHtml}
+                            disabled={pmConverting}
+                            className="px-2 py-1 bg-orange-500 text-white text-xs rounded hover:bg-orange-600 disabled:bg-gray-400 flex items-center gap-1"
+                            title="Convert uploaded PDF/images to editable HTML text via OCR"
+                          >
+                            {pmConverting ? (
+                              <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Converting...</>
+                            ) : (
+                              <>🔄 Convert to HTML</>
+                            )}
                           </button>
                         )}
                         <label className="px-2 py-1 bg-green-500 text-white text-xs rounded cursor-pointer hover:bg-green-600">
@@ -31769,23 +32045,47 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         />
                       )
                     ) : translatedContent.contentType?.includes('image') ? (
-                      <img
-                        src={translatedContent.data?.startsWith('data:')
-                          ? translatedContent.data
-                          : `data:${translatedContent.contentType};base64,${translatedContent.data}`}
-                        alt="Translation"
-                        className="w-full border rounded"
-                        style={{ height: 'auto' }}
-                      />
+                      <div>
+                        <div className="mb-3 p-3 bg-orange-50 border border-orange-200 rounded-lg flex items-center justify-between">
+                          <div>
+                            <p className="text-xs font-medium text-orange-800">⚠️ Image format - cannot proofread</p>
+                            <p className="text-[10px] text-orange-600 mt-0.5">Convert to HTML text to enable proofreading</p>
+                          </div>
+                          <button onClick={handlePmConvertToHtml} disabled={pmConverting}
+                            className="px-3 py-1.5 bg-orange-500 text-white text-xs rounded hover:bg-orange-600 disabled:bg-gray-400 flex items-center gap-1">
+                            {pmConverting ? <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Converting...</> : <>🔄 Convert to HTML</>}
+                          </button>
+                        </div>
+                        <img
+                          src={translatedContent.data?.startsWith('data:')
+                            ? translatedContent.data
+                            : `data:${translatedContent.contentType};base64,${translatedContent.data}`}
+                          alt="Translation"
+                          className="w-full border rounded"
+                          style={{ height: 'auto' }}
+                        />
+                      </div>
                     ) : translatedContent.contentType?.includes('pdf') ? (
-                      <iframe
-                        src={translatedContent.data?.startsWith('data:')
-                          ? translatedContent.data
-                          : `data:application/pdf;base64,${translatedContent.data}`}
-                        className="w-full border rounded"
-                        style={{ height: 'calc(100vh - 400px)' }}
-                        title="Translation PDF"
-                      />
+                      <div>
+                        <div className="mb-3 p-3 bg-orange-50 border border-orange-200 rounded-lg flex items-center justify-between">
+                          <div>
+                            <p className="text-xs font-medium text-orange-800">⚠️ PDF format - cannot proofread</p>
+                            <p className="text-[10px] text-orange-600 mt-0.5">Convert to HTML text to enable proofreading</p>
+                          </div>
+                          <button onClick={handlePmConvertToHtml} disabled={pmConverting}
+                            className="px-3 py-1.5 bg-orange-500 text-white text-xs rounded hover:bg-orange-600 disabled:bg-gray-400 flex items-center gap-1">
+                            {pmConverting ? <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Converting...</> : <>🔄 Convert to HTML</>}
+                          </button>
+                        </div>
+                        <iframe
+                          src={translatedContent.data?.startsWith('data:')
+                            ? translatedContent.data
+                            : `data:application/pdf;base64,${translatedContent.data}`}
+                          className="w-full border rounded"
+                          style={{ height: 'calc(100vh - 400px)' }}
+                          title="Translation PDF"
+                        />
+                      </div>
                     ) : translatedContent.contentType?.match(/wordprocessingml|msword|officedocument/) ? (
                       <div className="text-center py-8">
                         <div className="text-4xl mb-3">&#128196;</div>
@@ -31849,6 +32149,32 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                           />
                         )
                       )}
+                      {/* Convert to HTML banner - shows when files are images/PDF without HTML text */}
+                      {pmTranslationFiles.length > 0 && !pmTranslationHtml && (
+                        <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-xs font-medium text-orange-800">
+                                ⚠️ Translation is in image/PDF format
+                              </p>
+                              <p className="text-[10px] text-orange-600 mt-1">
+                                Convert to HTML text to enable proofreading and corrections
+                              </p>
+                            </div>
+                            <button
+                              onClick={handlePmConvertToHtml}
+                              disabled={pmConverting}
+                              className="px-3 py-2 bg-orange-500 text-white text-xs rounded-lg hover:bg-orange-600 disabled:bg-gray-400 flex items-center gap-1 font-medium whitespace-nowrap"
+                            >
+                              {pmConverting ? (
+                                <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Converting...</>
+                              ) : (
+                                <>🔄 Convert to HTML</>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      )}
                       {/* Show PM uploaded images */}
                       {pmTranslationFiles.map((file, idx) => (
                         <div key={idx} className="mb-4">
@@ -31867,12 +32193,21 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                               Delete
                             </button>
                           </div>
-                          <img
-                            src={`data:${file.type || 'image/png'};base64,${file.data}`}
-                            alt={`Translation page ${idx + 1}`}
-                            className="w-full border rounded"
-                            style={{ height: 'auto' }}
-                          />
+                          {file.type === 'application/pdf' ? (
+                            <iframe
+                              src={`data:application/pdf;base64,${file.data}`}
+                              className="w-full border rounded"
+                              style={{ height: '500px' }}
+                              title={`Translation PDF ${idx + 1}`}
+                            />
+                          ) : (
+                            <img
+                              src={`data:${file.type || 'image/png'};base64,${file.data}`}
+                              alt={`Translation page ${idx + 1}`}
+                              className="w-full border rounded"
+                              style={{ height: 'auto' }}
+                            />
+                          )}
                         </div>
                       ))}
                     </div>
@@ -31983,55 +32318,90 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
                     {/* Error List */}
                     {proofreadingResult.erros && proofreadingResult.erros.length > 0 && (
-                      <div className="max-h-60 overflow-y-auto border rounded">
-                        <table className="w-full text-[10px]">
-                          <thead className="bg-gray-100 sticky top-0">
-                            <tr>
-                              <th className="p-2 text-left">Tipo</th>
-                              <th className="p-2 text-left">Original</th>
-                              <th className="p-2 text-left">Encontrado</th>
-                              <th className="p-2 text-left">Sugerido</th>
-                              <th className="p-2 text-center">Gravidade</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {proofreadingResult.erros.map((erro, idx) => {
-                              const severity = erro.severidade || erro.gravidade || 'MÉDIO';
-                              const foundText = erro.traducao_errada || erro.found || '';
-                              const suggestionText = erro.correcao || erro.sugestao || '';
-                              return (
-                              <tr
-                                key={idx}
-                                data-pm-error-row={idx}
-                                onClick={() => handlePmErrorRowClick(idx, foundText)}
-                                className={`border-t cursor-pointer hover:ring-2 hover:ring-indigo-300 transition-all ${
-                                  highlightedPmErrorIndex === idx ? 'ring-2 ring-indigo-500 ring-inset shadow-lg' :
-                                  severity === 'CRÍTICO' ? 'bg-red-50' :
-                                  severity === 'ALTO' ? 'bg-blue-50' :
-                                  severity === 'MÉDIO' ? 'bg-yellow-50' :
-                                  'bg-blue-50'
-                                }`}
-                                title="Click to highlight in translation"
-                              >
-                                <td className="p-2">{erro.tipo}</td>
-                                <td className="p-2 font-mono">{erro.original || '-'}</td>
-                                <td className="p-2 font-mono text-red-600">{foundText || '-'}</td>
-                                <td className="p-2 font-mono text-green-600">{suggestionText || '-'}</td>
-                                <td className="p-2 text-center">
-                                  <span className={`px-1 py-0.5 rounded text-white ${
-                                    severity === 'CRÍTICO' ? 'bg-red-500' :
-                                    severity === 'ALTO' ? 'bg-blue-500' :
-                                    severity === 'MÉDIO' ? 'bg-yellow-500' :
-                                    'bg-blue-500'
-                                  }`}>
-                                    {severity}
-                                  </span>
-                                </td>
+                      <div>
+                        {/* Apply All Corrections Button */}
+                        {(translatedContent?.html || pmTranslationHtml) && (
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs text-gray-500">
+                              {proofreadingResult.erros.filter(e => e.applied).length}/{proofreadingResult.erros.length} corrections applied
+                            </span>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); applyAllPmProofreadingCorrections(); }}
+                              disabled={proofreadingResult.erros.every(e => e.applied)}
+                              className="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-1"
+                            >
+                              ✅ Apply All Corrections
+                            </button>
+                          </div>
+                        )}
+                        <div className="max-h-60 overflow-y-auto border rounded">
+                          <table className="w-full text-[10px]">
+                            <thead className="bg-gray-100 sticky top-0">
+                              <tr>
+                                <th className="p-2 text-left">Tipo</th>
+                                <th className="p-2 text-left">Original</th>
+                                <th className="p-2 text-left">Encontrado</th>
+                                <th className="p-2 text-left">Sugerido</th>
+                                <th className="p-2 text-center">Gravidade</th>
+                                {(translatedContent?.html || pmTranslationHtml) && (
+                                  <th className="p-2 text-center">Ação</th>
+                                )}
                               </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
+                            </thead>
+                            <tbody>
+                              {proofreadingResult.erros.map((erro, idx) => {
+                                const severity = erro.severidade || erro.gravidade || 'MÉDIO';
+                                const foundText = erro.traducao_errada || erro.found || '';
+                                const suggestionText = erro.correcao || erro.sugestao || '';
+                                return (
+                                <tr
+                                  key={idx}
+                                  data-pm-error-row={idx}
+                                  onClick={() => handlePmErrorRowClick(idx, foundText)}
+                                  className={`border-t cursor-pointer hover:ring-2 hover:ring-indigo-300 transition-all ${
+                                    erro.applied ? 'bg-green-50 opacity-70' :
+                                    highlightedPmErrorIndex === idx ? 'ring-2 ring-indigo-500 ring-inset shadow-lg' :
+                                    severity === 'CRÍTICO' ? 'bg-red-50' :
+                                    severity === 'ALTO' ? 'bg-blue-50' :
+                                    severity === 'MÉDIO' ? 'bg-yellow-50' :
+                                    'bg-blue-50'
+                                  }`}
+                                  title="Click to highlight in translation"
+                                >
+                                  <td className="p-2">{erro.tipo}</td>
+                                  <td className="p-2 font-mono">{erro.original || '-'}</td>
+                                  <td className="p-2 font-mono text-red-600" style={erro.applied ? { textDecoration: 'line-through' } : {}}>{foundText || '-'}</td>
+                                  <td className="p-2 font-mono text-green-600">{suggestionText || '-'}</td>
+                                  <td className="p-2 text-center">
+                                    <span className={`px-1 py-0.5 rounded text-white ${
+                                      severity === 'CRÍTICO' ? 'bg-red-500' :
+                                      severity === 'ALTO' ? 'bg-blue-500' :
+                                      severity === 'MÉDIO' ? 'bg-yellow-500' :
+                                      'bg-blue-500'
+                                    }`}>
+                                      {severity}
+                                    </span>
+                                  </td>
+                                  {(translatedContent?.html || pmTranslationHtml) && (
+                                    <td className="p-2 text-center">
+                                      {erro.applied ? (
+                                        <span className="text-green-600 text-[10px] font-medium">✓ Applied</span>
+                                      ) : (
+                                        <button
+                                          onClick={(e) => { e.stopPropagation(); applyPmProofreadingCorrection(erro, idx); }}
+                                          className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
+                                        >
+                                          Apply
+                                        </button>
+                                      )}
+                                    </td>
+                                  )}
+                                </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     )}
 
