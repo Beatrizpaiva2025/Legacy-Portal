@@ -219,8 +219,8 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
         axios.get(`${API}/admin/users/by-role/admin?admin_key=${adminKey}`),
         axios.get(`${API}/admin/users/by-role/pm?admin_key=${adminKey}`)
       ]);
-      const admins = (adminsRes.data.users || []).map(u => ({ ...u, role: 'admin' }));
-      const pms = (pmsRes.data.users || []).map(u => ({ ...u, role: 'pm' }));
+      const admins = (Array.isArray(adminsRes.data) ? adminsRes.data : adminsRes.data.users || []).map(u => ({ ...u, role: 'admin' }));
+      const pms = (Array.isArray(pmsRes.data) ? pmsRes.data : pmsRes.data.users || []).map(u => ({ ...u, role: 'pm' }));
       setAdminPmList([...pms, ...admins]);
       // Auto-select first PM if available
       if (pms.length > 0) setSelectedRecipient(pms[0].id);
