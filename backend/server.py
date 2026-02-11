@@ -605,26 +605,6 @@ def get_email_footer(include_review_button: bool = False) -> str:
                             </table>'''
 
     return f'''{review_section}
-                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 30px 0;">
-                                <tr>
-                                    <td style="border-top: 1px solid #e2e8f0;"></td>
-                                </tr>
-                            </table>
-                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
-                                <tr>
-                                    <td style="padding-top: 15px; border-top: 1px solid #e2e8f0;">
-                                        <p style="color: #1a2a4a; font-size: 15px; font-weight: 600; margin: 0 0 3px 0;">
-                                            Eduarda Quadra
-                                        </p>
-                                        <p style="color: #64748b; font-size: 13px; margin: 0 0 2px 0;">
-                                            Business Support Administrator
-                                        </p>
-                                        <p style="color: #64748b; font-size: 13px; margin: 0;">
-                                            Legacy Translations Inc.
-                                        </p>
-                                    </td>
-                                </tr>
-                            </table>
                         </td>
                     </tr>
                     <tr>
@@ -32119,7 +32099,7 @@ def get_outreach_signature() -> str:
                                             <a href="mailto:contact@legacytranslations.com" style="color: #c9a227; text-decoration: none;">contact@legacytranslations.com</a>
                                         </p>
                                         <p style="color: #64748b; font-size: 13px; margin: 4px 0 0;">
-                                            <a href="https://www.legacytranslations.com" style="color: #c9a227; text-decoration: none;">www.legacytranslations.com</a>
+                                            <a href="https://www.legacytranslations.com" target="_blank" style="color: #c9a227; text-decoration: none;">www.legacytranslations.com</a>
                                         </p>
                                     </td>
                                 </tr>
