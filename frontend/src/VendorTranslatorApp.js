@@ -91,7 +91,7 @@ const VendorLogin = ({ onLogin }) => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-blue-100 to-slate-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
         {/* Header with Logo */}
-        <div className="bg-gradient-to-b from-slate-50 to-blue-50 py-8 px-4 text-center border-b border-blue-100">
+        <div className="bg-white py-8 px-4 text-center border-b border-gray-200">
           <div className="mb-1">
             <img
               src="/images/legacy-translations-logo.svg"
@@ -426,7 +426,7 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Top Bar with Company Logo */}
-      <div className="bg-gradient-to-r from-slate-50 to-blue-50 border-b border-blue-200 px-6 py-2 shadow-sm">
+      <div className="bg-white border-b border-gray-200 px-6 py-2 shadow-sm">
         <div className="flex items-center justify-between max-w-6xl mx-auto">
           <div className="flex items-center gap-3">
             {companyLogo ? (
