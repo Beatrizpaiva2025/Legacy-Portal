@@ -16083,7 +16083,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
       {/* Translator Messages Bell - For PM/Admin */}
       {(isAdmin || isPM) && translatorInbox.filter(m => !m.read).length > 0 && (
-        <div className="fixed bottom-4 left-4 z-40">
+        <div className="fixed top-4 left-4 z-40">
           <button
             onClick={() => setShowTranslatorInbox(!showTranslatorInbox)}
             className="relative bg-blue-600 shadow-lg rounded-full p-3 hover:bg-blue-700 border border-blue-700 transition-all hover:scale-105"
@@ -16095,7 +16095,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
             </span>
           </button>
           {showTranslatorInbox && (
-            <div className="absolute bottom-14 left-0 w-96 bg-white rounded-lg shadow-xl border border-gray-200 max-h-96 overflow-hidden">
+            <div className="absolute top-14 left-0 w-96 bg-white rounded-lg shadow-xl border border-gray-200 max-h-96 overflow-hidden">
               <div className="p-2 border-b bg-blue-50 flex justify-between items-center">
                 <span className="text-xs font-bold text-blue-800">💬 Translator Messages</span>
                 <button onClick={() => setShowTranslatorInbox(false)} className="text-gray-400 hover:text-gray-600">×</button>
