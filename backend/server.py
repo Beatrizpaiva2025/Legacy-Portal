@@ -18544,7 +18544,12 @@ async def send_project_assignment_email(admin_key: str, request: dict = Body(...
 @api_router.post("/admin/translator-messages")
 async def send_translator_message(request: TranslatorMessageRequest, admin_key: str):
     """Admin/PM sends a message to a translator"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await db.admin_users.find_one({"token": admin_key, "is_active": {"$ne": False}})
+        if user and user.get("role") in ("admin", "pm"):
+            is_valid = True
+    if not is_valid:
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
     message_id = str(uuid.uuid4())
@@ -18566,6 +18571,33 @@ async def send_translator_message(request: TranslatorMessageRequest, admin_key: 
     await db.translator_messages.insert_one(translator_message)
 
     return {"status": "success", "message_id": message_id}
+
+
+@api_router.get("/admin/translator-messages")
+async def get_translator_messages_for_admin(admin_key: str, recipient_id: str = None):
+    """Get messages from translators to this admin/PM"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await db.admin_users.find_one({"token": admin_key, "is_active": {"$ne": False}})
+        if user and user.get("role") in ("admin", "pm"):
+            is_valid = True
+            if not recipient_id:
+                recipient_id = user.get("id")
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    query = {"type": "translator_to_admin"}
+    if recipient_id:
+        query["to_recipient_id"] = recipient_id
+
+    messages = await db.translator_messages.find(query).sort("created_at", -1).limit(50).to_list(50)
+
+    for msg in messages:
+        msg["_id"] = str(msg["_id"])
+        if msg.get("created_at"):
+            msg["created_at"] = msg["created_at"].isoformat()
+
+    return {"messages": messages}
 
 
 @api_router.get("/translator/messages")

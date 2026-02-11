@@ -14923,6 +14923,12 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [translatorMessageContent, setTranslatorMessageContent] = useState('');
   const [sendingTranslatorMessage, setSendingTranslatorMessage] = useState(false);
 
+  // Translator messages inbox (messages FROM translators TO pm/admin)
+  const [translatorInbox, setTranslatorInbox] = useState([]);
+  const [showTranslatorInbox, setShowTranslatorInbox] = useState(false);
+  const [replyingToTranslatorMsg, setReplyingToTranslatorMsg] = useState(null);
+  const [translatorReplyContent, setTranslatorReplyContent] = useState('');
+
   // Translator Assignment Modal state
   const [assigningTranslatorModal, setAssigningTranslatorModal] = useState(null); // Order to assign
   const [assignmentDetails, setAssignmentDetails] = useState({
@@ -16295,15 +16301,54 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     }
   };
 
-  // Poll for notifications and partner messages (partner messages admin only)
+  // Fetch translator messages for PM/Admin inbox
+  const fetchTranslatorInbox = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/translator-messages?admin_key=${adminKey}`);
+      setTranslatorInbox(response.data.messages || []);
+    } catch (err) {
+      console.error('Failed to fetch translator inbox:', err);
+    }
+  };
+
+  // Reply to translator message
+  const replyToTranslatorMessage = async () => {
+    if (!replyingToTranslatorMsg || !translatorReplyContent.trim()) return;
+    setSendingTranslatorMessage(true);
+    try {
+      await axios.post(`${API}/admin/translator-messages?admin_key=${adminKey}`, {
+        translator_id: replyingToTranslatorMsg.from_translator_id,
+        translator_name: replyingToTranslatorMsg.from_translator_name,
+        translator_email: '',
+        content: translatorReplyContent,
+        order_number: replyingToTranslatorMsg.order_number || '',
+        admin_name: user?.name || 'Admin'
+      });
+      // Mark the original message as read
+      await axios.put(`${API}/translator/messages/${replyingToTranslatorMsg.id}/read?admin_key=${adminKey}`);
+      showToast('Reply sent!');
+      setReplyingToTranslatorMsg(null);
+      setTranslatorReplyContent('');
+      fetchTranslatorInbox();
+    } catch (err) {
+      console.error('Failed to reply:', err);
+      showToast('Failed to send reply. Please try again.');
+    } finally {
+      setSendingTranslatorMessage(false);
+    }
+  };
+
+  // Poll for notifications, partner messages, and translator inbox
   useEffect(() => {
     if (adminKey && (isAdmin || isPM)) {
       fetchNotifications();
+      fetchTranslatorInbox();
       if (isAdmin) {
         fetchPartnerMessages();
       }
       const interval = setInterval(() => {
         fetchNotifications();
+        fetchTranslatorInbox();
         if (isAdmin) {
           fetchPartnerMessages();
         }
@@ -16822,20 +16867,31 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         <div className="font-medium text-gray-800">
                           {notif.type === 'assignment_declined' ? '❌' :
                            notif.type === 'assignment_accepted' ? '✅' :
-                           notif.type === 'payment_proof_received' ? '💰' : '📋'} {notif.title}
+                           notif.type === 'payment_proof_received' ? '💰' :
+                           notif.type === 'translator_message' ? '💬' : '📋'} {notif.title}
                         </div>
                         <div className="text-gray-600 mt-0.5">{notif.message}</div>
                         {notif.order_number && (
                           <span className="text-[10px] text-purple-600 font-medium">Order: {notif.order_number}</span>
                         )}
                       </div>
-                      <button
-                        onClick={() => markNotificationRead(notif.id)}
-                        className="text-gray-400 hover:text-red-500 text-[10px]"
-                        title="Mark as read"
-                      >
-                        ✓
-                      </button>
+                      {notif.type === 'translator_message' ? (
+                        <button
+                          onClick={() => { setShowTranslatorInbox(true); setShowNotifications(false); }}
+                          className="px-2 py-0.5 bg-blue-600 text-white rounded text-[10px] hover:bg-blue-700"
+                          title="View & Reply"
+                        >
+                          Reply
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => markNotificationRead(notif.id)}
+                          className="text-gray-400 hover:text-red-500 text-[10px]"
+                          title="Mark as read"
+                        >
+                          ✓
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -16964,6 +17020,113 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 className="px-4 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:bg-gray-400"
               >
                 {sendingReply ? 'Sending...' : '📤 Send Reply'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Translator Messages Bell - For PM/Admin */}
+      {(isAdmin || isPM) && translatorInbox.filter(m => !m.read).length > 0 && (
+        <div className="fixed top-4 left-4 z-40">
+          <button
+            onClick={() => setShowTranslatorInbox(!showTranslatorInbox)}
+            className="relative bg-blue-600 shadow-lg rounded-full p-3 hover:bg-blue-700 border border-blue-700 transition-all hover:scale-105"
+            title="Translator messages"
+          >
+            <span className="text-xl text-white">💬</span>
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1 animate-pulse">
+              {translatorInbox.filter(m => !m.read).length}
+            </span>
+          </button>
+          {showTranslatorInbox && (
+            <div className="absolute top-14 left-0 w-96 bg-white rounded-lg shadow-xl border border-gray-200 max-h-96 overflow-hidden">
+              <div className="p-2 border-b bg-blue-50 flex justify-between items-center">
+                <span className="text-xs font-bold text-blue-800">💬 Translator Messages</span>
+                <button onClick={() => setShowTranslatorInbox(false)} className="text-gray-400 hover:text-gray-600">×</button>
+              </div>
+              <div className="overflow-y-auto max-h-80">
+                {translatorInbox.filter(m => !m.read).map((msg) => (
+                  <div
+                    key={msg.id}
+                    className="p-3 border-b border-l-2 border-l-blue-500 hover:bg-gray-50"
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-medium text-xs text-gray-800">
+                        {msg.from_translator_name}
+                      </span>
+                      {msg.order_number && (
+                        <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">
+                          {msg.order_number}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-700 bg-gray-50 p-2 rounded mb-2">
+                      {msg.content}
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-gray-400">{formatDateTimeLocal(msg.created_at)}</span>
+                      <button
+                        onClick={() => {
+                          setReplyingToTranslatorMsg(msg);
+                          setTranslatorReplyContent('');
+                        }}
+                        className="px-2 py-0.5 bg-blue-600 text-white rounded text-[10px] hover:bg-blue-700"
+                      >
+                        Reply
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Reply to Translator Message Modal */}
+      {replyingToTranslatorMsg && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
+            <div className="p-4 border-b flex justify-between items-center bg-blue-600 text-white rounded-t-lg">
+              <div>
+                <h3 className="font-bold">Reply to {replyingToTranslatorMsg.from_translator_name}</h3>
+                {replyingToTranslatorMsg.order_number && (
+                  <p className="text-xs opacity-80">Project: {replyingToTranslatorMsg.order_number}</p>
+                )}
+              </div>
+              <button onClick={() => setReplyingToTranslatorMsg(null)} className="text-white hover:text-gray-200 text-xl">×</button>
+            </div>
+            <div className="p-4">
+              <div className="mb-4 p-3 bg-gray-50 rounded border">
+                <div className="text-xs text-gray-500 mb-1">Original message:</div>
+                <div className="text-sm text-gray-700">{replyingToTranslatorMsg.content}</div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Your Reply *</label>
+                <textarea
+                  value={translatorReplyContent}
+                  onChange={(e) => setTranslatorReplyContent(e.target.value)}
+                  rows="4"
+                  className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Type your reply..."
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="p-3 border-t bg-gray-50 flex justify-end gap-2 rounded-b-lg">
+              <button
+                onClick={() => setReplyingToTranslatorMsg(null)}
+                className="px-4 py-1.5 text-gray-600 text-sm hover:text-gray-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={replyToTranslatorMessage}
+                disabled={sendingTranslatorMessage || !translatorReplyContent.trim()}
+                className="px-4 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:bg-gray-400"
+              >
+                {sendingTranslatorMessage ? 'Sending...' : 'Send Reply'}
               </button>
             </div>
           </div>
