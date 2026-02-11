@@ -407,6 +407,59 @@ const sanitizeErrorMessage = (errorMsg) => {
   return sanitized;
 };
 
+// ==================== TEXT REPLACEMENT UTILITIES ====================
+// Used by both TranslationWorkspace and PMDashboard for applying proofreading corrections
+const tryReplaceText = (html, foundText, suggestionText) => {
+  let updatedHtml = html;
+  let replaced = false;
+
+  // Strategy 1: Try exact match (case insensitive)
+  const escapedText = foundText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const exactRegex = new RegExp(escapedText, 'gi');
+
+  if (exactRegex.test(html)) {
+    updatedHtml = html.replace(exactRegex, suggestionText);
+    replaced = true;
+  }
+
+  // Strategy 2: Try matching with flexible whitespace
+  if (!replaced) {
+    const flexiblePattern = foundText
+      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      .replace(/\s+/g, '\\s*(?:<[^>]*>)?\\s*');
+    const flexibleRegex = new RegExp(flexiblePattern, 'gi');
+
+    if (flexibleRegex.test(html)) {
+      updatedHtml = html.replace(flexibleRegex, suggestionText);
+      replaced = true;
+    }
+  }
+
+  // Strategy 3: Try finding words individually
+  if (!replaced) {
+    const words = foundText.split(/\s+/).filter(w => w.length > 2);
+    if (words.length > 0) {
+      const wordPattern = words
+        .map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+        .join('(?:[^<]*(?:<[^>]*>[^<]*)*?)');
+      const wordRegex = new RegExp(wordPattern, 'gi');
+
+      if (wordRegex.test(html)) {
+        updatedHtml = html.replace(wordRegex, suggestionText);
+        replaced = true;
+      }
+    }
+  }
+
+  return { updatedHtml, replaced };
+};
+
+// Strip trailing parenthetical comments from suggestion text
+const stripParentheticalComment = (text) => {
+  if (!text) return text;
+  return text.replace(/\s*\([^)]*\.{0,3}\)?\s*$/, '').trim();
+};
+
 // ==================== UNIFIED CSS STYLES FOR PDF GENERATION ====================
 // SIMPLIFIED - Uses inline styles in HTML for maximum reliability
 const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
@@ -5221,59 +5274,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     setTimeout(() => {
       setHighlightedPmErrorIndex(null);
     }, 3000);
-  };
-
-  // Helper function to try replacing text with multiple strategies
-  const tryReplaceText = (html, foundText, suggestionText) => {
-    let updatedHtml = html;
-    let replaced = false;
-
-    // Strategy 1: Try exact match (case insensitive)
-    const escapedText = foundText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const exactRegex = new RegExp(escapedText, 'gi');
-
-    if (exactRegex.test(html)) {
-      updatedHtml = html.replace(exactRegex, suggestionText);
-      replaced = true;
-    }
-
-    // Strategy 2: Try matching with flexible whitespace
-    if (!replaced) {
-      const flexiblePattern = foundText
-        .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-        .replace(/\s+/g, '\\s*(?:<[^>]*>)?\\s*');
-      const flexibleRegex = new RegExp(flexiblePattern, 'gi');
-
-      if (flexibleRegex.test(html)) {
-        updatedHtml = html.replace(flexibleRegex, suggestionText);
-        replaced = true;
-      }
-    }
-
-    // Strategy 3: Try finding words individually
-    if (!replaced) {
-      const words = foundText.split(/\s+/).filter(w => w.length > 2);
-      if (words.length > 0) {
-        const wordPattern = words
-          .map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-          .join('(?:[^<]*(?:<[^>]*>[^<]*)*?)');
-        const wordRegex = new RegExp(wordPattern, 'gi');
-
-        if (wordRegex.test(html)) {
-          updatedHtml = html.replace(wordRegex, suggestionText);
-          replaced = true;
-        }
-      }
-    }
-
-    return { updatedHtml, replaced };
-  };
-
-  // Strip trailing parenthetical comments from suggestion text (e.g. "corrected text (explanation...)" -> "corrected text")
-  const stripParentheticalComment = (text) => {
-    if (!text) return text;
-    // Remove trailing parenthetical content: "(any explanation here)" or "(truncated...)"
-    return text.replace(/\s*\([^)]*\.{0,3}\)?\s*$/, '').trim();
   };
 
   // Apply a single proofreading correction
@@ -28318,7 +28318,151 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   const [highlightedPmErrorIndex, setHighlightedPmErrorIndex] = useState(null);
 
   const handlePmErrorRowClick = (errorIndex, foundText) => {
+    if (!foundText) return;
+
     setHighlightedPmErrorIndex(errorIndex === highlightedPmErrorIndex ? null : errorIndex);
+
+    // Find and scroll to the text in the translation preview
+    setTimeout(() => {
+      const translationPreview = document.querySelector('.pm-translation-preview');
+      if (translationPreview) {
+        // Remove any previous highlights
+        const existingMarks = translationPreview.querySelectorAll('mark[data-pm-highlight]');
+        existingMarks.forEach(mark => {
+          const parent = mark.parentNode;
+          parent.replaceChild(document.createTextNode(mark.textContent), mark);
+          parent.normalize();
+        });
+
+        // Try to find and highlight the text
+        const content = translationPreview.innerHTML;
+        if (content.toLowerCase().includes(foundText.toLowerCase())) {
+          const escapedText = foundText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const regex = new RegExp(`(${escapedText})`, 'gi');
+          translationPreview.innerHTML = content.replace(
+            regex,
+            '<mark data-pm-highlight="true" style="background-color: #fef3c7; border: 2px solid #f59e0b; padding: 2px 4px; border-radius: 3px;">$1</mark>'
+          );
+          const mark = translationPreview.querySelector('mark[data-pm-highlight]');
+          if (mark) {
+            mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }
+      }
+    }, 100);
+
+    // Clear the highlight after 5 seconds
+    setTimeout(() => {
+      setHighlightedPmErrorIndex(null);
+      const translationPreview = document.querySelector('.pm-translation-preview');
+      if (translationPreview) {
+        const existingMarks = translationPreview.querySelectorAll('mark[data-pm-highlight]');
+        existingMarks.forEach(mark => {
+          const parent = mark.parentNode;
+          parent.replaceChild(document.createTextNode(mark.textContent), mark);
+          parent.normalize();
+        });
+      }
+    }, 5000);
+  };
+
+  // Apply a single proofreading correction in PM Dashboard
+  const applyPmProofreadingCorrection = (erro, index) => {
+    const foundText = (erro.traducao_errada || erro.found || '').trim();
+    const suggestionText = (erro.correcao || erro.sugestao || '').trim();
+    const cleanSuggestion = stripParentheticalComment(suggestionText);
+
+    if (!foundText || !cleanSuggestion) {
+      showToast('Cannot apply correction: missing original text or suggestion');
+      return;
+    }
+
+    // Get current translation HTML from PM state
+    let currentHtml = '';
+    if (translatedContent?.html) {
+      currentHtml = translatedContent.html;
+    } else if (pmTranslationHtml) {
+      currentHtml = pmTranslationHtml;
+    } else {
+      showToast('No translation content available to apply corrections');
+      return;
+    }
+
+    const result = tryReplaceText(currentHtml, foundText, cleanSuggestion);
+
+    if (!result.replaced) {
+      showToast(`Could not find text to replace: "${foundText.substring(0, 50)}${foundText.length > 50 ? '...' : ''}"\n\nThe text may have been modified or contains special formatting.`);
+      return;
+    }
+
+    // Update the appropriate translation state
+    if (translatedContent?.html) {
+      setTranslatedContent({ ...translatedContent, html: result.updatedHtml });
+    } else {
+      setPmTranslationHtml(result.updatedHtml);
+    }
+
+    // Mark this error as applied in proofreading result
+    if (proofreadingResult?.erros) {
+      const updatedErrors = [...proofreadingResult.erros];
+      updatedErrors[index] = { ...updatedErrors[index], applied: true };
+      setProofreadingResult({ ...proofreadingResult, erros: updatedErrors });
+    }
+
+    showToast('Correction applied successfully!');
+  };
+
+  // Apply all proofreading corrections at once in PM Dashboard
+  const applyAllPmProofreadingCorrections = () => {
+    if (!proofreadingResult?.erros || proofreadingResult.erros.length === 0) return;
+
+    // Get current translation HTML from PM state
+    let currentHtml = '';
+    if (translatedContent?.html) {
+      currentHtml = translatedContent.html;
+    } else if (pmTranslationHtml) {
+      currentHtml = pmTranslationHtml;
+    } else {
+      showToast('No translation content available to apply corrections');
+      return;
+    }
+
+    let updatedHtml = currentHtml;
+    let appliedCount = 0;
+
+    const updatedErrors = proofreadingResult.erros.map(erro => {
+      const foundText = (erro.traducao_errada || erro.found || '').trim();
+      const suggestionText = (erro.correcao || erro.sugestao || '').trim();
+      const cleanSuggestion = stripParentheticalComment(suggestionText);
+
+      if (foundText && cleanSuggestion && !erro.applied) {
+        const result = tryReplaceText(updatedHtml, foundText, cleanSuggestion);
+        if (result.replaced) {
+          updatedHtml = result.updatedHtml;
+          appliedCount++;
+          return { ...erro, applied: true };
+        }
+      }
+      return erro;
+    });
+
+    if (appliedCount === 0) {
+      showToast('No corrections could be applied. The text may have been modified or contains special formatting.');
+      return;
+    }
+
+    // Update the appropriate translation state
+    if (translatedContent?.html) {
+      setTranslatedContent({ ...translatedContent, html: updatedHtml });
+    } else {
+      setPmTranslationHtml(updatedHtml);
+    }
+
+    // Update proofreading result
+    setProofreadingResult({ ...proofreadingResult, erros: updatedErrors });
+
+    setProcessingStatus(`✅ ${appliedCount} correction(s) applied successfully!`);
+    setTimeout(() => setProcessingStatus(''), 3000);
   };
 
   // Translator Assignment Modal state (for email invites)
@@ -31779,55 +31923,90 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
                     {/* Error List */}
                     {proofreadingResult.erros && proofreadingResult.erros.length > 0 && (
-                      <div className="max-h-60 overflow-y-auto border rounded">
-                        <table className="w-full text-[10px]">
-                          <thead className="bg-gray-100 sticky top-0">
-                            <tr>
-                              <th className="p-2 text-left">Tipo</th>
-                              <th className="p-2 text-left">Original</th>
-                              <th className="p-2 text-left">Encontrado</th>
-                              <th className="p-2 text-left">Sugerido</th>
-                              <th className="p-2 text-center">Gravidade</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {proofreadingResult.erros.map((erro, idx) => {
-                              const severity = erro.severidade || erro.gravidade || 'MÉDIO';
-                              const foundText = erro.traducao_errada || erro.found || '';
-                              const suggestionText = erro.correcao || erro.sugestao || '';
-                              return (
-                              <tr
-                                key={idx}
-                                data-pm-error-row={idx}
-                                onClick={() => handlePmErrorRowClick(idx, foundText)}
-                                className={`border-t cursor-pointer hover:ring-2 hover:ring-indigo-300 transition-all ${
-                                  highlightedPmErrorIndex === idx ? 'ring-2 ring-indigo-500 ring-inset shadow-lg' :
-                                  severity === 'CRÍTICO' ? 'bg-red-50' :
-                                  severity === 'ALTO' ? 'bg-blue-50' :
-                                  severity === 'MÉDIO' ? 'bg-yellow-50' :
-                                  'bg-blue-50'
-                                }`}
-                                title="Click to highlight in translation"
-                              >
-                                <td className="p-2">{erro.tipo}</td>
-                                <td className="p-2 font-mono">{erro.original || '-'}</td>
-                                <td className="p-2 font-mono text-red-600">{foundText || '-'}</td>
-                                <td className="p-2 font-mono text-green-600">{suggestionText || '-'}</td>
-                                <td className="p-2 text-center">
-                                  <span className={`px-1 py-0.5 rounded text-white ${
-                                    severity === 'CRÍTICO' ? 'bg-red-500' :
-                                    severity === 'ALTO' ? 'bg-blue-500' :
-                                    severity === 'MÉDIO' ? 'bg-yellow-500' :
-                                    'bg-blue-500'
-                                  }`}>
-                                    {severity}
-                                  </span>
-                                </td>
+                      <div>
+                        {/* Apply All Corrections Button */}
+                        {(translatedContent?.html || pmTranslationHtml) && (
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs text-gray-500">
+                              {proofreadingResult.erros.filter(e => e.applied).length}/{proofreadingResult.erros.length} corrections applied
+                            </span>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); applyAllPmProofreadingCorrections(); }}
+                              disabled={proofreadingResult.erros.every(e => e.applied)}
+                              className="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-1"
+                            >
+                              ✅ Apply All Corrections
+                            </button>
+                          </div>
+                        )}
+                        <div className="max-h-60 overflow-y-auto border rounded">
+                          <table className="w-full text-[10px]">
+                            <thead className="bg-gray-100 sticky top-0">
+                              <tr>
+                                <th className="p-2 text-left">Tipo</th>
+                                <th className="p-2 text-left">Original</th>
+                                <th className="p-2 text-left">Encontrado</th>
+                                <th className="p-2 text-left">Sugerido</th>
+                                <th className="p-2 text-center">Gravidade</th>
+                                {(translatedContent?.html || pmTranslationHtml) && (
+                                  <th className="p-2 text-center">Ação</th>
+                                )}
                               </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
+                            </thead>
+                            <tbody>
+                              {proofreadingResult.erros.map((erro, idx) => {
+                                const severity = erro.severidade || erro.gravidade || 'MÉDIO';
+                                const foundText = erro.traducao_errada || erro.found || '';
+                                const suggestionText = erro.correcao || erro.sugestao || '';
+                                return (
+                                <tr
+                                  key={idx}
+                                  data-pm-error-row={idx}
+                                  onClick={() => handlePmErrorRowClick(idx, foundText)}
+                                  className={`border-t cursor-pointer hover:ring-2 hover:ring-indigo-300 transition-all ${
+                                    erro.applied ? 'bg-green-50 opacity-70' :
+                                    highlightedPmErrorIndex === idx ? 'ring-2 ring-indigo-500 ring-inset shadow-lg' :
+                                    severity === 'CRÍTICO' ? 'bg-red-50' :
+                                    severity === 'ALTO' ? 'bg-blue-50' :
+                                    severity === 'MÉDIO' ? 'bg-yellow-50' :
+                                    'bg-blue-50'
+                                  }`}
+                                  title="Click to highlight in translation"
+                                >
+                                  <td className="p-2">{erro.tipo}</td>
+                                  <td className="p-2 font-mono">{erro.original || '-'}</td>
+                                  <td className="p-2 font-mono text-red-600" style={erro.applied ? { textDecoration: 'line-through' } : {}}>{foundText || '-'}</td>
+                                  <td className="p-2 font-mono text-green-600">{suggestionText || '-'}</td>
+                                  <td className="p-2 text-center">
+                                    <span className={`px-1 py-0.5 rounded text-white ${
+                                      severity === 'CRÍTICO' ? 'bg-red-500' :
+                                      severity === 'ALTO' ? 'bg-blue-500' :
+                                      severity === 'MÉDIO' ? 'bg-yellow-500' :
+                                      'bg-blue-500'
+                                    }`}>
+                                      {severity}
+                                    </span>
+                                  </td>
+                                  {(translatedContent?.html || pmTranslationHtml) && (
+                                    <td className="p-2 text-center">
+                                      {erro.applied ? (
+                                        <span className="text-green-600 text-[10px] font-medium">✓ Applied</span>
+                                      ) : (
+                                        <button
+                                          onClick={(e) => { e.stopPropagation(); applyPmProofreadingCorrection(erro, idx); }}
+                                          className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
+                                        >
+                                          Apply
+                                        </button>
+                                      )}
+                                    </td>
+                                  )}
+                                </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     )}
 
