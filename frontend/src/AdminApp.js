@@ -9444,7 +9444,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               </div>
 
               {/* Page Navigation - shown when multiple pages */}
-              {originalImages.length > 1 && (
+              {Math.max(originalImages.length, translationResults.length) > 1 && (
                 <div className="flex items-center justify-center gap-3 mb-2 p-2 bg-gray-50 border rounded-lg">
                   <button
                     onClick={() => setSelectedResultIndex(Math.max(0, selectedResultIndex - 1))}
@@ -9454,32 +9454,32 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     ← Previous
                   </button>
                   <div className="flex items-center gap-2">
-                    {originalImages.map((_, idx) => (
+                    {Array.from({ length: Math.max(originalImages.length, translationResults.length) }, (_, idx) => (
                       <button
                         key={idx}
                         onClick={() => setSelectedResultIndex(idx)}
                         className={`w-7 h-7 text-xs font-bold rounded-full transition-all ${
                           selectedResultIndex === idx
                             ? 'bg-blue-600 text-white shadow'
-                            : translationResults[idx]
+                            : translationResults[idx]?.translatedText
                             ? 'bg-green-100 text-green-700 border border-green-300 hover:bg-green-200'
                             : 'bg-white text-gray-500 border border-gray-300 hover:bg-gray-100'
                         }`}
-                        title={`Page ${idx + 1}${translationResults[idx] ? ' (translated)' : ''}`}
+                        title={`Page ${idx + 1}${translationResults[idx]?.translatedText ? ' (translated)' : ''}${!originalImages[idx] ? ' (no original)' : ''}`}
                       >
                         {idx + 1}
                       </button>
                     ))}
                   </div>
                   <button
-                    onClick={() => setSelectedResultIndex(Math.min(originalImages.length - 1, selectedResultIndex + 1))}
-                    disabled={selectedResultIndex >= originalImages.length - 1}
+                    onClick={() => setSelectedResultIndex(Math.min(Math.max(originalImages.length, translationResults.length) - 1, selectedResultIndex + 1))}
+                    disabled={selectedResultIndex >= Math.max(originalImages.length, translationResults.length) - 1}
                     className="px-3 py-1.5 text-xs font-medium rounded transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-white border border-gray-300 text-gray-700 hover:bg-gray-100"
                   >
                     Next →
                   </button>
                   <span className="text-[10px] text-gray-500 ml-2">
-                    Page {selectedResultIndex + 1} of {originalImages.length}
+                    Page {selectedResultIndex + 1} of {Math.max(originalImages.length, translationResults.length)}
                     {translationResults.length > 0 && ` | ${translationResults.filter(r => r?.translatedText).length} translated`}
                   </span>
                 </div>
@@ -11136,7 +11136,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           {translationResults.length > 0 ? (
             <>
               {/* Page Navigation for Review */}
-              {translationResults.length > 1 && (
+              {Math.max(translationResults.length, originalImages.length) > 1 && (
                 <div className="flex items-center justify-center gap-3 mb-3 p-2 bg-gray-50 border rounded-lg">
                   <button
                     onClick={() => setSelectedResultIndex(Math.max(0, selectedResultIndex - 1))}
@@ -11146,7 +11146,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     ← Previous
                   </button>
                   <div className="flex items-center gap-2">
-                    {translationResults.map((r, idx) => (
+                    {Array.from({ length: Math.max(translationResults.length, originalImages.length) }, (_, idx) => (
                       <button
                         key={idx}
                         onClick={() => setSelectedResultIndex(idx)}
@@ -11155,21 +11155,21 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             ? 'bg-blue-600 text-white shadow'
                             : 'bg-white text-gray-500 border border-gray-300 hover:bg-gray-100'
                         }`}
-                        title={`Page ${idx + 1}: ${r.filename || ''}`}
+                        title={`Page ${idx + 1}: ${translationResults[idx]?.filename || ''}${!originalImages[idx] ? ' (no original)' : ''}${!translationResults[idx]?.translatedText ? ' (no translation)' : ''}`}
                       >
                         {idx + 1}
                       </button>
                     ))}
                   </div>
                   <button
-                    onClick={() => setSelectedResultIndex(Math.min(translationResults.length - 1, selectedResultIndex + 1))}
-                    disabled={selectedResultIndex >= translationResults.length - 1}
+                    onClick={() => setSelectedResultIndex(Math.min(Math.max(translationResults.length, originalImages.length) - 1, selectedResultIndex + 1))}
+                    disabled={selectedResultIndex >= Math.max(translationResults.length, originalImages.length) - 1}
                     className="px-3 py-1.5 text-xs font-medium rounded transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-white border border-gray-300 text-gray-700 hover:bg-gray-100"
                   >
                     Next →
                   </button>
                   <span className="text-[10px] text-gray-500 ml-2">
-                    Page {selectedResultIndex + 1} of {translationResults.length}
+                    Page {selectedResultIndex + 1} of {Math.max(translationResults.length, originalImages.length)}
                   </span>
                 </div>
               )}
@@ -11608,7 +11608,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           {translationResults.length > 0 ? (
             <>
               {/* Page Navigation for Proofreading */}
-              {translationResults.length > 1 && (
+              {Math.max(translationResults.length, originalImages.length) > 1 && (
                 <div className="flex items-center justify-center gap-3 mb-3 p-2 bg-gray-50 border rounded-lg">
                   <button
                     onClick={() => setSelectedResultIndex(Math.max(0, selectedResultIndex - 1))}
@@ -11618,7 +11618,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     ← Previous
                   </button>
                   <div className="flex items-center gap-2">
-                    {translationResults.map((r, idx) => (
+                    {Array.from({ length: Math.max(translationResults.length, originalImages.length) }, (_, idx) => (
                       <button
                         key={idx}
                         onClick={() => setSelectedResultIndex(idx)}
@@ -11627,21 +11627,21 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             ? 'bg-purple-600 text-white shadow'
                             : 'bg-white text-gray-500 border border-gray-300 hover:bg-gray-100'
                         }`}
-                        title={`Page ${idx + 1}: ${r.filename || ''}`}
+                        title={`Page ${idx + 1}: ${translationResults[idx]?.filename || ''}${!originalImages[idx] ? ' (no original)' : ''}${!translationResults[idx]?.translatedText ? ' (no translation)' : ''}`}
                       >
                         {idx + 1}
                       </button>
                     ))}
                   </div>
                   <button
-                    onClick={() => setSelectedResultIndex(Math.min(translationResults.length - 1, selectedResultIndex + 1))}
-                    disabled={selectedResultIndex >= translationResults.length - 1}
+                    onClick={() => setSelectedResultIndex(Math.min(Math.max(translationResults.length, originalImages.length) - 1, selectedResultIndex + 1))}
+                    disabled={selectedResultIndex >= Math.max(translationResults.length, originalImages.length) - 1}
                     className="px-3 py-1.5 text-xs font-medium rounded transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-white border border-gray-300 text-gray-700 hover:bg-gray-100"
                   >
                     Next →
                   </button>
                   <span className="text-[10px] text-gray-500 ml-2">
-                    Page {selectedResultIndex + 1} of {translationResults.length}
+                    Page {selectedResultIndex + 1} of {Math.max(translationResults.length, originalImages.length)}
                   </span>
                 </div>
               )}
