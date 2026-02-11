@@ -88,23 +88,18 @@ const VendorLogin = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-blue-100 to-slate-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-        {/* Blue Header with Logo */}
-        <div className="bg-gradient-to-b from-blue-500 to-blue-600 py-8 px-4 text-center">
+        {/* Header with Logo */}
+        <div className="bg-gradient-to-b from-slate-50 to-blue-50 py-8 px-4 text-center border-b border-blue-100">
           <div className="mb-3">
-            <div className="w-16 h-16 mx-auto">
-              <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="50" cy="50" r="45" fill="#B3E5FC"/>
-                <path d="M15 35 Q25 25 50 30 Q65 33 75 25" stroke="#1565C0" strokeWidth="5" fill="none" strokeLinecap="round"/>
-                <path d="M10 50 Q30 40 55 48 Q70 52 80 42" stroke="#1E88E5" strokeWidth="5" fill="none" strokeLinecap="round"/>
-                <path d="M15 65 Q35 55 55 62 Q70 67 82 58" stroke="#2196F3" strokeWidth="5" fill="none" strokeLinecap="round"/>
-                <path d="M25 78 Q40 70 55 75 Q68 79 78 72" stroke="#42A5F5" strokeWidth="4" fill="none" strokeLinecap="round"/>
-              </svg>
-            </div>
+            <img
+              src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png"
+              alt="Legacy Translations"
+              className="h-16 mx-auto object-contain"
+            />
           </div>
-          <h1 className="text-xl font-semibold text-white">Legacy Translations</h1>
-          <p className="text-blue-100 text-sm mt-1">Vendor Translator Portal</p>
+          <p className="text-blue-600 text-sm mt-1 font-medium">Vendor Translator Portal</p>
         </div>
 
         {/* Form */}
@@ -431,40 +426,28 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Top Bar with Company Logo */}
-      <div className="bg-slate-800 text-white px-6 py-2 shadow-md">
+      <div className="bg-gradient-to-r from-slate-50 to-blue-50 border-b border-blue-200 px-6 py-2 shadow-sm">
         <div className="flex items-center justify-between max-w-6xl mx-auto">
           <div className="flex items-center gap-3">
             {companyLogo ? (
-              <img src={companyLogo} alt="Legacy Translations" className="h-8 object-contain" />
+              <img src={companyLogo} alt="Legacy Translations" className="h-10 object-contain" />
             ) : (
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8">
-                  <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="50" cy="50" r="45" fill="#B3E5FC"/>
-                    <path d="M15 35 Q25 25 50 30 Q65 33 75 25" stroke="#1565C0" strokeWidth="5" fill="none" strokeLinecap="round"/>
-                    <path d="M10 50 Q30 40 55 48 Q70 52 80 42" stroke="#1E88E5" strokeWidth="5" fill="none" strokeLinecap="round"/>
-                    <path d="M15 65 Q35 55 55 62 Q70 67 82 58" stroke="#2196F3" strokeWidth="5" fill="none" strokeLinecap="round"/>
-                    <path d="M25 78 Q40 70 55 75 Q68 79 78 72" stroke="#42A5F5" strokeWidth="4" fill="none" strokeLinecap="round"/>
-                  </svg>
-                </div>
-                <div>
-                  <span className="text-sm font-bold tracking-wide" style={{ color: '#1a2d6d' }}>LEGACY</span>
-                  <span className="text-[10px] block" style={{ color: '#4fc3f7' }}>TRANSLATIONS</span>
-                </div>
-              </div>
+              <img
+                src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png"
+                alt="Legacy Translations"
+                className="h-10 object-contain"
+              />
             )}
-            {companyLogo && (
-              <p className="text-slate-400 text-[10px] ml-1">Vendor Portal</p>
-            )}
+            <p className="text-slate-400 text-[10px] ml-1">Vendor Portal</p>
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right">
-              <p className="text-xs font-medium">{user.name}</p>
+              <p className="text-xs font-medium text-slate-700">{user.name}</p>
               <p className="text-[10px] text-slate-400">{user.email}</p>
             </div>
             <button
               onClick={onLogout}
-              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded text-xs font-medium transition-colors"
+              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors"
             >
               Logout
             </button>
