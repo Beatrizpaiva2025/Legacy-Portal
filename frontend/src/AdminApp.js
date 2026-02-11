@@ -24505,7 +24505,7 @@ const FinancesPage = ({ adminKey }) => {
   const [invoiceManualDiscount, setInvoiceManualDiscount] = useState('');
   const [invoiceDiscountReason, setInvoiceDiscountReason] = useState('');
   // Partner filter and search state
-  const [partnerFilter, setPartnerFilter] = useState('all'); // all, registered, prospect
+  const [partnerFilter, setPartnerFilter] = useState('all'); // all, registered, prospect, new, first_email, follow_up_1, follow_up_2, archived
   const [partnerSearchQuery, setPartnerSearchQuery] = useState('');
   // Bulk partner selection state
   const [selectedPartnerIds, setSelectedPartnerIds] = useState([]);
@@ -25365,7 +25365,7 @@ const FinancesPage = ({ adminKey }) => {
 
   const findEmailInSystem = async () => {
     if (!emailSearchQuery.trim()) {
-      showToast('Please enter an email to search');
+      showToast('Please enter a search term');
       return;
     }
     setEmailSearching(true);
@@ -25375,9 +25375,9 @@ const FinancesPage = ({ adminKey }) => {
       setEmailSearchResult(response.data);
     } catch (err) {
       if (err.response?.status === 404) {
-        setEmailSearchResult({ status: 'not_found', message: `Email '${emailSearchQuery}' not found in any collection` });
+        setEmailSearchResult({ status: 'not_found', message: `'${emailSearchQuery}' not found in any collection` });
       } else {
-        showToast('Error searching email: ' + (err.response?.data?.detail || err.message));
+        showToast('Error searching: ' + (err.response?.data?.detail || err.message));
       }
     } finally {
       setEmailSearching(false);
@@ -26154,17 +26154,17 @@ const FinancesPage = ({ adminKey }) => {
           {/* Email Search Tool */}
           <div className="bg-white rounded-lg shadow">
             <div className="p-4 border-b bg-blue-50">
-              <h2 className="text-sm font-bold text-gray-700">🔍 Find Email in System</h2>
-              <p className="text-xs text-gray-500 mt-1">Search where an email is registered (partners, customers, admin users, salespersons)</p>
+              <h2 className="text-sm font-bold text-gray-700">🔍 Find in System</h2>
+              <p className="text-xs text-gray-500 mt-1">Search by name, email, phone or company (partners, customers, admin users, salespersons)</p>
             </div>
             <div className="p-4">
               <div className="flex gap-2 mb-3">
                 <input
-                  type="email"
+                  type="text"
                   value={emailSearchQuery}
                   onChange={(e) => setEmailSearchQuery(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && findEmailInSystem()}
-                  placeholder="Enter email to search..."
+                  placeholder="Search by name, email, phone, company..."
                   className="flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <button
@@ -26182,7 +26182,7 @@ const FinancesPage = ({ adminKey }) => {
                     <p className="text-sm text-green-700">{emailSearchResult.message}</p>
                   ) : (
                     <div>
-                      <p className="text-sm font-medium text-yellow-800 mb-2">Email found in {emailSearchResult.found_in.length} collection(s):</p>
+                      <p className="text-sm font-medium text-yellow-800 mb-2">Found {emailSearchResult.found_in.length} result(s):</p>
                       <div className="space-y-2">
                         {emailSearchResult.found_in.map((item, idx) => (
                           <div key={idx} className="flex items-center justify-between bg-white p-2 rounded border">
@@ -26235,7 +26235,7 @@ const FinancesPage = ({ adminKey }) => {
                 {selectedPartnerIds.length > 0 && (
                   <div className="flex items-center space-x-2">
                     <span className="text-xs text-gray-600 font-medium">{selectedPartnerIds.length} selected</span>
-                    {(partnerFilter === 'prospect') && (
+                    {(['prospect', 'new', 'first_email', 'follow_up_1', 'follow_up_2'].includes(partnerFilter)) && (
                       <>
                         <button
                           onClick={bulkSendProspectStep}
@@ -26274,41 +26274,70 @@ const FinancesPage = ({ adminKey }) => {
                 )}
               </div>
               {/* Filter Tabs and Search */}
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => { setPartnerFilter('all'); setSelectedPartnerIds([]); }}
+                      className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${partnerFilter === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                    >
+                      All ({partnerStats.partners?.length || 0})
+                    </button>
+                    <button
+                      onClick={() => { setPartnerFilter('registered'); setSelectedPartnerIds([]); }}
+                      className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${partnerFilter === 'registered' ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                    >
+                      Registered ({partnerStats.partners?.filter(p => p.is_real_partner && p.payment_plan_approved && (p.payment_plan === 'biweekly' || p.payment_plan === 'monthly')).length || 0})
+                    </button>
+                    <button
+                      onClick={() => { setPartnerFilter('prospect'); setSelectedPartnerIds([]); }}
+                      className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${partnerFilter === 'prospect' ? 'bg-orange-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                    >
+                      Prospects ({partnerStats.partners?.filter(p => (!p.is_real_partner || !p.payment_plan_approved || (p.payment_plan !== 'biweekly' && p.payment_plan !== 'monthly')) && p.prospect_status !== 'archived').length || 0})
+                    </button>
+                  </div>
+                  <div className="flex-1 max-w-xs">
+                    <input
+                      type="text"
+                      value={partnerSearchQuery}
+                      onChange={(e) => setPartnerSearchQuery(e.target.value)}
+                      placeholder="Search by name, email, phone..."
+                      className="w-full px-3 py-1.5 border rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-gray-500 mr-1">Status:</span>
                   <button
-                    onClick={() => { setPartnerFilter('all'); setSelectedPartnerIds([]); }}
-                    className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${partnerFilter === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                    onClick={() => { setPartnerFilter('new'); setSelectedPartnerIds([]); }}
+                    className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${partnerFilter === 'new' ? 'bg-orange-500 text-white' : 'bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100'}`}
                   >
-                    All ({partnerStats.partners?.length || 0})
+                    New ({partnerStats.partners?.filter(p => (!p.is_real_partner || !p.payment_plan_approved || (p.payment_plan !== 'biweekly' && p.payment_plan !== 'monthly')) && (!p.prospect_status || p.prospect_status === 'new')).length || 0})
                   </button>
                   <button
-                    onClick={() => { setPartnerFilter('registered'); setSelectedPartnerIds([]); }}
-                    className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${partnerFilter === 'registered' ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                    onClick={() => { setPartnerFilter('first_email'); setSelectedPartnerIds([]); }}
+                    className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${partnerFilter === 'first_email' ? 'bg-blue-500 text-white' : 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'}`}
                   >
-                    Registered ({partnerStats.partners?.filter(p => p.is_real_partner && p.payment_plan_approved && (p.payment_plan === 'biweekly' || p.payment_plan === 'monthly')).length || 0})
+                    1st Email ({partnerStats.partners?.filter(p => p.prospect_status === 'first_email').length || 0})
                   </button>
                   <button
-                    onClick={() => { setPartnerFilter('prospect'); setSelectedPartnerIds([]); }}
-                    className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${partnerFilter === 'prospect' ? 'bg-orange-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                    onClick={() => { setPartnerFilter('follow_up_1'); setSelectedPartnerIds([]); }}
+                    className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${partnerFilter === 'follow_up_1' ? 'bg-yellow-500 text-white' : 'bg-yellow-50 text-yellow-700 border border-yellow-200 hover:bg-yellow-100'}`}
                   >
-                    Prospects ({partnerStats.partners?.filter(p => (!p.is_real_partner || !p.payment_plan_approved || (p.payment_plan !== 'biweekly' && p.payment_plan !== 'monthly')) && p.prospect_status !== 'archived').length || 0})
+                    2nd Email ({partnerStats.partners?.filter(p => p.prospect_status === 'follow_up_1').length || 0})
+                  </button>
+                  <button
+                    onClick={() => { setPartnerFilter('follow_up_2'); setSelectedPartnerIds([]); }}
+                    className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${partnerFilter === 'follow_up_2' ? 'bg-red-500 text-white' : 'bg-red-50 text-red-700 border border-red-200 hover:bg-red-100'}`}
+                  >
+                    3rd Email ({partnerStats.partners?.filter(p => p.prospect_status === 'follow_up_2').length || 0})
                   </button>
                   <button
                     onClick={() => { setPartnerFilter('archived'); setSelectedPartnerIds([]); }}
-                    className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${partnerFilter === 'archived' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                    className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${partnerFilter === 'archived' ? 'bg-gray-600 text-white' : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200'}`}
                   >
                     Archived ({partnerStats.partners?.filter(p => p.prospect_status === 'archived').length || 0})
                   </button>
-                </div>
-                <div className="flex-1 max-w-xs">
-                  <input
-                    type="text"
-                    value={partnerSearchQuery}
-                    onChange={(e) => setPartnerSearchQuery(e.target.value)}
-                    placeholder="Search by name, email, phone..."
-                    className="w-full px-3 py-1.5 border rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
                 </div>
               </div>
             </div>
@@ -26344,6 +26373,10 @@ const FinancesPage = ({ adminKey }) => {
                       // Filter by type
                       if (partnerFilter === 'registered' && !isRegisteredPartner(p)) return false;
                       if (partnerFilter === 'prospect' && (isRegisteredPartner(p) || p.prospect_status === 'archived')) return false;
+                      if (partnerFilter === 'new' && (isRegisteredPartner(p) || (p.prospect_status && p.prospect_status !== 'new'))) return false;
+                      if (partnerFilter === 'first_email' && p.prospect_status !== 'first_email') return false;
+                      if (partnerFilter === 'follow_up_1' && p.prospect_status !== 'follow_up_1') return false;
+                      if (partnerFilter === 'follow_up_2' && p.prospect_status !== 'follow_up_2') return false;
                       if (partnerFilter === 'archived' && p.prospect_status !== 'archived') return false;
                       // Filter by search query
                       if (partnerSearchQuery.trim()) {
@@ -26356,7 +26389,15 @@ const FinancesPage = ({ adminKey }) => {
                       return (
                         <tr>
                           <td colSpan="10" className="px-4 py-8 text-center text-gray-500">
-                            {partnerSearchQuery.trim() ? 'No partners matching your search' : partnerFilter !== 'all' ? `No ${partnerFilter === 'registered' ? 'registered' : 'prospect'} partners found` : 'No partner orders found'}
+                            {partnerSearchQuery.trim() ? 'No partners matching your search' : partnerFilter !== 'all' ? `No ${
+                              partnerFilter === 'registered' ? 'registered' :
+                              partnerFilter === 'new' ? 'new' :
+                              partnerFilter === 'first_email' ? '1st email' :
+                              partnerFilter === 'follow_up_1' ? '2nd email' :
+                              partnerFilter === 'follow_up_2' ? '3rd email' :
+                              partnerFilter === 'archived' ? 'archived' :
+                              'prospect'
+                            } partners found` : 'No partner orders found'}
                           </td>
                         </tr>
                       );
