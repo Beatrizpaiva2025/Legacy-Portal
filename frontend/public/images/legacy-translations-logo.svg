@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 150" fill="none">
+  <defs>
+    <clipPath id="globe">
+      <circle cx="70" cy="75" r="65"/>
+    </clipPath>
+  </defs>
+
+  <!-- Globe base circle -->
+  <circle cx="70" cy="75" r="65" fill="#DCEEF8"/>
+
+  <!-- Swoosh wave shapes clipped to globe -->
+  <g clip-path="url(#globe)">
+    <!-- Bottom swoosh - lightest -->
+    <path d="M-10 120 Q10 108 40 100 Q70 92 100 92 Q120 92 145 100 L145 115 Q120 107 100 107 Q70 107 40 115 Q10 123 -10 135 Z" fill="#B8D8EC"/>
+    <!-- Middle-bottom swoosh -->
+    <path d="M-15 98 Q10 83 40 74 Q70 65 100 66 Q125 67 145 78 L145 93 Q125 82 100 81 Q70 80 40 89 Q10 98 -15 113 Z" fill="#7BBAE0"/>
+    <!-- Middle-top swoosh -->
+    <path d="M-10 73 Q15 56 45 47 Q72 39 100 42 Q125 45 145 57 L145 72 Q125 60 100 57 Q72 54 45 62 Q15 71 -10 88 Z" fill="#4A9DD6"/>
+    <!-- Top swoosh - darkest -->
+    <path d="M5 52 Q25 35 50 26 Q72 19 98 23 Q120 27 140 40 L140 54 Q120 42 98 38 Q72 34 50 41 Q25 50 5 67 Z" fill="#2E78B7"/>
+  </g>
+
+  <!-- LEGACY text -->
+  <text x="155" y="82" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="58" fill="#1A3255" letter-spacing="3">LEGACY</text>
+
+  <!-- TRANSLATIONS text -->
+  <text x="158" y="118" font-family="Arial, Helvetica, sans-serif" font-weight="600" font-size="32" fill="#4A9BD9" letter-spacing="5">TRANSLATIONS</text>
+</svg>
