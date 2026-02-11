@@ -199,7 +199,8 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
       setProjects(orders);
     } catch (err) {
       console.error('Failed to fetch projects:', err);
-      showToast('Failed to load projects', 'error');
+      const detail = err.response?.data?.detail || err.response?.statusText || err.message || 'Unknown error';
+      showToast(`Failed to load projects: ${detail}`, 'error');
     } finally {
       setLoading(false);
     }

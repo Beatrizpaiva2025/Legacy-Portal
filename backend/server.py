@@ -3366,7 +3366,7 @@ async def get_current_admin_user(token: str = None) -> Optional[dict]:
         return user
 
     # Fallback: check database for persisted token
-    user = await db.admin_users.find_one({"token": token, "is_active": True})
+    user = await db.admin_users.find_one({"token": token, "is_active": {"$ne": False}})
     if user:
         # Restore token to memory cache (including translator_type for in-house translators)
         active_admin_tokens[token] = {"user_id": user["id"], "role": user["role"], "translator_type": user.get("translator_type")}
@@ -3407,8 +3407,8 @@ async def validate_admin_or_user_token(admin_key: str) -> dict:
             "is_master": False
         }
 
-    # Check database for valid token
-    user = await db.admin_users.find_one({"token": admin_key, "is_active": True})
+    # Check database for valid token (accept missing is_active as active)
+    user = await db.admin_users.find_one({"token": admin_key, "is_active": {"$ne": False}})
     if user:
         # Cache the token (including translator_type)
         active_admin_tokens[admin_key] = {
