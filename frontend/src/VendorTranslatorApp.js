@@ -94,7 +94,7 @@ const VendorLogin = ({ onLogin }) => {
         <div className="bg-white py-8 px-4 text-center border-b border-gray-200">
           <div className="mb-1">
             <img
-              src="/images/legacy-translations-logo.svg"
+              src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png"
               alt="Legacy Translations"
               className="h-14 mx-auto object-contain"
             />
@@ -433,7 +433,7 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
               <img src={companyLogo} alt="Legacy Translations" className="h-10 object-contain" />
             ) : (
               <img
-                src="/images/legacy-translations-logo.svg"
+                src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png"
                 alt="Legacy Translations"
                 className="h-10 object-contain"
               />
