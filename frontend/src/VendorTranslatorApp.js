@@ -168,8 +168,10 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
   const [loading, setLoading] = useState(true);
   const [loadingFiles, setLoadingFiles] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [uploadFile, setUploadFile] = useState(null);
+  const [uploadFiles, setUploadFiles] = useState([]);
+  const [uploadedFileNames, setUploadedFileNames] = useState([]);
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [sentToPM, setSentToPM] = useState(false);
   const [downloading, setDownloading] = useState({});
 
   // Fetch assigned projects
@@ -204,7 +206,9 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
 
     setSelectedProject(project);
     setUploadSuccess(false);
-    setUploadFile(null);
+    setUploadFiles([]);
+    setUploadedFileNames([]);
+    setSentToPM(false);
     setLoadingFiles(true);
 
     try {
@@ -261,63 +265,66 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
     }
   };
 
-  // Upload translation
+  // Read file as base64
+  const readFileAsBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // Upload all selected translations (without notifying PM yet)
   const handleUpload = async () => {
-    if (!uploadFile || !selectedProject) return;
+    if (uploadFiles.length === 0 || !selectedProject) return;
 
     setUploading(true);
     try {
-      // Read file as base64
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const base64Data = e.target.result.split(',')[1];
-          const contentType = uploadFile.type || 'application/pdf';
+      const uploaded = [];
+      for (const file of uploadFiles) {
+        const base64Data = await readFileAsBase64(file);
+        const contentType = file.type || 'application/pdf';
 
-          // Upload as translated document
-          await axios.post(`${API}/admin/orders/${selectedProject.id}/documents?admin_key=${adminKey}`, {
-            filename: uploadFile.name,
-            file_data: base64Data,
-            content_type: contentType,
-            source: 'translated_document'
-          });
+        await axios.post(`${API}/admin/orders/${selectedProject.id}/documents?admin_key=${adminKey}`, {
+          filename: file.name,
+          file_data: base64Data,
+          content_type: contentType,
+          source: 'translated_document'
+        });
+        uploaded.push(file.name);
+      }
 
-          // Notify PM about the upload
-          try {
-            await axios.post(`${API}/vendor-translator/notify-upload?admin_key=${adminKey}`, {
-              order_id: selectedProject.id,
-              order_number: selectedProject.order_number,
-              translator_name: user.name,
-              translator_id: user.id,
-              filename: uploadFile.name
-            });
-          } catch (notifyErr) {
-            // Notification failure is non-critical
-            console.warn('PM notification failed (non-critical):', notifyErr);
-          }
-
-          setUploadSuccess(true);
-          setUploadFile(null);
-          showToast('Translation uploaded successfully! The PM has been notified.', 'success');
-
-          // Refresh projects
-          fetchProjects();
-        } catch (uploadErr) {
-          console.error('Upload failed:', uploadErr);
-          showToast('Failed to upload translation. Please try again.', 'error');
-        } finally {
-          setUploading(false);
-        }
-      };
-      reader.onerror = () => {
-        showToast('Failed to read file', 'error');
-        setUploading(false);
-      };
-      reader.readAsDataURL(uploadFile);
+      setUploadedFileNames(uploaded);
+      setUploadSuccess(true);
+      setUploadFiles([]);
+      showToast(`${uploaded.length} file(s) uploaded successfully!`, 'success');
     } catch (err) {
-      console.error('Upload error:', err);
-      showToast('Upload failed', 'error');
+      console.error('Upload failed:', err);
+      showToast('Failed to upload files. Please try again.', 'error');
+    } finally {
       setUploading(false);
+    }
+  };
+
+  // Send notification to PM/Admin
+  const handleSendToPM = async () => {
+    if (!selectedProject) return;
+
+    try {
+      await axios.post(`${API}/vendor-translator/notify-upload?admin_key=${adminKey}`, {
+        order_id: selectedProject.id,
+        order_number: selectedProject.order_number,
+        translator_name: user.name,
+        translator_id: user.id,
+        filename: uploadedFileNames.join(', ')
+      });
+      setSentToPM(true);
+      showToast('PM/Admin has been notified! They will review your translation.', 'success');
+      fetchProjects();
+    } catch (err) {
+      console.error('Failed to notify PM:', err);
+      showToast('Failed to notify PM. Please try again.', 'error');
     }
   };
 
@@ -562,32 +569,81 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
                       <h4 className="text-sm font-semibold text-gray-700">Upload Translation</h4>
                     </div>
                     <div className="p-5">
-                      {uploadSuccess ? (
+                      {sentToPM ? (
                         <div className="text-center py-6">
                           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                             <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                             </svg>
                           </div>
-                          <h4 className="text-lg font-medium text-green-700 mb-1">Translation Uploaded!</h4>
-                          <p className="text-sm text-gray-500 mb-4">The Project Manager has been notified and will review your work.</p>
+                          <h4 className="text-lg font-medium text-green-700 mb-1">Sent to PM/Admin!</h4>
+                          <p className="text-sm text-gray-500 mb-2">Your translation has been sent for review.</p>
+                          <div className="bg-gray-50 rounded-lg p-3 mb-4 text-left max-w-sm mx-auto">
+                            {uploadedFileNames.map((name, idx) => (
+                              <p key={idx} className="text-xs text-gray-600 flex items-center gap-2 py-0.5">
+                                <span className="text-green-500">&#10003;</span> {name}
+                              </p>
+                            ))}
+                          </div>
                           <button
-                            onClick={() => { setUploadSuccess(false); setUploadFile(null); }}
+                            onClick={() => { setUploadSuccess(false); setUploadFiles([]); setUploadedFileNames([]); setSentToPM(false); }}
                             className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-lg transition-colors"
                           >
-                            Upload another file
+                            Upload more files
+                          </button>
+                        </div>
+                      ) : uploadSuccess ? (
+                        <div className="text-center py-6">
+                          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                          <h4 className="text-lg font-medium text-blue-700 mb-1">Files Uploaded!</h4>
+                          <p className="text-sm text-gray-500 mb-3">
+                            {uploadedFileNames.length} file(s) uploaded. Now send to the PM/Admin for review.
+                          </p>
+                          <div className="bg-gray-50 rounded-lg p-3 mb-4 text-left max-w-sm mx-auto">
+                            {uploadedFileNames.map((name, idx) => (
+                              <p key={idx} className="text-xs text-gray-600 flex items-center gap-2 py-0.5">
+                                <span className="text-blue-500">&#10003;</span> {name}
+                              </p>
+                            ))}
+                          </div>
+                          <button
+                            onClick={handleSendToPM}
+                            className="w-full max-w-xs mx-auto py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                            </svg>
+                            Send to PM/Admin
+                          </button>
+                          <button
+                            onClick={() => { setUploadSuccess(false); setUploadFiles([]); setUploadedFileNames([]); }}
+                            className="mt-2 px-4 py-2 text-gray-500 hover:text-gray-700 text-xs transition-colors"
+                          >
+                            Upload more files first
                           </button>
                         </div>
                       ) : (
                         <div>
-                          <p className="text-sm text-gray-600 mb-4">
-                            Upload your completed translation file. Accepted formats: PDF, DOCX, DOC, TXT.
+                          <p className="text-sm text-gray-600 mb-3">
+                            Upload your completed translation files. You can select multiple files.
                           </p>
+                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-xs text-blue-800">
+                            <p className="font-medium mb-1">Formatting Guidelines:</p>
+                            <ul className="list-disc list-inside space-y-0.5 text-blue-700">
+                              <li><strong>Preferred format: PDF</strong> - best for review and package generation</li>
+                              <li>Use standard page size (Letter or A4) with normal margins</li>
+                              <li>The company letterhead will be added automatically to the final package</li>
+                            </ul>
+                          </div>
 
                           {/* Drop zone */}
                           <div
                             className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors ${
-                              uploadFile
+                              uploadFiles.length > 0
                                 ? 'border-blue-400 bg-blue-50'
                                 : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50/50'
                             }`}
@@ -596,50 +652,76 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
                               e.preventDefault();
                               e.stopPropagation();
                               if (e.dataTransfer.files?.length > 0) {
-                                setUploadFile(e.dataTransfer.files[0]);
+                                setUploadFiles(prev => [...prev, ...Array.from(e.dataTransfer.files)]);
                               }
                             }}
                           >
-                            {uploadFile ? (
+                            {uploadFiles.length > 0 ? (
                               <div>
-                                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                                  </svg>
+                                <div className="space-y-2 mb-4">
+                                  {uploadFiles.map((file, idx) => (
+                                    <div key={idx} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border">
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center">
+                                          <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                          </svg>
+                                        </div>
+                                        <div className="text-left">
+                                          <p className="text-xs font-medium text-gray-800">{file.name}</p>
+                                          <p className="text-[10px] text-gray-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                                        </div>
+                                      </div>
+                                      <button
+                                        onClick={() => setUploadFiles(prev => prev.filter((_, i) => i !== idx))}
+                                        className="text-red-400 hover:text-red-600 text-lg font-bold px-1"
+                                      >
+                                        &times;
+                                      </button>
+                                    </div>
+                                  ))}
                                 </div>
-                                <p className="text-sm font-medium text-blue-700">{uploadFile.name}</p>
-                                <p className="text-xs text-gray-500 mt-1">{(uploadFile.size / 1024 / 1024).toFixed(2)} MB</p>
-                                <button
-                                  onClick={() => setUploadFile(null)}
-                                  className="text-xs text-red-500 hover:text-red-700 mt-2"
-                                >
-                                  Remove file
-                                </button>
+                                <label className="inline-block px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs rounded-lg cursor-pointer transition-colors">
+                                  + Add more files
+                                  <input
+                                    type="file"
+                                    className="hidden"
+                                    multiple
+                                    accept=".pdf,.docx,.doc,.txt,.html"
+                                    onChange={(e) => {
+                                      if (e.target.files?.length > 0) {
+                                        setUploadFiles(prev => [...prev, ...Array.from(e.target.files)]);
+                                      }
+                                    }}
+                                  />
+                                </label>
                               </div>
                             ) : (
                               <div>
                                 <svg className="w-10 h-10 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                                 </svg>
-                                <p className="text-sm text-gray-600 mb-1">Drag and drop your file here, or</p>
+                                <p className="text-sm text-gray-600 mb-1">Drag and drop your files here, or</p>
                                 <label className="inline-block px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg cursor-pointer transition-colors">
                                   Browse Files
                                   <input
                                     type="file"
                                     className="hidden"
+                                    multiple
                                     accept=".pdf,.docx,.doc,.txt,.html"
                                     onChange={(e) => {
                                       if (e.target.files?.length > 0) {
-                                        setUploadFile(e.target.files[0]);
+                                        setUploadFiles(prev => [...prev, ...Array.from(e.target.files)]);
                                       }
                                     }}
                                   />
                                 </label>
+                                <p className="text-xs text-gray-400 mt-2">You can select multiple files at once</p>
                               </div>
                             )}
                           </div>
 
-                          {uploadFile && (
+                          {uploadFiles.length > 0 && (
                             <button
                               onClick={handleUpload}
                               disabled={uploading}
@@ -648,14 +730,14 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
                               {uploading ? (
                                 <>
                                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                                  Uploading...
+                                  Uploading {uploadFiles.length} file(s)...
                                 </>
                               ) : (
                                 <>
                                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                                   </svg>
-                                  Upload Translation
+                                  Upload {uploadFiles.length} File(s)
                                 </>
                               )}
                             </button>

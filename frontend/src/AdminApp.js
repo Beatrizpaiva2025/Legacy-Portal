@@ -30038,49 +30038,137 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       }
       setOriginalContents(loadedDocs);
 
-      // Find and load translated document
-      const translatedDoc = docs.find(d => d.document_type === 'translation' || d.filename?.includes('translation'));
-      if (translatedDoc) {
-        const transData = await axios.get(`${API}/admin/order-documents/${translatedDoc.id}/download?admin_key=${adminKey}`);
-        setTranslatedContent({
-          filename: translatedDoc.filename,
-          data: transData.data.file_data,
-          contentType: transData.data.content_type,
-          html: transData.data.html_content
-        });
-      } else if (order.translation_html) {
-        // Load translation from order's translation_html field
-        // Check for corrupted binary content
-        if (order.translation_html.startsWith('PK') || (order.translation_html.slice(0, 100).split('').filter(c => c.charCodeAt(0) < 32 && ![9,10,13].includes(c.charCodeAt(0))).length > 10)) {
-          console.warn('Binary content detected in translation_html');
-          showToast('⚠️ Translation data appears corrupted. Please re-upload the translation file.');
-        } else {
-          setTranslatedContent({
-            filename: 'Translation',
-            html: order.translation_html,
-            contentType: 'text/html'
-          });
-        }
-      } else {
-        // Try to fetch order details to get translation_html
+      // Find and load ALL translated documents (check source field for vendor uploads too)
+      const translatedDocs = docs.filter(d => d.document_type === 'translation' || d.source === 'translated_document' || d.filename?.includes('translation'));
+      const translationImages = [];
+      let translationHtmlContent = null;
+
+      for (const translatedDoc of translatedDocs) {
         try {
-          const orderRes = await axios.get(`${API}/admin/orders/${order.id}?admin_key=${adminKey}`);
-          const orderData = orderRes.data.order || orderRes.data;
-          if (orderData.translation_html) {
-            // Check for corrupted binary content
-            if (orderData.translation_html.startsWith('PK') || (orderData.translation_html.slice(0, 100).split('').filter(c => c.charCodeAt(0) < 32 && ![9,10,13].includes(c.charCodeAt(0))).length > 10)) {
-              console.warn('Binary content detected in translation_html');
-              showToast('⚠️ Translation data appears corrupted. Please re-upload the translation file.');
-            } else {
+          const transData = await axios.get(`${API}/admin/order-documents/${translatedDoc.id}/download?admin_key=${adminKey}`);
+          const fileData = transData.data.file_data;
+          const contentType = transData.data.content_type || 'application/pdf';
+          const filename = translatedDoc.filename || transData.data.filename || 'translation';
+
+          if (contentType === 'application/pdf' || filename.toLowerCase().endsWith('.pdf')) {
+            // Convert PDF to images using PDF.js (same as originals)
+            try {
+              const base64Content = fileData.startsWith('data:') ? fileData.split(',')[1] : fileData;
+              const binaryString = atob(base64Content);
+              const bytes = new Uint8Array(binaryString.length);
+              for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+              }
+
+              const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+              for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                const page = await pdf.getPage(pageNum);
+                const scale = 2;
+                const viewport = page.getViewport({ scale });
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                await page.render({ canvasContext: context, viewport }).promise;
+                const imageDataUrl = canvas.toDataURL('image/png');
+
+                translationImages.push({
+                  filename: `${filename}_page_${pageNum}.png`,
+                  data: imageDataUrl.split(',')[1],
+                  type: 'image/png'
+                });
+              }
+            } catch (pdfErr) {
+              console.error('Translation PDF conversion error:', pdfErr);
+              // Fallback: set as translatedContent for iframe display
               setTranslatedContent({
-                filename: 'Translation',
-                html: orderData.translation_html,
-                contentType: 'text/html'
+                filename: filename,
+                data: fileData,
+                contentType: contentType,
+                html: transData.data.html_content
               });
             }
+          } else if (contentType?.includes('image')) {
+            // Image file - add directly to translation images
+            translationImages.push({
+              filename: filename,
+              data: fileData,
+              type: contentType
+            });
+          } else if (transData.data.html_content) {
+            // HTML content available
+            translationHtmlContent = transData.data.html_content;
+            setTranslatedContent({
+              filename: filename,
+              data: fileData,
+              contentType: contentType,
+              html: transData.data.html_content
+            });
+          } else if (contentType?.match(/wordprocessingml|msword|officedocument/)) {
+            // DOCX/DOC - can't convert, show download button in review
+            setTranslatedContent({
+              filename: filename,
+              data: fileData,
+              contentType: contentType,
+              html: null
+            });
+          } else {
+            // Other types - set as translatedContent
+            setTranslatedContent({
+              filename: filename,
+              data: fileData,
+              contentType: contentType,
+              html: transData.data.html_content
+            });
           }
-        } catch (orderErr) {
-          console.error('Failed to fetch order details:', orderErr);
+        } catch (transErr) {
+          console.error('Failed to load translated document:', translatedDoc.id, transErr);
+        }
+      }
+
+      // Store converted translation images for package generation (with letterhead)
+      if (translationImages.length > 0) {
+        setPmTranslationFiles(translationImages);
+      }
+      if (translationHtmlContent) {
+        setPmTranslationHtml(translationHtmlContent);
+      }
+
+      // Fallback: try translation_html field if no documents found
+      if (translatedDocs.length === 0 && translationImages.length === 0) {
+        if (order.translation_html) {
+          // Check for corrupted binary content
+          if (order.translation_html.startsWith('PK') || (order.translation_html.slice(0, 100).split('').filter(c => c.charCodeAt(0) < 32 && ![9,10,13].includes(c.charCodeAt(0))).length > 10)) {
+            console.warn('Binary content detected in translation_html');
+            showToast('⚠️ Translation data appears corrupted. Please re-upload the translation file.');
+          } else {
+            setTranslatedContent({
+              filename: 'Translation',
+              html: order.translation_html,
+              contentType: 'text/html'
+            });
+          }
+        } else {
+          // Try to fetch order details to get translation_html
+          try {
+            const orderRes = await axios.get(`${API}/admin/orders/${order.id}?admin_key=${adminKey}`);
+            const orderData = orderRes.data.order || orderRes.data;
+            if (orderData.translation_html) {
+              // Check for corrupted binary content
+              if (orderData.translation_html.startsWith('PK') || (orderData.translation_html.slice(0, 100).split('').filter(c => c.charCodeAt(0) < 32 && ![9,10,13].includes(c.charCodeAt(0))).length > 10)) {
+                console.warn('Binary content detected in translation_html');
+                showToast('⚠️ Translation data appears corrupted. Please re-upload the translation file.');
+              } else {
+                setTranslatedContent({
+                  filename: 'Translation',
+                  html: orderData.translation_html,
+                  contentType: 'text/html'
+                });
+              }
+            }
+          } catch (orderErr) {
+            console.error('Failed to fetch order details:', orderErr);
+          }
         }
       }
     } catch (err) {
@@ -31465,9 +31553,45 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         style={{ height: 'calc(100vh - 400px)' }}
                         title="Translation PDF"
                       />
+                    ) : translatedContent.contentType?.match(/wordprocessingml|msword|officedocument/) ? (
+                      <div className="text-center py-8">
+                        <div className="text-4xl mb-3">&#128196;</div>
+                        <p className="text-sm font-medium text-gray-700 mb-2">{translatedContent.filename}</p>
+                        <p className="text-xs text-gray-500 mb-4">This file type cannot be previewed inline. Click to download.</p>
+                        <button
+                          onClick={() => {
+                            try {
+                              const byteCharacters = atob(translatedContent.data);
+                              const byteNumbers = new Array(byteCharacters.length);
+                              for (let i = 0; i < byteCharacters.length; i++) {
+                                byteNumbers[i] = byteCharacters.charCodeAt(i);
+                              }
+                              const byteArray = new Uint8Array(byteNumbers);
+                              const blob = new Blob([byteArray], { type: translatedContent.contentType });
+                              const url = window.URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = translatedContent.filename || 'translation.docx';
+                              document.body.appendChild(a);
+                              a.click();
+                              document.body.removeChild(a);
+                              window.URL.revokeObjectURL(url);
+                            } catch (e) {
+                              console.error('Download error:', e);
+                              showToast('Failed to download file', 'error');
+                            }
+                          }}
+                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors inline-flex items-center gap-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                          Download File
+                        </button>
+                      </div>
                     ) : (
                       <div className="p-4 bg-gray-50 rounded border text-sm whitespace-pre-wrap">
-                        {atob(translatedContent.data)}
+                        {(() => { try { return atob(translatedContent.data); } catch(e) { return 'Unable to preview this file format.'; } })()}
                       </div>
                     )
                   ) : (pmTranslationFiles.length > 0 || pmTranslationHtml) ? (
