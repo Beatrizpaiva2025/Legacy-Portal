@@ -18113,7 +18113,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           </span>
                         )}
                       </div>
-                    ) : ['review', 'ready', 'delivered'].includes(order.translation_status) ? (
+                    ) : ['review', 'ready'].includes(order.translation_status) ? (
                       <span className="px-2 py-1 bg-blue-50 text-blue-600 rounded text-xs font-medium border border-blue-200 flex items-center gap-1">
                         <RefreshIcon className="w-3 h-3" /> Review
                       </span>
