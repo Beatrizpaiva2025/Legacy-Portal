@@ -29970,7 +29970,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       const docs = docsRes.data.documents || [];
 
       // Load ALL original documents (not just the first one)
-      const originalDocs = docs.filter(d => d.document_type === 'original' || !d.document_type || d.source === 'manual_upload' || d.source === 'partner_upload');
+      const originalDocs = docs.filter(d => d.source !== 'translated_document' && (d.document_type === 'original' || !d.document_type || d.source === 'manual_upload' || d.source === 'partner_upload'));
       const loadedDocs = [];
 
       for (const doc of originalDocs) {
