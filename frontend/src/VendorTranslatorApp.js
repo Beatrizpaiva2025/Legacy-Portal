@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
 const API = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
@@ -90,22 +90,16 @@ const VendorLogin = ({ onLogin }) => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-        {/* Blue Header with Globe */}
+        {/* Blue Header with Logo */}
         <div className="bg-gradient-to-b from-blue-500 to-blue-600 py-8 px-4 text-center">
-          {/* Globe Icon */}
           <div className="mb-3">
             <div className="w-16 h-16 mx-auto">
               <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="50" cy="50" r="45" fill="#4FC3F7"/>
-                <ellipse cx="50" cy="50" rx="18" ry="45" stroke="white" strokeWidth="1.5" fill="none"/>
-                <line x1="5" y1="50" x2="95" y2="50" stroke="white" strokeWidth="1.5"/>
-                <ellipse cx="50" cy="28" rx="38" ry="10" stroke="white" strokeWidth="1.5" fill="none"/>
-                <ellipse cx="50" cy="72" rx="38" ry="10" stroke="white" strokeWidth="1.5" fill="none"/>
-                {/* Land masses */}
-                <path d="M28 32 Q34 26 46 30 Q52 34 48 44 Q42 48 34 44 Q28 38 28 32Z" fill="#4CAF50"/>
-                <path d="M56 22 Q68 18 76 26 Q80 36 72 42 Q62 40 54 34 Q50 28 56 22Z" fill="#4CAF50"/>
-                <path d="M22 54 Q30 50 42 54 Q48 60 44 70 Q34 74 26 68 Q18 62 22 54Z" fill="#4CAF50"/>
-                <path d="M58 56 Q70 52 80 60 Q84 70 76 76 Q64 78 56 72 Q52 64 58 56Z" fill="#4CAF50"/>
+                <circle cx="50" cy="50" r="45" fill="#B3E5FC"/>
+                <path d="M15 35 Q25 25 50 30 Q65 33 75 25" stroke="#1565C0" strokeWidth="5" fill="none" strokeLinecap="round"/>
+                <path d="M10 50 Q30 40 55 48 Q70 52 80 42" stroke="#1E88E5" strokeWidth="5" fill="none" strokeLinecap="round"/>
+                <path d="M15 65 Q35 55 55 62 Q70 67 82 58" stroke="#2196F3" strokeWidth="5" fill="none" strokeLinecap="round"/>
+                <path d="M25 78 Q40 70 55 75 Q68 79 78 72" stroke="#42A5F5" strokeWidth="4" fill="none" strokeLinecap="round"/>
               </svg>
             </div>
           </div>
@@ -173,10 +167,26 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [sentToPM, setSentToPM] = useState(false);
   const [downloading, setDownloading] = useState({});
+  // Logo
+  const [companyLogo, setCompanyLogo] = useState(null);
+  // Messaging
+  const [messages, setMessages] = useState([]);
+  const [showChat, setShowChat] = useState(false);
+  const [chatMessage, setChatMessage] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [adminPmList, setAdminPmList] = useState([]);
+  const [selectedRecipient, setSelectedRecipient] = useState('');
+  const chatEndRef = useRef(null);
 
-  // Fetch assigned projects
+  // Fetch assigned projects + logo + recipients
   useEffect(() => {
     fetchProjects();
+    fetchCompanyLogo();
+    fetchAdminPmList();
+    fetchMessages();
+    // Poll for new messages every 30 seconds
+    const interval = setInterval(fetchMessages, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const fetchProjects = async () => {
@@ -192,6 +202,81 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
       showToast('Failed to load projects', 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Load company logo from shared assets
+  const fetchCompanyLogo = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/shared-assets?admin_key=${adminKey}`);
+      if (response.data?.logo_left) {
+        setCompanyLogo(response.data.logo_left);
+      }
+    } catch (err) {
+      console.log('Could not load company logo');
+    }
+  };
+
+  // Load admin/PM list for messaging
+  const fetchAdminPmList = async () => {
+    try {
+      const [adminsRes, pmsRes] = await Promise.all([
+        axios.get(`${API}/admin/users/by-role/admin?admin_key=${adminKey}`),
+        axios.get(`${API}/admin/users/by-role/pm?admin_key=${adminKey}`)
+      ]);
+      const admins = (adminsRes.data.users || []).map(u => ({ ...u, role: 'admin' }));
+      const pms = (pmsRes.data.users || []).map(u => ({ ...u, role: 'pm' }));
+      setAdminPmList([...pms, ...admins]);
+      // Auto-select first PM if available
+      if (pms.length > 0) setSelectedRecipient(pms[0].id);
+      else if (admins.length > 0) setSelectedRecipient(admins[0].id);
+    } catch (err) {
+      console.log('Could not load admin/PM list');
+    }
+  };
+
+  // Fetch messages for this translator
+  const fetchMessages = async () => {
+    try {
+      const response = await axios.get(`${API}/translator/messages?admin_key=${adminKey}&translator_id=${user.id}`);
+      setMessages(response.data.messages || []);
+    } catch (err) {
+      // Silent fail for polling
+    }
+  };
+
+  // Send message to PM/Admin
+  const handleSendMessage = async () => {
+    if (!chatMessage.trim() || !selectedRecipient) return;
+    setSendingMessage(true);
+    try {
+      const recipient = adminPmList.find(u => u.id === selectedRecipient);
+      await axios.post(`${API}/translator/send-message?admin_key=${adminKey}`, {
+        translator_id: user.id,
+        translator_name: user.name,
+        recipient_id: selectedRecipient,
+        recipient_name: recipient?.name || 'Admin/PM',
+        recipient_role: recipient?.role || 'admin',
+        content: chatMessage.trim()
+      });
+      setChatMessage('');
+      showToast('Message sent!', 'success');
+      fetchMessages();
+    } catch (err) {
+      console.error('Failed to send message:', err);
+      showToast('Failed to send message', 'error');
+    } finally {
+      setSendingMessage(false);
+    }
+  };
+
+  // Mark message as read
+  const markAsRead = async (messageId) => {
+    try {
+      await axios.put(`${API}/translator/messages/${messageId}/read?admin_key=${adminKey}`);
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, read: true } : m));
+    } catch (err) {
+      console.error('Failed to mark message as read');
     }
   };
 
@@ -344,27 +429,32 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Top Bar - Blue with Globe Logo */}
+      {/* Top Bar with Company Logo */}
       <div className="bg-slate-800 text-white px-6 py-2 shadow-md">
         <div className="flex items-center justify-between max-w-6xl mx-auto">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8">
-              <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="50" cy="50" r="45" fill="#4FC3F7"/>
-                <ellipse cx="50" cy="50" rx="18" ry="45" stroke="white" strokeWidth="1.5" fill="none"/>
-                <line x1="5" y1="50" x2="95" y2="50" stroke="white" strokeWidth="1.5"/>
-                <ellipse cx="50" cy="28" rx="38" ry="10" stroke="white" strokeWidth="1.5" fill="none"/>
-                <ellipse cx="50" cy="72" rx="38" ry="10" stroke="white" strokeWidth="1.5" fill="none"/>
-                <path d="M28 32 Q34 26 46 30 Q52 34 48 44 Q42 48 34 44 Q28 38 28 32Z" fill="#4CAF50"/>
-                <path d="M56 22 Q68 18 76 26 Q80 36 72 42 Q62 40 54 34 Q50 28 56 22Z" fill="#4CAF50"/>
-                <path d="M22 54 Q30 50 42 54 Q48 60 44 70 Q34 74 26 68 Q18 62 22 54Z" fill="#4CAF50"/>
-                <path d="M58 56 Q70 52 80 60 Q84 70 76 76 Q64 78 56 72 Q52 64 58 56Z" fill="#4CAF50"/>
-              </svg>
-            </div>
-            <div>
-              <h1 className="text-sm font-semibold">Legacy Translations</h1>
-              <p className="text-slate-400 text-[10px]">Vendor Translator Portal</p>
-            </div>
+            {companyLogo ? (
+              <img src={companyLogo} alt="Legacy Translations" className="h-8 object-contain" />
+            ) : (
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8">
+                  <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="50" cy="50" r="45" fill="#B3E5FC"/>
+                    <path d="M15 35 Q25 25 50 30 Q65 33 75 25" stroke="#1565C0" strokeWidth="5" fill="none" strokeLinecap="round"/>
+                    <path d="M10 50 Q30 40 55 48 Q70 52 80 42" stroke="#1E88E5" strokeWidth="5" fill="none" strokeLinecap="round"/>
+                    <path d="M15 65 Q35 55 55 62 Q70 67 82 58" stroke="#2196F3" strokeWidth="5" fill="none" strokeLinecap="round"/>
+                    <path d="M25 78 Q40 70 55 75 Q68 79 78 72" stroke="#42A5F5" strokeWidth="4" fill="none" strokeLinecap="round"/>
+                  </svg>
+                </div>
+                <div>
+                  <span className="text-sm font-bold tracking-wide" style={{ color: '#1a2d6d' }}>LEGACY</span>
+                  <span className="text-[10px] block" style={{ color: '#4fc3f7' }}>TRANSLATIONS</span>
+                </div>
+              </div>
+            )}
+            {companyLogo && (
+              <p className="text-slate-400 text-[10px] ml-1">Vendor Portal</p>
+            )}
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right">
@@ -758,6 +848,133 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
           </div>
         )}
       </div>
+
+      {/* Floating Chat Button */}
+      <button
+        onClick={() => setShowChat(!showChat)}
+        className="fixed bottom-6 right-6 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-xl flex items-center justify-center transition-all z-50"
+      >
+        {showChat ? (
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        ) : (
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          </svg>
+        )}
+        {messages.filter(m => m.type === 'admin_to_translator' && !m.read).length > 0 && (
+          <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold">
+            {messages.filter(m => m.type === 'admin_to_translator' && !m.read).length}
+          </span>
+        )}
+      </button>
+
+      {/* Chat Panel */}
+      {showChat && (
+        <div className="fixed bottom-24 right-6 w-96 bg-white rounded-xl shadow-2xl border z-50 flex flex-col" style={{ maxHeight: '70vh' }}>
+          {/* Chat Header */}
+          <div className="bg-blue-600 text-white px-4 py-3 rounded-t-xl flex items-center justify-between">
+            <div>
+              <h4 className="text-sm font-semibold">Messages</h4>
+              <p className="text-blue-200 text-[10px]">Send questions to PM/Admin</p>
+            </div>
+            <button onClick={() => setShowChat(false)} className="text-white/70 hover:text-white">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Messages List */}
+          <div className="flex-1 overflow-y-auto p-3 space-y-2" style={{ maxHeight: '40vh', minHeight: '200px' }}>
+            {messages.length === 0 ? (
+              <div className="text-center py-8 text-gray-400">
+                <svg className="w-10 h-10 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                <p className="text-xs">No messages yet</p>
+                <p className="text-[10px] mt-1">Send a message to your PM or Admin</p>
+              </div>
+            ) : (
+              [...messages].reverse().map(msg => {
+                const isFromMe = msg.type === 'translator_to_admin';
+                const isUnread = msg.type === 'admin_to_translator' && !msg.read;
+                return (
+                  <div
+                    key={msg.id}
+                    className={`flex ${isFromMe ? 'justify-end' : 'justify-start'}`}
+                    onClick={() => isUnread && markAsRead(msg.id)}
+                  >
+                    <div className={`max-w-[80%] rounded-lg px-3 py-2 ${
+                      isFromMe
+                        ? 'bg-blue-600 text-white'
+                        : isUnread
+                          ? 'bg-blue-50 border-2 border-blue-300'
+                          : 'bg-gray-100'
+                    }`}>
+                      <p className={`text-[10px] font-medium mb-0.5 ${isFromMe ? 'text-blue-200' : 'text-gray-500'}`}>
+                        {isFromMe ? 'You' : (msg.from_admin_name || 'PM/Admin')}
+                        {msg.order_number ? ` - ${msg.order_number}` : ''}
+                      </p>
+                      <p className={`text-xs ${isFromMe ? 'text-white' : 'text-gray-800'}`}>{msg.content}</p>
+                      <p className={`text-[9px] mt-1 ${isFromMe ? 'text-blue-300' : 'text-gray-400'}`}>
+                        {msg.created_at ? new Date(msg.created_at).toLocaleString('en-US', {
+                          timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                        }) : ''}
+                        {isUnread && <span className="ml-1 text-blue-600 font-medium">(new)</span>}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+            <div ref={chatEndRef} />
+          </div>
+
+          {/* Send Message */}
+          <div className="border-t p-3">
+            {adminPmList.length > 1 && (
+              <select
+                value={selectedRecipient}
+                onChange={(e) => setSelectedRecipient(e.target.value)}
+                className="w-full mb-2 px-3 py-1.5 text-xs border rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500 outline-none"
+              >
+                <option value="">Select recipient...</option>
+                {adminPmList.map(u => (
+                  <option key={u.id} value={u.id}>
+                    {u.name} ({u.role === 'pm' ? 'PM' : 'Admin'})
+                  </option>
+                ))}
+              </select>
+            )}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={chatMessage}
+                onChange={(e) => setChatMessage(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
+                placeholder="Type a message..."
+                className="flex-1 px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              />
+              <button
+                onClick={handleSendMessage}
+                disabled={sendingMessage || !chatMessage.trim() || !selectedRecipient}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-1"
+              >
+                {sendingMessage ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  </svg>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <ToastContainer />
     </div>
   );
