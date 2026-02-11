@@ -5134,8 +5134,26 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           saveToTranslationMemory(currentResult.originalText, currentResult.translatedText, score);
         }
       } else if (data.raw_response) {
-        // Show raw response if JSON parsing failed
-        setProofreadingError(`JSON parsing failed. Raw response:\n${data.raw_response}`);
+        // Try to parse raw response on frontend as fallback
+        try {
+          let raw = data.raw_response.trim();
+          raw = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```\s*$/, '').trim();
+          // If truncated, try to close open braces/brackets
+          const openBraces = (raw.match(/\{/g) || []).length - (raw.match(/\}/g) || []).length;
+          const openBrackets = (raw.match(/\[/g) || []).length - (raw.match(/\]/g) || []).length;
+          if (raw.endsWith(',')) raw = raw.slice(0, -1);
+          for (let i = 0; i < openBrackets; i++) raw += ']';
+          for (let i = 0; i < openBraces; i++) raw += '}';
+          const parsed = JSON.parse(raw);
+          if (parsed.erros) {
+            setProofreadingResult(parsed);
+            showToast('Proofreading parsed with partial results');
+          } else {
+            setProofreadingError(`JSON parsing failed. Raw response:\n${data.raw_response.substring(0, 500)}...`);
+          }
+        } catch {
+          setProofreadingError(`JSON parsing failed. Raw response:\n${data.raw_response.substring(0, 500)}...`);
+        }
       }
     } catch (error) {
       console.error('Proofreading error:', error);

@@ -20820,6 +20820,84 @@ Retorne o JSON com a análise completa."""
         raise HTTPException(status_code=500, detail=f"Proofreading failed: {str(e)}")
 
 
+def _repair_truncated_json(text: str) -> str:
+    """Attempt to repair a truncated JSON string by closing open brackets/braces."""
+    # Count open/close brackets and braces
+    open_braces = 0
+    open_brackets = 0
+    in_string = False
+    escape_next = False
+
+    for ch in text:
+        if escape_next:
+            escape_next = False
+            continue
+        if ch == '\\' and in_string:
+            escape_next = True
+            continue
+        if ch == '"' and not escape_next:
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == '{':
+            open_braces += 1
+        elif ch == '}':
+            open_braces -= 1
+        elif ch == '[':
+            open_brackets += 1
+        elif ch == ']':
+            open_brackets -= 1
+
+    # If we're inside a string, close it
+    if in_string:
+        text += '"'
+
+    # Remove any trailing incomplete object/value (after last comma or colon)
+    # Find the last complete value by looking for the last complete item
+    stripped = text.rstrip()
+    # If it ends with a comma, remove it (incomplete next item)
+    if stripped.endswith(','):
+        stripped = stripped[:-1]
+    # If it ends mid-key or mid-value (e.g., "key": "val), try to trim back to last comma or bracket
+    # Simple heuristic: if open counts don't match, trim back to last } or ] and recount
+    text = stripped
+
+    # Close any open brackets and braces in correct order
+    # Re-count after trimming
+    open_braces = 0
+    open_brackets = 0
+    in_string = False
+    escape_next = False
+    stack = []
+
+    for ch in text:
+        if escape_next:
+            escape_next = False
+            continue
+        if ch == '\\' and in_string:
+            escape_next = True
+            continue
+        if ch == '"' and not escape_next:
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == '{':
+            stack.append('}')
+        elif ch == '[':
+            stack.append(']')
+        elif ch == '}' or ch == ']':
+            if stack and stack[-1] == ch:
+                stack.pop()
+
+    # Close remaining open structures
+    closing = ''.join(reversed(stack))
+    if closing:
+        logger.info(f"Repairing truncated JSON: adding {len(closing)} closing chars")
+    return text + closing
+
+
 @api_router.post("/admin/proofread")
 async def admin_proofread(request: ProofreadRequest, admin_key: str):
     """
@@ -21005,7 +21083,7 @@ Analise minuciosamente e retorne o JSON com todos os erros encontrados."""
                 },
                 json={
                     "model": "claude-sonnet-4-5-20250929",
-                    "max_tokens": 8192,
+                    "max_tokens": 16384,
                     "system": system_prompt,
                     "messages": messages
                 }
@@ -21019,18 +21097,23 @@ Analise minuciosamente e retorne o JSON com todos os erros encontrados."""
 
             result = response.json()
             proofreading_result = result.get("content", [{}])[0].get("text", "")
+            stop_reason = result.get("stop_reason", "end_turn")
 
             # Try to parse as JSON
             try:
                 # Clean up the response - remove markdown code blocks if present
                 clean_result = proofreading_result.strip()
-                if clean_result.startswith("```json"):
-                    clean_result = clean_result[7:]
-                if clean_result.startswith("```"):
-                    clean_result = clean_result[3:]
-                if clean_result.endswith("```"):
-                    clean_result = clean_result[:-3]
+                # Remove opening markdown code block (```json or ```)
+                import re as _re
+                clean_result = _re.sub(r'^```(?:json)?\s*', '', clean_result)
+                # Remove closing markdown code block
+                clean_result = _re.sub(r'\s*```\s*$', '', clean_result)
                 clean_result = clean_result.strip()
+
+                # If the response was truncated (max_tokens hit), try to repair the JSON
+                if stop_reason == "max_tokens":
+                    logger.warning("Proofreading response was truncated (max_tokens). Attempting JSON repair.")
+                    clean_result = _repair_truncated_json(clean_result)
 
                 parsed_result = json.loads(clean_result)
 
