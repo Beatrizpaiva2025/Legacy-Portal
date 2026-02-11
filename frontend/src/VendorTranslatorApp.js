@@ -803,7 +803,7 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
                           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-xs text-blue-800">
                             <p className="font-medium mb-1">Formatting Guidelines:</p>
                             <ul className="list-disc list-inside space-y-0.5 text-blue-700">
-                              <li><strong>Preferred format: PDF</strong> - best for review and package generation</li>
+                              <li><strong>Preferred format: DOCX</strong> - best for review and package generation</li>
                               <li>Use standard page size Letter (8.5&quot; x 11&quot;) with normal margins</li>
                             </ul>
                           </div>
