@@ -2472,6 +2472,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStatus, setProcessingStatus] = useState('');
   const [selectedResultIndex, setSelectedResultIndex] = useState(0);
+  const [selectedOriginalPageIndex, setSelectedOriginalPageIndex] = useState(0); // Independent page index for original document in Review/Proofreading
   const [translationEditMode, setTranslationEditMode] = useState(false); // Edit mode for in-house translators in TRANSLATION tab
 
   // Proofreading state (admin only)
@@ -11135,92 +11136,74 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
           {translationResults.length > 0 ? (
             <>
-              {/* Page Navigation for Review */}
-              {Math.max(translationResults.length, originalImages.length) > 1 && (
-                <div className="flex items-center justify-center gap-3 mb-3 p-2 bg-gray-50 border rounded-lg">
-                  <button
-                    onClick={() => setSelectedResultIndex(Math.max(0, selectedResultIndex - 1))}
-                    disabled={selectedResultIndex === 0}
-                    className="px-3 py-1.5 text-xs font-medium rounded transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-white border border-gray-300 text-gray-700 hover:bg-gray-100"
-                  >
-                    ← Previous
-                  </button>
-                  <div className="flex items-center gap-2">
-                    {Array.from({ length: Math.max(translationResults.length, originalImages.length) }, (_, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => setSelectedResultIndex(idx)}
-                        className={`w-7 h-7 text-xs font-bold rounded-full transition-all ${
-                          selectedResultIndex === idx
-                            ? 'bg-blue-600 text-white shadow'
-                            : 'bg-white text-gray-500 border border-gray-300 hover:bg-gray-100'
-                        }`}
-                        title={`Page ${idx + 1}: ${translationResults[idx]?.filename || ''}${!originalImages[idx] ? ' (no original)' : ''}${!translationResults[idx]?.translatedText ? ' (no translation)' : ''}`}
-                      >
-                        {idx + 1}
-                      </button>
-                    ))}
-                  </div>
-                  <button
-                    onClick={() => setSelectedResultIndex(Math.min(Math.max(translationResults.length, originalImages.length) - 1, selectedResultIndex + 1))}
-                    disabled={selectedResultIndex >= Math.max(translationResults.length, originalImages.length) - 1}
-                    className="px-3 py-1.5 text-xs font-medium rounded transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-white border border-gray-300 text-gray-700 hover:bg-gray-100"
-                  >
-                    Next →
-                  </button>
-                  <span className="text-[10px] text-gray-500 ml-2">
-                    Page {selectedResultIndex + 1} of {Math.max(translationResults.length, originalImages.length)}
-                  </span>
-                </div>
-              )}
-
-              {/* Side by side view: Original | Translation */}
+              {/* Side by side view: Original | Translation - Independent page navigation */}
               <div className="border rounded mb-4">
                 <div className="grid grid-cols-2 gap-0 bg-gray-100 border-b">
-                  <div className="px-3 py-2 border-r flex items-center justify-between">
-                    <span className="text-xs font-bold text-gray-700">Original Document</span>
-                    <div className="flex items-center gap-1">
-                      <ReviewTooltip id="upload_original">
-                        <label className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded cursor-pointer hover:bg-blue-600">
-                          Upload
-                          <input
-                            type="file"
-                            accept="image/*,.pdf"
-                            className="hidden"
-                            onChange={(e) => {
-                              if (e.target.files && e.target.files[0]) {
-                                const file = e.target.files[0];
-                                const reader = new FileReader();
-                                reader.onload = (event) => {
-                                  const newOriginalImages = [...originalImages];
-                                  newOriginalImages[selectedResultIndex] = {
-                                    data: event.target.result,
-                                    filename: file.name
+                  <div className="px-3 py-2 border-r">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-gray-700">Original Document</span>
+                      <div className="flex items-center gap-1">
+                        {originalImages.length > 1 && (
+                          <>
+                            <button
+                              onClick={() => setSelectedOriginalPageIndex(Math.max(0, selectedOriginalPageIndex - 1))}
+                              disabled={selectedOriginalPageIndex === 0}
+                              className="px-1.5 py-0.5 text-[10px] rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
+                            >
+                              ←
+                            </button>
+                            <span className="text-[10px] text-gray-500 font-medium">{selectedOriginalPageIndex + 1}/{originalImages.length}</span>
+                            <button
+                              onClick={() => setSelectedOriginalPageIndex(Math.min(originalImages.length - 1, selectedOriginalPageIndex + 1))}
+                              disabled={selectedOriginalPageIndex >= originalImages.length - 1}
+                              className="px-1.5 py-0.5 text-[10px] rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
+                            >
+                              →
+                            </button>
+                          </>
+                        )}
+                        <ReviewTooltip id="upload_original">
+                          <label className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded cursor-pointer hover:bg-blue-600">
+                            Upload
+                            <input
+                              type="file"
+                              accept="image/*,.pdf"
+                              className="hidden"
+                              onChange={(e) => {
+                                if (e.target.files && e.target.files[0]) {
+                                  const file = e.target.files[0];
+                                  const reader = new FileReader();
+                                  reader.onload = (event) => {
+                                    const newOriginalImages = [...originalImages];
+                                    newOriginalImages[selectedOriginalPageIndex] = {
+                                      data: event.target.result,
+                                      filename: file.name
+                                    };
+                                    setOriginalImages(newOriginalImages);
                                   };
-                                  setOriginalImages(newOriginalImages);
-                                };
-                                reader.readAsDataURL(file);
-                              }
-                            }}
-                          />
-                        </label>
-                      </ReviewTooltip>
-                      {originalImages[selectedResultIndex] && (
-                        <ReviewTooltip id="delete_original">
-                          <button
-                            onClick={() => {
-                              if (window.confirm('Are you sure you want to delete this original page?')) {
-                                const newOriginalImages = [...originalImages];
-                                newOriginalImages[selectedResultIndex] = null;
-                                setOriginalImages(newOriginalImages);
-                              }
-                            }}
-                            className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
-                          >
-                            Delete
-                          </button>
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                            />
+                          </label>
                         </ReviewTooltip>
-                      )}
+                        {originalImages[selectedOriginalPageIndex] && (
+                          <ReviewTooltip id="delete_original">
+                            <button
+                              onClick={() => {
+                                if (window.confirm('Are you sure you want to delete this original page?')) {
+                                  const newOriginalImages = [...originalImages];
+                                  newOriginalImages[selectedOriginalPageIndex] = null;
+                                  setOriginalImages(newOriginalImages);
+                                }
+                              }}
+                              className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
+                            >
+                              Delete
+                            </button>
+                          </ReviewTooltip>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <div className="px-3 py-2 flex items-center justify-between">
@@ -11228,6 +11211,25 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       Translation ({targetLanguage}) - {reviewViewMode === 'preview' ? 'Preview' : 'Editing'}
                     </span>
                     <div className="flex items-center gap-1">
+                      {translationResults.length > 1 && (
+                        <>
+                          <button
+                            onClick={() => setSelectedResultIndex(Math.max(0, selectedResultIndex - 1))}
+                            disabled={selectedResultIndex === 0}
+                            className="px-1.5 py-0.5 text-[10px] rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
+                          >
+                            ←
+                          </button>
+                          <span className="text-[10px] text-gray-500 font-medium">{selectedResultIndex + 1}/{translationResults.length}</span>
+                          <button
+                            onClick={() => setSelectedResultIndex(Math.min(translationResults.length - 1, selectedResultIndex + 1))}
+                            disabled={selectedResultIndex >= translationResults.length - 1}
+                            className="px-1.5 py-0.5 text-[10px] rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
+                          >
+                            →
+                          </button>
+                        </>
+                      )}
                       <ReviewTooltip id="preview">
                         <button
                           onClick={() => setReviewViewMode('preview')}
@@ -11401,16 +11403,16 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   </div>
                 )}
                 <div className="grid grid-cols-2 gap-0 h-[384px] overflow-hidden">
-                  {/* Left: Original Document */}
+                  {/* Left: Original Document - uses independent selectedOriginalPageIndex */}
                   <div className="border-r overflow-auto bg-gray-50 p-2" ref={originalTextRef} onScroll={() => handleScroll('original')}>
-                    {originalImages[selectedResultIndex] ? (
-                      originalImages[selectedResultIndex].filename?.toLowerCase().endsWith('.pdf') ? (
-                        <embed src={getImageSrc(originalImages[selectedResultIndex])} type="application/pdf" className="w-full border shadow-sm" style={{height: '380px'}} />
+                    {originalImages[selectedOriginalPageIndex] ? (
+                      originalImages[selectedOriginalPageIndex].filename?.toLowerCase().endsWith('.pdf') ? (
+                        <embed src={getImageSrc(originalImages[selectedOriginalPageIndex])} type="application/pdf" className="w-full border shadow-sm" style={{height: '380px'}} />
                       ) : (
-                        <img src={getImageSrc(originalImages[selectedResultIndex])} alt={originalImages[selectedResultIndex].filename || 'Original'} className="max-w-full border shadow-sm" />
+                        <img src={getImageSrc(originalImages[selectedOriginalPageIndex])} alt={originalImages[selectedOriginalPageIndex].filename || 'Original'} className="max-w-full border shadow-sm" />
                       )
-                    ) : translationResults[selectedResultIndex]?.original ? (
-                      <img src={translationResults[selectedResultIndex].original} alt="Original" className="max-w-full border shadow-sm" />
+                    ) : translationResults[selectedOriginalPageIndex]?.original ? (
+                      <img src={translationResults[selectedOriginalPageIndex].original} alt="Original" className="max-w-full border shadow-sm" />
                     ) : (
                       <div className="flex items-center justify-center h-full text-gray-400 text-xs">
                         <div className="text-center">
@@ -11607,96 +11609,98 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
           {translationResults.length > 0 ? (
             <>
-              {/* Page Navigation for Proofreading */}
-              {Math.max(translationResults.length, originalImages.length) > 1 && (
-                <div className="flex items-center justify-center gap-3 mb-3 p-2 bg-gray-50 border rounded-lg">
-                  <button
-                    onClick={() => setSelectedResultIndex(Math.max(0, selectedResultIndex - 1))}
-                    disabled={selectedResultIndex === 0}
-                    className="px-3 py-1.5 text-xs font-medium rounded transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-white border border-gray-300 text-gray-700 hover:bg-gray-100"
-                  >
-                    ← Previous
-                  </button>
-                  <div className="flex items-center gap-2">
-                    {Array.from({ length: Math.max(translationResults.length, originalImages.length) }, (_, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => setSelectedResultIndex(idx)}
-                        className={`w-7 h-7 text-xs font-bold rounded-full transition-all ${
-                          selectedResultIndex === idx
-                            ? 'bg-purple-600 text-white shadow'
-                            : 'bg-white text-gray-500 border border-gray-300 hover:bg-gray-100'
-                        }`}
-                        title={`Page ${idx + 1}: ${translationResults[idx]?.filename || ''}${!originalImages[idx] ? ' (no original)' : ''}${!translationResults[idx]?.translatedText ? ' (no translation)' : ''}`}
-                      >
-                        {idx + 1}
-                      </button>
-                    ))}
-                  </div>
-                  <button
-                    onClick={() => setSelectedResultIndex(Math.min(Math.max(translationResults.length, originalImages.length) - 1, selectedResultIndex + 1))}
-                    disabled={selectedResultIndex >= Math.max(translationResults.length, originalImages.length) - 1}
-                    className="px-3 py-1.5 text-xs font-medium rounded transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-white border border-gray-300 text-gray-700 hover:bg-gray-100"
-                  >
-                    Next →
-                  </button>
-                  <span className="text-[10px] text-gray-500 ml-2">
-                    Page {selectedResultIndex + 1} of {Math.max(translationResults.length, originalImages.length)}
-                  </span>
-                </div>
-              )}
-
-              {/* Original and Translation Side by Side - Same layout as REVIEW tab */}
+              {/* Original and Translation Side by Side - Independent page navigation */}
               <div className="border rounded mb-4">
                 <div className="grid grid-cols-2 gap-0 bg-gray-100 border-b">
-                  <div className="px-3 py-2 border-r flex items-center justify-between">
-                    <span className="text-xs font-bold text-gray-700">Original Document ({sourceLanguage})</span>
-                    <div className="flex items-center gap-1">
-                      <label className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded cursor-pointer hover:bg-blue-600">
-                        Upload
-                        <input
-                          type="file"
-                          accept="image/*,.pdf"
-                          className="hidden"
-                          onChange={(e) => {
-                            if (e.target.files && e.target.files[0]) {
-                              const file = e.target.files[0];
-                              const reader = new FileReader();
-                              reader.onload = (event) => {
-                                const newOriginalImages = [...originalImages];
-                                newOriginalImages[selectedResultIndex] = {
-                                  data: event.target.result,
-                                  filename: file.name
+                  <div className="px-3 py-2 border-r">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-gray-700">Original ({sourceLanguage})</span>
+                      <div className="flex items-center gap-1">
+                        {originalImages.length > 1 && (
+                          <>
+                            <button
+                              onClick={() => setSelectedOriginalPageIndex(Math.max(0, selectedOriginalPageIndex - 1))}
+                              disabled={selectedOriginalPageIndex === 0}
+                              className="px-1.5 py-0.5 text-[10px] rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
+                            >
+                              ←
+                            </button>
+                            <span className="text-[10px] text-gray-500 font-medium">{selectedOriginalPageIndex + 1}/{originalImages.length}</span>
+                            <button
+                              onClick={() => setSelectedOriginalPageIndex(Math.min(originalImages.length - 1, selectedOriginalPageIndex + 1))}
+                              disabled={selectedOriginalPageIndex >= originalImages.length - 1}
+                              className="px-1.5 py-0.5 text-[10px] rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
+                            >
+                              →
+                            </button>
+                          </>
+                        )}
+                        <label className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded cursor-pointer hover:bg-blue-600">
+                          Upload
+                          <input
+                            type="file"
+                            accept="image/*,.pdf"
+                            className="hidden"
+                            onChange={(e) => {
+                              if (e.target.files && e.target.files[0]) {
+                                const file = e.target.files[0];
+                                const reader = new FileReader();
+                                reader.onload = (event) => {
+                                  const newOriginalImages = [...originalImages];
+                                  newOriginalImages[selectedOriginalPageIndex] = {
+                                    data: event.target.result,
+                                    filename: file.name
+                                  };
+                                  setOriginalImages(newOriginalImages);
                                 };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          />
+                        </label>
+                        {originalImages[selectedOriginalPageIndex] && (
+                          <button
+                            onClick={() => {
+                              if (window.confirm('Are you sure you want to delete this original page?')) {
+                                const newOriginalImages = [...originalImages];
+                                newOriginalImages[selectedOriginalPageIndex] = null;
                                 setOriginalImages(newOriginalImages);
-                              };
-                              reader.readAsDataURL(file);
-                            }
-                          }}
-                        />
-                      </label>
-                      {originalImages[selectedResultIndex] && (
-                        <button
-                          onClick={() => {
-                            if (window.confirm('Are you sure you want to delete this original page?')) {
-                              const newOriginalImages = [...originalImages];
-                              newOriginalImages[selectedResultIndex] = null;
-                              setOriginalImages(newOriginalImages);
-                            }
-                          }}
-                          className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
-                          title="Delete original page"
-                        >
-                          Delete
-                        </button>
-                      )}
+                              }
+                            }}
+                            className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
+                            title="Delete original page"
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  <div className="px-3 py-2 flex items-center justify-between">
-                    <span className="text-xs font-bold text-gray-700">
-                      Translation ({targetLanguage}) - {proofreadingViewMode === 'preview' ? 'Preview' : 'Editing'}
-                    </span>
+                  <div className="px-3 py-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-gray-700">
+                        Translation ({targetLanguage}) - {proofreadingViewMode === 'preview' ? 'Preview' : 'Editing'}
+                      </span>
                     <div className="flex items-center gap-1">
+                      {translationResults.length > 1 && (
+                        <>
+                          <button
+                            onClick={() => setSelectedResultIndex(Math.max(0, selectedResultIndex - 1))}
+                            disabled={selectedResultIndex === 0}
+                            className="px-1.5 py-0.5 text-[10px] rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
+                          >
+                            ←
+                          </button>
+                          <span className="text-[10px] text-gray-500 font-medium">{selectedResultIndex + 1}/{translationResults.length}</span>
+                          <button
+                            onClick={() => setSelectedResultIndex(Math.min(translationResults.length - 1, selectedResultIndex + 1))}
+                            disabled={selectedResultIndex >= translationResults.length - 1}
+                            className="px-1.5 py-0.5 text-[10px] rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
+                          >
+                            →
+                          </button>
+                        </>
+                      )}
                       <button
                         onClick={() => setProofreadingViewMode('preview')}
                         className={`px-2 py-0.5 text-[10px] rounded ${proofreadingViewMode === 'preview' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border'}`}
@@ -11769,11 +11773,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                               } else {
                                 updatedResults.splice(selectedResultIndex, 1);
                                 setTranslationResults(updatedResults);
-                                // Also remove matching original image if exists
-                                const newOriginalImages = [...originalImages];
-                                newOriginalImages.splice(selectedResultIndex, 1);
-                                setOriginalImages(newOriginalImages);
-                                // Adjust selected index
                                 if (selectedResultIndex >= updatedResults.length) {
                                   setSelectedResultIndex(Math.max(0, updatedResults.length - 1));
                                 }
@@ -11787,6 +11786,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           Delete
                         </button>
                       )}
+                    </div>
                     </div>
                   </div>
                 </div>
@@ -11806,20 +11806,20 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   </div>
                 )}
                 <div className="grid grid-cols-2 gap-0 h-[600px] overflow-hidden">
-                  {/* Left: Original Document */}
+                  {/* Left: Original Document - uses independent selectedOriginalPageIndex */}
                   <div className="border-r overflow-auto bg-gray-50 p-2">
-                    {originalImages[selectedResultIndex] ? (
-                      originalImages[selectedResultIndex].filename?.toLowerCase().endsWith('.pdf') ? (
-                        <embed src={getImageSrc(originalImages[selectedResultIndex])} type="application/pdf" className="w-full border shadow-sm" style={{height: '580px'}} />
+                    {originalImages[selectedOriginalPageIndex] ? (
+                      originalImages[selectedOriginalPageIndex].filename?.toLowerCase().endsWith('.pdf') ? (
+                        <embed src={getImageSrc(originalImages[selectedOriginalPageIndex])} type="application/pdf" className="w-full border shadow-sm" style={{height: '580px'}} />
                       ) : (
-                        <img src={getImageSrc(originalImages[selectedResultIndex])} alt={originalImages[selectedResultIndex].filename || 'Original'} className="max-w-full border shadow-sm" />
+                        <img src={getImageSrc(originalImages[selectedOriginalPageIndex])} alt={originalImages[selectedOriginalPageIndex].filename || 'Original'} className="max-w-full border shadow-sm" />
                       )
-                    ) : translationResults[selectedResultIndex]?.original ? (
+                    ) : translationResults[selectedOriginalPageIndex]?.original ? (
                       // Show original image from external upload
-                      <img src={translationResults[selectedResultIndex].original} alt="Original" className="max-w-full border shadow-sm" />
-                    ) : (ocrResults[selectedResultIndex]?.text || translationResults[selectedResultIndex]?.originalText) ? (
+                      <img src={translationResults[selectedOriginalPageIndex].original} alt="Original" className="max-w-full border shadow-sm" />
+                    ) : (ocrResults[selectedOriginalPageIndex]?.text || translationResults[selectedOriginalPageIndex]?.originalText) ? (
                       <div className="text-xs whitespace-pre-wrap p-2">
-                        {ocrResults[selectedResultIndex]?.text || translationResults[selectedResultIndex]?.originalText}
+                        {ocrResults[selectedOriginalPageIndex]?.text || translationResults[selectedOriginalPageIndex]?.originalText}
                       </div>
                     ) : (
                       <div className="flex items-center justify-center h-full text-gray-400 text-xs">
