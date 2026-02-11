@@ -17389,14 +17389,22 @@ async def send_translator_message(request: TranslatorMessageRequest, admin_key: 
 async def get_translator_messages(admin_key: str, translator_id: str = None, token: str = None):
     """Get messages for a translator"""
     # Can be accessed by admin or by translator with token
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
-        raise HTTPException(status_code=401, detail="Invalid admin key")
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await db.admin_users.find_one({"token": admin_key, "is_active": {"$ne": False}})
+        if user:
+            is_valid = True
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
 
     if not translator_id:
         raise HTTPException(status_code=400, detail="translator_id required")
 
     messages = await db.translator_messages.find(
-        {"to_translator_id": translator_id}
+        {"$or": [
+            {"to_translator_id": translator_id},
+            {"from_translator_id": translator_id}
+        ]}
     ).sort("created_at", -1).limit(50).to_list(50)
 
     for msg in messages:
@@ -17410,8 +17418,13 @@ async def get_translator_messages(admin_key: str, translator_id: str = None, tok
 @api_router.put("/translator/messages/{message_id}/read")
 async def mark_translator_message_read(message_id: str, admin_key: str):
     """Mark a translator message as read"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
-        raise HTTPException(status_code=401, detail="Invalid admin key")
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await db.admin_users.find_one({"token": admin_key, "is_active": {"$ne": False}})
+        if user:
+            is_valid = True
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
 
     result = await db.translator_messages.update_one(
         {"id": message_id},
@@ -17427,7 +17440,7 @@ async def translator_send_message_to_admin(admin_key: str, request: dict = Body(
     # Allow translator token or admin key
     is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
     if not is_valid:
-        user = await db.admin_users.find_one({"token": admin_key, "is_active": True})
+        user = await db.admin_users.find_one({"token": admin_key, "is_active": {"$ne": False}})
         if user:
             is_valid = True
 
@@ -17446,6 +17459,7 @@ async def translator_send_message_to_admin(admin_key: str, request: dict = Body(
         "to_recipient_name": request.get("recipient_name", "Admin"),
         "to_recipient_role": request.get("recipient_role", "admin"),
         "content": request.get("content", ""),
+        "order_number": request.get("order_number"),
         "read": False,
         "created_at": now
     }
