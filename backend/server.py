@@ -12173,65 +12173,85 @@ async def bulk_email_partners(request: BulkPartnerEmailRequest, admin_key: str):
 
 @api_router.get("/admin/find-email/{email}")
 async def find_email_in_system(email: str, admin_key: str):
-    """Find where an email is registered in the system (admin only)"""
+    """Find where an email/name/phone is registered in the system (admin only)"""
     if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
         user = await get_current_admin_user(admin_key)
         if not user or user.get("role") != "admin":
             raise HTTPException(status_code=401, detail="Admin access required")
 
-    email_lower = email.lower().strip()
+    import re
+    query_str = email.strip()
+    query_escaped = re.escape(query_str)
     found_in = []
 
     try:
-        # Check partners collection
-        partner = await db.partners.find_one({"email": {"$regex": f"^{email_lower}$", "$options": "i"}})
-        if partner:
+        # Check partners collection - search by email, company_name, contact_name, phone
+        partner_query = {"$or": [
+            {"email": {"$regex": query_escaped, "$options": "i"}},
+            {"company_name": {"$regex": query_escaped, "$options": "i"}},
+            {"contact_name": {"$regex": query_escaped, "$options": "i"}},
+            {"name": {"$regex": query_escaped, "$options": "i"}},
+            {"phone": {"$regex": query_escaped, "$options": "i"}}
+        ]}
+        async for partner in db.partners.find(partner_query):
             found_in.append({
                 "collection": "partners",
                 "id": partner.get("id"),
-                "name": partner.get("company_name") or partner.get("name"),
-                "email": partner.get("email")
+                "name": partner.get("company_name") or partner.get("contact_name") or partner.get("name"),
+                "email": partner.get("email") or "N/A"
             })
 
-        # Check customers collection
-        customer = await db.customers.find_one({"email": {"$regex": f"^{email_lower}$", "$options": "i"}})
-        if customer:
+        # Check customers collection - search by email, name, phone
+        customer_query = {"$or": [
+            {"email": {"$regex": query_escaped, "$options": "i"}},
+            {"full_name": {"$regex": query_escaped, "$options": "i"}},
+            {"name": {"$regex": query_escaped, "$options": "i"}},
+            {"phone": {"$regex": query_escaped, "$options": "i"}}
+        ]}
+        async for customer in db.customers.find(customer_query):
             found_in.append({
                 "collection": "customers",
                 "id": customer.get("id"),
                 "name": customer.get("full_name") or customer.get("name"),
-                "email": customer.get("email")
+                "email": customer.get("email") or "N/A"
             })
 
-        # Check admin_users collection
-        admin_user = await db.admin_users.find_one({"email": {"$regex": f"^{email_lower}$", "$options": "i"}})
-        if admin_user:
+        # Check admin_users collection - search by email, name
+        admin_query = {"$or": [
+            {"email": {"$regex": query_escaped, "$options": "i"}},
+            {"name": {"$regex": query_escaped, "$options": "i"}}
+        ]}
+        async for admin_user in db.admin_users.find(admin_query):
             found_in.append({
                 "collection": "admin_users",
                 "id": admin_user.get("id"),
                 "name": admin_user.get("name"),
-                "email": admin_user.get("email"),
+                "email": admin_user.get("email") or "N/A",
                 "role": admin_user.get("role")
             })
 
-        # Check salespersons collection
-        salesperson = await db.salespersons.find_one({"email": {"$regex": f"^{email_lower}$", "$options": "i"}})
-        if salesperson:
+        # Check salespersons collection - search by email, name, phone
+        sales_query = {"$or": [
+            {"email": {"$regex": query_escaped, "$options": "i"}},
+            {"name": {"$regex": query_escaped, "$options": "i"}},
+            {"phone": {"$regex": query_escaped, "$options": "i"}}
+        ]}
+        async for salesperson in db.salespersons.find(sales_query):
             found_in.append({
                 "collection": "salespersons",
                 "id": salesperson.get("id"),
                 "name": salesperson.get("name"),
-                "email": salesperson.get("email")
+                "email": salesperson.get("email") or "N/A"
             })
 
         if not found_in:
-            return {"status": "not_found", "message": f"Email '{email}' not found in any collection"}
+            return {"status": "not_found", "message": f"'{query_str}' not found in any collection"}
 
-        return {"status": "found", "email": email, "found_in": found_in}
+        return {"status": "found", "query": query_str, "found_in": found_in}
 
     except Exception as e:
         logger.error(f"Error finding email: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to search for email")
+        raise HTTPException(status_code=500, detail="Failed to search")
 
 
 @api_router.delete("/admin/delete-email/{email}")
