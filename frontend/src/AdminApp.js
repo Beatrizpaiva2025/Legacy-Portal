@@ -9417,12 +9417,55 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     setOriginalImages([]);
                     setTranslationResults([]);
                     setFiles([]);
+                    setSelectedResultIndex(0);
                   }}
                   className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded"
                 >
                   🗑️ Clear & Start Over
                 </button>
               </div>
+
+              {/* Page Navigation - shown when multiple pages */}
+              {originalImages.length > 1 && (
+                <div className="flex items-center justify-center gap-3 mb-2 p-2 bg-gray-50 border rounded-lg">
+                  <button
+                    onClick={() => setSelectedResultIndex(Math.max(0, selectedResultIndex - 1))}
+                    disabled={selectedResultIndex === 0}
+                    className="px-3 py-1.5 text-xs font-medium rounded transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-white border border-gray-300 text-gray-700 hover:bg-gray-100"
+                  >
+                    ← Previous
+                  </button>
+                  <div className="flex items-center gap-2">
+                    {originalImages.map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setSelectedResultIndex(idx)}
+                        className={`w-7 h-7 text-xs font-bold rounded-full transition-all ${
+                          selectedResultIndex === idx
+                            ? 'bg-blue-600 text-white shadow'
+                            : translationResults[idx]
+                            ? 'bg-green-100 text-green-700 border border-green-300 hover:bg-green-200'
+                            : 'bg-white text-gray-500 border border-gray-300 hover:bg-gray-100'
+                        }`}
+                        title={`Page ${idx + 1}${translationResults[idx] ? ' (translated)' : ''}`}
+                      >
+                        {idx + 1}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => setSelectedResultIndex(Math.min(originalImages.length - 1, selectedResultIndex + 1))}
+                    disabled={selectedResultIndex >= originalImages.length - 1}
+                    className="px-3 py-1.5 text-xs font-medium rounded transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-white border border-gray-300 text-gray-700 hover:bg-gray-100"
+                  >
+                    Next →
+                  </button>
+                  <span className="text-[10px] text-gray-500 ml-2">
+                    Page {selectedResultIndex + 1} of {originalImages.length}
+                    {translationResults.length > 0 && ` | ${translationResults.filter(r => r?.translatedText).length} translated`}
+                  </span>
+                </div>
+              )}
 
               {/* Side-by-Side Panels */}
               <div className="border rounded">
@@ -9466,50 +9509,56 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   </div>
                 )}
                 <div className="grid grid-cols-2 gap-0 h-[500px] overflow-hidden">
-                  {/* Left: Original Document */}
+                  {/* Left: Original Document - Single page at a time */}
                   <div className="border-r overflow-auto bg-gray-50 p-2">
-                    {originalImages.map((img, idx) => (
-                      <div key={idx} className="mb-2">
-                        {img.filename?.toLowerCase().endsWith('.pdf') ? (
+                    {originalImages[selectedResultIndex] ? (
+                      <div>
+                        {originalImages[selectedResultIndex].filename?.toLowerCase().endsWith('.pdf') ? (
                           <embed
-                            src={getImageSrc(img)}
+                            src={getImageSrc(originalImages[selectedResultIndex])}
                             type="application/pdf"
                             className="w-full border shadow-sm"
                             style={{height: '480px'}}
                           />
                         ) : (
                           <img
-                            src={getImageSrc(img)}
-                            alt={img.filename || 'Original'}
+                            src={getImageSrc(originalImages[selectedResultIndex])}
+                            alt={originalImages[selectedResultIndex].filename || 'Original'}
                             className="max-w-full border shadow-sm"
                           />
                         )}
                       </div>
-                    ))}
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-gray-400 text-xs">
+                        No original for this page
+                      </div>
+                    )}
                   </div>
 
-                  {/* Right: Translation Result - With Edit Mode for In-House Translators */}
+                  {/* Right: Translation Result - Single page at a time */}
                   <div className="overflow-auto bg-white flex flex-col h-full">
-                    {translationResults.length > 0 ? (
+                    {translationResults[selectedResultIndex]?.translatedText ? (
                       isInHouseTranslator && translationEditMode ? (
                         <div
+                          key={`edit-${selectedResultIndex}`}
                           contentEditable
                           suppressContentEditableWarning
                           className="p-3 overflow-auto focus:outline-none h-full"
                           style={{width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
-                          dangerouslySetInnerHTML={{ __html: extractBodyForEdit(translationResults[0]?.translatedText) }}
+                          dangerouslySetInnerHTML={{ __html: extractBodyForEdit(translationResults[selectedResultIndex]?.translatedText) }}
                           onBlur={(e) => {
                             // Save edits back to translationResults, preserving original styles
                             const newResults = [...translationResults];
-                            const fullHtml = reconstructFullHtml(newResults[0]?.translatedText, e.target.innerHTML);
-                            newResults[0] = { ...newResults[0], translatedText: fullHtml };
+                            const fullHtml = reconstructFullHtml(newResults[selectedResultIndex]?.translatedText, e.target.innerHTML);
+                            newResults[selectedResultIndex] = { ...newResults[selectedResultIndex], translatedText: fullHtml };
                             setTranslationResults(newResults);
                           }}
                         />
                       ) : (
                         <iframe
-                          srcDoc={translationResults[0]?.translatedText || '<p>No translation</p>'}
-                          title="Translation"
+                          key={`preview-${selectedResultIndex}`}
+                          srcDoc={translationResults[selectedResultIndex]?.translatedText || '<p>No translation</p>'}
+                          title={`Translation Page ${selectedResultIndex + 1}`}
                           className="w-full h-full border-0"
                         />
                       )
@@ -9517,8 +9566,22 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
                         <div className="text-center">
                           <div className="text-3xl mb-2">🌐</div>
-                          <p>Click "Translate" to start</p>
-                          <p className="text-xs mt-1">Claude will see the image and translate directly</p>
+                          {isProcessing ? (
+                            <>
+                              <p>Translating page {selectedResultIndex + 1}...</p>
+                              <p className="text-xs mt-1">Please wait</p>
+                            </>
+                          ) : translationResults.length > 0 ? (
+                            <>
+                              <p>Page {selectedResultIndex + 1} not translated yet</p>
+                              <p className="text-xs mt-1">Click "Translate" to translate all pages</p>
+                            </>
+                          ) : (
+                            <>
+                              <p>Click "Translate" to start</p>
+                              <p className="text-xs mt-1">Claude will see the image and translate directly</p>
+                            </>
+                          )}
                         </div>
                       </div>
                     )}
@@ -10936,19 +10999,42 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
           {translationResults.length > 0 ? (
             <>
-              {/* Document selector */}
+              {/* Page Navigation for Review */}
               {translationResults.length > 1 && (
-                <div className="mb-3">
-                  <label className="text-xs text-gray-600 mr-2">Document:</label>
-                  <select
-                    value={selectedResultIndex}
-                    onChange={(e) => setSelectedResultIndex(Number(e.target.value))}
-                    className="px-2 py-1 text-xs border rounded"
+                <div className="flex items-center justify-center gap-3 mb-3 p-2 bg-gray-50 border rounded-lg">
+                  <button
+                    onClick={() => setSelectedResultIndex(Math.max(0, selectedResultIndex - 1))}
+                    disabled={selectedResultIndex === 0}
+                    className="px-3 py-1.5 text-xs font-medium rounded transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-white border border-gray-300 text-gray-700 hover:bg-gray-100"
                   >
+                    ← Previous
+                  </button>
+                  <div className="flex items-center gap-2">
                     {translationResults.map((r, idx) => (
-                      <option key={idx} value={idx}>{r.filename || `Page ${idx + 1}`}</option>
+                      <button
+                        key={idx}
+                        onClick={() => setSelectedResultIndex(idx)}
+                        className={`w-7 h-7 text-xs font-bold rounded-full transition-all ${
+                          selectedResultIndex === idx
+                            ? 'bg-blue-600 text-white shadow'
+                            : 'bg-white text-gray-500 border border-gray-300 hover:bg-gray-100'
+                        }`}
+                        title={`Page ${idx + 1}: ${r.filename || ''}`}
+                      >
+                        {idx + 1}
+                      </button>
                     ))}
-                  </select>
+                  </div>
+                  <button
+                    onClick={() => setSelectedResultIndex(Math.min(translationResults.length - 1, selectedResultIndex + 1))}
+                    disabled={selectedResultIndex >= translationResults.length - 1}
+                    className="px-3 py-1.5 text-xs font-medium rounded transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-white border border-gray-300 text-gray-700 hover:bg-gray-100"
+                  >
+                    Next →
+                  </button>
+                  <span className="text-[10px] text-gray-500 ml-2">
+                    Page {selectedResultIndex + 1} of {translationResults.length}
+                  </span>
                 </div>
               )}
 
@@ -11385,19 +11471,42 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
           {translationResults.length > 0 ? (
             <>
-              {/* Document selector */}
+              {/* Page Navigation for Proofreading */}
               {translationResults.length > 1 && (
-                <div className="mb-3">
-                  <label className="text-xs text-gray-600 mr-2">Document:</label>
-                  <select
-                    value={selectedResultIndex}
-                    onChange={(e) => setSelectedResultIndex(Number(e.target.value))}
-                    className="px-2 py-1 text-xs border rounded"
+                <div className="flex items-center justify-center gap-3 mb-3 p-2 bg-gray-50 border rounded-lg">
+                  <button
+                    onClick={() => setSelectedResultIndex(Math.max(0, selectedResultIndex - 1))}
+                    disabled={selectedResultIndex === 0}
+                    className="px-3 py-1.5 text-xs font-medium rounded transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-white border border-gray-300 text-gray-700 hover:bg-gray-100"
                   >
+                    ← Previous
+                  </button>
+                  <div className="flex items-center gap-2">
                     {translationResults.map((r, idx) => (
-                      <option key={idx} value={idx}>{r.filename}</option>
+                      <button
+                        key={idx}
+                        onClick={() => setSelectedResultIndex(idx)}
+                        className={`w-7 h-7 text-xs font-bold rounded-full transition-all ${
+                          selectedResultIndex === idx
+                            ? 'bg-purple-600 text-white shadow'
+                            : 'bg-white text-gray-500 border border-gray-300 hover:bg-gray-100'
+                        }`}
+                        title={`Page ${idx + 1}: ${r.filename || ''}`}
+                      >
+                        {idx + 1}
+                      </button>
                     ))}
-                  </select>
+                  </div>
+                  <button
+                    onClick={() => setSelectedResultIndex(Math.min(translationResults.length - 1, selectedResultIndex + 1))}
+                    disabled={selectedResultIndex >= translationResults.length - 1}
+                    className="px-3 py-1.5 text-xs font-medium rounded transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-white border border-gray-300 text-gray-700 hover:bg-gray-100"
+                  >
+                    Next →
+                  </button>
+                  <span className="text-[10px] text-gray-500 ml-2">
+                    Page {selectedResultIndex + 1} of {translationResults.length}
+                  </span>
                 </div>
               )}
 
