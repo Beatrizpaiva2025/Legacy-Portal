@@ -1112,6 +1112,7 @@ const TopBar = ({
     { id: 'new-quote', label: 'New Quote', icon: '📝', roles: ['sales'] },
     { id: 'translation', label: 'Translation', icon: '✍️', roles: ['admin', 'pm', 'translator'] },
     { id: 'production', label: 'Reports', icon: '📊', roles: ['admin'] },
+    { id: 'expenses', label: 'Expenses', icon: '💸', roles: ['admin'] },
     { id: 'finances', label: 'Partners', icon: '🤝', roles: ['admin'] },
     { id: 'followups', label: 'Follow-ups', icon: '🔔', roles: ['admin'] },
     { id: 'pm-dashboard', label: 'PM Dashboard', icon: '🎯', roles: ['pm'] },
@@ -23977,13 +23978,491 @@ const ProductionPage = ({ adminKey }) => {
   );
 };
 
+// ==================== EXPENSES PAGE ====================
+const ExpensesPage = ({ adminKey }) => {
+  const [expenses, setExpenses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showExpenseModal, setShowExpenseModal] = useState(false);
+  const [expenseReceiptFile, setExpenseReceiptFile] = useState(null);
+  const [expenseReceiptPreview, setExpenseReceiptPreview] = useState(null);
+  const [translators, setTranslators] = useState([]);
+  const [vendorError, setVendorError] = useState(null);
+  const [expenseForm, setExpenseForm] = useState({
+    category: 'fixed',
+    subcategory: '',
+    description: '',
+    amount: 0,
+    date: new Date().toISOString().split('T')[0],
+    is_recurring: false,
+    recurring_period: '',
+    vendor: '',
+    vendor_id: '',
+    notes: ''
+  });
+
+  const EXPENSE_CATEGORIES = {
+    fixed: { label: 'Fixed Expenses', color: '#3B82F6' },
+    translators: { label: 'Translators', color: '#10B981' },
+    ai: { label: 'AI & Technology', color: '#8B5CF6' },
+    marketing: { label: 'Marketing', color: '#F59E0B' },
+    office: { label: 'Office', color: '#EF4444' },
+    utilities: { label: 'Utilities', color: '#06B6D4' },
+    other: { label: 'Other', color: '#6B7280' }
+  };
+
+  const fetchExpenses = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/expenses?admin_key=${adminKey}`);
+      setExpenses(response.data.expenses || []);
+    } catch (err) {
+      console.error('Error fetching expenses:', err);
+    }
+  };
+
+  const fetchTranslatorsForPayment = async () => {
+    try {
+      setVendorError(null);
+      const response = await axios.get(`${API}/admin/payments/translators?admin_key=${adminKey}`);
+      const vendorsList = response.data?.translators || response.data || [];
+      setTranslators(vendorsList);
+    } catch (err) {
+      console.error('Error fetching translators:', err);
+      const errorMsg = err.response?.data?.detail || err.message || 'Failed to fetch vendors';
+      setVendorError(`Error ${err.response?.status || ''}: ${errorMsg}`);
+      setTranslators([]);
+    }
+  };
+
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      await Promise.all([fetchExpenses(), fetchTranslatorsForPayment()]);
+      setLoading(false);
+    };
+    loadData();
+  }, [adminKey]);
+
+  const handleExpenseReceiptChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'application/pdf'];
+      if (!allowedTypes.includes(file.type)) {
+        showToast('Please upload an image (PNG, JPG, GIF) or PDF file');
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        showToast('File size must be less than 10MB');
+        return;
+      }
+      setExpenseReceiptFile(file);
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (e) => setExpenseReceiptPreview(e.target.result);
+        reader.readAsDataURL(file);
+      } else {
+        setExpenseReceiptPreview(null);
+      }
+    }
+  };
+
+  const handleCreateExpense = async (e) => {
+    e.preventDefault();
+    try {
+      const formData = new FormData();
+      formData.append('category', expenseForm.category);
+      formData.append('subcategory', expenseForm.subcategory || '');
+      formData.append('description', expenseForm.description);
+      formData.append('amount', parseFloat(expenseForm.amount) || 0);
+      formData.append('date', expenseForm.date);
+      formData.append('is_recurring', expenseForm.is_recurring);
+      formData.append('recurring_period', expenseForm.recurring_period || '');
+      formData.append('vendor', expenseForm.vendor);
+      formData.append('vendor_id', expenseForm.vendor_id || '');
+      formData.append('notes', expenseForm.notes || '');
+      if (expenseReceiptFile) {
+        formData.append('receipt_file', expenseReceiptFile);
+      }
+
+      await axios.post(`${API}/admin/expenses?admin_key=${adminKey}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setShowExpenseModal(false);
+      setExpenseForm({
+        category: 'fixed', subcategory: '', description: '', amount: 0,
+        date: new Date().toISOString().split('T')[0], is_recurring: false,
+        recurring_period: '', vendor: '', vendor_id: '', notes: ''
+      });
+      setExpenseReceiptFile(null);
+      setExpenseReceiptPreview(null);
+      fetchExpenses();
+      showToast('Expense created successfully!');
+    } catch (err) {
+      console.error('Error creating expense:', err);
+      showToast('Error creating expense: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const handleDeleteExpense = async (expenseId) => {
+    if (!window.confirm('Delete this expense?')) return;
+    try {
+      await axios.delete(`${API}/admin/expenses/${expenseId}?admin_key=${adminKey}`);
+      fetchExpenses();
+    } catch (err) {
+      showToast('Error deleting expense');
+    }
+  };
+
+  const handleViewExpenseReceipt = async (expenseId, filename) => {
+    try {
+      const response = await axios.get(`${API}/admin/expenses/${expenseId}/receipt?admin_key=${adminKey}`);
+      const { receipt_file_data, receipt_file_type, receipt_filename } = response.data;
+
+      const byteCharacters = atob(receipt_file_data);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: receipt_file_type });
+      const url = URL.createObjectURL(blob);
+
+      const newWindow = window.open(url, '_blank');
+      if (newWindow) {
+        newWindow.document.title = receipt_filename || 'Receipt';
+      }
+    } catch (err) {
+      console.error('Error fetching receipt:', err);
+      showToast('Error loading receipt: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const handleDownloadExpenseReceipt = async (expenseId) => {
+    try {
+      const response = await axios.get(`${API}/admin/expenses/${expenseId}/receipt?admin_key=${adminKey}`);
+      const { receipt_file_data, receipt_file_type, receipt_filename } = response.data;
+
+      const link = document.createElement('a');
+      link.href = `data:${receipt_file_type};base64,${receipt_file_data}`;
+      link.download = receipt_filename || 'receipt';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('Error downloading receipt:', err);
+      showToast('Error downloading receipt: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const handleUploadExpenseReceipt = async (expenseId, file) => {
+    if (!file) return;
+
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'application/pdf'];
+    if (!allowedTypes.includes(file.type)) {
+      showToast('Please upload an image (PNG, JPG, GIF) or PDF file');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      showToast('File size must be less than 10MB');
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('receipt', file);
+
+      await axios.post(
+        `${API}/admin/expenses/${expenseId}/upload-receipt?admin_key=${adminKey}`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
+
+      showToast('Receipt uploaded successfully!');
+      fetchExpenses();
+    } catch (err) {
+      console.error('Error uploading receipt:', err);
+      showToast('Error uploading receipt: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
+  };
+
+  const formatDate = (dateStr) => {
+    return formatDateLocal(dateStr);
+  };
+
+  if (loading) return <div className="p-6 text-center">Loading expenses data...</div>;
+
+  return (
+    <div className="p-6">
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-xl font-bold text-gray-800">💸 Expenses</h1>
+      </div>
+
+      {/* Expenses List */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="p-4 border-b flex justify-between items-center">
+          <h3 className="font-bold text-gray-800">Expenses List</h3>
+          <button
+            onClick={() => setShowExpenseModal(true)}
+            className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+          >
+            + New Expense
+          </button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">Date</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">Category</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">Description</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">Vendor</th>
+                <th className="px-4 py-3 text-right font-medium text-gray-600">Amount</th>
+                <th className="px-4 py-3 text-center font-medium text-gray-600">Receipt</th>
+                <th className="px-4 py-3 text-center font-medium text-gray-600">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {expenses.length === 0 ? (
+                <tr><td colSpan="7" className="px-4 py-8 text-center text-gray-500">No expenses registered</td></tr>
+              ) : (
+                expenses.map((expense) => (
+                  <tr key={expense.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3">{formatDate(expense.date)}</td>
+                    <td className="px-4 py-3">
+                      <span className="px-2 py-1 rounded text-xs" style={{
+                        backgroundColor: `${EXPENSE_CATEGORIES[expense.category]?.color}20`,
+                        color: EXPENSE_CATEGORIES[expense.category]?.color
+                      }}>
+                        {EXPENSE_CATEGORIES[expense.category]?.label || expense.category}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">{expense.description}</td>
+                    <td className="px-4 py-3 text-gray-500">{expense.vendor || '-'}</td>
+                    <td className="px-4 py-3 text-right font-medium text-red-600">{formatCurrency(expense.amount)}</td>
+                    <td className="px-4 py-3 text-center">
+                      {expense.has_receipt ? (
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => handleViewExpenseReceipt(expense.id, expense.receipt_filename)}
+                            className="text-blue-600 hover:text-blue-800 text-xs"
+                            title="View receipt"
+                          >
+                            View
+                          </button>
+                          <button
+                            onClick={() => handleDownloadExpenseReceipt(expense.id)}
+                            className="text-green-600 hover:text-green-800 text-xs"
+                            title="Download receipt"
+                          >
+                            Download
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="cursor-pointer text-blue-600 hover:text-blue-800 text-xs">
+                          Upload
+                          <input
+                            type="file"
+                            accept="image/*,.pdf"
+                            className="hidden"
+                            onChange={(e) => handleUploadExpenseReceipt(expense.id, e.target.files[0])}
+                          />
+                        </label>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <button onClick={() => handleDeleteExpense(expense.id)} className="text-red-600 hover:text-red-800">Delete</button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Expense Modal */}
+      {showExpenseModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
+            <div className="p-4 border-b flex justify-between items-center flex-shrink-0">
+              <h3 className="font-bold text-gray-800">New Expense</h3>
+              <button onClick={() => setShowExpenseModal(false)} className="text-gray-500 hover:text-gray-700">✕</button>
+            </div>
+            <form onSubmit={handleCreateExpense} className="p-4 space-y-4 overflow-y-auto flex-1">
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Category</label>
+                <select
+                  value={expenseForm.category}
+                  onChange={(e) => setExpenseForm({...expenseForm, category: e.target.value})}
+                  className="w-full px-3 py-2 border rounded text-sm"
+                  required
+                >
+                  {Object.entries(EXPENSE_CATEGORIES).map(([key, { label }]) => (
+                    <option key={key} value={key}>{label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Description</label>
+                <input
+                  type="text"
+                  value={expenseForm.description}
+                  onChange={(e) => setExpenseForm({...expenseForm, description: e.target.value})}
+                  className="w-full px-3 py-2 border rounded text-sm"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Amount ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={expenseForm.amount}
+                    onChange={(e) => setExpenseForm({...expenseForm, amount: parseFloat(e.target.value) || 0})}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Date</label>
+                  <input
+                    type="date"
+                    value={expenseForm.date}
+                    onChange={(e) => setExpenseForm({...expenseForm, date: e.target.value})}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                    required
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Vendor (optional)</label>
+                <select
+                  value={expenseForm.vendor_id}
+                  onChange={(e) => {
+                    const selectedVendor = translators.find(t => (t.translator_id || t._id) === e.target.value);
+                    setExpenseForm({
+                      ...expenseForm,
+                      vendor_id: e.target.value,
+                      vendor: selectedVendor ? selectedVendor.name : ''
+                    });
+                  }}
+                  className="w-full px-3 py-2 border rounded text-sm"
+                >
+                  <option value="">Select vendor...</option>
+                  {translators.map(t => (
+                    <option key={t.translator_id || t._id} value={t.translator_id || t._id}>
+                      {t.name} ({t.role === 'translator' ? 'Translator' : t.role === 'pm' ? 'PM' : t.role === 'admin' ? 'Admin' : t.role || 'Vendor'})
+                    </option>
+                  ))}
+                </select>
+                {!expenseForm.vendor_id && (
+                  <input
+                    type="text"
+                    value={expenseForm.vendor}
+                    onChange={(e) => setExpenseForm({...expenseForm, vendor: e.target.value})}
+                    className="w-full px-3 py-2 border rounded text-sm mt-2"
+                    placeholder="Or type vendor name manually..."
+                  />
+                )}
+              </div>
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={expenseForm.is_recurring}
+                  onChange={(e) => setExpenseForm({...expenseForm, is_recurring: e.target.checked})}
+                  className="mr-2"
+                />
+                <label className="text-sm text-gray-600">Recurring expense</label>
+              </div>
+              {expenseForm.is_recurring && (
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Period</label>
+                  <select
+                    value={expenseForm.recurring_period}
+                    onChange={(e) => setExpenseForm({...expenseForm, recurring_period: e.target.value})}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  >
+                    <option value="">Select...</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="yearly">Yearly</option>
+                  </select>
+                </div>
+              )}
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Notes (optional)</label>
+                <textarea
+                  value={expenseForm.notes}
+                  onChange={(e) => setExpenseForm({...expenseForm, notes: e.target.value})}
+                  className="w-full px-3 py-2 border rounded text-sm"
+                  rows={2}
+                  placeholder="Additional notes..."
+                />
+              </div>
+              {/* Receipt Upload */}
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Receipt (optional)</label>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center hover:border-blue-400 transition-colors">
+                  <input
+                    type="file"
+                    accept="image/*,.pdf"
+                    onChange={handleExpenseReceiptChange}
+                    className="hidden"
+                    id="expenses-page-receipt-input"
+                  />
+                  <label htmlFor="expenses-page-receipt-input" className="cursor-pointer">
+                    {expenseReceiptFile ? (
+                      <div className="space-y-2">
+                        {expenseReceiptPreview ? (
+                          <img src={expenseReceiptPreview} alt="Receipt preview" className="max-h-24 mx-auto rounded" />
+                        ) : (
+                          <div className="text-3xl">📄</div>
+                        )}
+                        <div className="text-sm text-gray-700">{expenseReceiptFile.name}</div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setExpenseReceiptFile(null);
+                            setExpenseReceiptPreview(null);
+                          }}
+                          className="text-xs text-red-600 hover:text-red-800"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <div className="text-2xl text-gray-400">📎</div>
+                        <div className="text-xs text-gray-500">Clique para fazer upload do comprovante</div>
+                        <div className="text-xs text-gray-400">PNG, JPG, GIF ou PDF (max 10MB)</div>
+                      </div>
+                    )}
+                  </label>
+                </div>
+              </div>
+              <div className="flex justify-end space-x-2 pt-2">
+                <button type="button" onClick={() => { setShowExpenseModal(false); setExpenseReceiptFile(null); setExpenseReceiptPreview(null); }} className="px-4 py-2 border rounded text-sm text-gray-600">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">Save</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ==================== FINANCES PAGE ====================
 const FinancesPage = ({ adminKey }) => {
   const [summary, setSummary] = useState(null);
-  const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState('month');
-  const [activeView, setActiveView] = useState('partners'); // overview, expenses, quickbooks, partners, pages
+  const [activeView, setActiveView] = useState('partners'); // overview, quickbooks, partners, pages
   // Translator payments state
   const [translators, setTranslators] = useState([]);
   const [translatorPayments, setTranslatorPayments] = useState([]);
@@ -23994,7 +24473,6 @@ const FinancesPage = ({ adminKey }) => {
   const [paymentType, setPaymentType] = useState('translation');
   const [commissionRate, setCommissionRate] = useState('');
   const [paymentReport, setPaymentReport] = useState(null);
-  const [showExpenseModal, setShowExpenseModal] = useState(false);
   // Receipt file upload state
   const [receiptFile, setReceiptFile] = useState(null);
   const [receiptPreview, setReceiptPreview] = useState(null);
@@ -24061,11 +24539,6 @@ const FinancesPage = ({ adminKey }) => {
   const [addingPages, setAddingPages] = useState(false);
   const [editingPagesLog, setEditingPagesLog] = useState(null);
   const [editPagesForm, setEditPagesForm] = useState({ pages: '', date: '', note: '' });
-  // Expense receipt upload state
-  const [expenseReceiptFile, setExpenseReceiptFile] = useState(null);
-  const [expenseReceiptPreview, setExpenseReceiptPreview] = useState(null);
-  // Vendor expenses state (for showing expenses per vendor)
-  const [vendorExpenses, setVendorExpenses] = useState([]);
   // Coupon management state
   const [couponTemplates, setCouponTemplates] = useState([]);
   const [showCouponModal, setShowCouponModal] = useState(false);
@@ -24074,18 +24547,6 @@ const FinancesPage = ({ adminKey }) => {
   const [selectedCouponToAssign, setSelectedCouponToAssign] = useState('');
   const [couponMaxUses, setCouponMaxUses] = useState(1);
   const [assigningCoupon, setAssigningCoupon] = useState(false);
-  const [expenseForm, setExpenseForm] = useState({
-    category: 'fixed',
-    subcategory: '',
-    description: '',
-    amount: 0,
-    date: new Date().toISOString().split('T')[0],
-    is_recurring: false,
-    recurring_period: '',
-    vendor: '',
-    vendor_id: '',
-    notes: ''
-  });
 
   const EXPENSE_CATEGORIES = {
     fixed: { label: 'Fixed Expenses', color: '#3B82F6' },
@@ -24115,15 +24576,6 @@ const FinancesPage = ({ adminKey }) => {
       setSummary(response.data);
     } catch (err) {
       console.error('Error fetching financial summary:', err);
-    }
-  };
-
-  const fetchExpenses = async () => {
-    try {
-      const response = await axios.get(`${API}/admin/expenses?admin_key=${adminKey}`);
-      setExpenses(response.data.expenses || []);
-    } catch (err) {
-      console.error('Error fetching expenses:', err);
     }
   };
 
@@ -24161,16 +24613,6 @@ const FinancesPage = ({ adminKey }) => {
       setTranslatorPayments(response.data.payments || []);
     } catch (err) {
       console.error('Error fetching translator payments:', err);
-    }
-  };
-
-  const fetchVendorExpenses = async (vendorId) => {
-    try {
-      const response = await axios.get(`${API}/admin/expenses?admin_key=${adminKey}&vendor_id=${vendorId}`);
-      setVendorExpenses(response.data.expenses || []);
-    } catch (err) {
-      console.error('Error fetching vendor expenses:', err);
-      setVendorExpenses([]);
     }
   };
 
@@ -25042,7 +25484,7 @@ const FinancesPage = ({ adminKey }) => {
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([fetchSummary(), fetchExpenses(), checkQuickBooksStatus()]);
+      await Promise.all([fetchSummary(), checkQuickBooksStatus()]);
       setLoading(false);
     };
     loadData();
@@ -25063,158 +25505,7 @@ const FinancesPage = ({ adminKey }) => {
       fetchPagesLogs();
       fetchTranslatorsForPayment();
     }
-    if (activeView === 'expenses') {
-      fetchTranslatorsForPayment(); // Fetch vendors for dropdown
-      fetchExpenses();
-    }
   }, [activeView]);
-
-  const handleExpenseReceiptChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'application/pdf'];
-      if (!allowedTypes.includes(file.type)) {
-        showToast('Please upload an image (PNG, JPG, GIF) or PDF file');
-        return;
-      }
-      if (file.size > 10 * 1024 * 1024) {
-        showToast('File size must be less than 10MB');
-        return;
-      }
-      setExpenseReceiptFile(file);
-      if (file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onload = (e) => setExpenseReceiptPreview(e.target.result);
-        reader.readAsDataURL(file);
-      } else {
-        setExpenseReceiptPreview(null);
-      }
-    }
-  };
-
-  const handleCreateExpense = async (e) => {
-    e.preventDefault();
-    try {
-      const formData = new FormData();
-      formData.append('category', expenseForm.category);
-      formData.append('subcategory', expenseForm.subcategory || '');
-      formData.append('description', expenseForm.description);
-      formData.append('amount', parseFloat(expenseForm.amount) || 0);
-      formData.append('date', expenseForm.date);
-      formData.append('is_recurring', expenseForm.is_recurring);
-      formData.append('recurring_period', expenseForm.recurring_period || '');
-      formData.append('vendor', expenseForm.vendor);
-      formData.append('vendor_id', expenseForm.vendor_id || '');
-      formData.append('notes', expenseForm.notes || '');
-      if (expenseReceiptFile) {
-        formData.append('receipt_file', expenseReceiptFile);
-      }
-
-      await axios.post(`${API}/admin/expenses?admin_key=${adminKey}`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      setShowExpenseModal(false);
-      setExpenseForm({
-        category: 'fixed', subcategory: '', description: '', amount: 0,
-        date: new Date().toISOString().split('T')[0], is_recurring: false,
-        recurring_period: '', vendor: '', vendor_id: '', notes: ''
-      });
-      setExpenseReceiptFile(null);
-      setExpenseReceiptPreview(null);
-      fetchExpenses();
-      fetchSummary();
-      showToast('Expense created successfully!');
-    } catch (err) {
-      console.error('Error creating expense:', err);
-      showToast('Error creating expense: ' + (err.response?.data?.detail || err.message));
-    }
-  };
-
-  const handleDeleteExpense = async (expenseId) => {
-    if (!window.confirm('Delete this expense?')) return;
-    try {
-      await axios.delete(`${API}/admin/expenses/${expenseId}?admin_key=${adminKey}`);
-      fetchExpenses();
-      fetchSummary();
-    } catch (err) {
-      showToast('Error deleting expense');
-    }
-  };
-
-  const handleViewExpenseReceipt = async (expenseId, filename) => {
-    try {
-      const response = await axios.get(`${API}/admin/expenses/${expenseId}/receipt?admin_key=${adminKey}`);
-      const { receipt_file_data, receipt_file_type, receipt_filename } = response.data;
-
-      // Create blob and open in new window
-      const byteCharacters = atob(receipt_file_data);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: receipt_file_type });
-      const url = URL.createObjectURL(blob);
-
-      // Open in new window for viewing/printing
-      const newWindow = window.open(url, '_blank');
-      if (newWindow) {
-        newWindow.document.title = receipt_filename || 'Receipt';
-      }
-    } catch (err) {
-      console.error('Error fetching receipt:', err);
-      showToast('Error loading receipt: ' + (err.response?.data?.detail || err.message));
-    }
-  };
-
-  const handleDownloadExpenseReceipt = async (expenseId) => {
-    try {
-      const response = await axios.get(`${API}/admin/expenses/${expenseId}/receipt?admin_key=${adminKey}`);
-      const { receipt_file_data, receipt_file_type, receipt_filename } = response.data;
-
-      // Create download link
-      const link = document.createElement('a');
-      link.href = `data:${receipt_file_type};base64,${receipt_file_data}`;
-      link.download = receipt_filename || 'receipt';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } catch (err) {
-      console.error('Error downloading receipt:', err);
-      showToast('Error downloading receipt: ' + (err.response?.data?.detail || err.message));
-    }
-  };
-
-  const handleUploadExpenseReceipt = async (expenseId, file) => {
-    if (!file) return;
-
-    const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'application/pdf'];
-    if (!allowedTypes.includes(file.type)) {
-      showToast('Please upload an image (PNG, JPG, GIF) or PDF file');
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      showToast('File size must be less than 10MB');
-      return;
-    }
-
-    try {
-      const formData = new FormData();
-      formData.append('receipt', file);
-
-      await axios.post(
-        `${API}/admin/expenses/${expenseId}/upload-receipt?admin_key=${adminKey}`,
-        formData,
-        { headers: { 'Content-Type': 'multipart/form-data' } }
-      );
-
-      showToast('Receipt uploaded successfully!');
-      fetchExpenses(); // Refresh the list
-    } catch (err) {
-      console.error('Error uploading receipt:', err);
-      showToast('Error uploading receipt: ' + (err.response?.data?.detail || err.message));
-    }
-  };
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
@@ -25305,12 +25596,6 @@ const FinancesPage = ({ adminKey }) => {
               className={`px-4 py-2 rounded text-sm ${activeView === 'overview' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
             >
               Overview
-            </button>
-            <button
-              onClick={() => setActiveView('expenses')}
-              className={`px-4 py-2 rounded text-sm ${activeView === 'expenses' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
-            >
-              Expenses
             </button>
             <button
               onClick={() => setActiveView('quickbooks')}
@@ -25452,262 +25737,6 @@ const FinancesPage = ({ adminKey }) => {
             </div>
           </div>
         </>
-      )}
-
-      {activeView === 'expenses' && (
-        <div className="bg-white rounded-lg shadow">
-          <div className="p-4 border-b flex justify-between items-center">
-            <h3 className="font-bold text-gray-800">Expenses List</h3>
-            <button
-              onClick={() => setShowExpenseModal(true)}
-              className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
-            >
-              + New Expense
-            </button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">Date</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">Category</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">Description</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">Vendor</th>
-                  <th className="px-4 py-3 text-right font-medium text-gray-600">Amount</th>
-                  <th className="px-4 py-3 text-center font-medium text-gray-600">Receipt</th>
-                  <th className="px-4 py-3 text-center font-medium text-gray-600">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {expenses.length === 0 ? (
-                  <tr><td colSpan="7" className="px-4 py-8 text-center text-gray-500">No expenses registered</td></tr>
-                ) : (
-                  expenses.map((expense) => (
-                    <tr key={expense.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3">{formatDate(expense.date)}</td>
-                      <td className="px-4 py-3">
-                        <span className="px-2 py-1 rounded text-xs" style={{
-                          backgroundColor: `${EXPENSE_CATEGORIES[expense.category]?.color}20`,
-                          color: EXPENSE_CATEGORIES[expense.category]?.color
-                        }}>
-                          {EXPENSE_CATEGORIES[expense.category]?.label || expense.category}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">{expense.description}</td>
-                      <td className="px-4 py-3 text-gray-500">{expense.vendor || '-'}</td>
-                      <td className="px-4 py-3 text-right font-medium text-red-600">{formatCurrency(expense.amount)}</td>
-                      <td className="px-4 py-3 text-center">
-                        {expense.has_receipt ? (
-                          <div className="flex items-center justify-center gap-2">
-                            <button
-                              onClick={() => handleViewExpenseReceipt(expense.id, expense.receipt_filename)}
-                              className="text-blue-600 hover:text-blue-800 text-xs"
-                              title="View receipt"
-                            >
-                              👁️ View
-                            </button>
-                            <button
-                              onClick={() => handleDownloadExpenseReceipt(expense.id)}
-                              className="text-green-600 hover:text-green-800 text-xs"
-                              title="Download receipt"
-                            >
-                              ⬇️ Download
-                            </button>
-                          </div>
-                        ) : (
-                          <label className="cursor-pointer text-blue-600 hover:text-blue-800 text-xs">
-                            📎 Upload
-                            <input
-                              type="file"
-                              accept="image/*,.pdf"
-                              className="hidden"
-                              onChange={(e) => handleUploadExpenseReceipt(expense.id, e.target.files[0])}
-                            />
-                          </label>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <button onClick={() => handleDeleteExpense(expense.id)} className="text-red-600 hover:text-red-800">Delete</button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Expense Modal */}
-      {showExpenseModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
-            <div className="p-4 border-b flex justify-between items-center flex-shrink-0">
-              <h3 className="font-bold text-gray-800">New Expense</h3>
-              <button onClick={() => setShowExpenseModal(false)} className="text-gray-500 hover:text-gray-700">✕</button>
-            </div>
-            <form onSubmit={handleCreateExpense} className="p-4 space-y-4 overflow-y-auto flex-1">
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">Category</label>
-                <select
-                  value={expenseForm.category}
-                  onChange={(e) => setExpenseForm({...expenseForm, category: e.target.value})}
-                  className="w-full px-3 py-2 border rounded text-sm"
-                  required
-                >
-                  {Object.entries(EXPENSE_CATEGORIES).map(([key, { label }]) => (
-                    <option key={key} value={key}>{label}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">Description</label>
-                <input
-                  type="text"
-                  value={expenseForm.description}
-                  onChange={(e) => setExpenseForm({...expenseForm, description: e.target.value})}
-                  className="w-full px-3 py-2 border rounded text-sm"
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">Amount ($)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={expenseForm.amount}
-                    onChange={(e) => setExpenseForm({...expenseForm, amount: parseFloat(e.target.value) || 0})}
-                    className="w-full px-3 py-2 border rounded text-sm"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">Date</label>
-                  <input
-                    type="date"
-                    value={expenseForm.date}
-                    onChange={(e) => setExpenseForm({...expenseForm, date: e.target.value})}
-                    className="w-full px-3 py-2 border rounded text-sm"
-                    required
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">Vendor (optional)</label>
-                <select
-                  value={expenseForm.vendor_id}
-                  onChange={(e) => {
-                    const selectedVendor = translators.find(t => (t.translator_id || t._id) === e.target.value);
-                    setExpenseForm({
-                      ...expenseForm,
-                      vendor_id: e.target.value,
-                      vendor: selectedVendor ? selectedVendor.name : ''
-                    });
-                  }}
-                  className="w-full px-3 py-2 border rounded text-sm"
-                >
-                  <option value="">Select vendor...</option>
-                  {translators.map(t => (
-                    <option key={t.translator_id || t._id} value={t.translator_id || t._id}>
-                      {t.name} ({t.role === 'translator' ? 'Translator' : t.role === 'pm' ? 'PM' : t.role === 'admin' ? 'Admin' : t.role || 'Vendor'})
-                    </option>
-                  ))}
-                </select>
-                {/* Option to type manually if vendor not in list */}
-                {!expenseForm.vendor_id && (
-                  <input
-                    type="text"
-                    value={expenseForm.vendor}
-                    onChange={(e) => setExpenseForm({...expenseForm, vendor: e.target.value})}
-                    className="w-full px-3 py-2 border rounded text-sm mt-2"
-                    placeholder="Or type vendor name manually..."
-                  />
-                )}
-              </div>
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={expenseForm.is_recurring}
-                  onChange={(e) => setExpenseForm({...expenseForm, is_recurring: e.target.checked})}
-                  className="mr-2"
-                />
-                <label className="text-sm text-gray-600">Recurring expense</label>
-              </div>
-              {expenseForm.is_recurring && (
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">Period</label>
-                  <select
-                    value={expenseForm.recurring_period}
-                    onChange={(e) => setExpenseForm({...expenseForm, recurring_period: e.target.value})}
-                    className="w-full px-3 py-2 border rounded text-sm"
-                  >
-                    <option value="">Select...</option>
-                    <option value="monthly">Monthly</option>
-                    <option value="yearly">Yearly</option>
-                  </select>
-                </div>
-              )}
-              {/* Notes field */}
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">Notes (optional)</label>
-                <textarea
-                  value={expenseForm.notes}
-                  onChange={(e) => setExpenseForm({...expenseForm, notes: e.target.value})}
-                  className="w-full px-3 py-2 border rounded text-sm"
-                  rows={2}
-                  placeholder="Additional notes..."
-                />
-              </div>
-              {/* Receipt Upload */}
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">Receipt (optional)</label>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center hover:border-blue-400 transition-colors">
-                  <input
-                    type="file"
-                    accept="image/*,.pdf"
-                    onChange={handleExpenseReceiptChange}
-                    className="hidden"
-                    id="expense-receipt-input"
-                  />
-                  <label htmlFor="expense-receipt-input" className="cursor-pointer">
-                    {expenseReceiptFile ? (
-                      <div className="space-y-2">
-                        {expenseReceiptPreview ? (
-                          <img src={expenseReceiptPreview} alt="Receipt preview" className="max-h-24 mx-auto rounded" />
-                        ) : (
-                          <div className="text-3xl">📄</div>
-                        )}
-                        <div className="text-sm text-gray-700">{expenseReceiptFile.name}</div>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            setExpenseReceiptFile(null);
-                            setExpenseReceiptPreview(null);
-                          }}
-                          className="text-xs text-red-600 hover:text-red-800"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="space-y-1">
-                        <div className="text-2xl text-gray-400">📎</div>
-                        <div className="text-xs text-gray-500">Clique para fazer upload do comprovante</div>
-                        <div className="text-xs text-gray-400">PNG, JPG, GIF ou PDF (max 10MB)</div>
-                      </div>
-                    )}
-                  </label>
-                </div>
-              </div>
-              <div className="flex justify-end space-x-2 pt-2">
-                <button type="button" onClick={() => { setShowExpenseModal(false); setExpenseReceiptFile(null); setExpenseReceiptPreview(null); }} className="px-4 py-2 border rounded text-sm text-gray-600">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">Save</button>
-              </div>
-            </form>
-          </div>
-        </div>
       )}
 
       {/* Pages Tracking View */}
@@ -35523,6 +35552,10 @@ function AdminApp() {
       case 'production':
         return userRole === 'admin'
           ? <ProductionPage adminKey={adminKey} />
+          : <div className="p-6 text-center text-gray-500">Access denied</div>;
+      case 'expenses':
+        return userRole === 'admin'
+          ? <ExpensesPage adminKey={adminKey} />
           : <div className="p-6 text-center text-gray-500">Access denied</div>;
       case 'finances':
         return userRole === 'admin'
