@@ -628,9 +628,17 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
                         </div>
                       ) : (
                         <div>
-                          <p className="text-sm text-gray-600 mb-4">
-                            Upload your completed translation files. You can select multiple files. Accepted formats: PDF, DOCX, DOC, TXT.
+                          <p className="text-sm text-gray-600 mb-3">
+                            Upload your completed translation files. You can select multiple files.
                           </p>
+                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-xs text-blue-800">
+                            <p className="font-medium mb-1">Formatting Guidelines:</p>
+                            <ul className="list-disc list-inside space-y-0.5 text-blue-700">
+                              <li><strong>Preferred format: PDF</strong> - best for review and package generation</li>
+                              <li>Use standard page size (Letter or A4) with normal margins</li>
+                              <li>The company letterhead will be added automatically to the final package</li>
+                            </ul>
+                          </div>
 
                           {/* Drop zone */}
                           <div
