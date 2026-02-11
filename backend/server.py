@@ -17059,12 +17059,169 @@ async def download_translated_document(order_id: str, admin_key: str):
     else:
         raise HTTPException(status_code=404, detail="No translated document found")
 
+# ==================== BULK TRANSLATOR ASSIGNMENT ====================
+
+@api_router.post("/admin/orders/{order_id}/bulk-assign")
+async def bulk_assign_translators(order_id: str, admin_key: str, data: dict = Body(...)):
+    """Send bulk invite to multiple translators - first to accept gets the project"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+    if user_info.get("role") not in ["admin", "pm"]:
+        raise HTTPException(status_code=403, detail="Only admin or PM can bulk assign")
+
+    translator_ids = data.get("translator_ids", [])
+    translator_deadline = data.get("translator_deadline")
+    project_notes = data.get("project_notes", "")
+
+    if len(translator_ids) < 2:
+        raise HTTPException(status_code=400, detail="Select at least 2 translators for bulk invite")
+
+    order = await db.translation_orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    order_number = order.get("order_number", order_id)
+
+    # Build bulk invite tokens - one per translator
+    bulk_invite_tokens = []
+    translator_names = []
+
+    for tid in translator_ids:
+        translator = await db.admin_users.find_one({"id": tid})
+        if not translator:
+            continue
+
+        token = str(uuid.uuid4())
+        tname = translator.get("name", "Translator")
+        translator_names.append(tname)
+
+        bulk_invite_tokens.append({
+            "translator_id": tid,
+            "translator_name": tname,
+            "translator_email": translator.get("email", ""),
+            "token": token,
+            "status": "pending",
+            "sent_at": datetime.utcnow().isoformat()
+        })
+
+    if len(bulk_invite_tokens) < 2:
+        raise HTTPException(status_code=400, detail="Could not find enough valid translators")
+
+    # Update order with bulk invite data
+    update_fields = {
+        "bulk_invite_tokens": bulk_invite_tokens,
+        "bulk_invite_status": "pending",
+        "bulk_invite_count": len(bulk_invite_tokens),
+        "bulk_invite_sent_at": datetime.utcnow().isoformat(),
+        "bulk_invite_sent_by": user_info.get("name", "Admin"),
+        "translator_assignment_status": "bulk_pending",
+    }
+    if translator_deadline:
+        update_fields["translator_deadline"] = translator_deadline
+    if project_notes:
+        update_fields["internal_notes"] = project_notes
+
+    # Add all translator IDs so they can see the project
+    await db.translation_orders.update_one(
+        {"id": order_id},
+        {
+            "$set": update_fields,
+            "$addToSet": {
+                "file_translator_ids": {"$each": translator_ids},
+                "file_translator_names": {"$each": translator_names}
+            }
+        }
+    )
+
+    # Build deadline string for emails
+    deadline_str = "To be confirmed"
+    deadline = translator_deadline or order.get("translator_deadline") or order.get("deadline")
+    if deadline:
+        try:
+            if isinstance(deadline, str):
+                from dateutil import parser
+                parsed = parser.parse(deadline)
+                ny_parsed = parsed.replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo("America/New_York")) if parsed.tzinfo is None else parsed.astimezone(ZoneInfo("America/New_York"))
+                deadline_str = ny_parsed.strftime("%B %d, %Y at %I:%M %p") + " (EST)"
+            elif isinstance(deadline, datetime):
+                ny_deadline = deadline.replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo("America/New_York")) if deadline.tzinfo is None else deadline.astimezone(ZoneInfo("America/New_York"))
+                deadline_str = ny_deadline.strftime("%B %d, %Y at %I:%M %p") + " (EST)"
+        except:
+            deadline_str = str(deadline)
+
+    order_details = {
+        "order_number": order_number,
+        "client_name": order.get("client_name", "N/A"),
+        "translate_from": order.get("translate_from", ""),
+        "translate_to": order.get("translate_to", ""),
+        "document_type": order.get("document_type", "Document"),
+        "document_category": order.get("document_category", "General"),
+        "page_count": order.get("page_count", 1),
+        "word_count": order.get("word_count", 0),
+        "deadline": deadline_str
+    }
+
+    # Send emails to each translator
+    frontend_url = os.environ.get("FRONTEND_URL", "https://legacy-portal-frontend.onrender.com")
+    emails_sent = 0
+
+    for invite in bulk_invite_tokens:
+        if not invite["translator_email"]:
+            continue
+        try:
+            accept_url = f"{frontend_url}/#/assignment/{invite['token']}/accept"
+            decline_url = f"{frontend_url}/#/assignment/{invite['token']}/decline"
+
+            email_html = get_translator_assignment_email_template(
+                invite["translator_name"],
+                order_details,
+                accept_url,
+                decline_url
+            )
+            await email_service.send_email(
+                invite["translator_email"],
+                f"New Translation Assignment - {order_number}",
+                email_html
+            )
+            emails_sent += 1
+            logger.info(f"Bulk invite email sent to {invite['translator_name']} ({invite['translator_email']}) for order {order_id}")
+        except Exception as e:
+            logger.error(f"Failed to send bulk invite email to {invite['translator_name']}: {str(e)}")
+
+        # Create notification for each translator
+        await create_notification(
+            user_id=invite["translator_id"],
+            notif_type="project_assigned",
+            title="New Project Available",
+            message=f"You have been invited to translate project {order_number}. First translator to accept gets the assignment!",
+            order_id=order_id,
+            order_number=order_number
+        )
+
+    logger.info(f"Bulk invite sent for order {order_id}: {emails_sent}/{len(bulk_invite_tokens)} emails sent")
+
+    return {
+        "success": True,
+        "message": f"Bulk invite sent to {emails_sent} translators",
+        "translator_count": len(bulk_invite_tokens),
+        "emails_sent": emails_sent,
+        "translator_names": translator_names
+    }
+
+
 # ==================== TRANSLATOR ASSIGNMENT RESPONSE ENDPOINTS ====================
 
-# Helper to find assignment by token - checks both order-level and document-level tokens
+# Helper to find assignment by token - checks bulk invites, order-level and document-level tokens
 async def find_assignment_by_token(token: str):
     """Find assignment by token. Returns (order, document_or_none, is_document_level)"""
-    # First check order-level tokens (from "Send Complete Project")
+    # Check bulk invite tokens first
+    order = await db.translation_orders.find_one({"bulk_invite_tokens.token": token})
+    if order:
+        # Return as order-level but mark it as bulk for the accept handler
+        return order, None, False
+
+    # Then check order-level tokens (from "Send Complete Project")
     order = await db.translation_orders.find_one({"translator_assignment_token": token})
     if order:
         return order, None, False
@@ -17087,6 +17244,84 @@ async def accept_translator_assignment(token: str):
     if not order and not doc:
         return HTMLResponse(content=get_assignment_response_page("error", "Invalid or expired link. This assignment token was not found."), status_code=404)
 
+    order_number = order.get("order_number", order["id"]) if order else "Unknown"
+
+    # Check if this is a BULK invite token
+    bulk_tokens = order.get("bulk_invite_tokens", []) if order else []
+    bulk_invite = None
+    for bt in bulk_tokens:
+        if bt.get("token") == token:
+            bulk_invite = bt
+            break
+
+    if bulk_invite:
+        # BULK INVITE FLOW - first-come-first-served
+        # Check if this specific translator already responded
+        if bulk_invite.get("status") in ["accepted", "declined"]:
+            return HTMLResponse(content=get_assignment_response_page("already_responded", f"You have already {bulk_invite['status']} this assignment."))
+
+        # Check if ANOTHER translator already accepted this bulk invite
+        if order.get("bulk_invite_status") == "accepted":
+            accepted_by = order.get("assigned_translator_name", "another translator")
+            return HTMLResponse(content=get_assignment_response_page("already_taken",
+                f"This project ({order_number}) has already been accepted by {accepted_by}. The assignment is no longer available."))
+
+        # This translator is the first to accept!
+        translator_name = bulk_invite.get("translator_name", "Unknown")
+        translator_id = bulk_invite.get("translator_id")
+
+        # Update this token status to accepted, all others to expired
+        updated_tokens = []
+        for bt in bulk_tokens:
+            if bt["token"] == token:
+                bt["status"] = "accepted"
+                bt["responded_at"] = datetime.utcnow().isoformat()
+            elif bt["status"] == "pending":
+                bt["status"] = "expired"
+            updated_tokens.append(bt)
+
+        # Set this translator as THE assigned translator for the order
+        await db.translation_orders.update_one(
+            {"id": order["id"]},
+            {"$set": {
+                "bulk_invite_tokens": updated_tokens,
+                "bulk_invite_status": "accepted",
+                "bulk_invite_accepted_by": translator_id,
+                "bulk_invite_accepted_at": datetime.utcnow().isoformat(),
+                "assigned_translator_id": translator_id,
+                "assigned_translator_name": translator_name,
+                "translator_assignment_status": "accepted",
+                "translator_assignment_responded_at": datetime.utcnow()
+            }}
+        )
+
+        # Notify admin/PM
+        await create_notification(
+            user_id=(order.get("assigned_pm_id") or "admin"),
+            notif_type="assignment_accepted",
+            title="Bulk Invite - Translator Accepted",
+            message=f"Translator {translator_name} was the FIRST to accept the bulk invite for project {order_number}. They are now assigned to this project.",
+            order_id=order["id"],
+            order_number=order_number
+        )
+
+        # Notify other translators that the project is no longer available
+        for bt in updated_tokens:
+            if bt["token"] != token and bt.get("translator_id"):
+                await create_notification(
+                    user_id=bt["translator_id"],
+                    notif_type="assignment_expired",
+                    title="Project No Longer Available",
+                    message=f"Project {order_number} has been accepted by another translator and is no longer available.",
+                    order_id=order["id"],
+                    order_number=order_number
+                )
+
+        logger.info(f"Bulk invite for order {order['id']}: {translator_name} accepted first")
+        return HTMLResponse(content=get_assignment_response_page("accepted",
+            f"Thank you, {translator_name}! You were the first to accept and have been assigned to project {order_number}. You can now access it in your translator portal."))
+
+    # STANDARD (non-bulk) FLOW
     # Check if already responded
     if is_doc_level:
         if doc.get("assignment_status") in ["accepted", "declined"]:
@@ -17099,7 +17334,6 @@ async def accept_translator_assignment(token: str):
 
     # Update assignment status
     if is_doc_level:
-        # Update the document-level assignment
         collection = db.order_documents if await db.order_documents.find_one({"id": doc["id"]}) else db.documents
         await collection.update_one(
             {"id": doc["id"]},
@@ -17122,9 +17356,9 @@ async def accept_translator_assignment(token: str):
         doc_name = None
 
     # Create notification for admin/PM
-    order_number = order.get("order_number", order["id"]) if order else "Unknown"
     msg = f"Translator {translator_name} has ACCEPTED the assignment for project {order_number}"
-    if doc_name:
+    if is_doc_level and doc:
+        doc_name = doc.get("filename", "document")
         msg += f" (file: {doc_name})"
     msg += "."
     await create_notification(
@@ -17332,6 +17566,17 @@ def get_assignment_response_page(status: str, message: str) -> str:
         color = "#dc3545"
         title = "Assignment Declined"
         button_html = ""
+        redirect_script = ""
+    elif status == "already_taken":
+        icon = "🚫"
+        color = "#e65100"
+        title = "Project No Longer Available"
+        button_html = f'''
+        <p style="color: #64748b; font-size: 14px; margin-top: 15px;">This project was part of a bulk invite and another translator accepted first.</p>
+        <a href="{portal_url}/#/admin" style="display: inline-block; background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); color: white; text-decoration: none; padding: 14px 30px; border-radius: 50px; font-size: 15px; font-weight: 600; margin-top: 20px; box-shadow: 0 4px 15px rgba(13, 148, 136, 0.3);">
+            🔐 Go to Portal
+        </a>
+        '''
         redirect_script = ""
     elif status == "already_responded":
         icon = "ℹ"

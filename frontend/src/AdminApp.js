@@ -8193,8 +8193,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     {assignedOrders.map(order => {
                       // Check if translator (in-house or contractor) needs to accept this assignment first
                       // Only block if this translator is the one with the pending order-level assignment
-                      const isPendingAcceptance = isTranslator && order.translator_assignment_status === 'pending'
-                        && (order.assigned_translator_id === user.id || order.assigned_translator_name === user.name);
+                      const isBulkPending = isTranslator && order.translator_assignment_status === 'bulk_pending'
+                        && order.file_translator_ids && order.file_translator_ids.includes(user.id);
+                      const isPendingAcceptance = isBulkPending || (isTranslator && order.translator_assignment_status === 'pending'
+                        && (order.assigned_translator_id === user.id || order.assigned_translator_name === user.name));
 
                       return (
                         <div
@@ -8214,11 +8216,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                 : 'bg-white border-gray-200 hover:border-blue-400 hover:shadow cursor-pointer'
                           }`}
                         >
-                          {/* Pending acceptance banner for contractors */}
+                          {/* Pending acceptance banner for contractors / bulk invites */}
                           {isPendingAcceptance && (
-                            <div className="bg-yellow-100 border border-yellow-300 rounded px-2 py-1 mb-2 text-center">
-                              <span className="text-[10px] text-yellow-800 font-medium">
-                                ⚠️ Accept via email to start
+                            <div className={`${isBulkPending ? 'bg-purple-100 border-purple-300' : 'bg-yellow-100 border-yellow-300'} border rounded px-2 py-1 mb-2 text-center`}>
+                              <span className={`text-[10px] ${isBulkPending ? 'text-purple-800' : 'text-yellow-800'} font-medium`}>
+                                {isBulkPending ? '📢 Bulk invite - Accept via email (first to accept gets it!)' : '⚠️ Accept via email to start'}
                               </span>
                             </div>
                           )}
@@ -14930,6 +14932,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     language_pair: ''
   });
   const [sendingAssignment, setSendingAssignment] = useState(false);
+  const [bulkInviteMode, setBulkInviteMode] = useState(false); // Toggle bulk invite mode
+  const [bulkSelectedTranslators, setBulkSelectedTranslators] = useState(new Set()); // Selected translator IDs for bulk
 
   // Quick Add Translator state (for PM)
   const [showQuickAddTranslator, setShowQuickAddTranslator] = useState(false);
@@ -16526,6 +16530,45 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     }
   };
 
+  // Send bulk invite to multiple translators - first to accept gets the project
+  const sendBulkAssignment = async () => {
+    if (bulkSelectedTranslators.size < 2) {
+      showToast('Select at least 2 translators for bulk invite');
+      return;
+    }
+    setSendingAssignment(true);
+    try {
+      let translatorDeadline = null;
+      if (assignmentDetails.due_date) {
+        translatorDeadline = `${assignmentDetails.due_date}T${assignmentDetails.due_time}:00`;
+      }
+
+      const response = await axios.post(
+        `${API}/admin/orders/${assigningTranslatorModal.id}/bulk-assign?admin_key=${adminKey}`,
+        {
+          translator_ids: Array.from(bulkSelectedTranslators),
+          translator_deadline: translatorDeadline,
+          project_notes: assignmentDetails.project_notes
+        }
+      );
+
+      if (response.data.success) {
+        const names = response.data.translator_names || [];
+        showToast(`Bulk invite sent to ${response.data.emails_sent} translators: ${names.join(', ')}. First to accept gets the project!`);
+        setAssigningTranslatorModal(null);
+        setBulkInviteMode(false);
+        setBulkSelectedTranslators(new Set());
+        fetchOrders();
+        fetchNotifications();
+      }
+    } catch (err) {
+      console.error('Failed to send bulk assignment:', err);
+      showToast('Error sending bulk invite: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setSendingAssignment(false);
+    }
+  };
+
   // Simple assign translator (from dropdown)
   const assignTranslator = async (orderId, translatorName) => {
     try {
@@ -16930,12 +16973,12 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       {assigningTranslatorModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
-            <div className="p-4 border-b flex justify-between items-center bg-blue-600 text-white rounded-t-lg">
+            <div className={`p-4 border-b flex justify-between items-center ${bulkInviteMode ? 'bg-purple-600' : 'bg-blue-600'} text-white rounded-t-lg`}>
               <div>
-                <h3 className="font-bold">👤 Assign Translator</h3>
+                <h3 className="font-bold">{bulkInviteMode ? '📢 Bulk Invite Translators' : '👤 Assign Translator'}</h3>
                 <p className="text-xs opacity-80">{assigningTranslatorModal.order_number} - {assigningTranslatorModal.client_name}</p>
               </div>
-              <button onClick={() => setAssigningTranslatorModal(null)} className="text-white hover:text-gray-200 text-xl">×</button>
+              <button onClick={() => { setAssigningTranslatorModal(null); setBulkInviteMode(false); setBulkSelectedTranslators(new Set()); }} className="text-white hover:text-gray-200 text-xl">×</button>
             </div>
 
             <div className="p-4 space-y-4">
@@ -16953,34 +16996,112 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 </div>
               </div>
 
-              {/* Select Translator */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Select Translator *</label>
-                <select
-                  value={assignmentDetails.translator_id}
-                  onChange={(e) => setAssignmentDetails({...assignmentDetails, translator_id: e.target.value})}
-                  className="w-full px-3 py-2 border rounded text-sm"
+              {/* Mode Toggle: Single vs Bulk */}
+              <div className="flex items-center gap-2 p-2 bg-gray-100 rounded-lg">
+                <button
+                  onClick={() => { setBulkInviteMode(false); setBulkSelectedTranslators(new Set()); }}
+                  className={`flex-1 px-3 py-1.5 text-xs rounded-md transition-all ${
+                    !bulkInviteMode ? 'bg-blue-600 text-white shadow' : 'text-gray-600 hover:bg-gray-200'
+                  }`}
                 >
-                  <option value="">-- Choose Translator --</option>
-                  {/* Option for admin to assign to themselves */}
-                  {user?.role === 'admin' && (
-                    <option value="self" className="font-medium bg-blue-50">
-                      👤 Myself ({user?.name || 'Admin'}) - No email notification
-                    </option>
-                  )}
-                  {translatorList.filter(t => t.is_active !== false).map(t => (
-                    <option key={t.id} value={t.id}>
-                      {t.name} {t.language_pairs ? `(${t.language_pairs})` : ''} {t.rate_per_page ? `- $${t.rate_per_page}/pg` : ''} {t.invitation_pending ? '(pending)' : ''}
-                    </option>
-                  ))}
-                </select>
-                {translatorList.length === 0 && (
-                  <p className="text-[10px] text-blue-600 mt-1">No translators found. Register translators in the Users tab first.</p>
-                )}
-                {translatorList.length > 0 && translatorList.filter(t => t.is_active !== false).length === 0 && (
-                  <p className="text-[10px] text-blue-600 mt-1">All translators are inactive. They need to accept their invitation first.</p>
-                )}
+                  👤 Single Assign
+                </button>
+                <button
+                  onClick={() => { setBulkInviteMode(true); setAssignmentDetails({...assignmentDetails, translator_id: ''}); }}
+                  className={`flex-1 px-3 py-1.5 text-xs rounded-md transition-all ${
+                    bulkInviteMode ? 'bg-purple-600 text-white shadow' : 'text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  📢 Bulk Invite
+                </button>
               </div>
+
+              {bulkInviteMode ? (
+                <>
+                  {/* Bulk Invite - Checkbox list */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-medium text-gray-700">Select Translators * (min 2)</label>
+                      <span className="text-[10px] text-purple-600 font-medium">{bulkSelectedTranslators.size} selected</span>
+                    </div>
+                    <div className="max-h-48 overflow-y-auto border rounded p-2 space-y-1">
+                      {translatorList.filter(t => t.is_active !== false).map(t => (
+                        <label
+                          key={t.id}
+                          className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
+                            bulkSelectedTranslators.has(t.id) ? 'bg-purple-50 border border-purple-200' : 'hover:bg-gray-50'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={bulkSelectedTranslators.has(t.id)}
+                            onChange={() => {
+                              setBulkSelectedTranslators(prev => {
+                                const next = new Set(prev);
+                                if (next.has(t.id)) next.delete(t.id);
+                                else next.add(t.id);
+                                return next;
+                              });
+                            }}
+                            className="w-4 h-4 text-purple-600 rounded border-gray-300 focus:ring-purple-500"
+                          />
+                          <div className="flex-1">
+                            <span className="text-sm font-medium">{t.name}</span>
+                            {t.language_pairs && <span className="text-[10px] text-gray-500 ml-1">({t.language_pairs})</span>}
+                            {t.rate_per_page && <span className="text-[10px] text-green-600 ml-1">${t.rate_per_page}/pg</span>}
+                          </div>
+                        </label>
+                      ))}
+                      {translatorList.filter(t => t.is_active !== false).length === 0 && (
+                        <p className="text-xs text-gray-500 text-center py-2">No active translators found.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Info - Bulk */}
+                  <div className="p-2 bg-purple-50 rounded text-xs text-purple-700">
+                    <span className="font-medium">📢 Bulk Invite:</span> All selected translators will receive an email invite. The <strong>first translator to accept</strong> gets the project. Others will be notified it is no longer available.
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Single Assign - Original dropdown */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Select Translator *</label>
+                    <select
+                      value={assignmentDetails.translator_id}
+                      onChange={(e) => setAssignmentDetails({...assignmentDetails, translator_id: e.target.value})}
+                      className="w-full px-3 py-2 border rounded text-sm"
+                    >
+                      <option value="">-- Choose Translator --</option>
+                      {user?.role === 'admin' && (
+                        <option value="self" className="font-medium bg-blue-50">
+                          👤 Myself ({user?.name || 'Admin'}) - No email notification
+                        </option>
+                      )}
+                      {translatorList.filter(t => t.is_active !== false).map(t => (
+                        <option key={t.id} value={t.id}>
+                          {t.name} {t.language_pairs ? `(${t.language_pairs})` : ''} {t.rate_per_page ? `- $${t.rate_per_page}/pg` : ''} {t.invitation_pending ? '(pending)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                    {translatorList.length === 0 && (
+                      <p className="text-[10px] text-blue-600 mt-1">No translators found. Register translators in the Users tab first.</p>
+                    )}
+                  </div>
+
+                  {/* Info - Single */}
+                  {assignmentDetails.translator_id === 'self' ? (
+                    <div className="p-2 bg-green-50 rounded text-xs text-green-700">
+                      <span className="font-medium">👤 Self Assignment:</span> The project will be assigned directly to you. No email will be sent.
+                    </div>
+                  ) : (
+                    <div className="p-2 bg-blue-50 rounded text-xs text-blue-700">
+                      <span className="font-medium">📧 Email Invitation:</span> The translator will receive an email with accept/decline links. You will be notified of their response.
+                    </div>
+                  )}
+                </>
+              )}
 
               {/* Translator Deadline - When translator must return */}
               <div className="grid grid-cols-2 gap-3">
@@ -17015,33 +17136,32 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   placeholder="Special instructions for the translator..."
                 />
               </div>
-
-              {/* Info */}
-              {assignmentDetails.translator_id === 'self' ? (
-                <div className="p-2 bg-green-50 rounded text-xs text-green-700">
-                  <span className="font-medium">👤 Self Assignment:</span> The project will be assigned directly to you. No email will be sent.
-                </div>
-              ) : (
-                <div className="p-2 bg-blue-50 rounded text-xs text-blue-700">
-                  <span className="font-medium">📧 Email Invitation:</span> The translator will receive an email with accept/decline links. You will be notified of their response.
-                </div>
-              )}
             </div>
 
             <div className="p-3 border-t bg-gray-50 flex justify-end gap-2 rounded-b-lg">
               <button
-                onClick={() => setAssigningTranslatorModal(null)}
+                onClick={() => { setAssigningTranslatorModal(null); setBulkInviteMode(false); setBulkSelectedTranslators(new Set()); }}
                 className="px-4 py-1.5 text-gray-600 text-sm hover:text-gray-800"
               >
                 Cancel
               </button>
-              <button
-                onClick={sendTranslatorAssignment}
-                disabled={sendingAssignment || !assignmentDetails.translator_id}
-                className="px-4 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:bg-gray-400"
-              >
-                {sendingAssignment ? 'Sending...' : (assignmentDetails.translator_id === 'self' ? '✅ Assign to Myself' : '📤 Send Invitation')}
-              </button>
+              {bulkInviteMode ? (
+                <button
+                  onClick={sendBulkAssignment}
+                  disabled={sendingAssignment || bulkSelectedTranslators.size < 2}
+                  className="px-4 py-1.5 bg-purple-600 text-white rounded text-sm hover:bg-purple-700 disabled:bg-gray-400"
+                >
+                  {sendingAssignment ? 'Sending...' : `📢 Send Bulk Invite (${bulkSelectedTranslators.size})`}
+                </button>
+              ) : (
+                <button
+                  onClick={sendTranslatorAssignment}
+                  disabled={sendingAssignment || !assignmentDetails.translator_id}
+                  className="px-4 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:bg-gray-400"
+                >
+                  {sendingAssignment ? 'Sending...' : (assignmentDetails.translator_id === 'self' ? '✅ Assign to Myself' : '📤 Send Invitation')}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -30476,6 +30596,14 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                                   title="Click to change translator"
                                 >
                                   {allTranslatorNames[0]}
+                                </span>
+                              )}
+                              {order.translator_assignment_status === 'bulk_pending' && (
+                                <span
+                                  className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded w-fit border border-purple-200"
+                                  title={`Bulk invite sent to ${order.bulk_invite_count || '?'} translators. Waiting for first acceptance.`}
+                                >
+                                  📢 BULK INVITE ({order.bulk_invite_count || '?'}) - Awaiting
                                 </span>
                               )}
                               {order.translator_assignment_status === 'pending' && (
