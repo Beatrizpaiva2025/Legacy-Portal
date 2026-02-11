@@ -28040,8 +28040,8 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       }
       setOriginalContents(loadedDocs);
 
-      // Find and load translated document
-      const translatedDoc = docs.find(d => d.document_type === 'translation' || d.filename?.includes('translation'));
+      // Find and load translated document (check source field for vendor uploads too)
+      const translatedDoc = docs.find(d => d.document_type === 'translation' || d.source === 'translated_document' || d.filename?.includes('translation'));
       if (translatedDoc) {
         const transData = await axios.get(`${API}/admin/order-documents/${translatedDoc.id}/download?admin_key=${adminKey}`);
         setTranslatedContent({
@@ -29424,9 +29424,45 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         style={{ height: 'calc(100vh - 400px)' }}
                         title="Translation PDF"
                       />
+                    ) : translatedContent.contentType?.match(/wordprocessingml|msword|officedocument/) ? (
+                      <div className="text-center py-8">
+                        <div className="text-4xl mb-3">&#128196;</div>
+                        <p className="text-sm font-medium text-gray-700 mb-2">{translatedContent.filename}</p>
+                        <p className="text-xs text-gray-500 mb-4">This file type cannot be previewed inline. Click to download.</p>
+                        <button
+                          onClick={() => {
+                            try {
+                              const byteCharacters = atob(translatedContent.data);
+                              const byteNumbers = new Array(byteCharacters.length);
+                              for (let i = 0; i < byteCharacters.length; i++) {
+                                byteNumbers[i] = byteCharacters.charCodeAt(i);
+                              }
+                              const byteArray = new Uint8Array(byteNumbers);
+                              const blob = new Blob([byteArray], { type: translatedContent.contentType });
+                              const url = window.URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = translatedContent.filename || 'translation.docx';
+                              document.body.appendChild(a);
+                              a.click();
+                              document.body.removeChild(a);
+                              window.URL.revokeObjectURL(url);
+                            } catch (e) {
+                              console.error('Download error:', e);
+                              showToast('Failed to download file', 'error');
+                            }
+                          }}
+                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors inline-flex items-center gap-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                          Download File
+                        </button>
+                      </div>
                     ) : (
                       <div className="p-4 bg-gray-50 rounded border text-sm whitespace-pre-wrap">
-                        {atob(translatedContent.data)}
+                        {(() => { try { return atob(translatedContent.data); } catch(e) { return 'Unable to preview this file format.'; } })()}
                       </div>
                     )
                   ) : (pmTranslationFiles.length > 0 || pmTranslationHtml) ? (
