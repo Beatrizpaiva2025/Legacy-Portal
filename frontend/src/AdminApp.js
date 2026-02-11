@@ -28065,7 +28065,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
               const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
               for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
                 const page = await pdf.getPage(pageNum);
-                const scale = 2;
+                const scale = 3; // Higher scale for translation quality
                 const viewport = page.getViewport({ scale });
                 const canvas = document.createElement('canvas');
                 const context = canvas.getContext('2d');
