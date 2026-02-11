@@ -6264,23 +6264,23 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     const pageSizeCSS = pageFormat === 'a4' ? 'A4' : 'Letter';
     const certTitle = translationType === 'sworn' ? 'Sworn Translation Certificate' : 'Certification of Translation Accuracy';
 
-    // Cover Letter HTML - MATCHING START PREVIEW EXACTLY
+    // Cover Letter HTML - MATCHING NORMAL FLOW EXACTLY (with !important flags)
     const coverLetterHTML = `
     <div style="font-family: Georgia, 'Times New Roman', serif; font-size: 12px; line-height: 1.6; max-width: 100%; padding: 0; page-break-after: always;">
 
-        <!-- HEADER - Using fixed widths like START preview -->
-        <div style="width: 100%; margin-bottom: 8px; overflow: hidden;">
-            <div style="float: left; width: 128px;">
+        <!-- HEADER - Using fixed widths with !important like normal flow -->
+        <div style="width: 100% !important; margin-bottom: 8px; overflow: hidden !important;">
+            <div style="float: left !important; width: 128px !important;">
                 ${logoLeft
                   ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
                   : `<div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>`}
             </div>
-            <div style="float: right; width: 80px; text-align: right;">
+            <div style="float: right !important; width: 80px !important; text-align: right !important;">
                 ${logoRight
                   ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px; max-width: 75px;" />`
                   : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>`}
             </div>
-            <div style="margin-left: 138px; margin-right: 90px; text-align: center;">
+            <div style="margin-left: 138px !important; margin-right: 90px !important; text-align: center !important;">
                 <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
                 <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
                 <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
@@ -6288,7 +6288,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
 
         <!-- Blue line -->
-        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>
+        <div style="clear: both !important; width: 100% !important; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>
 
         <!-- Order Number -->
         ${orderNumber && !orderNumber.toLowerCase().includes('order0') && orderNumber !== 'P0000'
@@ -6319,9 +6319,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           }).join('\n        ');
         })()}
 
-        <!-- Signature Section - Fixed at bottom -->
-        <div style="margin-top: 60px; overflow: hidden;">
-            <div style="float: left; width: 60%;">
+        <!-- Signature Section -->
+        <div style="margin-top: 60px; overflow: hidden !important;">
+            <div style="float: left !important; width: 60% !important;">
                 ${signatureImage
                   ? `<img src="${signatureImage}" alt="Signature" style="max-height: 40px; max-width: 180px; margin-bottom: 4px;" />`
                   : `<div style="font-family: 'Brush Script MT', cursive; font-size: 24px; color: #1a365d; margin-bottom: 4px;">Beatriz Paiva</div>`}
@@ -6330,38 +6330,38 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <div style="font-size: 13px;">Legacy Translations Inc.</div>
                 <div style="font-size: 13px; margin-top: 8px;">Dated: ${translationDate}</div>
             </div>
-            <div style="float: right; width: 35%; text-align: right;">
+            <div style="float: right !important; width: 35% !important; text-align: right !important;">
                 ${logoStamp
-                  ? `<img src="${logoStamp}" alt="Stamp" style="width: 120px; height: 120px; object-fit: contain;" />`
-                  : `<div style="width: 120px; height: 120px; border: 4px double #2563eb; border-radius: 50%; margin-left: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px;">
-                      <div style="font-size: 7px; font-weight: bold; color: #2563eb;">CERTIFIED TRANSLATOR</div>
-                      <div style="font-size: 9px; font-weight: bold; color: #2563eb; margin-top: 4px;">LEGACY TRANSLATIONS</div>
-                      <div style="font-size: 7px; color: #2563eb;">ATA # 275993</div>
+                  ? `<img src="${logoStamp}" alt="Stamp" style="width: 146px; height: 146px; object-fit: contain;" />`
+                  : `<div style="width: 146px; height: 146px; border: 5px double #2563eb; border-radius: 50%; margin-left: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px;">
+                      <div style="font-size: 10px; font-weight: bold; color: #2563eb;">CERTIFIED TRANSLATOR</div>
+                      <div style="font-size: 13px; font-weight: bold; color: #2563eb; margin-top: 4px;">LEGACY TRANSLATIONS</div>
+                      <div style="font-size: 10px; color: #2563eb;">ATA # 275993</div>
                     </div>`}
             </div>
         </div>
     </div>`;
 
-    // Letterhead for all pages - Same style as cover
+    // Letterhead for all pages - Same style as normal flow (with !important flags)
     const letterheadHTML = `
-        <div style="width: 100%; margin-bottom: 8px; overflow: hidden;">
-            <div style="float: left; width: 128px;">
+        <div style="width: 100% !important; margin-bottom: 8px; overflow: hidden !important; position: relative !important;">
+            <div style="float: left !important; width: 128px !important;">
                 ${logoLeft
                   ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
                   : `<div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>`}
             </div>
-            <div style="float: right; width: 80px; text-align: right;">
+            <div style="float: right !important; width: 80px !important; text-align: right !important;">
                 ${logoRight
                   ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px; max-width: 75px;" />`
                   : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span></div>`}
             </div>
-            <div style="margin-left: 138px; margin-right: 90px; text-align: center;">
+            <div style="margin-left: 138px !important; margin-right: 90px !important; text-align: center !important;">
                 <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
                 <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
                 <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
-        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>`;
+        <div style="clear: both !important; width: 100% !important; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>`;
 
     // Extract translation styles to include in print document (preserves formatting)
     const quickTranslationStyles = extractStylesFromHtml(quickTranslationHtml);
@@ -6759,11 +6759,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           </div>
           <div style="text-align: center;">
             ${logoStamp
-              ? `<img src="${logoStamp}" alt="Stamp" style="width: 112px; height: 112px; object-fit: contain;" />`
-              : `<div style="width: 112px; height: 112px; border-radius: 50%; border: 4px double #2563eb; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px;">
-                  <div style="font-size: 8px; color: #2563eb; font-weight: bold;">CERTIFIED TRANSLATOR</div>
-                  <div style="font-size: 10px; color: #2563eb; font-weight: bold; margin-top: 4px;">LEGACY TRANSLATIONS</div>
-                  <div style="font-size: 8px; color: #2563eb;">ATA # 275993</div>
+              ? `<img src="${logoStamp}" alt="Stamp" style="width: 146px; height: 146px; object-fit: contain;" />`
+              : `<div style="width: 146px; height: 146px; border-radius: 50%; border: 5px double #2563eb; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px;">
+                  <div style="font-size: 10px; color: #2563eb; font-weight: bold;">CERTIFIED TRANSLATOR</div>
+                  <div style="font-size: 13px; color: #2563eb; font-weight: bold; margin-top: 4px;">LEGACY TRANSLATIONS</div>
+                  <div style="font-size: 10px; color: #2563eb;">ATA # 275993</div>
                 </div>`}
           </div>
         </div>
@@ -6888,11 +6888,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             </div>
             <div style="float: right !important; width: 35% !important; text-align: right !important;">
                 ${logoStamp
-                  ? `<img src="${logoStamp}" alt="Stamp" style="width: 120px; height: 120px; object-fit: contain;" />`
-                  : `<div style="width: 120px; height: 120px; border: 4px double #2563eb; border-radius: 50%; margin-left: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px;">
-                      <div style="font-size: 7px; font-weight: bold; color: #2563eb;">CERTIFIED TRANSLATOR</div>
-                      <div style="font-size: 9px; font-weight: bold; color: #2563eb; margin-top: 4px;">LEGACY TRANSLATIONS</div>
-                      <div style="font-size: 7px; color: #2563eb;">ATA # 275993</div>
+                  ? `<img src="${logoStamp}" alt="Stamp" style="width: 146px; height: 146px; object-fit: contain;" />`
+                  : `<div style="width: 146px; height: 146px; border: 5px double #2563eb; border-radius: 50%; margin-left: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px;">
+                      <div style="font-size: 10px; font-weight: bold; color: #2563eb;">CERTIFIED TRANSLATOR</div>
+                      <div style="font-size: 13px; font-weight: bold; color: #2563eb; margin-top: 4px;">LEGACY TRANSLATIONS</div>
+                      <div style="font-size: 10px; color: #2563eb;">ATA # 275993</div>
                     </div>`}
             </div>
         </div>
@@ -7010,16 +7010,19 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     ` : '';
 
     // Original documents pages HTML (each image on separate page, title only on first)
-    // Wrapped in original-wrapper/original-content for auto-scaling like translation pages
-    const originalPagesHTML = (includeOriginal && originalImages.length > 0) ? originalImages.map((img, index) => `
+    // Filter out null/empty entries and resolve image src (handles both data URLs and raw base64)
+    const validOriginalImages = originalImages.filter(img => img && img.data);
+    const originalPagesHTML = (includeOriginal && validOriginalImages.length > 0) ? validOriginalImages.map((img, index) => {
+      const imgSrc = img.data.startsWith('data:') ? img.data : `data:${img.type || img.contentType || 'image/png'};base64,${img.data}`;
+      return `
     <div style="page-break-before: always; padding-top: 5px;">
         ${includeLetterhead ? letterheadHTML : ''}
         ${index === 0 ? '<div style="font-size: 13px; font-weight: bold; text-align: center; margin: 4px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px;">Original Document</div>' : ''}
         <div style="text-align: center;">
-            <img src="${img.data}" alt="${img.filename}" style="max-width: 100%; max-height: 7in; object-fit: contain; display: block; margin: 0 auto;" />
+            <img src="${imgSrc}" alt="${img.filename || 'Original'}" style="max-width: 100%; max-height: 7in; object-fit: contain; display: block; margin: 0 auto;" />
         </div>
-    </div>
-    `).join('') : '';
+    </div>`;
+    }).join('') : '';
 
     // Use UNIFIED styles (same as Quick Package)
     const htmlContent = `<!DOCTYPE html>
