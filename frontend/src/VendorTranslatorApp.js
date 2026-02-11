@@ -240,7 +240,7 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
     }
   };
 
-  // Send message to PM/Admin (project-specific)
+  // Send message to PM (project-specific)
   const handleSendProjectMessage = async () => {
     if (!chatMessage.trim() || !selectedRecipient || !selectedProject) return;
     setSendingMessage(true);
@@ -388,7 +388,7 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
     }
   };
 
-  // Send notification to PM/Admin
+  // Send notification to PM
   const handleSendToPM = async () => {
     if (!selectedProject) return;
 
@@ -401,7 +401,7 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
         filename: uploadedFileNames.join(', ')
       });
       setSentToPM(true);
-      showToast('PM/Admin has been notified! They will review your translation.', 'success');
+      showToast('PM has been notified! They will review your translation.', 'success');
       fetchProjects();
     } catch (err) {
       console.error('Failed to notify PM:', err);
@@ -568,7 +568,7 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
                                     : 'bg-white/70'
                               }`}>
                                 <p className={`text-[9px] font-medium mb-0.5 ${isFromMe ? 'text-blue-200' : 'text-gray-500'}`}>
-                                  {isFromMe ? 'You' : (msg.from_admin_name || 'PM/Admin')}
+                                  {isFromMe ? 'You' : (msg.from_admin_name || 'PM')}
                                 </p>
                                 <p className={`text-[11px] ${isFromMe ? 'text-white' : 'text-gray-800'}`}>{msg.content}</p>
                                 <p className={`text-[8px] mt-0.5 ${isFromMe ? 'text-blue-300' : 'text-gray-400'}`}>
@@ -745,7 +745,7 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                             </svg>
                           </div>
-                          <h4 className="text-lg font-medium text-green-700 mb-1">Sent to PM/Admin!</h4>
+                          <h4 className="text-lg font-medium text-green-700 mb-1">Sent to PM!</h4>
                           <p className="text-sm text-gray-500 mb-2">Your translation has been sent for review.</p>
                           <div className="bg-gray-50 rounded-lg p-3 mb-4 text-left max-w-sm mx-auto">
                             {uploadedFileNames.map((name, idx) => (
@@ -770,7 +770,7 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
                           </div>
                           <h4 className="text-lg font-medium text-blue-700 mb-1">Files Uploaded!</h4>
                           <p className="text-sm text-gray-500 mb-3">
-                            {uploadedFileNames.length} file(s) uploaded. Now send to the PM/Admin for review.
+                            {uploadedFileNames.length} file(s) uploaded. Now send to the PM for review.
                           </p>
                           <div className="bg-gray-50 rounded-lg p-3 mb-4 text-left max-w-sm mx-auto">
                             {uploadedFileNames.map((name, idx) => (
@@ -786,7 +786,7 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                             </svg>
-                            Send to PM/Admin
+                            Send to PM
                           </button>
                           <button
                             onClick={() => { setUploadSuccess(false); setUploadFiles([]); setUploadedFileNames([]); }}
