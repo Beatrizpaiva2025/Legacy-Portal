@@ -151,7 +151,8 @@ const VerificationPage = () => {
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
-      day: 'numeric'
+      day: 'numeric',
+      timeZone: 'America/New_York'
     });
   };
 
@@ -164,6 +165,7 @@ const VerificationPage = () => {
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
+      timeZone: 'America/New_York',
       timeZoneName: 'short'
     });
   };
@@ -254,7 +256,7 @@ const VerificationPage = () => {
                 </div>
                 <div className="text-right">
                   <p className="text-slate-500 text-xs uppercase tracking-wider font-medium mb-1">Verification Time</p>
-                  <p className="text-sm text-slate-600">{new Date().toLocaleString()}</p>
+                  <p className="text-sm text-slate-600">{new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })}</p>
                 </div>
               </div>
             </div>

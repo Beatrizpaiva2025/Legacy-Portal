@@ -37,6 +37,32 @@ const showToast = (message) => {
   window.showAppToast(message, type);
 };
 
+// Parse API error messages into user-friendly text
+const parseApiError = (error) => {
+  const detail = error?.response?.data?.detail || error?.message || String(error);
+  // If the backend already returned a friendly message, use it
+  if (detail.includes('Insufficient balance') || detail.includes('API Key') ||
+      detail.includes('Rate limit') || detail.includes('overloaded') ||
+      detail.includes('Saldo insuficiente') || detail.includes('Chave de API') ||
+      detail.includes('Limite de requisições') || detail.includes('sobrecarregado')) {
+    return detail;
+  }
+  // Fallback: parse raw JSON error from Anthropic API
+  if (detail.includes('credit balance') || detail.includes('billing')) {
+    return 'Insufficient balance on Claude API. Check your credits at console.anthropic.com → Plans & Billing.';
+  }
+  if (detail.includes('authentication_error') || detail.includes('invalid x-api-key')) {
+    return 'Invalid or expired API key. Check the key in Settings → API Key.';
+  }
+  if (detail.includes('rate_limit')) {
+    return 'Rate limit exceeded. Please wait a few seconds and try again.';
+  }
+  if (detail.includes('overloaded')) {
+    return 'The API server is overloaded. Please try again in a few moments.';
+  }
+  return detail;
+};
+
 const ToastContainer = () => {
   const [toasts, setToasts] = useState([]);
 
@@ -311,6 +337,21 @@ const generatePdfWithHash = async (htmlContent, filename, options = {}) => {
       }));
     }
 
+    // Auto-scale translation content if it overflows the page width
+    // This ensures large documents fit within the page boundaries
+    const translationContents = iframeDoc.querySelectorAll('.translation-content');
+    translationContents.forEach(el => {
+      const parent = el.parentElement;
+      if (parent && el.scrollWidth > parent.clientWidth + 5) {
+        const scale = parent.clientWidth / el.scrollWidth;
+        if (scale < 1 && scale >= 0.5) {
+          el.style.transform = `scale(${scale})`;
+          el.style.transformOrigin = 'top left';
+          el.style.width = `${100 / scale}%`;
+        }
+      }
+    });
+
     // Extra delay for rendering
     await new Promise(resolve => setTimeout(resolve, 500));
 
@@ -386,6 +427,10 @@ const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
     table { border-collapse: collapse; width: 100%; }
     td, th { border: 1px solid #333; padding: 5px 6px; font-size: 10pt; vertical-align: top; }
     /* Translation content: robust table layout for complex documents (birth certificates, etc.) */
+    .translation-content {
+        font-size: 10.5pt !important;
+        line-height: 1.4 !important;
+    }
     .translation-content table {
         table-layout: fixed;
         width: 100%;
@@ -415,6 +460,17 @@ const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
         word-wrap: break-word;
         overflow-wrap: break-word;
     }
+    /* Normalize heading sizes inside translation content to prevent layout overflow */
+    .translation-content h1 { font-size: 14pt !important; margin: 4px 0 2px 0 !important; line-height: 1.3 !important; }
+    .translation-content h2 { font-size: 12pt !important; margin: 3px 0 2px 0 !important; line-height: 1.3 !important; }
+    .translation-content h3 { font-size: 11pt !important; margin: 2px 0 1px 0 !important; line-height: 1.3 !important; }
+    .translation-content h4,
+    .translation-content h5,
+    .translation-content h6 { font-size: 10pt !important; margin: 2px 0 1px 0 !important; line-height: 1.3 !important; }
+    /* Prevent oversized content from breaking page layout */
+    .translation-content div,
+    .translation-content section,
+    .translation-content article { max-width: 100% !important; }
     .translation-content td p:last-child,
     .translation-content th p:last-child {
         margin-bottom: 0;
@@ -430,7 +486,7 @@ const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
     .paged-translation { width: 100%; border-collapse: collapse; border: none !important; }
     .paged-translation > thead > tr > td,
     .paged-translation > tbody > tr > td { border: none !important; padding: 0 !important; }
-    .paged-translation > thead > tr > td { padding: 5px 0 0 0 !important; }
+    .paged-translation > thead > tr > td { padding: 0 !important; }
     .paged-translation > thead { display: table-header-group; }
     .paged-translation > tbody { display: table-row-group; }
     /* Avoid breaking inside table rows (bank statements, financial tables) */
@@ -459,7 +515,7 @@ const getLetterheadHTML = (logoLeft, logoRight) => `
         </td>
     </tr>
 </table>
-<div style="width: 100%; height: 2px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 12px;"></div>`;
+<div style="width: 100%; height: 2px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 8px;"></div>`;
 
 // ==================== CONSTANTS ====================
 const STATUS_COLORS = {
@@ -1056,7 +1112,8 @@ const TopBar = ({
     { id: 'new-quote', label: 'New Quote', icon: '📝', roles: ['sales'] },
     { id: 'translation', label: 'Translation', icon: '✍️', roles: ['admin', 'pm', 'translator'] },
     { id: 'production', label: 'Reports', icon: '📊', roles: ['admin'] },
-    { id: 'finances', label: 'Finances', icon: '💰', roles: ['admin'] },
+    { id: 'expenses', label: 'Expenses', icon: '💸', roles: ['admin'] },
+    { id: 'finances', label: 'Partners', icon: '🤝', roles: ['admin'] },
     { id: 'followups', label: 'Follow-ups', icon: '🔔', roles: ['admin'] },
     { id: 'pm-dashboard', label: 'PM Dashboard', icon: '🎯', roles: ['pm'] },
     { id: 'sales-control', label: 'Sales', icon: '📈', roles: ['admin'] },
@@ -1459,6 +1516,41 @@ const scopeTranslationStyles = (stylesHtml) => {
   });
 };
 
+// Normalize translation HTML content for consistent page layout.
+// Strips excessive inline font-sizes, paddings and margins that can break the page layout
+// when content is placed inside the .translation-content wrapper with letterhead.
+const normalizeTranslationHtml = (html) => {
+  if (!html) return html;
+
+  // Cap inline font-size values that are too large (> 14pt or > 18px)
+  let normalized = html.replace(/font-size\s*:\s*(\d+(?:\.\d+)?)(pt|px|em|rem)/gi, (match, size, unit) => {
+    const numSize = parseFloat(size);
+    if (unit.toLowerCase() === 'pt' && numSize > 14) return `font-size: 14pt`;
+    if (unit.toLowerCase() === 'px' && numSize > 18) return `font-size: 18px`;
+    if (unit.toLowerCase() === 'em' && numSize > 1.3) return `font-size: 1.3em`;
+    if (unit.toLowerCase() === 'rem' && numSize > 1.3) return `font-size: 1.3rem`;
+    return match;
+  });
+
+  // Cap excessive line-height values (> 2.0)
+  normalized = normalized.replace(/line-height\s*:\s*(\d+(?:\.\d+)?)\s*(?:;|")/gi, (match, size) => {
+    const numSize = parseFloat(size);
+    if (numSize > 2.0) return match.replace(size, '1.6');
+    return match;
+  });
+
+  // Cap excessive padding and margin values (> 30px or > 0.5in)
+  normalized = normalized.replace(/(padding|margin)(-top|-bottom|-left|-right)?\s*:\s*(\d+(?:\.\d+)?)(px|in|cm)/gi, (match, prop, side, size, unit) => {
+    const numSize = parseFloat(size);
+    if (unit.toLowerCase() === 'px' && numSize > 30) return `${prop}${side || ''}: 30px`;
+    if (unit.toLowerCase() === 'in' && numSize > 0.5) return `${prop}${side || ''}: 0.5in`;
+    if (unit.toLowerCase() === 'cm' && numSize > 1.2) return `${prop}${side || ''}: 1.2cm`;
+    return match;
+  });
+
+  return normalized;
+};
+
 // Reconstruct full HTML document by replacing body content while preserving styles/head.
 const reconstructFullHtml = (originalHtml, newBodyContent) => {
   if (!originalHtml) return newBodyContent;
@@ -1506,6 +1598,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [allProjectFiles, setAllProjectFiles] = useState([]); // All files from all projects for individual view
   const [viewMode, setViewMode] = useState('files'); // 'projects' or 'files' - default to files view
 
+  // Page grouping state
+  const [pageGroupMode, setPageGroupMode] = useState(false); // Toggle grouping mode
+  const [pageGroupSelections, setPageGroupSelections] = useState({}); // { docId: pageNumber }
+  const [savingPageGroup, setSavingPageGroup] = useState(false);
+
+  // Batch translation state
+  const [batchSelectMode, setBatchSelectMode] = useState(false); // Toggle batch selection mode
+  const [batchSelectedFileIds, setBatchSelectedFileIds] = useState(new Set()); // Set of selected file IDs for batch translation
+
   // Translator messages
   const [translatorMessages, setTranslatorMessages] = useState([]);
   const [showTranslatorMessages, setShowTranslatorMessages] = useState(false);
@@ -1518,7 +1619,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [adminPmList, setAdminPmList] = useState([]);
   const [selectedAdminPm, setSelectedAdminPm] = useState('');
   // PM Upload Translation state
-  const [pmUploadFile, setPmUploadFile] = useState(null);
+  const [pmUploadFiles, setPmUploadFiles] = useState([]);
   const [pmUploadLoading, setPmUploadLoading] = useState(false);
   const [pmAcceptLoading, setPmAcceptLoading] = useState(false);
 
@@ -1847,8 +1948,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       `
     },
     'rmv-formulario': {
-      name: "RMV Formulário",
-      description: 'Tradução CNH',
+      name: "RMV Form",
+      description: 'CNH Translation',
       category: 'rmv-forms',
       isForm: true,
       formHTML: `
@@ -2950,11 +3051,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     try {
       const assetData = { [assetType]: value };
       await axios.put(`${API}/admin/shared-assets?admin_key=${adminKey}`, assetData);
-      setProcessingStatus(`✅ ${assetType === 'logo_left' ? 'Left logo' : assetType === 'logo_right' ? 'Center logo' : assetType === 'logo_stamp' ? 'Stamp' : assetType === 'signature_image' ? 'Signature' : assetType} salvo!`);
+      setProcessingStatus(`✅ ${assetType === 'logo_left' ? 'Left logo' : assetType === 'logo_right' ? 'Center logo' : assetType === 'logo_stamp' ? 'Stamp' : assetType === 'signature_image' ? 'Signature' : assetType} saved!`);
       return true;
     } catch (error) {
       console.error('Error saving asset:', error);
-      setProcessingStatus(`❌ Falha ao salvar ${assetType}`);
+      setProcessingStatus(`❌ Failed to save ${assetType}`);
       return false;
     }
   };
@@ -3088,13 +3189,14 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           const docs = docsResponse.data.documents || [];
           // For orders matched via file_translator_ids (individual file assignments),
           // only show files assigned to this translator
+          const isOrderLevelAssigned = order.assigned_translator_id === user.id
+            || order.assigned_translator === user.name
+            || order.assigned_translator_name === user.name;
           const isFileLevel = order.file_translator_ids && order.file_translator_ids.includes(user.id)
-            && order.assigned_translator_id !== user.id
-            && order.assigned_translator !== user.name
-            && order.assigned_translator_name !== user.name;
+            && !isOrderLevelAssigned;
           for (const doc of docs) {
-            // Skip files not assigned to this translator for file-level assignments
-            if (isFileLevel && doc.assigned_translator_id && doc.assigned_translator_id !== user.id) {
+            // For file-level assignments: only show files explicitly assigned to this translator
+            if (isFileLevel && doc.assigned_translator_id !== user.id) {
               continue;
             }
             allFiles.push({
@@ -3126,12 +3228,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
   // Fetch messages for translator
   const fetchTranslatorMessages = async () => {
-    if (!user?.id) return;
+    if (!user?.id || !adminKey) return;
     try {
       const response = await axios.get(`${API}/translator/messages?admin_key=${adminKey}&translator_id=${user.id}`);
       setTranslatorMessages(response.data.messages || []);
     } catch (err) {
-      console.error('Failed to fetch translator messages:', err);
+      // Silently ignore errors to avoid console spam
     }
   };
 
@@ -3380,17 +3482,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
   // Delete project document (Admin only - for project modal)
   const deleteProjectDocument = async (docId, filename) => {
-    if (!confirm(`Tem certeza que deseja excluir "${filename}"? Esta ação não pode ser desfeita.`)) {
+    if (!confirm(`Are you sure you want to delete "${filename}"? This action cannot be undone.`)) {
       return;
     }
     try {
       await axios.delete(`${API}/admin/order-documents/${docId}?admin_key=${adminKey}`);
-      showToast(`Documento "${filename}" excluído com sucesso`);
+      showToast(`Document "${filename}" deleted successfully`);
       // Update local state to remove the deleted document
       setProjectDocuments(prev => prev.filter(doc => doc.id !== docId));
     } catch (err) {
       console.error('Failed to delete document:', err);
-      showToast('Erro ao excluir documento');
+      showToast('Error deleting document');
     }
   };
 
@@ -3425,8 +3527,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               setProcessingStatus(`Converting PDF: page ${pageNum} of ${pdf.numPages}...`);
 
               const page = await pdf.getPage(pageNum);
-              const scale = 3; // Higher scale = better quality (3x for sharp PDF rendering)
-              const viewport = page.getViewport({ scale });
+              let scale = 3; // Higher scale = better quality (3x for sharp PDF rendering)
+              let viewport = page.getViewport({ scale });
+
+              // Ensure no dimension exceeds 7900px (Claude API limit is 8000px)
+              const maxDimension = 7900;
+              if (viewport.width > maxDimension || viewport.height > maxDimension) {
+                const dimensionScale = Math.min(maxDimension / viewport.width, maxDimension / viewport.height);
+                scale = scale * dimensionScale;
+                viewport = page.getViewport({ scale });
+              }
+
               const canvas = document.createElement('canvas');
               const context = canvas.getContext('2d');
               canvas.height = viewport.height;
@@ -3480,6 +3591,282 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
   };
 
+  // ==================== PAGE GROUPING FUNCTIONS ====================
+
+  // Save page group - assigns page_group_id and page_number to selected files
+  const savePageGroup = async () => {
+    const selectedEntries = Object.entries(pageGroupSelections).filter(([_, num]) => num > 0);
+    if (selectedEntries.length < 2) {
+      showToast('Select at least 2 files and assign page numbers to create a group');
+      return;
+    }
+
+    // Verify all page numbers are unique
+    const pageNumbers = selectedEntries.map(([_, num]) => num);
+    if (new Set(pageNumbers).size !== pageNumbers.length) {
+      showToast('Each file must have a unique page number');
+      return;
+    }
+
+    // Find the order_id from the first selected file
+    const firstFile = allProjectFiles.find(f => f.id === selectedEntries[0][0]);
+    if (!firstFile) return;
+
+    // All files must be from the same order
+    const allSameOrder = selectedEntries.every(([docId]) => {
+      const file = allProjectFiles.find(f => f.id === docId);
+      return file && file.order_id === firstFile.order_id;
+    });
+    if (!allSameOrder) {
+      showToast('All files in a group must be from the same project/order');
+      return;
+    }
+
+    setSavingPageGroup(true);
+    try {
+      const pageGroupId = `pg_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+      const items = selectedEntries.map(([docId, pageNumber]) => ({
+        doc_id: docId,
+        page_number: pageNumber
+      }));
+
+      await axios.post(
+        `${API}/admin/orders/${firstFile.order_id}/page-group?admin_key=${adminKey}`,
+        { page_group_id: pageGroupId, items }
+      );
+
+      showToast(`Page group created with ${items.length} pages`);
+      setPageGroupMode(false);
+      setPageGroupSelections({});
+
+      // Refresh files to show updated grouping
+      await fetchAssignedOrders();
+    } catch (err) {
+      console.error('Failed to save page group:', err);
+      showToast('Error saving page group');
+    } finally {
+      setSavingPageGroup(false);
+    }
+  };
+
+  // Remove page group from all files in a group
+  const removePageGroup = async (pageGroupId, orderId) => {
+    try {
+      await axios.delete(
+        `${API}/admin/orders/${orderId}/page-group/${pageGroupId}?admin_key=${adminKey}`
+      );
+      showToast('Page group removed');
+      await fetchAssignedOrders();
+    } catch (err) {
+      console.error('Failed to remove page group:', err);
+      showToast('Error removing page group');
+    }
+  };
+
+  // Load all files in a page group into the workspace (in order)
+  const loadPageGroup = async (pageGroupId) => {
+    const groupFiles = allProjectFiles
+      .filter(f => f.page_group_id === pageGroupId)
+      .sort((a, b) => (a.page_number || 0) - (b.page_number || 0));
+
+    if (groupFiles.length === 0) return;
+
+    // Set order context from first file
+    const order = assignedOrders.find(o => o.id === groupFiles[0].order_id);
+    if (order) {
+      setSelectedOrderId(order.id);
+      setOrderNumber(order.order_number);
+      if (order.translate_from) setSourceLanguage(order.translate_from);
+      if (order.translate_to) setTargetLanguage(order.translate_to);
+    }
+
+    setProcessingStatus(`Loading ${groupFiles.length} grouped pages...`);
+    const allImages = [];
+
+    for (let i = 0; i < groupFiles.length; i++) {
+      const file = groupFiles[i];
+      setProcessingStatus(`Loading page ${i + 1} of ${groupFiles.length}: "${file.filename}"...`);
+
+      try {
+        const downloadResponse = await axios.get(
+          `${API}/admin/order-documents/${file.id}/download?admin_key=${adminKey}`
+        );
+
+        if (downloadResponse.data.file_data) {
+          const contentType = downloadResponse.data.content_type || 'application/pdf';
+          const base64Data = downloadResponse.data.file_data;
+
+          if (contentType === 'application/pdf' || file.filename?.toLowerCase().endsWith('.pdf')) {
+            // Convert PDF pages to images
+            const binaryString = atob(base64Data);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let j = 0; j < binaryString.length; j++) {
+              bytes[j] = binaryString.charCodeAt(j);
+            }
+            const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+              const page = await pdf.getPage(pageNum);
+              let scale = 3;
+              let viewport = page.getViewport({ scale });
+
+              // Ensure no dimension exceeds 7900px (Claude API limit is 8000px)
+              const maxDimension = 7900;
+              if (viewport.width > maxDimension || viewport.height > maxDimension) {
+                const dimensionScale = Math.min(maxDimension / viewport.width, maxDimension / viewport.height);
+                scale = scale * dimensionScale;
+                viewport = page.getViewport({ scale });
+              }
+
+              const canvas = document.createElement('canvas');
+              const context = canvas.getContext('2d');
+              canvas.height = viewport.height;
+              canvas.width = viewport.width;
+              await page.render({ canvasContext: context, viewport }).promise;
+              const base64Image = canvas.toDataURL('image/png').split(',')[1];
+              allImages.push({
+                filename: `${file.filename}_page_${pageNum}.png`,
+                data: base64Image,
+                type: 'image/png'
+              });
+            }
+          } else {
+            // Image file - add directly
+            allImages.push({
+              filename: file.filename,
+              data: base64Data,
+              type: contentType
+            });
+          }
+        }
+      } catch (err) {
+        console.error(`Failed to load grouped file ${file.filename}:`, err);
+      }
+    }
+
+    if (allImages.length > 0) {
+      setOriginalImages(allImages);
+      setSelectedFileId(groupFiles[0].id);
+      setProcessingStatus(`${allImages.length} page(s) loaded from group`);
+      showToast(`${allImages.length} page(s) loaded from group`);
+      if (activeSubTab === 'start') {
+        setActiveSubTab('translate');
+      }
+    } else {
+      setProcessingStatus('No images could be loaded from group');
+    }
+  };
+
+  // Load batch selected files into the workspace (for batch translation)
+  const loadBatchFiles = async () => {
+    const selectedIds = Array.from(batchSelectedFileIds);
+    if (selectedIds.length === 0) return;
+
+    const batchFiles = allProjectFiles.filter(f => selectedIds.includes(f.id));
+    if (batchFiles.length === 0) return;
+
+    // All files must be from the same order
+    const orderIds = [...new Set(batchFiles.map(f => f.order_id))];
+    if (orderIds.length > 1) {
+      showToast('All files must be from the same project to batch translate.');
+      return;
+    }
+
+    // Set order context from first file
+    const order = assignedOrders.find(o => o.id === batchFiles[0].order_id);
+    if (order) {
+      setSelectedOrderId(order.id);
+      setOrderNumber(order.order_number);
+      if (order.translate_from) setSourceLanguage(order.translate_from);
+      if (order.translate_to) setTargetLanguage(order.translate_to);
+    }
+
+    setProcessingStatus(`Loading ${batchFiles.length} files for batch translation...`);
+    const allImages = [];
+
+    for (let i = 0; i < batchFiles.length; i++) {
+      const file = batchFiles[i];
+      setProcessingStatus(`Loading file ${i + 1} of ${batchFiles.length}: "${file.filename}"...`);
+
+      try {
+        const downloadResponse = await axios.get(
+          `${API}/admin/order-documents/${file.id}/download?admin_key=${adminKey}`
+        );
+
+        if (downloadResponse.data.file_data) {
+          const contentType = downloadResponse.data.content_type || 'application/pdf';
+          const base64Data = downloadResponse.data.file_data;
+
+          if (contentType === 'application/pdf' || file.filename?.toLowerCase().endsWith('.pdf')) {
+            const binaryString = atob(base64Data);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let j = 0; j < binaryString.length; j++) {
+              bytes[j] = binaryString.charCodeAt(j);
+            }
+            const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+              const page = await pdf.getPage(pageNum);
+              let scale = 3;
+              let viewport = page.getViewport({ scale });
+
+              const maxDimension = 7900;
+              if (viewport.width > maxDimension || viewport.height > maxDimension) {
+                const dimensionScale = Math.min(maxDimension / viewport.width, maxDimension / viewport.height);
+                scale = scale * dimensionScale;
+                viewport = page.getViewport({ scale });
+              }
+
+              const canvas = document.createElement('canvas');
+              const context = canvas.getContext('2d');
+              canvas.height = viewport.height;
+              canvas.width = viewport.width;
+              await page.render({ canvasContext: context, viewport }).promise;
+              const base64Image = canvas.toDataURL('image/png').split(',')[1];
+              allImages.push({
+                filename: `${file.filename}_page_${pageNum}.png`,
+                data: base64Image,
+                type: 'image/png',
+                sourceFileId: file.id,
+                sourceFilename: file.filename
+              });
+            }
+          } else {
+            allImages.push({
+              filename: file.filename,
+              data: base64Data,
+              type: contentType,
+              sourceFileId: file.id,
+              sourceFilename: file.filename
+            });
+          }
+        }
+      } catch (err) {
+        console.error(`Failed to load batch file ${file.filename}:`, err);
+      }
+    }
+
+    if (allImages.length > 0) {
+      setOriginalImages(allImages);
+      setSelectedFileId(batchFiles[0].id);
+      // Store batch info for later saving
+      window.__batchTranslationFileIds = selectedIds;
+      window.__batchTranslationFileInfo = batchFiles.map(f => ({
+        id: f.id,
+        filename: f.filename,
+        order_id: f.order_id,
+        order_number: f.order_number
+      }));
+      setProcessingStatus(`${allImages.length} page(s) loaded from ${batchFiles.length} files (batch translation)`);
+      showToast(`${allImages.length} page(s) loaded from ${batchFiles.length} files`);
+      setBatchSelectMode(false);
+      setBatchSelectedFileIds(new Set());
+      if (activeSubTab === 'start') {
+        setActiveSubTab('translate');
+      }
+    } else {
+      setProcessingStatus('No images could be loaded from selected files');
+    }
+  };
+
   // Load document from order (legacy - loads first file automatically)
   const loadOrderDocument = async (order) => {
     await selectProject(order);
@@ -3509,6 +3896,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             filename: orderData.translation_document_type || 'Translation',
             originalText: orderData.translation_original_text || ''
           }]);
+
+          // Restore batch translation info if present
+          if (orderData.batch_file_ids && orderData.batch_file_ids.length > 0) {
+            window.__batchTranslationFileIds = orderData.batch_file_ids;
+            window.__batchTranslationFileInfo = orderData.batch_file_info || [];
+          } else {
+            window.__batchTranslationFileIds = null;
+            window.__batchTranslationFileInfo = null;
+          }
 
           // Also set OCR results if original text is available
           if (orderData.translation_original_text) {
@@ -3675,8 +4071,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         origImages = originalImages.map(img => ({ filename: img.filename, data: img.data, type: img.type || 'image/png' }));
       }
 
-      // Send to backend with destination info
-      const response = await axios.post(`${API}/admin/orders/${selectedOrderId}/translation?admin_key=${adminKey}`, {
+      // Build payload with optional batch info
+      const translationPayload = {
         translation_html: translationHTML,
         translation_original_text: originalText,
         source_language: sourceLanguage,
@@ -3695,7 +4091,16 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         send_to: destination, // 'save', 'pm', 'ready', 'deliver'
         submitted_by: user?.name || 'Unknown',
         submitted_by_role: user?.role || 'unknown'
-      });
+      };
+
+      // Include batch translation file info if available
+      if (window.__batchTranslationFileIds && window.__batchTranslationFileIds.length > 0) {
+        translationPayload.batch_file_ids = window.__batchTranslationFileIds;
+        translationPayload.batch_file_info = window.__batchTranslationFileInfo || [];
+      }
+
+      // Send to backend with destination info
+      const response = await axios.post(`${API}/admin/orders/${selectedOrderId}/translation?admin_key=${adminKey}`, translationPayload);
 
       const destinationLabels = {
         'save': 'Saved',
@@ -3711,6 +4116,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
       if (response.data.status === 'success' || response.data.success) {
         const isTranslator = user?.role === 'translator';
+
+        // Clear batch translation info after successful submit (not save)
+        if (destination !== 'save' && window.__batchTranslationFileIds) {
+          window.__batchTranslationFileIds = null;
+          window.__batchTranslationFileInfo = null;
+        }
 
         if (destination === 'save') {
           showToast('✅ Translation saved successfully!');
@@ -4006,6 +4417,50 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       // Fallback to localStorage only
       localStorage.setItem('claude_api_key', claudeApiKey);
       setProcessingStatus('⚠️ API Key saved locally only. Backend save failed.');
+    }
+  };
+
+  // Test API key by making a validation call
+  const testApiKey = async () => {
+    const keyToTest = claudeApiKey;
+    if (!keyToTest) {
+      setProcessingStatus('❌ No API key configured to test.');
+      return;
+    }
+    setProcessingStatus('🔄 Testando chave de API...');
+    try {
+      const response = await axios.post(`${API}/admin/settings/api-key/test?admin_key=${adminKey}`, {
+        api_key: keyToTest
+      });
+      if (response.data?.valid) {
+        setProcessingStatus(`✅ ${response.data.message}`);
+      } else {
+        setProcessingStatus(`❌ ${response.data.message}`);
+      }
+    } catch (err) {
+      const msg = err.response?.data?.detail || err.message;
+      setProcessingStatus(`❌ Error testing: ${msg}`);
+    }
+  };
+
+  // Diagnose all API key sources
+  const [diagnosisResult, setDiagnosisResult] = useState(null);
+  const diagnoseApiKeys = async () => {
+    setProcessingStatus('🔍 Diagnosticando chaves de API...');
+    setDiagnosisResult(null);
+    try {
+      const response = await axios.get(`${API}/admin/settings/api-key/diagnose?admin_key=${adminKey}`);
+      setDiagnosisResult(response.data);
+      if (response.data.sources?.length === 0) {
+        setProcessingStatus('❌ No API key found in the system.');
+      } else {
+        const anyOk = response.data.sources.some(s => s.test_ok);
+        setProcessingStatus(anyOk
+          ? '✅ Diagnosis complete - valid key found!'
+          : '❌ Diagnosis complete - no valid key found.');
+      }
+    } catch (err) {
+      setProcessingStatus(`❌ Diagnosis error: ${err.response?.data?.detail || err.message}`);
     }
   };
 
@@ -4545,38 +5000,47 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       return;
     }
 
-    const currentResult = translationResults[selectedResultIndex];
-    if (!currentResult?.translatedText) {
+    // Check if we have any translation
+    if (!translationResults || translationResults.length === 0 || !translationResults[0]?.translatedText) {
       showToast('No translation to proofread');
       return;
     }
 
-    // Extract text from translation (remove HTML tags for proofreading)
-    const translatedText = currentResult.translatedText
-      .replace(/<[^>]*>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
+    // Combine ALL pages' translated text for proofreading
+    const translatedText = translationResults
+      .map((r, idx) => {
+        const text = (r.translatedText || '')
+          .replace(/<[^>]*>/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+        return translationResults.length > 1 ? `[Page ${idx + 1}]\n${text}` : text;
+      })
+      .filter(t => t)
+      .join('\n\n');
 
-    // Get original text (from OCR or extracted)
-    let originalText = ocrResults[selectedResultIndex]?.text ||
-                        currentResult.originalText ||
-                        '';
+    // Combine ALL pages' original text
+    let originalText = translationResults
+      .map((r, idx) => {
+        const text = ocrResults[idx]?.text || r.originalText || '';
+        return translationResults.length > 1 && text ? `[Page ${idx + 1}]\n${text}` : text;
+      })
+      .filter(t => t)
+      .join('\n\n');
 
-    // Check if we have an original image that we can use
-    const originalImage = originalImages[selectedResultIndex];
-    let originalImageBase64 = null;
-
-    if (originalImage?.data) {
-      // Extract base64 from data URL if present
-      if (originalImage.data.startsWith('data:')) {
-        originalImageBase64 = originalImage.data.split(',')[1];
-      } else {
-        originalImageBase64 = originalImage.data;
+    // Collect ALL original images
+    const allOriginalImages = [];
+    originalImages.forEach(img => {
+      if (img?.data) {
+        let imgBase64 = img.data;
+        if (imgBase64.startsWith('data:')) {
+          imgBase64 = imgBase64.split(',')[1];
+        }
+        allOriginalImages.push(imgBase64);
       }
-    }
+    });
 
-    // If no text and no image, show error
-    if (!originalText && !originalImageBase64) {
+    // If no text and no images, show error
+    if (!originalText && allOriginalImages.length === 0) {
       showToast('No original document available for comparison. Please upload the original document in the Original Document section.');
       return;
     }
@@ -4590,8 +5054,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          original_text: originalText || 'See attached image',
-          original_image: originalImageBase64,
+          original_text: originalText || 'See attached images',
+          original_image: allOriginalImages.length === 1 ? allOriginalImages[0] : null,
+          original_images: allOriginalImages.length > 1 ? allOriginalImages : null,
           translated_text: translatedText,
           source_language: sourceLanguage,
           target_language: targetLanguage,
@@ -4665,7 +5130,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       const escapedText = error.text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
       // Create tooltip with error details
-      const tooltipText = `Tipo: ${error.type} | Severidade: ${error.severity} | Sugestão: ${error.suggestion}`.replace(/"/g, '&quot;');
+      const tooltipText = `Type: ${error.type} | Severity: ${error.severity} | Suggestion: ${error.suggestion}`.replace(/"/g, '&quot;');
 
       // Use simple global replace (case insensitive) - only replace first occurrence to avoid duplicates
       const regex = new RegExp(escapedText, 'i');
@@ -4804,13 +5269,22 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     return { updatedHtml, replaced };
   };
 
+  // Strip trailing parenthetical comments from suggestion text (e.g. "corrected text (explanation...)" -> "corrected text")
+  const stripParentheticalComment = (text) => {
+    if (!text) return text;
+    // Remove trailing parenthetical content: "(any explanation here)" or "(truncated...)"
+    return text.replace(/\s*\([^)]*\.{0,3}\)?\s*$/, '').trim();
+  };
+
   // Apply a single proofreading correction
   const applyProofreadingCorrection = (erro, index) => {
     // Handle both field name conventions - traducao_errada is the incorrect English text to find
     const foundText = (erro.traducao_errada || erro.found || '').trim();
     const suggestionText = (erro.correcao || erro.sugestao || '').trim();
+    // Strip parenthetical comments - they should only appear in observations, not in the applied text
+    const cleanSuggestion = stripParentheticalComment(suggestionText);
 
-    if (!foundText || !suggestionText) {
+    if (!foundText || !cleanSuggestion) {
       showToast('Cannot apply correction: missing original text or suggestion');
       return;
     }
@@ -4818,7 +5292,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     const currentResult = translationResults[selectedResultIndex];
     if (!currentResult?.translatedText) return;
 
-    const result = tryReplaceText(currentResult.translatedText, foundText, suggestionText);
+    const result = tryReplaceText(currentResult.translatedText, foundText, cleanSuggestion);
 
     if (!result.replaced) {
       showToast(`Could not find text to replace: "${foundText.substring(0, 50)}${foundText.length > 50 ? '...' : ''}"\n\nThe text may have been modified or contains special formatting.`);
@@ -4833,7 +5307,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       translatedText: result.updatedHtml,
       appliedCorrections: [...appliedCorrections, {
         original: foundText,
-        corrected: suggestionText,
+        corrected: cleanSuggestion,
         timestamp: Date.now()
       }]
     };
@@ -4868,15 +5342,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       // Handle both field name conventions - traducao_errada is the incorrect English text to find
       const foundText = (erro.traducao_errada || erro.found || '').trim();
       const suggestionText = (erro.correcao || erro.sugestao || '').trim();
+      // Strip parenthetical comments - they should only appear in observations, not in the applied text
+      const cleanSuggestion = stripParentheticalComment(suggestionText);
 
-      if (foundText && suggestionText && !erro.applied) {
-        const result = tryReplaceText(updatedHtml, foundText, suggestionText);
+      if (foundText && cleanSuggestion && !erro.applied) {
+        const result = tryReplaceText(updatedHtml, foundText, cleanSuggestion);
         if (result.replaced) {
           updatedHtml = result.updatedHtml;
           appliedCount++;
           newAppliedCorrections.push({
             original: foundText,
-            corrected: suggestionText,
+            corrected: cleanSuggestion,
             timestamp: Date.now()
           });
           return { ...erro, applied: true };
@@ -5039,8 +5515,16 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             if (onProgress) onProgress(pageNum, pdf.numPages);
 
             const page = await pdf.getPage(pageNum);
-            const scale = 3; // Higher scale = better quality (3x for sharp PDF rendering)
-            const viewport = page.getViewport({ scale });
+            let scale = 3; // Higher scale = better quality (3x for sharp PDF rendering)
+            let viewport = page.getViewport({ scale });
+
+            // Ensure no dimension exceeds 7900px (Claude API limit is 8000px)
+            const maxDimension = 7900;
+            if (viewport.width > maxDimension || viewport.height > maxDimension) {
+              const dimensionScale = Math.min(maxDimension / viewport.width, maxDimension / viewport.height);
+              scale = scale * dimensionScale;
+              viewport = page.getViewport({ scale });
+            }
 
             const canvas = document.createElement('canvas');
             const context = canvas.getContext('2d');
@@ -5251,7 +5735,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       setActiveSubTab('review');
     } catch (error) {
       console.error('Translation error:', error);
-      setProcessingStatus(`❌ Translation failed: ${error.response?.data?.detail || error.message}`);
+      setProcessingStatus(`❌ Translation error: ${parseApiError(error)}`);
     } finally {
       setIsProcessing(false);
     }
@@ -5313,7 +5797,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       setProcessingStatus(`✅ Translation completed! ${totalPages} page(s) translated.`);
     } catch (error) {
       console.error('Translation error:', error);
-      setProcessingStatus(`❌ Translation failed: ${error.response?.data?.detail || error.message}`);
+      setProcessingStatus(`❌ Translation error: ${parseApiError(error)}`);
     } finally {
       setIsProcessing(false);
     }
@@ -5841,7 +6325,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
     // Letterhead for all pages - Same style as cover
     const letterheadHTML = `
-        <div style="width: 100%; margin-bottom: 2px; padding-bottom: 2px; overflow: hidden;">
+        <div style="width: 100%; margin-bottom: 8px; overflow: hidden;">
             <div style="float: left; width: 128px;">
                 ${logoLeft
                   ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
@@ -5858,7 +6342,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
-        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 12px;"></div>`;
+        <div style="clear: both; width: 100%; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>`;
 
     // Extract translation styles to include in print document (preserves formatting)
     const quickTranslationStyles = extractStylesFromHtml(quickTranslationHtml);
@@ -5874,20 +6358,21 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     // For mildly overflowing content, JS auto-scale still applies (scale >= 0.55)
     // First page doesn't need page-break since cover ends with one
     if (quickTranslationHtml) {
+      const normalizedQuickHtml = normalizeTranslationHtml(quickTranslationHtml);
       translationPagesHTML = includeLetterhead ? `
     <table class="paged-translation">
-        <thead><tr><td style="padding: 5px 0 0 0;">
+        <thead><tr><td style="padding: 0;">
             ${letterheadHTML}
         </td></tr></thead>
         <tbody><tr><td>
-            <div class="translation-content" style="padding: 0; line-height: 1.5; font-size: 11pt;">
-                ${quickTranslationHtml}
+            <div class="translation-content" style="padding: 0; line-height: 1.4; font-size: 10.5pt;">
+                ${normalizedQuickHtml}
             </div>
         </td></tr></tbody>
     </table>` : `
     <div style="padding-top: 5px;">
-        <div class="translation-content" style="padding: 0; line-height: 1.5; font-size: 11pt;">
-            ${quickTranslationHtml}
+        <div class="translation-content" style="padding: 0; line-height: 1.4; font-size: 10.5pt;">
+            ${normalizedQuickHtml}
         </div>
     </div>`;
     }
@@ -5943,7 +6428,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     </div>
                     <div style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; overflow: hidden;">
                         <span style="float: left; font-size: 11px; color: #64748b;">Certified Date:</span>
-                        <span style="float: right; font-size: 11px; font-weight: 600; color: #1e293b;">${new Date(certData.certified_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                        <span style="float: right; font-size: 11px; font-weight: 600; color: #1e293b;">${new Date(certData.certified_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/New_York' })}</span>
                     </div>
                     <div style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; overflow: hidden;">
                         <span style="float: left; font-size: 11px; color: #64748b;">Document Hash:</span>
@@ -6003,7 +6488,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       const printWindow = window.open('', 'PDFPreview', `width=${windowWidth},height=${windowHeight},left=${left},top=${top},scrollbars=yes,resizable=yes`);
 
       if (!printWindow || printWindow.closed || typeof printWindow.closed === 'undefined') {
-        alert('⚠️ Pop-up bloqueado!\n\nPor favor, permita pop-ups para este site:\n1. Clique no ícone de pop-up bloqueado na barra de endereço\n2. Selecione "Sempre permitir pop-ups"\n3. Tente novamente');
+        alert('⚠️ Pop-up blocked!\n\nPlease allow pop-ups for this site:\n1. Click the blocked pop-up icon in the address bar\n2. Select "Always allow pop-ups"\n3. Try again');
         setQuickPackageLoading(false);
         setQuickPackageProgress('');
         return;
@@ -6397,7 +6882,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     // Letterhead for all pages - Same style as cover
     // Uses !important on critical float/layout properties to prevent AI translation CSS from breaking layout
     const letterheadHTML = `
-        <div style="width: 100% !important; margin-bottom: 2px; padding-bottom: 2px; overflow: hidden !important; position: relative !important;">
+        <div style="width: 100% !important; margin-bottom: 8px; overflow: hidden !important; position: relative !important;">
             <div style="float: left !important; width: 128px !important;">
                 ${logoLeft
                   ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
@@ -6414,7 +6899,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
-        <div style="clear: both !important; width: 100% !important; height: 2px; background: #93c5fd; margin-bottom: 12px;"></div>`;
+        <div style="clear: both !important; width: 100% !important; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>`;
 
     // Extract translation styles and SCOPE them to .translation-content to prevent
     // AI-generated global CSS from breaking letterhead/cover layout
@@ -6428,15 +6913,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     // NOTE: extractBodyForEdit strips <html>/<head>/<style>/<body> wrapper from AI output.
     const translationPagesHTML = translationResults.map((result, index) => {
       const pageBreak = index > 0 ? 'page-break-before: always;' : '';
-      const content = extractBodyForEdit(result.translatedText);
+      const content = normalizeTranslationHtml(extractBodyForEdit(result.translatedText));
       if (includeLetterhead) {
         return `
     <table class="paged-translation" style="${pageBreak}">
-        <thead><tr><td style="padding: 5px 0 0 0;">
+        <thead><tr><td style="padding: 0;">
             ${letterheadHTML}
         </td></tr></thead>
         <tbody><tr><td>
-            <div class="translation-content" style="padding: 0; line-height: 1.5; font-size: 11pt;">
+            <div class="translation-content" style="padding: 0; line-height: 1.4; font-size: 10.5pt;">
                 ${content}
             </div>
         </td></tr></tbody>
@@ -6444,7 +6929,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       } else {
         return `
     <div style="${pageBreak} padding-top: 5px;">
-        <div class="translation-content" style="padding: 0; line-height: 1.5; font-size: 11pt;">
+        <div class="translation-content" style="padding: 0; line-height: 1.4; font-size: 10.5pt;">
             ${content}
         </div>
     </div>`;
@@ -6481,7 +6966,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     </div>
                     <div style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; overflow: hidden;">
                         <span style="float: left; font-size: 11px; color: #64748b;">Certified Date:</span>
-                        <span style="float: right; font-size: 11px; font-weight: 600; color: #1e293b;">${new Date(certData.certified_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                        <span style="float: right; font-size: 11px; font-weight: 600; color: #1e293b;">${new Date(certData.certified_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/New_York' })}</span>
                     </div>
                     <div style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; overflow: hidden;">
                         <span style="float: left; font-size: 11px; color: #64748b;">Document Hash:</span>
@@ -6661,23 +7146,46 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
   // ==================== PM UPLOAD TRANSLATION FUNCTIONS ====================
   const uploadPmTranslation = async (orderId) => {
-    if (!pmUploadFile || !orderId) return;
+    if (!pmUploadFiles.length || !orderId) return;
     setPmUploadLoading(true);
     try {
-      const formData = new FormData();
-      formData.append('order_id', orderId);
-      formData.append('admin_key', adminKey);
-      formData.append('file', pmUploadFile);
-      const response = await axios.post(`${API}/admin/upload-pm-translation`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      // Upload each file using the same method as admin (base64 + JSON)
+      for (const file of pmUploadFiles) {
+        const base64Data = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result.split(',')[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        await axios.post(`${API}/admin/orders/${orderId}/documents?admin_key=${adminKey}`, {
+          filename: file.name,
+          file_data: base64Data,
+          content_type: file.type || 'application/octet-stream',
+          source: 'translated_document'
+        });
+      }
+      // Update order status to pm_upload_ready
+      await axios.put(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`, {
+        translation_status: 'pm_upload_ready',
+        pm_uploaded_at: new Date().toISOString()
       });
-      showToast('Translation uploaded successfully! Status set to READY.');
-      setPmUploadFile(null);
-      // Refresh order data
+      // Notify admin via email
+      try {
+        await axios.post(`${API}/admin/notify-pm-upload`, {
+          order_id: orderId,
+          admin_key: adminKey,
+          file_count: pmUploadFiles.length,
+          filenames: pmUploadFiles.map(f => f.name)
+        });
+      } catch (notifyErr) {
+        console.warn('Admin notification email failed:', notifyErr);
+      }
+      showToast(`${pmUploadFiles.length} file(s) uploaded and sent to Admin!`);
+      setPmUploadFiles([]);
       fetchAssignedOrders();
     } catch (err) {
       console.error('PM upload failed:', err);
-      showToast('Error uploading translation: ' + (err.response?.data?.detail || err.message));
+      showToast('Error uploading: ' + (err.response?.data?.detail || err.message));
     } finally {
       setPmUploadLoading(false);
     }
@@ -6968,6 +7476,90 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             </div>
           )}
 
+          {/* API Key Status & Configuration - Admin only */}
+          {isAdmin && (
+          <div className={`border rounded-lg p-3 ${claudeApiKey ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-sm">{claudeApiKey ? '🟢' : '🔴'}</span>
+                <span className={`text-xs font-bold ${claudeApiKey ? 'text-green-800' : 'text-red-800'}`}>
+                  Claude API Key: {claudeApiKey ? 'Configured' : 'Not configured'}
+                </span>
+                {claudeApiKey && (
+                  <span className="text-[10px] text-gray-500">({claudeApiKey.slice(0, 7)}...{claudeApiKey.slice(-4)})</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {claudeApiKey && (
+                  <button
+                    onClick={testApiKey}
+                    className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                  >
+                    Testar Chave
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowApiKey(!showApiKey)}
+                  className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+                >
+                  {showApiKey ? 'Close' : 'Change Key'}
+                </button>
+              </div>
+            </div>
+            {showApiKey && (
+              <div className="mt-3 flex gap-2">
+                <input
+                  type="password"
+                  value={claudeApiKey}
+                  onChange={(e) => setClaudeApiKey(e.target.value)}
+                  placeholder="sk-ant-..."
+                  className="flex-1 px-3 py-1.5 text-xs border rounded font-mono"
+                />
+                <button
+                  onClick={saveApiKey}
+                  className="px-3 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                >
+                  Save
+                </button>
+              </div>
+            )}
+            {!claudeApiKey && (
+              <p className="text-[10px] text-red-600 mt-1">
+                Configure your Claude API key to use AI translation. Get it at console.anthropic.com
+              </p>
+            )}
+            {/* Diagnose button */}
+            <div className="mt-2 flex items-center gap-2">
+              <button
+                onClick={diagnoseApiKeys}
+                className="px-3 py-1 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600"
+              >
+                Diagnosticar todas as chaves
+              </button>
+              <span className="text-[10px] text-gray-500">Verifica todas as fontes de chave de API</span>
+            </div>
+            {/* Diagnosis results */}
+            {diagnosisResult && diagnosisResult.sources && (
+              <div className="mt-2 border border-gray-200 rounded p-2 bg-white text-xs space-y-2">
+                {diagnosisResult.sources.map((s, i) => (
+                  <div key={i} className={`p-2 rounded ${s.test_ok ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                    <div className="flex items-center gap-2">
+                      <span>{s.test_ok ? '✅' : '❌'}</span>
+                      <strong>{s.source}</strong>
+                    </div>
+                    <div className="ml-5 text-gray-600">Chave: <code>{s.key_preview}</code></div>
+                    <div className="ml-5">{s.test_result}</div>
+                    {s.updated_at && <div className="ml-5 text-gray-400">Atualizada: {s.updated_at}</div>}
+                  </div>
+                ))}
+                {diagnosisResult.sources.length === 0 && (
+                  <p className="text-red-600">{diagnosisResult.message}</p>
+                )}
+              </div>
+            )}
+          </div>
+          )}
+
           {/* Upload Document Section - Compact */}
           <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-3">
             <div className="flex items-center justify-between mb-2">
@@ -7237,8 +7829,111 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       📁 Projects
                     </button>
                   </div>
+                  {/* Group Pages Toggle */}
+                  {viewMode === 'files' && allProjectFiles.length > 1 && !batchSelectMode && (
+                    <button
+                      onClick={() => {
+                        setPageGroupMode(!pageGroupMode);
+                        if (pageGroupMode) setPageGroupSelections({});
+                      }}
+                      className={`px-3 py-1 text-xs rounded-md transition-all ${
+                        pageGroupMode
+                          ? 'bg-orange-500 text-white shadow'
+                          : 'bg-white border border-orange-300 text-orange-600 hover:bg-orange-50'
+                      }`}
+                      title="Group multiple pages/images into a single translation"
+                    >
+                      {pageGroupMode ? '✕ Cancel' : '🔗 Group Pages'}
+                    </button>
+                  )}
+                  {/* Batch Translate Toggle */}
+                  {viewMode === 'files' && allProjectFiles.length > 1 && !pageGroupMode && (
+                    <button
+                      onClick={() => {
+                        setBatchSelectMode(!batchSelectMode);
+                        if (batchSelectMode) setBatchSelectedFileIds(new Set());
+                      }}
+                      className={`px-3 py-1 text-xs rounded-md transition-all ${
+                        batchSelectMode
+                          ? 'bg-indigo-500 text-white shadow'
+                          : 'bg-white border border-indigo-300 text-indigo-600 hover:bg-indigo-50'
+                      }`}
+                      title="Select multiple files to translate together in batch"
+                    >
+                      {batchSelectMode ? '✕ Cancel' : '📑 Batch Translate'}
+                    </button>
+                  )}
                 </div>
               </div>
+
+              {/* Page Grouping Toolbar */}
+              {pageGroupMode && viewMode === 'files' && (
+                <div className="mb-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-orange-700">
+                      <strong>Page Grouping Mode:</strong> Type page numbers (1, 2, 3...) on each file to set the order. Files with numbers will be grouped together.
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-orange-600">
+                        {Object.values(pageGroupSelections).filter(v => v > 0).length} selected
+                      </span>
+                      <button
+                        onClick={savePageGroup}
+                        disabled={savingPageGroup || Object.values(pageGroupSelections).filter(v => v > 0).length < 2}
+                        className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 text-white text-xs rounded-md transition-colors font-medium"
+                      >
+                        {savingPageGroup ? 'Saving...' : 'Save Group'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Batch Translation Toolbar */}
+              {batchSelectMode && viewMode === 'files' && (
+                <div className="mb-3 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-indigo-700">
+                      <strong>Batch Translation:</strong> Select 2 or more files to translate them all together. All files must be from the same project.
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-indigo-600">
+                        {batchSelectedFileIds.size} file(s) selected
+                      </span>
+                      <button
+                        onClick={() => {
+                          // Select all files from the same order as the first selected file
+                          if (batchSelectedFileIds.size > 0) {
+                            const firstId = Array.from(batchSelectedFileIds)[0];
+                            const firstFile = allProjectFiles.find(f => f.id === firstId);
+                            if (firstFile) {
+                              const sameOrderFiles = allProjectFiles.filter(f => f.order_id === firstFile.order_id && !f.page_group_id);
+                              setBatchSelectedFileIds(new Set(sameOrderFiles.map(f => f.id)));
+                            }
+                          } else {
+                            // Select all ungrouped files from the first order
+                            const orders = [...new Set(allProjectFiles.map(f => f.order_id))];
+                            if (orders.length > 0) {
+                              const sameOrderFiles = allProjectFiles.filter(f => f.order_id === orders[0] && !f.page_group_id);
+                              setBatchSelectedFileIds(new Set(sameOrderFiles.map(f => f.id)));
+                            }
+                          }
+                        }}
+                        className="px-2 py-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 text-xs rounded transition-colors"
+                      >
+                        Select All
+                      </button>
+                      <button
+                        onClick={loadBatchFiles}
+                        disabled={batchSelectedFileIds.size < 2}
+                        className="px-3 py-1.5 bg-indigo-500 hover:bg-indigo-600 disabled:bg-gray-300 text-white text-xs rounded-md transition-colors font-medium"
+                      >
+                        Load {batchSelectedFileIds.size} Files for Translation
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {loadingAssigned ? (
                 <div className="text-center py-4 text-gray-500 text-sm">Loading...</div>
@@ -7246,10 +7941,38 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 /* FILES VIEW - Show individual files */
                 allProjectFiles.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {allProjectFiles.map((file, idx) => (
+                    {[...allProjectFiles].sort((a, b) => {
+                      // Group files with page_group_id together, sorted by page_number
+                      if (a.page_group_id && b.page_group_id && a.page_group_id === b.page_group_id) {
+                        return (a.page_number || 0) - (b.page_number || 0);
+                      }
+                      if (a.page_group_id && !b.page_group_id) return -1;
+                      if (!a.page_group_id && b.page_group_id) return 1;
+                      if (a.page_group_id && b.page_group_id) return a.page_group_id.localeCompare(b.page_group_id);
+                      return 0; // Keep original order for ungrouped files
+                    }).map((file, idx) => (
                       <div
                         key={file.id || idx}
                         onClick={async () => {
+                          if (pageGroupMode) return; // Don't load files in grouping mode
+                          // In batch mode, toggle selection
+                          if (batchSelectMode) {
+                            setBatchSelectedFileIds(prev => {
+                              const next = new Set(prev);
+                              if (next.has(file.id)) {
+                                next.delete(file.id);
+                              } else {
+                                next.add(file.id);
+                              }
+                              return next;
+                            });
+                            return;
+                          }
+                          // If file is part of a group, load all group files
+                          if (file.page_group_id) {
+                            await loadPageGroup(file.page_group_id);
+                            return;
+                          }
                           // Set order context
                           const order = assignedOrders.find(o => o.id === file.order_id);
                           if (order) {
@@ -7262,11 +7985,85 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           await loadProjectFile(file);
                         }}
                         className={`p-3 rounded-lg cursor-pointer transition-all border ${
-                          selectedFileId === file.id
+                          batchSelectMode && batchSelectedFileIds.has(file.id)
+                            ? 'bg-indigo-50 border-indigo-400 shadow-md ring-2 ring-indigo-300'
+                            : pageGroupMode && pageGroupSelections[file.id] > 0
+                            ? 'bg-orange-50 border-orange-400 shadow-md ring-2 ring-orange-300'
+                            : file.page_group_id
+                            ? 'bg-purple-50 border-purple-300 hover:border-purple-500 hover:shadow'
+                            : selectedFileId === file.id
                             ? 'bg-blue-100 border-blue-500 shadow-md'
                             : 'bg-white border-gray-200 hover:border-blue-400 hover:shadow'
                         }`}
                       >
+                        {/* Batch Selection Checkbox */}
+                        {batchSelectMode && !file.page_group_id && (
+                          <div className="mb-2 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={batchSelectedFileIds.has(file.id)}
+                              onChange={() => {
+                                setBatchSelectedFileIds(prev => {
+                                  const next = new Set(prev);
+                                  if (next.has(file.id)) {
+                                    next.delete(file.id);
+                                  } else {
+                                    next.add(file.id);
+                                  }
+                                  return next;
+                                });
+                              }}
+                              className="w-4 h-4 text-indigo-600 rounded border-indigo-300 focus:ring-indigo-500"
+                            />
+                            <span className="text-[10px] text-indigo-600 font-medium">
+                              {batchSelectedFileIds.has(file.id) ? 'Selected for batch' : 'Select for batch translation'}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Page Grouping Input */}
+                        {pageGroupMode && !file.page_group_id && (
+                          <div className="mb-2 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                            <label className="text-[10px] text-orange-600 font-medium whitespace-nowrap">Page #:</label>
+                            <input
+                              type="number"
+                              min="0"
+                              max="99"
+                              value={pageGroupSelections[file.id] || ''}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value) || 0;
+                                setPageGroupSelections(prev => ({
+                                  ...prev,
+                                  [file.id]: val
+                                }));
+                              }}
+                              className="w-14 px-2 py-1 text-sm border border-orange-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-orange-400"
+                              placeholder="-"
+                            />
+                          </div>
+                        )}
+
+                        {/* Existing Group Badge */}
+                        {file.page_group_id && (
+                          <div className="mb-2 flex items-center justify-between">
+                            <span className="text-[10px] px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full font-medium">
+                              🔗 Page {file.page_number} of {allProjectFiles.filter(f => f.page_group_id === file.page_group_id).length}
+                            </span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (confirm('Remove this file from the page group?')) {
+                                  removePageGroup(file.page_group_id, file.order_id);
+                                }
+                              }}
+                              className="text-[10px] text-red-400 hover:text-red-600"
+                              title="Remove group"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        )}
+
                         <div className="flex items-center justify-between mb-2">
                           <span className="font-bold text-blue-700 text-xs truncate max-w-[120px]" title={file.filename}>
                             {file.filename || 'Document'}
@@ -7285,6 +8082,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                              file.file_status}
                           </span>
                         </div>
+                        {file.batch_translated && (
+                          <div className="mb-1">
+                            <span className="text-[10px] px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full font-medium">
+                              📑 Batch translated
+                            </span>
+                          </div>
+                        )}
                         <div className="text-[10px] text-gray-500 mb-1">
                           Project: <span className="font-medium text-blue-600">{file.order_number}</span>
                         </div>
@@ -7306,16 +8110,30 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         )}
                         {/* Action buttons */}
                         <div className="mt-2 flex flex-wrap gap-1">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              loadFileToWorkspace(file.id, file.filename);
-                            }}
-                            className="flex-1 px-2 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded flex items-center justify-center gap-1 transition-colors"
-                            title="Load PDF/Image to workspace (PDF auto-converts to images)"
-                          >
-                            📥 Load
-                          </button>
+                          {/* Load Group button for grouped files */}
+                          {file.page_group_id ? (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                loadPageGroup(file.page_group_id);
+                              }}
+                              className="flex-1 px-2 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded flex items-center justify-center gap-1 transition-colors"
+                              title="Load all pages in this group into workspace (in order)"
+                            >
+                              🔗 Load Group ({allProjectFiles.filter(f => f.page_group_id === file.page_group_id).length} pages)
+                            </button>
+                          ) : !pageGroupMode && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                loadFileToWorkspace(file.id, file.filename);
+                              }}
+                              className="flex-1 px-2 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded flex items-center justify-center gap-1 transition-colors"
+                              title="Load PDF/Image to workspace (PDF auto-converts to images)"
+                            >
+                              📥 Load
+                            </button>
+                          )}
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -7376,8 +8194,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     {assignedOrders.map(order => {
                       // Check if translator (in-house or contractor) needs to accept this assignment first
                       // Only block if this translator is the one with the pending order-level assignment
-                      const isPendingAcceptance = isTranslator && order.translator_assignment_status === 'pending'
-                        && (order.assigned_translator_id === user.id || order.assigned_translator_name === user.name);
+                      const isBulkPending = isTranslator && order.translator_assignment_status === 'bulk_pending'
+                        && order.file_translator_ids && order.file_translator_ids.includes(user.id);
+                      const isPendingAcceptance = isBulkPending || (isTranslator && order.translator_assignment_status === 'pending'
+                        && (order.assigned_translator_id === user.id || order.assigned_translator_name === user.name));
 
                       return (
                         <div
@@ -7397,11 +8217,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                 : 'bg-white border-gray-200 hover:border-blue-400 hover:shadow cursor-pointer'
                           }`}
                         >
-                          {/* Pending acceptance banner for contractors */}
+                          {/* Pending acceptance banner for contractors / bulk invites */}
                           {isPendingAcceptance && (
-                            <div className="bg-yellow-100 border border-yellow-300 rounded px-2 py-1 mb-2 text-center">
-                              <span className="text-[10px] text-yellow-800 font-medium">
-                                ⚠️ Accept via email to start
+                            <div className={`${isBulkPending ? 'bg-purple-100 border-purple-300' : 'bg-yellow-100 border-yellow-300'} border rounded px-2 py-1 mb-2 text-center`}>
+                              <span className={`text-[10px] ${isBulkPending ? 'text-purple-800' : 'text-yellow-800'} font-medium`}>
+                                {isBulkPending ? '📢 Bulk invite - Accept via email (first to accept gets it!)' : '⚠️ Accept via email to start'}
                               </span>
                             </div>
                           )}
@@ -8037,7 +8857,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <input ref={logoLeftInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'left')} className="hidden" />
                 <div className="flex justify-center gap-1 mt-1">
                   {user?.role === 'admin' && <button onClick={() => logoLeftInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>}
-                  {user?.role === 'admin' && logoLeft && <button onClick={() => saveAssetToBackend('logo_left', logoLeft)} className="px-1.5 py-0.5 bg-green-500 text-white text-[9px] rounded hover:bg-green-600">Salvar</button>}
+                  {user?.role === 'admin' && logoLeft && <button onClick={() => saveAssetToBackend('logo_left', logoLeft)} className="px-1.5 py-0.5 bg-green-500 text-white text-[9px] rounded hover:bg-green-600">Save</button>}
                   {user?.role === 'admin' && logoLeft && <button onClick={() => removeLogo('left')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
                 </div>
               </div>
@@ -8055,7 +8875,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <input ref={logoRightInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'right')} className="hidden" />
                 <div className="flex justify-center gap-1 mt-1">
                   {user?.role === 'admin' && <button onClick={() => logoRightInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>}
-                  {user?.role === 'admin' && logoRight && <button onClick={() => saveAssetToBackend('logo_right', logoRight)} className="px-1.5 py-0.5 bg-green-500 text-white text-[9px] rounded hover:bg-green-600">Salvar</button>}
+                  {user?.role === 'admin' && logoRight && <button onClick={() => saveAssetToBackend('logo_right', logoRight)} className="px-1.5 py-0.5 bg-green-500 text-white text-[9px] rounded hover:bg-green-600">Save</button>}
                   {user?.role === 'admin' && logoRight && <button onClick={() => removeLogo('right')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
                 </div>
               </div>
@@ -8073,7 +8893,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <input ref={logoStampInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'stamp')} className="hidden" />
                 <div className="flex justify-center gap-1 mt-1">
                   {user?.role === 'admin' && <button onClick={() => logoStampInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>}
-                  {user?.role === 'admin' && logoStamp && <button onClick={() => saveAssetToBackend('logo_stamp', logoStamp)} className="px-1.5 py-0.5 bg-green-500 text-white text-[9px] rounded hover:bg-green-600">Salvar</button>}
+                  {user?.role === 'admin' && logoStamp && <button onClick={() => saveAssetToBackend('logo_stamp', logoStamp)} className="px-1.5 py-0.5 bg-green-500 text-white text-[9px] rounded hover:bg-green-600">Save</button>}
                   {user?.role === 'admin' && logoStamp && <button onClick={() => removeLogo('stamp')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
                 </div>
               </div>
@@ -8091,7 +8911,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <input ref={signatureInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'signature')} className="hidden" />
                 <div className="flex justify-center gap-1 mt-1">
                   {user?.role === 'admin' && <button onClick={() => signatureInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>}
-                  {user?.role === 'admin' && signatureImage && <button onClick={() => saveAssetToBackend('signature_image', signatureImage)} className="px-1.5 py-0.5 bg-green-500 text-white text-[9px] rounded hover:bg-green-600">Salvar</button>}
+                  {user?.role === 'admin' && signatureImage && <button onClick={() => saveAssetToBackend('signature_image', signatureImage)} className="px-1.5 py-0.5 bg-green-500 text-white text-[9px] rounded hover:bg-green-600">Save</button>}
                   {user?.role === 'admin' && signatureImage && <button onClick={() => removeLogo('signature')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
                 </div>
               </div>
@@ -9876,73 +10696,91 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 {orderStatus !== 'final' && (
                   <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-lg p-4">
                     <h3 className="text-xs font-bold text-orange-800 mb-3">
-                      {hasPmUpload ? 'Re-upload Translation File' : 'Upload External Translation'}
+                      {hasPmUpload ? 'Re-upload Translation Files' : 'Upload External Translation'}
                     </h3>
+                    <p className="text-xs text-orange-600 mb-2">Multiple files allowed. Max 20MB per file.</p>
                     <div
                       className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-                        pmUploadFile ? 'border-orange-400 bg-orange-100' : 'border-orange-300 hover:border-orange-500'
+                        pmUploadFiles.length > 0 ? 'border-orange-400 bg-orange-100' : 'border-orange-300 hover:border-orange-500'
                       }`}
                       onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                       onDrop={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        const files = e.dataTransfer.files;
-                        if (files.length > 0) {
-                          const file = files[0];
-                          if (file.size > 20 * 1024 * 1024) {
-                            showToast('File too large. Maximum size is 20MB.');
-                            return;
+                        const droppedFiles = Array.from(e.dataTransfer.files);
+                        const validFiles = droppedFiles.filter(f => {
+                          if (f.size > 20 * 1024 * 1024) {
+                            showToast(`File "${f.name}" too large. Maximum 20MB per file.`);
+                            return false;
                           }
-                          setPmUploadFile(file);
-                        }
+                          return true;
+                        });
+                        if (validFiles.length > 0) setPmUploadFiles(prev => [...prev, ...validFiles]);
                       }}
                     >
-                      {pmUploadFile ? (
+                      {pmUploadFiles.length > 0 ? (
                         <div>
                           <div className="text-3xl mb-2">📎</div>
-                          <div className="text-sm font-medium text-orange-800">{pmUploadFile.name}</div>
-                          <div className="text-xs text-orange-600 mt-1">{(pmUploadFile.size / 1024).toFixed(1)} KB</div>
+                          <div className="text-sm font-medium text-orange-800">{pmUploadFiles.length} file(s) selected</div>
+                          <div className="mt-1 space-y-1">
+                            {pmUploadFiles.map((f, i) => (
+                              <div key={i} className="text-xs text-orange-700 flex items-center justify-center gap-2">
+                                <span>{f.name} ({(f.size / 1024).toFixed(1)} KB)</span>
+                                <button onClick={(e) => { e.stopPropagation(); setPmUploadFiles(prev => prev.filter((_, idx) => idx !== i)); }} className="text-red-500 hover:text-red-700 font-bold">x</button>
+                              </div>
+                            ))}
+                          </div>
                           <button
-                            onClick={() => setPmUploadFile(null)}
+                            onClick={() => setPmUploadFiles([])}
                             className="mt-2 text-xs text-red-500 hover:text-red-700 underline"
                           >
-                            Remove
+                            Remove All
                           </button>
                         </div>
                       ) : (
                         <div>
                           <div className="text-3xl mb-2">📤</div>
-                          <p className="text-sm text-orange-700 mb-1">Drag & drop your translation file here</p>
-                          <p className="text-xs text-orange-500">PDF, DOCX, TXT, XLSX (max 20MB)</p>
+                          <p className="text-sm text-orange-700 mb-1">Drag & drop your translation files here</p>
+                          <p className="text-xs text-orange-500">PDF, DOCX, TXT, XLSX (max 20MB per file)</p>
                         </div>
                       )}
                       <input
                         type="file"
                         accept=".pdf,.docx,.doc,.txt,.xlsx,.xls,.pptx,.rtf"
+                        multiple
                         onChange={(e) => {
-                          const file = e.target.files[0];
-                          if (file) {
-                            if (file.size > 20 * 1024 * 1024) {
-                              showToast('File too large. Maximum size is 20MB.');
-                              return;
+                          const newFiles = Array.from(e.target.files).filter(f => {
+                            if (f.size > 20 * 1024 * 1024) {
+                              showToast(`File "${f.name}" too large. Maximum 20MB per file.`);
+                              return false;
                             }
-                            setPmUploadFile(file);
-                          }
+                            return true;
+                          });
+                          if (newFiles.length > 0) setPmUploadFiles(prev => [...prev, ...newFiles]);
+                          e.target.value = '';
                         }}
                         className="hidden"
                         id="pm-upload-input"
                       />
-                      {!pmUploadFile && (
+                      {pmUploadFiles.length === 0 && (
                         <label
                           htmlFor="pm-upload-input"
                           className="mt-3 inline-block px-4 py-2 bg-orange-500 text-white text-sm rounded cursor-pointer hover:bg-orange-600 transition"
                         >
-                          Choose File
+                          Choose Files
+                        </label>
+                      )}
+                      {pmUploadFiles.length > 0 && (
+                        <label
+                          htmlFor="pm-upload-input"
+                          className="mt-2 inline-block px-3 py-1 bg-orange-400 text-white text-xs rounded cursor-pointer hover:bg-orange-500 transition"
+                        >
+                          + Add More Files
                         </label>
                       )}
                     </div>
 
-                    {pmUploadFile && (
+                    {pmUploadFiles.length > 0 && (
                       <button
                         onClick={() => uploadPmTranslation(selectedOrderId)}
                         disabled={pmUploadLoading}
@@ -9954,7 +10792,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             Uploading...
                           </>
                         ) : (
-                          'Upload & Send to Admin'
+                          `Upload ${pmUploadFiles.length} File(s) & Send to Admin`
                         )}
                       </button>
                     )}
@@ -9970,6 +10808,25 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       {activeSubTab === 'review' && (
         <div className="bg-white rounded shadow p-4">
           <h2 className="text-sm font-bold mb-2">📋 Review Translation</h2>
+
+          {/* Batch Translation Info Banner */}
+          {window.__batchTranslationFileInfo && window.__batchTranslationFileInfo.length > 0 && (
+            <div className="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-indigo-600 font-bold text-xs">📑 Batch Translation</span>
+                <span className="text-[10px] px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full">
+                  {window.__batchTranslationFileInfo.length} files
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {window.__batchTranslationFileInfo.map((file, idx) => (
+                  <span key={idx} className="text-[10px] px-2 py-1 bg-white border border-indigo-200 rounded text-indigo-700">
+                    {idx + 1}. {file.filename}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Upload Translation */}
           <div className="mb-4 p-3 bg-gray-50 rounded-lg border">
@@ -10507,6 +11364,25 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             )}
           </div>
 
+          {/* Batch Translation Info Banner */}
+          {window.__batchTranslationFileInfo && window.__batchTranslationFileInfo.length > 0 && (
+            <div className="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-indigo-600 font-bold text-xs">📑 Batch Translation</span>
+                <span className="text-[10px] px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full">
+                  {window.__batchTranslationFileInfo.length} files
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {window.__batchTranslationFileInfo.map((file, idx) => (
+                  <span key={idx} className="text-[10px] px-2 py-1 bg-white border border-indigo-200 rounded text-indigo-700">
+                    {idx + 1}. {file.filename}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           {translationResults.length > 0 ? (
             <>
               {/* Document selector */}
@@ -10806,13 +11682,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         Total: <strong>{proofreadingResult.total_erros || 0}</strong>
                       </span>
                       <span className="px-2 py-1 bg-red-100 text-red-700 rounded">
-                        Críticos: <strong>{proofreadingResult.criticos || 0}</strong>
+                        Critical: <strong>{proofreadingResult.criticos || 0}</strong>
                       </span>
                       <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">
-                        Altos: <strong>{proofreadingResult.altos || 0}</strong>
+                        High: <strong>{proofreadingResult.altos || 0}</strong>
                       </span>
                       <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded">
-                        Médios: <strong>{proofreadingResult.medios || 0}</strong>
+                        Medium: <strong>{proofreadingResult.medios || 0}</strong>
                       </span>
                       <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">
                         Baixos: <strong>{proofreadingResult.baixos || 0}</strong>
@@ -10839,9 +11715,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                 <th className="px-2 py-2 text-left font-medium text-gray-600">Severidade</th>
                                 <th className="px-2 py-2 text-left font-medium text-gray-600">Tipo</th>
                                 <th className="px-2 py-2 text-left font-medium text-gray-600">Original</th>
-                                <th className="px-2 py-2 text-left font-medium text-gray-600">Encontrado</th>
-                                <th className="px-2 py-2 text-left font-medium text-gray-600">Sugestão</th>
-                                <th className="px-2 py-2 text-center font-medium text-gray-600">Ação</th>
+                                <th className="px-2 py-2 text-left font-medium text-gray-600">Found</th>
+                                <th className="px-2 py-2 text-left font-medium text-gray-600">Suggestion</th>
+                                <th className="px-2 py-2 text-center font-medium text-gray-600">Action</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -10927,6 +11803,29 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         <p className="text-xs text-gray-600">{proofreadingResult.observacoes}</p>
                       </div>
                     )}
+
+                    {/* Correction Command - Send instructions to Claude to fix translation */}
+                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        📝 Send Command to Claude (correct/modify translation)
+                      </label>
+                      <div className="flex space-x-2">
+                        <input
+                          type="text"
+                          value={correctionCommand}
+                          onChange={(e) => setCorrectionCommand(e.target.value)}
+                          placeholder='e.g., "Fix formatting" or "Change word X to Y"'
+                          className="flex-1 px-2 py-1.5 text-xs border rounded"
+                        />
+                        <button
+                          onClick={handleApplyCorrection}
+                          disabled={!correctionCommand.trim() || applyingCorrection}
+                          className="px-3 py-1.5 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 disabled:bg-gray-300"
+                        >
+                          {applyingCorrection ? '⏳' : '✨ Apply'}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -14040,6 +14939,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     language_pair: ''
   });
   const [sendingAssignment, setSendingAssignment] = useState(false);
+  const [bulkInviteMode, setBulkInviteMode] = useState(false); // Toggle bulk invite mode
+  const [bulkSelectedTranslators, setBulkSelectedTranslators] = useState(new Set()); // Selected translator IDs for bulk
 
   // Quick Add Translator state (for PM)
   const [showQuickAddTranslator, setShowQuickAddTranslator] = useState(false);
@@ -14384,7 +15285,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       const documentType = DOCUMENT_TYPES.find(d => d.value === orderData.document_type)?.label || orderData.document_type || 'Document';
       const sourceLanguage = orderData.translate_from || orderData.source_language || 'Portuguese';
       const targetLanguage = orderData.translate_to || orderData.target_language || 'English';
-      const translationDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      const translationDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/New_York' });
 
       // Letterhead HTML
       const letterheadHTML = `
@@ -14564,6 +15465,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const openDeliveryModal = async (order) => {
     setDeliveryModalOrder(order);
     setDeliveryStatus('');
+    setDeliveryIncludeVerification(true); // Always reset to include verification page
     setShowDeliveryModal(true);
 
     // Fetch the translation HTML
@@ -15440,12 +16342,16 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   useEffect(() => {
     if (adminKey && (isAdmin || isPM)) {
       fetchNotifications();
-      fetchPartnerMessages();
       fetchTranslatorInbox();
+      if (isAdmin) {
+        fetchPartnerMessages();
+      }
       const interval = setInterval(() => {
         fetchNotifications();
-        fetchPartnerMessages();
         fetchTranslatorInbox();
+        if (isAdmin) {
+          fetchPartnerMessages();
+        }
       }, 30000); // Every 30 seconds
       return () => clearInterval(interval);
     }
@@ -15665,6 +16571,45 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     } catch (err) {
       console.error('Failed to assign translator:', err);
       showToast('Error sending assignment');
+    } finally {
+      setSendingAssignment(false);
+    }
+  };
+
+  // Send bulk invite to multiple translators - first to accept gets the project
+  const sendBulkAssignment = async () => {
+    if (bulkSelectedTranslators.size < 2) {
+      showToast('Select at least 2 translators for bulk invite');
+      return;
+    }
+    setSendingAssignment(true);
+    try {
+      let translatorDeadline = null;
+      if (assignmentDetails.due_date) {
+        translatorDeadline = `${assignmentDetails.due_date}T${assignmentDetails.due_time}:00`;
+      }
+
+      const response = await axios.post(
+        `${API}/admin/orders/${assigningTranslatorModal.id}/bulk-assign?admin_key=${adminKey}`,
+        {
+          translator_ids: Array.from(bulkSelectedTranslators),
+          translator_deadline: translatorDeadline,
+          project_notes: assignmentDetails.project_notes
+        }
+      );
+
+      if (response.data.success) {
+        const names = response.data.translator_names || [];
+        showToast(`Bulk invite sent to ${response.data.emails_sent} translators: ${names.join(', ')}. First to accept gets the project!`);
+        setAssigningTranslatorModal(null);
+        setBulkInviteMode(false);
+        setBulkSelectedTranslators(new Set());
+        fetchOrders();
+        fetchNotifications();
+      }
+    } catch (err) {
+      console.error('Failed to send bulk assignment:', err);
+      showToast('Error sending bulk invite: ' + (err.response?.data?.detail || err.message));
     } finally {
       setSendingAssignment(false);
     }
@@ -15956,8 +16901,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         </div>
       )}
 
-      {/* Partner Messages Bell - Discreet message indicator */}
-      {partnerMessages.filter(m => !m.read).length > 0 && (
+      {/* Partner Messages Bell - Discreet message indicator (admin only) */}
+      {isAdmin && partnerMessages.filter(m => !m.read).length > 0 && (
         <div className="fixed bottom-4 right-4 z-40">
           <button
             onClick={() => setShowPartnerMessages(!showPartnerMessages)}
@@ -16192,12 +17137,12 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       {assigningTranslatorModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
-            <div className="p-4 border-b flex justify-between items-center bg-blue-600 text-white rounded-t-lg">
+            <div className={`p-4 border-b flex justify-between items-center ${bulkInviteMode ? 'bg-purple-600' : 'bg-blue-600'} text-white rounded-t-lg`}>
               <div>
-                <h3 className="font-bold">👤 Assign Translator</h3>
+                <h3 className="font-bold">{bulkInviteMode ? '📢 Bulk Invite Translators' : '👤 Assign Translator'}</h3>
                 <p className="text-xs opacity-80">{assigningTranslatorModal.order_number} - {assigningTranslatorModal.client_name}</p>
               </div>
-              <button onClick={() => setAssigningTranslatorModal(null)} className="text-white hover:text-gray-200 text-xl">×</button>
+              <button onClick={() => { setAssigningTranslatorModal(null); setBulkInviteMode(false); setBulkSelectedTranslators(new Set()); }} className="text-white hover:text-gray-200 text-xl">×</button>
             </div>
 
             <div className="p-4 space-y-4">
@@ -16215,34 +17160,112 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 </div>
               </div>
 
-              {/* Select Translator */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Select Translator *</label>
-                <select
-                  value={assignmentDetails.translator_id}
-                  onChange={(e) => setAssignmentDetails({...assignmentDetails, translator_id: e.target.value})}
-                  className="w-full px-3 py-2 border rounded text-sm"
+              {/* Mode Toggle: Single vs Bulk */}
+              <div className="flex items-center gap-2 p-2 bg-gray-100 rounded-lg">
+                <button
+                  onClick={() => { setBulkInviteMode(false); setBulkSelectedTranslators(new Set()); }}
+                  className={`flex-1 px-3 py-1.5 text-xs rounded-md transition-all ${
+                    !bulkInviteMode ? 'bg-blue-600 text-white shadow' : 'text-gray-600 hover:bg-gray-200'
+                  }`}
                 >
-                  <option value="">-- Choose Translator --</option>
-                  {/* Option for admin to assign to themselves */}
-                  {user?.role === 'admin' && (
-                    <option value="self" className="font-medium bg-blue-50">
-                      👤 Myself ({user?.name || 'Admin'}) - No email notification
-                    </option>
-                  )}
-                  {translatorList.filter(t => t.is_active !== false).map(t => (
-                    <option key={t.id} value={t.id}>
-                      {t.name} {t.language_pairs ? `(${t.language_pairs})` : ''} {t.rate_per_page ? `- $${t.rate_per_page}/pg` : ''} {t.invitation_pending ? '(pending)' : ''}
-                    </option>
-                  ))}
-                </select>
-                {translatorList.length === 0 && (
-                  <p className="text-[10px] text-blue-600 mt-1">No translators found. Register translators in the Users tab first.</p>
-                )}
-                {translatorList.length > 0 && translatorList.filter(t => t.is_active !== false).length === 0 && (
-                  <p className="text-[10px] text-blue-600 mt-1">All translators are inactive. They need to accept their invitation first.</p>
-                )}
+                  👤 Single Assign
+                </button>
+                <button
+                  onClick={() => { setBulkInviteMode(true); setAssignmentDetails({...assignmentDetails, translator_id: ''}); }}
+                  className={`flex-1 px-3 py-1.5 text-xs rounded-md transition-all ${
+                    bulkInviteMode ? 'bg-purple-600 text-white shadow' : 'text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  📢 Bulk Invite
+                </button>
               </div>
+
+              {bulkInviteMode ? (
+                <>
+                  {/* Bulk Invite - Checkbox list */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-medium text-gray-700">Select Translators * (min 2)</label>
+                      <span className="text-[10px] text-purple-600 font-medium">{bulkSelectedTranslators.size} selected</span>
+                    </div>
+                    <div className="max-h-48 overflow-y-auto border rounded p-2 space-y-1">
+                      {translatorList.filter(t => t.is_active !== false).map(t => (
+                        <label
+                          key={t.id}
+                          className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
+                            bulkSelectedTranslators.has(t.id) ? 'bg-purple-50 border border-purple-200' : 'hover:bg-gray-50'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={bulkSelectedTranslators.has(t.id)}
+                            onChange={() => {
+                              setBulkSelectedTranslators(prev => {
+                                const next = new Set(prev);
+                                if (next.has(t.id)) next.delete(t.id);
+                                else next.add(t.id);
+                                return next;
+                              });
+                            }}
+                            className="w-4 h-4 text-purple-600 rounded border-gray-300 focus:ring-purple-500"
+                          />
+                          <div className="flex-1">
+                            <span className="text-sm font-medium">{t.name}</span>
+                            {t.language_pairs && <span className="text-[10px] text-gray-500 ml-1">({t.language_pairs})</span>}
+                            {t.rate_per_page && <span className="text-[10px] text-green-600 ml-1">${t.rate_per_page}/pg</span>}
+                          </div>
+                        </label>
+                      ))}
+                      {translatorList.filter(t => t.is_active !== false).length === 0 && (
+                        <p className="text-xs text-gray-500 text-center py-2">No active translators found.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Info - Bulk */}
+                  <div className="p-2 bg-purple-50 rounded text-xs text-purple-700">
+                    <span className="font-medium">📢 Bulk Invite:</span> All selected translators will receive an email invite. The <strong>first translator to accept</strong> gets the project. Others will be notified it is no longer available.
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Single Assign - Original dropdown */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Select Translator *</label>
+                    <select
+                      value={assignmentDetails.translator_id}
+                      onChange={(e) => setAssignmentDetails({...assignmentDetails, translator_id: e.target.value})}
+                      className="w-full px-3 py-2 border rounded text-sm"
+                    >
+                      <option value="">-- Choose Translator --</option>
+                      {user?.role === 'admin' && (
+                        <option value="self" className="font-medium bg-blue-50">
+                          👤 Myself ({user?.name || 'Admin'}) - No email notification
+                        </option>
+                      )}
+                      {translatorList.filter(t => t.is_active !== false).map(t => (
+                        <option key={t.id} value={t.id}>
+                          {t.name} {t.language_pairs ? `(${t.language_pairs})` : ''} {t.rate_per_page ? `- $${t.rate_per_page}/pg` : ''} {t.invitation_pending ? '(pending)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                    {translatorList.length === 0 && (
+                      <p className="text-[10px] text-blue-600 mt-1">No translators found. Register translators in the Users tab first.</p>
+                    )}
+                  </div>
+
+                  {/* Info - Single */}
+                  {assignmentDetails.translator_id === 'self' ? (
+                    <div className="p-2 bg-green-50 rounded text-xs text-green-700">
+                      <span className="font-medium">👤 Self Assignment:</span> The project will be assigned directly to you. No email will be sent.
+                    </div>
+                  ) : (
+                    <div className="p-2 bg-blue-50 rounded text-xs text-blue-700">
+                      <span className="font-medium">📧 Email Invitation:</span> The translator will receive an email with accept/decline links. You will be notified of their response.
+                    </div>
+                  )}
+                </>
+              )}
 
               {/* Translator Deadline - When translator must return */}
               <div className="grid grid-cols-2 gap-3">
@@ -16277,33 +17300,32 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   placeholder="Special instructions for the translator..."
                 />
               </div>
-
-              {/* Info */}
-              {assignmentDetails.translator_id === 'self' ? (
-                <div className="p-2 bg-green-50 rounded text-xs text-green-700">
-                  <span className="font-medium">👤 Self Assignment:</span> The project will be assigned directly to you. No email will be sent.
-                </div>
-              ) : (
-                <div className="p-2 bg-blue-50 rounded text-xs text-blue-700">
-                  <span className="font-medium">📧 Email Invitation:</span> The translator will receive an email with accept/decline links. You will be notified of their response.
-                </div>
-              )}
             </div>
 
             <div className="p-3 border-t bg-gray-50 flex justify-end gap-2 rounded-b-lg">
               <button
-                onClick={() => setAssigningTranslatorModal(null)}
+                onClick={() => { setAssigningTranslatorModal(null); setBulkInviteMode(false); setBulkSelectedTranslators(new Set()); }}
                 className="px-4 py-1.5 text-gray-600 text-sm hover:text-gray-800"
               >
                 Cancel
               </button>
-              <button
-                onClick={sendTranslatorAssignment}
-                disabled={sendingAssignment || !assignmentDetails.translator_id}
-                className="px-4 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:bg-gray-400"
-              >
-                {sendingAssignment ? 'Sending...' : (assignmentDetails.translator_id === 'self' ? '✅ Assign to Myself' : '📤 Send Invitation')}
-              </button>
+              {bulkInviteMode ? (
+                <button
+                  onClick={sendBulkAssignment}
+                  disabled={sendingAssignment || bulkSelectedTranslators.size < 2}
+                  className="px-4 py-1.5 bg-purple-600 text-white rounded text-sm hover:bg-purple-700 disabled:bg-gray-400"
+                >
+                  {sendingAssignment ? 'Sending...' : `📢 Send Bulk Invite (${bulkSelectedTranslators.size})`}
+                </button>
+              ) : (
+                <button
+                  onClick={sendTranslatorAssignment}
+                  disabled={sendingAssignment || !assignmentDetails.translator_id}
+                  className="px-4 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:bg-gray-400"
+                >
+                  {sendingAssignment ? 'Sending...' : (assignmentDetails.translator_id === 'self' ? '✅ Assign to Myself' : '📤 Send Invitation')}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -16965,8 +17987,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               {/* PM column - Admin only */}
               {isAdmin && <th className="px-3 py-3 text-left font-semibold text-gray-700">PM</th>}
               <th className="px-3 py-3 text-left font-semibold text-gray-700">Translator</th>
-              <th className="px-3 py-3 text-left font-semibold text-gray-700" title="Prazo do Tradutor - Data de retorno da tradução (EST)">TR Deadline <span className="text-xs font-normal text-gray-400">(EST)</span></th>
-              <th className="px-3 py-3 text-left font-semibold text-gray-700" title="Prazo do Cliente - Data de entrega ao cliente (EST)">Client Deadline <span className="text-xs font-normal text-gray-400">(EST)</span></th>
+              <th className="px-3 py-3 text-left font-semibold text-gray-700" title="Translator Deadline - Translation return date (EST)">TR Deadline <span className="text-xs font-normal text-gray-400">(EST)</span></th>
+              <th className="px-3 py-3 text-left font-semibold text-gray-700" title="Client Deadline - Delivery date to client (EST)">Client Deadline <span className="text-xs font-normal text-gray-400">(EST)</span></th>
               <th className="px-3 py-3 text-left font-semibold text-gray-700">Status</th>
               {/* Translation Ready column - shows when translation is complete */}
               <th className="px-3 py-3 text-center font-semibold text-gray-700">Translation</th>
@@ -17255,7 +18277,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           </span>
                         )}
                       </div>
-                    ) : ['review', 'ready', 'delivered'].includes(order.translation_status) ? (
+                    ) : ['review', 'ready'].includes(order.translation_status) ? (
                       <span className="px-2 py-1 bg-blue-50 text-blue-600 rounded text-xs font-medium border border-blue-200 flex items-center gap-1">
                         <RefreshIcon className="w-3 h-3" /> Review
                       </span>
@@ -17866,7 +18888,26 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         <tr className="border-b">
                           <td className="py-2 font-medium text-gray-600">Translator</td>
                           <td className="py-2">
-                            {viewingOrder.assigned_translator_name || viewingOrder.assigned_translator || '-'}
+                            {(() => {
+                              const names = [];
+                              if (viewingOrder.assigned_translator_name || viewingOrder.assigned_translator) {
+                                names.push(viewingOrder.assigned_translator_name || viewingOrder.assigned_translator);
+                              }
+                              if (viewingOrder.file_translator_names && viewingOrder.file_translator_names.length > 0) {
+                                for (const n of viewingOrder.file_translator_names) {
+                                  if (n && !names.includes(n)) names.push(n);
+                                }
+                              }
+                              if (names.length > 1) {
+                                return (
+                                  <span>
+                                    <span className="font-bold text-purple-700">MULTIPLE ({names.length})</span>
+                                    <span className="ml-1 text-xs text-gray-500">({names.join(', ')})</span>
+                                  </span>
+                                );
+                              }
+                              return names[0] || '-';
+                            })()}
                             {viewingOrder.translator_assignment_status && (
                               <span
                                 onClick={() => {
@@ -18054,7 +19095,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                 <button
                                   onClick={() => deleteOrderDocument(doc.id, doc.filename)}
                                   className="px-2 py-1.5 bg-red-500 text-white rounded text-xs hover:bg-red-600"
-                                  title="Excluir documento"
+                                  title="Delete document"
                                 >
                                   🗑️
                                 </button>
@@ -18216,15 +19257,16 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                     }
                                   }}
                                   className="w-4 h-4 mr-3 text-purple-600 bg-white border-gray-300 rounded focus:ring-purple-500 cursor-pointer"
-                                  title="Selecionar para enviar ao cliente"
+                                  title="Select to send to client"
                                 />
                               )}
                               <span className="text-2xl mr-3">📗</span>
                               <div>
                                 <div className="text-sm font-medium text-green-800">{doc.filename || 'Translated Document'}</div>
                                 <div className="text-[10px] text-green-600">
-                                  Approved translation
+                                  {doc.uploaded_by === 'pm' ? 'PM upload' : doc.uploaded_by === 'workspace' ? 'Workspace' : doc.uploaded_by === 'translator' ? 'Translator' : 'Translation'}
                                   {doc.uploaded_at && ` • ${new Date(doc.uploaded_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}`}
+                                  {doc.file_size && ` • ${(doc.file_size / 1024).toFixed(1)} KB`}
                                 </div>
                               </div>
                             </div>
@@ -18256,27 +19298,27 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                               <div className="flex flex-col gap-2">
                                 <button
                                   onClick={async () => {
-                                    if (confirm('Aceitar esta tradução e marcar como pronta para envio?')) {
+                                    if (confirm('Accept this translation and mark as ready for delivery?')) {
                                       try {
                                         await axios.put(`${API}/admin/orders/${viewingOrder.id}?admin_key=${adminKey}`, {
                                           translation_status: 'ready',
                                           translation_ready_at: new Date().toISOString()
                                         });
-                                        showToast('Tradução aceita! Agora você pode enviar para o cliente.');
+                                        showToast('Translation accepted! You can now deliver to the client.');
                                         setViewingOrder(prev => ({ ...prev, translation_status: 'ready' }));
                                         fetchOrders();
                                       } catch (err) {
                                         console.error('Failed to update status:', err);
-                                        showToast('Erro ao atualizar status');
+                                        showToast('Error updating status');
                                       }
                                     }
                                   }}
                                   className="w-full px-4 py-3 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg flex items-center justify-center gap-2 transition-colors"
                                 >
-                                  ✅ Aceitar Tradução
+                                  ✅ Accept Translation
                                 </button>
                                 <p className="text-[10px] text-gray-500 text-center">
-                                  Após aceitar, você poderá enviar o email ao cliente com a tradução
+                                  After accepting, you can send the email to the client with the translation
                                 </p>
                               </div>
                             )}
@@ -18287,8 +19329,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                 <div className="flex items-center gap-2 mb-2">
                                   <span className="text-2xl">📧</span>
                                   <div>
-                                    <div className="text-sm font-medium text-purple-800">Tradução Aceita!</div>
-                                    <div className="text-[10px] text-purple-600">Pronto para enviar ao cliente</div>
+                                    <div className="text-sm font-medium text-purple-800">Translation Accepted!</div>
+                                    <div className="text-[10px] text-purple-600">Ready to send to client</div>
                                   </div>
                                 </div>
                                 <div className="flex flex-col gap-2">
@@ -18296,9 +19338,9 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                   <div className="flex items-center justify-between text-xs text-purple-700 bg-purple-100 px-2 py-1 rounded">
                                     <span>
                                       {selectedDocsForDelivery.length > 0 ? (
-                                        <span>{selectedDocsForDelivery.length} arquivo(s) selecionado(s) para envio</span>
+                                        <span>{selectedDocsForDelivery.length} file(s) selected for delivery</span>
                                       ) : (
-                                        <span className="text-orange-600">Selecione os arquivos acima para enviar</span>
+                                        <span className="text-orange-600">Select files above to send</span>
                                       )}
                                     </span>
                                     <div className="flex gap-1">
@@ -18330,7 +19372,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                   <button
                                     onClick={async () => {
                                       if (selectedDocsForDelivery.length === 0) {
-                                        showToast('Por favor, selecione pelo menos um arquivo para enviar ao cliente.');
+                                        showToast('Please select at least one file to send to the client.');
                                         return;
                                       }
                                       const bccInput = document.getElementById('bcc-email-input');
@@ -18340,7 +19382,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                         .map(d => d.filename)
                                         .join('\n  - ');
 
-                                      if (confirm(`Enviar tradução para ${viewingOrder.client_email}?\n\nArquivos selecionados:\n  - ${selectedFilenames}${bccEmail ? `\n\nCópia (BCC): ${bccEmail}` : ''}`)) {
+                                      if (confirm(`Send translation to ${viewingOrder.client_email}?\n\nSelected files:\n  - ${selectedFilenames}${bccEmail ? `\n\nCopy (BCC): ${bccEmail}` : ''}`)) {
                                         try {
                                           await axios.post(`${API}/admin/orders/${viewingOrder.id}/deliver?admin_key=${adminKey}`, {
                                             bcc_email: bccEmail,
@@ -18355,12 +19397,12 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                               additional_document_ids: selectedDocsForDelivery
                                             }
                                           });
-                                          showToast(`Tradução enviada para o cliente!\n\n${selectedDocsForDelivery.length} arquivo(s) enviado(s).` + (bccEmail ? `\n\nCópia (BCC): ${bccEmail}` : ''));
+                                          showToast(`Translation sent to client!\n\n${selectedDocsForDelivery.length} file(s) delivered.` + (bccEmail ? `\n\nCopy (BCC): ${bccEmail}` : ''));
                                           setViewingOrder(prev => ({ ...prev, translation_status: 'delivered' }));
                                           fetchOrders();
                                         } catch (err) {
                                           console.error('Failed to deliver:', err);
-                                          showToast('Erro ao enviar para o cliente');
+                                          showToast('Error delivering to client');
                                         }
                                       }
                                     }}
@@ -18375,7 +19417,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                     Enviar Email ao Cliente
                                   </button>
                                   <div className="text-[10px] text-purple-600 text-center">
-                                    Será enviado para: <strong>{viewingOrder.client_email}</strong>
+                                    Will be sent to: <strong>{viewingOrder.client_email}</strong>
                                   </div>
                                 </div>
                               </div>
@@ -18443,12 +19485,35 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   </div>
 
                   {/* Translator Assignment Status */}
-                  {(viewingOrder.assigned_translator_name || viewingOrder.assigned_translator) && (
+                  {(viewingOrder.assigned_translator_name || viewingOrder.assigned_translator || (viewingOrder.file_translator_names && viewingOrder.file_translator_names.length > 0)) && (
                     <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
                       <div className="text-xs font-medium text-blue-700 mb-2">Translator Assignment</div>
                       <div className="flex items-center justify-between">
                         <div>
-                          <div className="text-sm">{viewingOrder.assigned_translator_name || viewingOrder.assigned_translator}</div>
+                          {(() => {
+                            const names = [];
+                            if (viewingOrder.assigned_translator_name || viewingOrder.assigned_translator) {
+                              names.push(viewingOrder.assigned_translator_name || viewingOrder.assigned_translator);
+                            }
+                            if (viewingOrder.file_translator_names && viewingOrder.file_translator_names.length > 0) {
+                              for (const n of viewingOrder.file_translator_names) {
+                                if (n && !names.includes(n)) names.push(n);
+                              }
+                            }
+                            if (names.length > 1) {
+                              return (
+                                <div>
+                                  <div className="text-sm font-bold text-purple-700">MULTIPLE ({names.length})</div>
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {names.map((n, i) => (
+                                      <span key={i} className="text-[10px] px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded border border-purple-200">{n}</span>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return <div className="text-sm">{names[0] || '-'}</div>;
+                          })()}
                           <div className={`text-xs mt-1 ${
                             viewingOrder.translator_assignment_status === 'accepted' ? 'text-green-600' :
                             viewingOrder.translator_assignment_status === 'declined' ? 'text-red-600' :
@@ -19655,7 +20720,7 @@ const FollowupsPage = ({ adminKey }) => {
       showToast(`Follow-up automatico ${newEnabled ? 'ativado' : 'desativado'}`);
       fetchFollowupStatus();
     } catch (err) {
-      showToast('Erro ao alterar follow-up automatico');
+      showToast('Error changing automatic follow-up');
       console.error(err);
     } finally {
       setTogglingAuto(false);
@@ -19670,7 +20735,7 @@ const FollowupsPage = ({ adminKey }) => {
       await axios.post(`${API}/admin/quotes/exclude-from-followup?admin_key=${adminKey}&quote_id=${quoteId}&quote_type=${quoteType}`);
       fetchFollowupStatus();
     } catch (err) {
-      showToast('Erro ao excluir cliente do follow-up');
+      showToast('Error removing client from follow-up');
       console.error(err);
     }
   };
@@ -20002,7 +21067,7 @@ const FollowupsPage = ({ adminKey }) => {
               </div>
               <div className="p-6 overflow-y-auto max-h-[60vh]">
                 {getClientsForStage(selectedStage).length === 0 ? (
-                  <p className="text-center text-gray-500 py-8">Nenhum cliente nesta categoria</p>
+                  <p className="text-center text-gray-500 py-8">No clients in this category</p>
                 ) : (
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50">
@@ -20032,9 +21097,9 @@ const FollowupsPage = ({ adminKey }) => {
                             <button
                               onClick={() => excludeFromFollowup(client.id, client.type)}
                               className="px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 text-xs font-medium"
-                              title="Remover do follow-up automatico"
+                              title="Remove from automatic follow-up"
                             >
-                              Excluir
+                              Remove
                             </button>
                           </td>
                         </tr>
@@ -20048,7 +21113,7 @@ const FollowupsPage = ({ adminKey }) => {
                   onClick={() => setShowModal(false)}
                   className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
                 >
-                  Fechar
+                  Close
                 </button>
               </div>
             </div>
@@ -21860,7 +22925,7 @@ const UsersPage = ({ adminKey, user }) => {
 
   // Delete document
   const handleDeleteDocument = async (userId, docId) => {
-    if (!window.confirm('Excluir este document?')) return;
+    if (!window.confirm('Delete this document?')) return;
     try {
       await axios.delete(`${API}/admin/users/${userId}/documents/${docId}?admin_key=${adminKey}`);
       await fetchUserDocuments(userId);
@@ -22193,7 +23258,7 @@ const UsersPage = ({ adminKey, user }) => {
                       onClick={() => toggleExpandUser(u.id)}
                       className="text-blue-600 hover:text-blue-800 text-xs"
                     >
-                      {expandedUser === u.id ? 'Fechar' : 'Ver Perfil'}
+                      {expandedUser === u.id ? 'Close' : 'View Profile'}
                     </button>
                     {u.invitation_pending && (
                       <button
@@ -22248,13 +23313,13 @@ const UsersPage = ({ adminKey, user }) => {
                                   disabled={savingUser}
                                   className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-400"
                                 >
-                                  {savingUser ? '⏳...' : '✓ Salvar'}
+                                  {savingUser ? '⏳...' : '✓ Save'}
                                 </button>
                                 <button
                                   onClick={cancelEditUser}
                                   className="px-2 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600"
                                 >
-                                  ✕ Cancelar
+                                  ✕ Cancel
                                 </button>
                               </div>
                             )}
@@ -23076,13 +24141,491 @@ const ProductionPage = ({ adminKey }) => {
   );
 };
 
+// ==================== EXPENSES PAGE ====================
+const ExpensesPage = ({ adminKey }) => {
+  const [expenses, setExpenses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showExpenseModal, setShowExpenseModal] = useState(false);
+  const [expenseReceiptFile, setExpenseReceiptFile] = useState(null);
+  const [expenseReceiptPreview, setExpenseReceiptPreview] = useState(null);
+  const [translators, setTranslators] = useState([]);
+  const [vendorError, setVendorError] = useState(null);
+  const [expenseForm, setExpenseForm] = useState({
+    category: 'fixed',
+    subcategory: '',
+    description: '',
+    amount: 0,
+    date: new Date().toISOString().split('T')[0],
+    is_recurring: false,
+    recurring_period: '',
+    vendor: '',
+    vendor_id: '',
+    notes: ''
+  });
+
+  const EXPENSE_CATEGORIES = {
+    fixed: { label: 'Fixed Expenses', color: '#3B82F6' },
+    translators: { label: 'Translators', color: '#10B981' },
+    ai: { label: 'AI & Technology', color: '#8B5CF6' },
+    marketing: { label: 'Marketing', color: '#F59E0B' },
+    office: { label: 'Office', color: '#EF4444' },
+    utilities: { label: 'Utilities', color: '#06B6D4' },
+    other: { label: 'Other', color: '#6B7280' }
+  };
+
+  const fetchExpenses = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/expenses?admin_key=${adminKey}`);
+      setExpenses(response.data.expenses || []);
+    } catch (err) {
+      console.error('Error fetching expenses:', err);
+    }
+  };
+
+  const fetchTranslatorsForPayment = async () => {
+    try {
+      setVendorError(null);
+      const response = await axios.get(`${API}/admin/payments/translators?admin_key=${adminKey}`);
+      const vendorsList = response.data?.translators || response.data || [];
+      setTranslators(vendorsList);
+    } catch (err) {
+      console.error('Error fetching translators:', err);
+      const errorMsg = err.response?.data?.detail || err.message || 'Failed to fetch vendors';
+      setVendorError(`Error ${err.response?.status || ''}: ${errorMsg}`);
+      setTranslators([]);
+    }
+  };
+
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      await Promise.all([fetchExpenses(), fetchTranslatorsForPayment()]);
+      setLoading(false);
+    };
+    loadData();
+  }, [adminKey]);
+
+  const handleExpenseReceiptChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'application/pdf'];
+      if (!allowedTypes.includes(file.type)) {
+        showToast('Please upload an image (PNG, JPG, GIF) or PDF file');
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        showToast('File size must be less than 10MB');
+        return;
+      }
+      setExpenseReceiptFile(file);
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (e) => setExpenseReceiptPreview(e.target.result);
+        reader.readAsDataURL(file);
+      } else {
+        setExpenseReceiptPreview(null);
+      }
+    }
+  };
+
+  const handleCreateExpense = async (e) => {
+    e.preventDefault();
+    try {
+      const formData = new FormData();
+      formData.append('category', expenseForm.category);
+      formData.append('subcategory', expenseForm.subcategory || '');
+      formData.append('description', expenseForm.description);
+      formData.append('amount', parseFloat(expenseForm.amount) || 0);
+      formData.append('date', expenseForm.date);
+      formData.append('is_recurring', expenseForm.is_recurring);
+      formData.append('recurring_period', expenseForm.recurring_period || '');
+      formData.append('vendor', expenseForm.vendor);
+      formData.append('vendor_id', expenseForm.vendor_id || '');
+      formData.append('notes', expenseForm.notes || '');
+      if (expenseReceiptFile) {
+        formData.append('receipt_file', expenseReceiptFile);
+      }
+
+      await axios.post(`${API}/admin/expenses?admin_key=${adminKey}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setShowExpenseModal(false);
+      setExpenseForm({
+        category: 'fixed', subcategory: '', description: '', amount: 0,
+        date: new Date().toISOString().split('T')[0], is_recurring: false,
+        recurring_period: '', vendor: '', vendor_id: '', notes: ''
+      });
+      setExpenseReceiptFile(null);
+      setExpenseReceiptPreview(null);
+      fetchExpenses();
+      showToast('Expense created successfully!');
+    } catch (err) {
+      console.error('Error creating expense:', err);
+      showToast('Error creating expense: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const handleDeleteExpense = async (expenseId) => {
+    if (!window.confirm('Delete this expense?')) return;
+    try {
+      await axios.delete(`${API}/admin/expenses/${expenseId}?admin_key=${adminKey}`);
+      fetchExpenses();
+    } catch (err) {
+      showToast('Error deleting expense');
+    }
+  };
+
+  const handleViewExpenseReceipt = async (expenseId, filename) => {
+    try {
+      const response = await axios.get(`${API}/admin/expenses/${expenseId}/receipt?admin_key=${adminKey}`);
+      const { receipt_file_data, receipt_file_type, receipt_filename } = response.data;
+
+      const byteCharacters = atob(receipt_file_data);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: receipt_file_type });
+      const url = URL.createObjectURL(blob);
+
+      const newWindow = window.open(url, '_blank');
+      if (newWindow) {
+        newWindow.document.title = receipt_filename || 'Receipt';
+      }
+    } catch (err) {
+      console.error('Error fetching receipt:', err);
+      showToast('Error loading receipt: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const handleDownloadExpenseReceipt = async (expenseId) => {
+    try {
+      const response = await axios.get(`${API}/admin/expenses/${expenseId}/receipt?admin_key=${adminKey}`);
+      const { receipt_file_data, receipt_file_type, receipt_filename } = response.data;
+
+      const link = document.createElement('a');
+      link.href = `data:${receipt_file_type};base64,${receipt_file_data}`;
+      link.download = receipt_filename || 'receipt';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('Error downloading receipt:', err);
+      showToast('Error downloading receipt: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const handleUploadExpenseReceipt = async (expenseId, file) => {
+    if (!file) return;
+
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'application/pdf'];
+    if (!allowedTypes.includes(file.type)) {
+      showToast('Please upload an image (PNG, JPG, GIF) or PDF file');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      showToast('File size must be less than 10MB');
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('receipt', file);
+
+      await axios.post(
+        `${API}/admin/expenses/${expenseId}/upload-receipt?admin_key=${adminKey}`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
+
+      showToast('Receipt uploaded successfully!');
+      fetchExpenses();
+    } catch (err) {
+      console.error('Error uploading receipt:', err);
+      showToast('Error uploading receipt: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
+  };
+
+  const formatDate = (dateStr) => {
+    return formatDateLocal(dateStr);
+  };
+
+  if (loading) return <div className="p-6 text-center">Loading expenses data...</div>;
+
+  return (
+    <div className="p-6">
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-xl font-bold text-gray-800">💸 Expenses</h1>
+      </div>
+
+      {/* Expenses List */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="p-4 border-b flex justify-between items-center">
+          <h3 className="font-bold text-gray-800">Expenses List</h3>
+          <button
+            onClick={() => setShowExpenseModal(true)}
+            className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+          >
+            + New Expense
+          </button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">Date</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">Category</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">Description</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">Vendor</th>
+                <th className="px-4 py-3 text-right font-medium text-gray-600">Amount</th>
+                <th className="px-4 py-3 text-center font-medium text-gray-600">Receipt</th>
+                <th className="px-4 py-3 text-center font-medium text-gray-600">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {expenses.length === 0 ? (
+                <tr><td colSpan="7" className="px-4 py-8 text-center text-gray-500">No expenses registered</td></tr>
+              ) : (
+                expenses.map((expense) => (
+                  <tr key={expense.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3">{formatDate(expense.date)}</td>
+                    <td className="px-4 py-3">
+                      <span className="px-2 py-1 rounded text-xs" style={{
+                        backgroundColor: `${EXPENSE_CATEGORIES[expense.category]?.color}20`,
+                        color: EXPENSE_CATEGORIES[expense.category]?.color
+                      }}>
+                        {EXPENSE_CATEGORIES[expense.category]?.label || expense.category}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">{expense.description}</td>
+                    <td className="px-4 py-3 text-gray-500">{expense.vendor || '-'}</td>
+                    <td className="px-4 py-3 text-right font-medium text-red-600">{formatCurrency(expense.amount)}</td>
+                    <td className="px-4 py-3 text-center">
+                      {expense.has_receipt ? (
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => handleViewExpenseReceipt(expense.id, expense.receipt_filename)}
+                            className="text-blue-600 hover:text-blue-800 text-xs"
+                            title="View receipt"
+                          >
+                            View
+                          </button>
+                          <button
+                            onClick={() => handleDownloadExpenseReceipt(expense.id)}
+                            className="text-green-600 hover:text-green-800 text-xs"
+                            title="Download receipt"
+                          >
+                            Download
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="cursor-pointer text-blue-600 hover:text-blue-800 text-xs">
+                          Upload
+                          <input
+                            type="file"
+                            accept="image/*,.pdf"
+                            className="hidden"
+                            onChange={(e) => handleUploadExpenseReceipt(expense.id, e.target.files[0])}
+                          />
+                        </label>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <button onClick={() => handleDeleteExpense(expense.id)} className="text-red-600 hover:text-red-800">Delete</button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Expense Modal */}
+      {showExpenseModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
+            <div className="p-4 border-b flex justify-between items-center flex-shrink-0">
+              <h3 className="font-bold text-gray-800">New Expense</h3>
+              <button onClick={() => setShowExpenseModal(false)} className="text-gray-500 hover:text-gray-700">✕</button>
+            </div>
+            <form onSubmit={handleCreateExpense} className="p-4 space-y-4 overflow-y-auto flex-1">
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Category</label>
+                <select
+                  value={expenseForm.category}
+                  onChange={(e) => setExpenseForm({...expenseForm, category: e.target.value})}
+                  className="w-full px-3 py-2 border rounded text-sm"
+                  required
+                >
+                  {Object.entries(EXPENSE_CATEGORIES).map(([key, { label }]) => (
+                    <option key={key} value={key}>{label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Description</label>
+                <input
+                  type="text"
+                  value={expenseForm.description}
+                  onChange={(e) => setExpenseForm({...expenseForm, description: e.target.value})}
+                  className="w-full px-3 py-2 border rounded text-sm"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Amount ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={expenseForm.amount}
+                    onChange={(e) => setExpenseForm({...expenseForm, amount: parseFloat(e.target.value) || 0})}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Date</label>
+                  <input
+                    type="date"
+                    value={expenseForm.date}
+                    onChange={(e) => setExpenseForm({...expenseForm, date: e.target.value})}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                    required
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Vendor (optional)</label>
+                <select
+                  value={expenseForm.vendor_id}
+                  onChange={(e) => {
+                    const selectedVendor = translators.find(t => (t.translator_id || t._id) === e.target.value);
+                    setExpenseForm({
+                      ...expenseForm,
+                      vendor_id: e.target.value,
+                      vendor: selectedVendor ? selectedVendor.name : ''
+                    });
+                  }}
+                  className="w-full px-3 py-2 border rounded text-sm"
+                >
+                  <option value="">Select vendor...</option>
+                  {translators.map(t => (
+                    <option key={t.translator_id || t._id} value={t.translator_id || t._id}>
+                      {t.name} ({t.role === 'translator' ? 'Translator' : t.role === 'pm' ? 'PM' : t.role === 'admin' ? 'Admin' : t.role || 'Vendor'})
+                    </option>
+                  ))}
+                </select>
+                {!expenseForm.vendor_id && (
+                  <input
+                    type="text"
+                    value={expenseForm.vendor}
+                    onChange={(e) => setExpenseForm({...expenseForm, vendor: e.target.value})}
+                    className="w-full px-3 py-2 border rounded text-sm mt-2"
+                    placeholder="Or type vendor name manually..."
+                  />
+                )}
+              </div>
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={expenseForm.is_recurring}
+                  onChange={(e) => setExpenseForm({...expenseForm, is_recurring: e.target.checked})}
+                  className="mr-2"
+                />
+                <label className="text-sm text-gray-600">Recurring expense</label>
+              </div>
+              {expenseForm.is_recurring && (
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Period</label>
+                  <select
+                    value={expenseForm.recurring_period}
+                    onChange={(e) => setExpenseForm({...expenseForm, recurring_period: e.target.value})}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  >
+                    <option value="">Select...</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="yearly">Yearly</option>
+                  </select>
+                </div>
+              )}
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Notes (optional)</label>
+                <textarea
+                  value={expenseForm.notes}
+                  onChange={(e) => setExpenseForm({...expenseForm, notes: e.target.value})}
+                  className="w-full px-3 py-2 border rounded text-sm"
+                  rows={2}
+                  placeholder="Additional notes..."
+                />
+              </div>
+              {/* Receipt Upload */}
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Receipt (optional)</label>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center hover:border-blue-400 transition-colors">
+                  <input
+                    type="file"
+                    accept="image/*,.pdf"
+                    onChange={handleExpenseReceiptChange}
+                    className="hidden"
+                    id="expenses-page-receipt-input"
+                  />
+                  <label htmlFor="expenses-page-receipt-input" className="cursor-pointer">
+                    {expenseReceiptFile ? (
+                      <div className="space-y-2">
+                        {expenseReceiptPreview ? (
+                          <img src={expenseReceiptPreview} alt="Receipt preview" className="max-h-24 mx-auto rounded" />
+                        ) : (
+                          <div className="text-3xl">📄</div>
+                        )}
+                        <div className="text-sm text-gray-700">{expenseReceiptFile.name}</div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setExpenseReceiptFile(null);
+                            setExpenseReceiptPreview(null);
+                          }}
+                          className="text-xs text-red-600 hover:text-red-800"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <div className="text-2xl text-gray-400">📎</div>
+                        <div className="text-xs text-gray-500">Clique para fazer upload do comprovante</div>
+                        <div className="text-xs text-gray-400">PNG, JPG, GIF ou PDF (max 10MB)</div>
+                      </div>
+                    )}
+                  </label>
+                </div>
+              </div>
+              <div className="flex justify-end space-x-2 pt-2">
+                <button type="button" onClick={() => { setShowExpenseModal(false); setExpenseReceiptFile(null); setExpenseReceiptPreview(null); }} className="px-4 py-2 border rounded text-sm text-gray-600">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">Save</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ==================== FINANCES PAGE ====================
 const FinancesPage = ({ adminKey }) => {
   const [summary, setSummary] = useState(null);
-  const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState('month');
-  const [activeView, setActiveView] = useState('overview'); // overview, expenses, quickbooks, partners, pages
+  const [activeView, setActiveView] = useState('partners'); // overview, quickbooks, partners, pages
   // Translator payments state
   const [translators, setTranslators] = useState([]);
   const [translatorPayments, setTranslatorPayments] = useState([]);
@@ -23093,7 +24636,6 @@ const FinancesPage = ({ adminKey }) => {
   const [paymentType, setPaymentType] = useState('translation');
   const [commissionRate, setCommissionRate] = useState('');
   const [paymentReport, setPaymentReport] = useState(null);
-  const [showExpenseModal, setShowExpenseModal] = useState(false);
   // Receipt file upload state
   const [receiptFile, setReceiptFile] = useState(null);
   const [receiptPreview, setReceiptPreview] = useState(null);
@@ -23114,6 +24656,30 @@ const FinancesPage = ({ adminKey }) => {
   const [creatingInvoice, setCreatingInvoice] = useState(false);
   const [showInvoicesModal, setShowInvoicesModal] = useState(false);
   const [selectedPartnerInvoices, setSelectedPartnerInvoices] = useState([]);
+  const [editingInvoice, setEditingInvoice] = useState(null);
+  const [editInvoiceDiscount, setEditInvoiceDiscount] = useState('');
+  const [editInvoiceDiscountReason, setEditInvoiceDiscountReason] = useState('');
+  const [editInvoiceDueDate, setEditInvoiceDueDate] = useState('');
+  const [editInvoiceFixedDueDay, setEditInvoiceFixedDueDay] = useState('');
+  const [editInvoiceNotes, setEditInvoiceNotes] = useState('');
+  const [savingInvoiceEdit, setSavingInvoiceEdit] = useState(false);
+  const [invoiceFixedDueDay, setInvoiceFixedDueDay] = useState('');
+  const [invoiceDueDateMode, setInvoiceDueDateMode] = useState('days');
+  const [invoiceManualDiscount, setInvoiceManualDiscount] = useState('');
+  const [invoiceDiscountReason, setInvoiceDiscountReason] = useState('');
+  // Partner filter and search state
+  const [partnerFilter, setPartnerFilter] = useState('all'); // all, registered, prospect, new, first_email, follow_up_1, follow_up_2, archived
+  const [partnerSearchQuery, setPartnerSearchQuery] = useState('');
+  // Bulk partner selection state
+  const [selectedPartnerIds, setSelectedPartnerIds] = useState([]);
+  const [showBulkEmailModal, setShowBulkEmailModal] = useState(false);
+  const [bulkEmailSubject, setBulkEmailSubject] = useState('');
+  const [bulkEmailMessage, setBulkEmailMessage] = useState('');
+  const [sendingBulkEmail, setSendingBulkEmail] = useState(false);
+  // Add prospect modal state
+  const [showAddProspectModal, setShowAddProspectModal] = useState(false);
+  const [addProspectForm, setAddProspectForm] = useState({ company_name: '', contact_name: '', email: '', phone: '' });
+  const [addingProspect, setAddingProspect] = useState(false);
   // Invoice payment management state
   const [pendingZelleInvoices, setPendingZelleInvoices] = useState([]);
   const [paymentHistory, setPaymentHistory] = useState([]);
@@ -23136,11 +24702,6 @@ const FinancesPage = ({ adminKey }) => {
   const [addingPages, setAddingPages] = useState(false);
   const [editingPagesLog, setEditingPagesLog] = useState(null);
   const [editPagesForm, setEditPagesForm] = useState({ pages: '', date: '', note: '' });
-  // Expense receipt upload state
-  const [expenseReceiptFile, setExpenseReceiptFile] = useState(null);
-  const [expenseReceiptPreview, setExpenseReceiptPreview] = useState(null);
-  // Vendor expenses state (for showing expenses per vendor)
-  const [vendorExpenses, setVendorExpenses] = useState([]);
   // Coupon management state
   const [couponTemplates, setCouponTemplates] = useState([]);
   const [showCouponModal, setShowCouponModal] = useState(false);
@@ -23149,18 +24710,6 @@ const FinancesPage = ({ adminKey }) => {
   const [selectedCouponToAssign, setSelectedCouponToAssign] = useState('');
   const [couponMaxUses, setCouponMaxUses] = useState(1);
   const [assigningCoupon, setAssigningCoupon] = useState(false);
-  const [expenseForm, setExpenseForm] = useState({
-    category: 'fixed',
-    subcategory: '',
-    description: '',
-    amount: 0,
-    date: new Date().toISOString().split('T')[0],
-    is_recurring: false,
-    recurring_period: '',
-    vendor: '',
-    vendor_id: '',
-    notes: ''
-  });
 
   const EXPENSE_CATEGORIES = {
     fixed: { label: 'Fixed Expenses', color: '#3B82F6' },
@@ -23190,15 +24739,6 @@ const FinancesPage = ({ adminKey }) => {
       setSummary(response.data);
     } catch (err) {
       console.error('Error fetching financial summary:', err);
-    }
-  };
-
-  const fetchExpenses = async () => {
-    try {
-      const response = await axios.get(`${API}/admin/expenses?admin_key=${adminKey}`);
-      setExpenses(response.data.expenses || []);
-    } catch (err) {
-      console.error('Error fetching expenses:', err);
     }
   };
 
@@ -23236,16 +24776,6 @@ const FinancesPage = ({ adminKey }) => {
       setTranslatorPayments(response.data.payments || []);
     } catch (err) {
       console.error('Error fetching translator payments:', err);
-    }
-  };
-
-  const fetchVendorExpenses = async (vendorId) => {
-    try {
-      const response = await axios.get(`${API}/admin/expenses?admin_key=${adminKey}&vendor_id=${vendorId}`);
-      setVendorExpenses(response.data.expenses || []);
-    } catch (err) {
-      console.error('Error fetching vendor expenses:', err);
-      setVendorExpenses([]);
     }
   };
 
@@ -23377,6 +24907,8 @@ const FinancesPage = ({ adminKey }) => {
     setSelectedOrdersForInvoice([]);
     setInvoiceDueDays(30);
     setInvoiceNotes('');
+    setInvoiceManualDiscount('');
+    setInvoiceDiscountReason('');
     await fetchPartnerOrdersForInvoice(partner.partner_id);
     setShowCreateInvoiceModal(true);
   };
@@ -23394,12 +24926,20 @@ const FinancesPage = ({ adminKey }) => {
     }
     setCreatingInvoice(true);
     try {
-      await axios.post(`${API}/admin/partner-invoices/create?admin_key=${adminKey}`, {
+      const invoicePayload = {
         partner_id: selectedPartnerForInvoice.partner_id,
         order_ids: selectedOrdersForInvoice,
         due_days: invoiceDueDays,
         notes: invoiceNotes
-      });
+      };
+      if (invoiceDueDateMode === 'fixed' && invoiceFixedDueDay) {
+        invoicePayload.fixed_due_day = parseInt(invoiceFixedDueDay);
+      }
+      if (invoiceManualDiscount && parseFloat(invoiceManualDiscount) > 0) {
+        invoicePayload.manual_discount_amount = parseFloat(invoiceManualDiscount);
+        invoicePayload.manual_discount_reason = invoiceDiscountReason;
+      }
+      await axios.post(`${API}/admin/partner-invoices/create?admin_key=${adminKey}`, invoicePayload);
       showToast('Invoice created successfully!');
       setShowCreateInvoiceModal(false);
       fetchPartnerStats();
@@ -23429,6 +24969,50 @@ const FinancesPage = ({ adminKey }) => {
       fetchPartnerStats();
     } catch (err) {
       showToast('Error marking invoice as paid: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const handleOpenEditInvoice = (invoice) => {
+    setEditingInvoice(invoice);
+    setEditInvoiceDiscount('');
+    setEditInvoiceDiscountReason('');
+    setEditInvoiceDueDate(invoice.due_date ? new Date(invoice.due_date).toISOString().split('T')[0] : '');
+    setEditInvoiceFixedDueDay(invoice.fixed_due_day || '');
+    setEditInvoiceNotes(invoice.notes || '');
+  };
+
+  const handleSaveInvoiceEdit = async () => {
+    if (!editingInvoice) return;
+    setSavingInvoiceEdit(true);
+    try {
+      const payload = {};
+      if (editInvoiceDiscount && parseFloat(editInvoiceDiscount) > 0) {
+        payload.manual_discount_amount = parseFloat(editInvoiceDiscount);
+        payload.manual_discount_reason = editInvoiceDiscountReason;
+      }
+      if (editInvoiceDueDate) {
+        payload.new_due_date = editInvoiceDueDate;
+      }
+      if (editInvoiceFixedDueDay && parseInt(editInvoiceFixedDueDay) > 0) {
+        payload.fixed_due_day = parseInt(editInvoiceFixedDueDay);
+      }
+      if (editInvoiceNotes !== (editingInvoice.notes || '')) {
+        payload.notes = editInvoiceNotes;
+      }
+      if (Object.keys(payload).length === 0) {
+        showToast('No changes to save');
+        setSavingInvoiceEdit(false);
+        return;
+      }
+      await axios.put(`${API}/admin/partner-invoices/${editingInvoice.id}/edit?admin_key=${adminKey}`, payload);
+      showToast('Invoice updated successfully!');
+      setEditingInvoice(null);
+      fetchPartnerInvoicesForPartner(selectedPartnerForInvoice.partner_id);
+      fetchPartnerInvoices();
+    } catch (err) {
+      showToast('Error updating invoice: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setSavingInvoiceEdit(false);
     }
   };
 
@@ -23607,6 +25191,18 @@ const FinancesPage = ({ adminKey }) => {
     }
   };
 
+  // Send prospect invite email to encourage partner registration
+  const sendProspectInvite = async (partnerId, partnerEmail, companyName) => {
+    if (!window.confirm(`Send a partner registration invite to ${companyName} (${partnerEmail})?`)) return;
+    try {
+      const response = await axios.post(`${API}/admin/partners/${partnerId}/send-invite?admin_key=${adminKey}`);
+      showToast(response.data.message || 'Invite sent successfully!');
+      fetchPartnerStats();
+    } catch (err) {
+      showToast('Error sending invite: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
   const handleMarkNotificationRead = async (notifId) => {
     try {
       await axios.put(`${API}/admin/invoice-notifications/${notifId}/read?admin_key=${adminKey}`);
@@ -23724,6 +25320,175 @@ const FinancesPage = ({ adminKey }) => {
     }
   };
 
+  // Bulk partner selection helpers
+  const togglePartnerSelection = (partnerId) => {
+    setSelectedPartnerIds(prev =>
+      prev.includes(partnerId)
+        ? prev.filter(id => id !== partnerId)
+        : [...prev, partnerId]
+    );
+  };
+
+  const toggleSelectAllPartners = () => {
+    const isRegisteredPartner = (p) => p.is_real_partner && p.payment_plan_approved && (p.payment_plan === 'biweekly' || p.payment_plan === 'monthly');
+    const visiblePartners = (partnerStats.partners || []).filter(p => {
+      if (partnerFilter === 'registered' && !isRegisteredPartner(p)) return false;
+      if (partnerFilter === 'prospect' && isRegisteredPartner(p)) return false;
+      if (partnerFilter === 'archived' && p.prospect_status !== 'archived') return false;
+      if (partnerFilter === 'prospect' && p.prospect_status === 'archived') return false;
+      if (partnerSearchQuery.trim()) {
+        const q = partnerSearchQuery.toLowerCase();
+        return (p.company_name || '').toLowerCase().includes(q) || (p.email || '').toLowerCase().includes(q) || (p.contact_name || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q);
+      }
+      return true;
+    });
+    const allVisibleSelected = visiblePartners.length > 0 && visiblePartners.every(p => selectedPartnerIds.includes(p.partner_id));
+    if (allVisibleSelected) {
+      setSelectedPartnerIds([]);
+    } else {
+      setSelectedPartnerIds(visiblePartners.map(p => p.partner_id));
+    }
+  };
+
+  // Send prospect outreach email (next step in sequence)
+  const sendProspectStepEmail = async (partnerId, companyName, currentStatus) => {
+    const stepMap = { 'new': 'first_contact', 'first_email': 'followup_1', 'follow_up_1': 'followup_2' };
+    const stepLabels = { 'new': '1st Email', 'first_email': 'Follow-up 1', 'follow_up_1': 'Follow-up 2' };
+    const nextStep = stepMap[currentStatus || 'new'];
+    const label = stepLabels[currentStatus || 'new'];
+    if (!nextStep) { showToast('All email steps completed for this prospect'); return; }
+    if (!window.confirm(`Send "${label}" to ${companyName}?`)) return;
+    try {
+      const res = await axios.post(`${API}/admin/partners/${partnerId}/prospect-step?admin_key=${adminKey}`);
+      showToast(res.data.message || `${label} sent successfully!`);
+      fetchPartnerStats();
+    } catch (err) {
+      showToast('Error: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  // Archive prospect (after all follow-ups with no response)
+  const archiveProspect = async (partnerId, companyName) => {
+    if (!window.confirm(`Archive prospect "${companyName}"? It will move to the Archived tab.`)) return;
+    try {
+      await axios.post(`${API}/admin/partners/${partnerId}/archive?admin_key=${adminKey}`);
+      showToast(`${companyName} archived`);
+      fetchPartnerStats();
+    } catch (err) {
+      showToast('Error: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  // Unarchive prospect
+  const unarchiveProspect = async (partnerId, companyName) => {
+    if (!window.confirm(`Unarchive "${companyName}"? It will move back to Prospects.`)) return;
+    try {
+      await axios.post(`${API}/admin/partners/${partnerId}/unarchive?admin_key=${adminKey}`);
+      showToast(`${companyName} unarchived`);
+      fetchPartnerStats();
+    } catch (err) {
+      showToast('Error: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  // Bulk send next prospect step email
+  const bulkSendProspectStep = async () => {
+    if (selectedPartnerIds.length === 0) { showToast('No partners selected'); return; }
+    if (!window.confirm(`Send the next outreach email step to ${selectedPartnerIds.length} prospect(s)?`)) return;
+    try {
+      const res = await axios.post(`${API}/admin/partners/bulk-prospect-step?admin_key=${adminKey}`, {
+        partner_ids: selectedPartnerIds
+      });
+      showToast(res.data.message || 'Emails sent!');
+      setSelectedPartnerIds([]);
+      fetchPartnerStats();
+    } catch (err) {
+      showToast('Error: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  // Bulk archive prospects
+  const bulkArchiveProspects = async () => {
+    if (selectedPartnerIds.length === 0) { showToast('No partners selected'); return; }
+    if (!window.confirm(`Archive ${selectedPartnerIds.length} prospect(s)?`)) return;
+    try {
+      const res = await axios.post(`${API}/admin/partners/bulk-archive?admin_key=${adminKey}`, {
+        partner_ids: selectedPartnerIds
+      });
+      showToast(res.data.message || 'Prospects archived!');
+      setSelectedPartnerIds([]);
+      fetchPartnerStats();
+    } catch (err) {
+      showToast('Error: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const bulkDeletePartners = async () => {
+    if (selectedPartnerIds.length === 0) {
+      showToast('No partners selected');
+      return;
+    }
+    if (!window.confirm(`Are you sure you want to delete ${selectedPartnerIds.length} partner(s)?\n\nThis action cannot be undone.`)) return;
+    try {
+      const res = await axios.post(`${API}/admin/partners/bulk-delete?admin_key=${adminKey}`, {
+        partner_ids: selectedPartnerIds
+      });
+      showToast(res.data.message || `${res.data.deleted} partner(s) deleted`);
+      setSelectedPartnerIds([]);
+      fetchPartnerStats();
+    } catch (err) {
+      showToast('Error deleting partners: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const handleBulkEmailSend = async () => {
+    if (!bulkEmailSubject.trim() || !bulkEmailMessage.trim()) {
+      showToast('Please fill in subject and message');
+      return;
+    }
+    setSendingBulkEmail(true);
+    try {
+      const res = await axios.post(`${API}/admin/partners/bulk-email?admin_key=${adminKey}`, {
+        partner_ids: selectedPartnerIds,
+        subject: bulkEmailSubject,
+        message: bulkEmailMessage
+      });
+      showToast(res.data.message || `Email sent to ${res.data.sent} partner(s)`);
+      setShowBulkEmailModal(false);
+      setBulkEmailSubject('');
+      setBulkEmailMessage('');
+      setSelectedPartnerIds([]);
+    } catch (err) {
+      showToast('Error sending emails: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setSendingBulkEmail(false);
+    }
+  };
+
+  const handleAddProspect = async () => {
+    if (!addProspectForm.company_name.trim()) {
+      showToast('Company name is required');
+      return;
+    }
+    setAddingProspect(true);
+    try {
+      const res = await axios.post(`${API}/admin/partners/add-prospect?admin_key=${adminKey}`, {
+        company_name: addProspectForm.company_name,
+        contact_name: addProspectForm.contact_name,
+        email: addProspectForm.email,
+        phone: addProspectForm.phone
+      });
+      showToast(res.data.message || 'Prospect added successfully!');
+      setShowAddProspectModal(false);
+      setAddProspectForm({ company_name: '', contact_name: '', email: '', phone: '' });
+      fetchPartnerStats();
+    } catch (err) {
+      showToast('Error adding prospect: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setAddingProspect(false);
+    }
+  };
+
   const setPartnerPaymentPlan = async (partnerId, plan) => {
     try {
       await axios.post(`${API}/admin/partners/${partnerId}/set-payment-plan?admin_key=${adminKey}&plan=${plan}&send_notification=true`);
@@ -23732,6 +25497,17 @@ const FinancesPage = ({ adminKey }) => {
       fetchPartnerStats(); // Refresh the list
     } catch (err) {
       showToast('Error setting payment plan: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const setPartnerTier = async (partnerId, tier) => {
+    try {
+      await axios.post(`${API}/admin/partners/${partnerId}/set-tier?admin_key=${adminKey}&tier=${tier}`);
+      const tierNames = { standard: 'Standard (auto)', bronze: 'Bronze (10%)', silver: 'Silver (15%)', gold: 'Gold (25%)', platinum: 'Platinum (35%)' };
+      showToast(`Tier set to ${tierNames[tier] || tier}`);
+      fetchPartnerStats();
+    } catch (err) {
+      showToast('Error setting tier: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -23752,7 +25528,7 @@ const FinancesPage = ({ adminKey }) => {
 
   const findEmailInSystem = async () => {
     if (!emailSearchQuery.trim()) {
-      showToast('Please enter an email to search');
+      showToast('Please enter a search term');
       return;
     }
     setEmailSearching(true);
@@ -23762,9 +25538,9 @@ const FinancesPage = ({ adminKey }) => {
       setEmailSearchResult(response.data);
     } catch (err) {
       if (err.response?.status === 404) {
-        setEmailSearchResult({ status: 'not_found', message: `Email '${emailSearchQuery}' not found in any collection` });
+        setEmailSearchResult({ status: 'not_found', message: `'${emailSearchQuery}' not found in any collection` });
       } else {
-        showToast('Error searching email: ' + (err.response?.data?.detail || err.message));
+        showToast('Error searching: ' + (err.response?.data?.detail || err.message));
       }
     } finally {
       setEmailSearching(false);
@@ -23871,7 +25647,7 @@ const FinancesPage = ({ adminKey }) => {
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([fetchSummary(), fetchExpenses(), checkQuickBooksStatus()]);
+      await Promise.all([fetchSummary(), checkQuickBooksStatus()]);
       setLoading(false);
     };
     loadData();
@@ -23892,158 +25668,7 @@ const FinancesPage = ({ adminKey }) => {
       fetchPagesLogs();
       fetchTranslatorsForPayment();
     }
-    if (activeView === 'expenses') {
-      fetchTranslatorsForPayment(); // Fetch vendors for dropdown
-      fetchExpenses();
-    }
   }, [activeView]);
-
-  const handleExpenseReceiptChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'application/pdf'];
-      if (!allowedTypes.includes(file.type)) {
-        showToast('Please upload an image (PNG, JPG, GIF) or PDF file');
-        return;
-      }
-      if (file.size > 10 * 1024 * 1024) {
-        showToast('File size must be less than 10MB');
-        return;
-      }
-      setExpenseReceiptFile(file);
-      if (file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onload = (e) => setExpenseReceiptPreview(e.target.result);
-        reader.readAsDataURL(file);
-      } else {
-        setExpenseReceiptPreview(null);
-      }
-    }
-  };
-
-  const handleCreateExpense = async (e) => {
-    e.preventDefault();
-    try {
-      const formData = new FormData();
-      formData.append('category', expenseForm.category);
-      formData.append('subcategory', expenseForm.subcategory || '');
-      formData.append('description', expenseForm.description);
-      formData.append('amount', parseFloat(expenseForm.amount) || 0);
-      formData.append('date', expenseForm.date);
-      formData.append('is_recurring', expenseForm.is_recurring);
-      formData.append('recurring_period', expenseForm.recurring_period || '');
-      formData.append('vendor', expenseForm.vendor);
-      formData.append('vendor_id', expenseForm.vendor_id || '');
-      formData.append('notes', expenseForm.notes || '');
-      if (expenseReceiptFile) {
-        formData.append('receipt_file', expenseReceiptFile);
-      }
-
-      await axios.post(`${API}/admin/expenses?admin_key=${adminKey}`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      setShowExpenseModal(false);
-      setExpenseForm({
-        category: 'fixed', subcategory: '', description: '', amount: 0,
-        date: new Date().toISOString().split('T')[0], is_recurring: false,
-        recurring_period: '', vendor: '', vendor_id: '', notes: ''
-      });
-      setExpenseReceiptFile(null);
-      setExpenseReceiptPreview(null);
-      fetchExpenses();
-      fetchSummary();
-      showToast('Expense created successfully!');
-    } catch (err) {
-      console.error('Error creating expense:', err);
-      showToast('Error creating expense: ' + (err.response?.data?.detail || err.message));
-    }
-  };
-
-  const handleDeleteExpense = async (expenseId) => {
-    if (!window.confirm('Delete this expense?')) return;
-    try {
-      await axios.delete(`${API}/admin/expenses/${expenseId}?admin_key=${adminKey}`);
-      fetchExpenses();
-      fetchSummary();
-    } catch (err) {
-      showToast('Error deleting expense');
-    }
-  };
-
-  const handleViewExpenseReceipt = async (expenseId, filename) => {
-    try {
-      const response = await axios.get(`${API}/admin/expenses/${expenseId}/receipt?admin_key=${adminKey}`);
-      const { receipt_file_data, receipt_file_type, receipt_filename } = response.data;
-
-      // Create blob and open in new window
-      const byteCharacters = atob(receipt_file_data);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: receipt_file_type });
-      const url = URL.createObjectURL(blob);
-
-      // Open in new window for viewing/printing
-      const newWindow = window.open(url, '_blank');
-      if (newWindow) {
-        newWindow.document.title = receipt_filename || 'Receipt';
-      }
-    } catch (err) {
-      console.error('Error fetching receipt:', err);
-      showToast('Error loading receipt: ' + (err.response?.data?.detail || err.message));
-    }
-  };
-
-  const handleDownloadExpenseReceipt = async (expenseId) => {
-    try {
-      const response = await axios.get(`${API}/admin/expenses/${expenseId}/receipt?admin_key=${adminKey}`);
-      const { receipt_file_data, receipt_file_type, receipt_filename } = response.data;
-
-      // Create download link
-      const link = document.createElement('a');
-      link.href = `data:${receipt_file_type};base64,${receipt_file_data}`;
-      link.download = receipt_filename || 'receipt';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } catch (err) {
-      console.error('Error downloading receipt:', err);
-      showToast('Error downloading receipt: ' + (err.response?.data?.detail || err.message));
-    }
-  };
-
-  const handleUploadExpenseReceipt = async (expenseId, file) => {
-    if (!file) return;
-
-    const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'application/pdf'];
-    if (!allowedTypes.includes(file.type)) {
-      showToast('Please upload an image (PNG, JPG, GIF) or PDF file');
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      showToast('File size must be less than 10MB');
-      return;
-    }
-
-    try {
-      const formData = new FormData();
-      formData.append('receipt', file);
-
-      await axios.post(
-        `${API}/admin/expenses/${expenseId}/upload-receipt?admin_key=${adminKey}`,
-        formData,
-        { headers: { 'Content-Type': 'multipart/form-data' } }
-      );
-
-      showToast('Receipt uploaded successfully!');
-      fetchExpenses(); // Refresh the list
-    } catch (err) {
-      console.error('Error uploading receipt:', err);
-      showToast('Error uploading receipt: ' + (err.response?.data?.detail || err.message));
-    }
-  };
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
@@ -24134,12 +25759,6 @@ const FinancesPage = ({ adminKey }) => {
               className={`px-4 py-2 rounded text-sm ${activeView === 'overview' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
             >
               Overview
-            </button>
-            <button
-              onClick={() => setActiveView('expenses')}
-              className={`px-4 py-2 rounded text-sm ${activeView === 'expenses' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
-            >
-              Expenses
             </button>
             <button
               onClick={() => setActiveView('quickbooks')}
@@ -24281,262 +25900,6 @@ const FinancesPage = ({ adminKey }) => {
             </div>
           </div>
         </>
-      )}
-
-      {activeView === 'expenses' && (
-        <div className="bg-white rounded-lg shadow">
-          <div className="p-4 border-b flex justify-between items-center">
-            <h3 className="font-bold text-gray-800">Expenses List</h3>
-            <button
-              onClick={() => setShowExpenseModal(true)}
-              className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
-            >
-              + New Expense
-            </button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">Date</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">Category</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">Description</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">Vendor</th>
-                  <th className="px-4 py-3 text-right font-medium text-gray-600">Amount</th>
-                  <th className="px-4 py-3 text-center font-medium text-gray-600">Receipt</th>
-                  <th className="px-4 py-3 text-center font-medium text-gray-600">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {expenses.length === 0 ? (
-                  <tr><td colSpan="7" className="px-4 py-8 text-center text-gray-500">No expenses registered</td></tr>
-                ) : (
-                  expenses.map((expense) => (
-                    <tr key={expense.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3">{formatDate(expense.date)}</td>
-                      <td className="px-4 py-3">
-                        <span className="px-2 py-1 rounded text-xs" style={{
-                          backgroundColor: `${EXPENSE_CATEGORIES[expense.category]?.color}20`,
-                          color: EXPENSE_CATEGORIES[expense.category]?.color
-                        }}>
-                          {EXPENSE_CATEGORIES[expense.category]?.label || expense.category}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">{expense.description}</td>
-                      <td className="px-4 py-3 text-gray-500">{expense.vendor || '-'}</td>
-                      <td className="px-4 py-3 text-right font-medium text-red-600">{formatCurrency(expense.amount)}</td>
-                      <td className="px-4 py-3 text-center">
-                        {expense.has_receipt ? (
-                          <div className="flex items-center justify-center gap-2">
-                            <button
-                              onClick={() => handleViewExpenseReceipt(expense.id, expense.receipt_filename)}
-                              className="text-blue-600 hover:text-blue-800 text-xs"
-                              title="View receipt"
-                            >
-                              👁️ View
-                            </button>
-                            <button
-                              onClick={() => handleDownloadExpenseReceipt(expense.id)}
-                              className="text-green-600 hover:text-green-800 text-xs"
-                              title="Download receipt"
-                            >
-                              ⬇️ Download
-                            </button>
-                          </div>
-                        ) : (
-                          <label className="cursor-pointer text-blue-600 hover:text-blue-800 text-xs">
-                            📎 Upload
-                            <input
-                              type="file"
-                              accept="image/*,.pdf"
-                              className="hidden"
-                              onChange={(e) => handleUploadExpenseReceipt(expense.id, e.target.files[0])}
-                            />
-                          </label>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <button onClick={() => handleDeleteExpense(expense.id)} className="text-red-600 hover:text-red-800">Delete</button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Expense Modal */}
-      {showExpenseModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
-            <div className="p-4 border-b flex justify-between items-center flex-shrink-0">
-              <h3 className="font-bold text-gray-800">New Expense</h3>
-              <button onClick={() => setShowExpenseModal(false)} className="text-gray-500 hover:text-gray-700">✕</button>
-            </div>
-            <form onSubmit={handleCreateExpense} className="p-4 space-y-4 overflow-y-auto flex-1">
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">Category</label>
-                <select
-                  value={expenseForm.category}
-                  onChange={(e) => setExpenseForm({...expenseForm, category: e.target.value})}
-                  className="w-full px-3 py-2 border rounded text-sm"
-                  required
-                >
-                  {Object.entries(EXPENSE_CATEGORIES).map(([key, { label }]) => (
-                    <option key={key} value={key}>{label}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">Description</label>
-                <input
-                  type="text"
-                  value={expenseForm.description}
-                  onChange={(e) => setExpenseForm({...expenseForm, description: e.target.value})}
-                  className="w-full px-3 py-2 border rounded text-sm"
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">Amount ($)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={expenseForm.amount}
-                    onChange={(e) => setExpenseForm({...expenseForm, amount: parseFloat(e.target.value) || 0})}
-                    className="w-full px-3 py-2 border rounded text-sm"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">Date</label>
-                  <input
-                    type="date"
-                    value={expenseForm.date}
-                    onChange={(e) => setExpenseForm({...expenseForm, date: e.target.value})}
-                    className="w-full px-3 py-2 border rounded text-sm"
-                    required
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">Vendor (optional)</label>
-                <select
-                  value={expenseForm.vendor_id}
-                  onChange={(e) => {
-                    const selectedVendor = translators.find(t => (t.translator_id || t._id) === e.target.value);
-                    setExpenseForm({
-                      ...expenseForm,
-                      vendor_id: e.target.value,
-                      vendor: selectedVendor ? selectedVendor.name : ''
-                    });
-                  }}
-                  className="w-full px-3 py-2 border rounded text-sm"
-                >
-                  <option value="">Select vendor...</option>
-                  {translators.map(t => (
-                    <option key={t.translator_id || t._id} value={t.translator_id || t._id}>
-                      {t.name} ({t.role === 'translator' ? 'Translator' : t.role === 'pm' ? 'PM' : t.role === 'admin' ? 'Admin' : t.role || 'Vendor'})
-                    </option>
-                  ))}
-                </select>
-                {/* Option to type manually if vendor not in list */}
-                {!expenseForm.vendor_id && (
-                  <input
-                    type="text"
-                    value={expenseForm.vendor}
-                    onChange={(e) => setExpenseForm({...expenseForm, vendor: e.target.value})}
-                    className="w-full px-3 py-2 border rounded text-sm mt-2"
-                    placeholder="Or type vendor name manually..."
-                  />
-                )}
-              </div>
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={expenseForm.is_recurring}
-                  onChange={(e) => setExpenseForm({...expenseForm, is_recurring: e.target.checked})}
-                  className="mr-2"
-                />
-                <label className="text-sm text-gray-600">Recurring expense</label>
-              </div>
-              {expenseForm.is_recurring && (
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">Period</label>
-                  <select
-                    value={expenseForm.recurring_period}
-                    onChange={(e) => setExpenseForm({...expenseForm, recurring_period: e.target.value})}
-                    className="w-full px-3 py-2 border rounded text-sm"
-                  >
-                    <option value="">Select...</option>
-                    <option value="monthly">Monthly</option>
-                    <option value="yearly">Yearly</option>
-                  </select>
-                </div>
-              )}
-              {/* Notes field */}
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">Notes (optional)</label>
-                <textarea
-                  value={expenseForm.notes}
-                  onChange={(e) => setExpenseForm({...expenseForm, notes: e.target.value})}
-                  className="w-full px-3 py-2 border rounded text-sm"
-                  rows={2}
-                  placeholder="Additional notes..."
-                />
-              </div>
-              {/* Receipt Upload */}
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">Receipt (optional)</label>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center hover:border-blue-400 transition-colors">
-                  <input
-                    type="file"
-                    accept="image/*,.pdf"
-                    onChange={handleExpenseReceiptChange}
-                    className="hidden"
-                    id="expense-receipt-input"
-                  />
-                  <label htmlFor="expense-receipt-input" className="cursor-pointer">
-                    {expenseReceiptFile ? (
-                      <div className="space-y-2">
-                        {expenseReceiptPreview ? (
-                          <img src={expenseReceiptPreview} alt="Receipt preview" className="max-h-24 mx-auto rounded" />
-                        ) : (
-                          <div className="text-3xl">📄</div>
-                        )}
-                        <div className="text-sm text-gray-700">{expenseReceiptFile.name}</div>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            setExpenseReceiptFile(null);
-                            setExpenseReceiptPreview(null);
-                          }}
-                          className="text-xs text-red-600 hover:text-red-800"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="space-y-1">
-                        <div className="text-2xl text-gray-400">📎</div>
-                        <div className="text-xs text-gray-500">Clique para fazer upload do comprovante</div>
-                        <div className="text-xs text-gray-400">PNG, JPG, GIF ou PDF (max 10MB)</div>
-                      </div>
-                    )}
-                  </label>
-                </div>
-              </div>
-              <div className="flex justify-end space-x-2 pt-2">
-                <button type="button" onClick={() => { setShowExpenseModal(false); setExpenseReceiptFile(null); setExpenseReceiptPreview(null); }} className="px-4 py-2 border rounded text-sm text-gray-600">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">Save</button>
-              </div>
-            </form>
-          </div>
-        </div>
       )}
 
       {/* Pages Tracking View */}
@@ -24954,17 +26317,17 @@ const FinancesPage = ({ adminKey }) => {
           {/* Email Search Tool */}
           <div className="bg-white rounded-lg shadow">
             <div className="p-4 border-b bg-blue-50">
-              <h2 className="text-sm font-bold text-gray-700">🔍 Find Email in System</h2>
-              <p className="text-xs text-gray-500 mt-1">Search where an email is registered (partners, customers, admin users, salespersons)</p>
+              <h2 className="text-sm font-bold text-gray-700">🔍 Find in System</h2>
+              <p className="text-xs text-gray-500 mt-1">Search by name, email, phone or company (partners, customers, admin users, salespersons)</p>
             </div>
             <div className="p-4">
               <div className="flex gap-2 mb-3">
                 <input
-                  type="email"
+                  type="text"
                   value={emailSearchQuery}
                   onChange={(e) => setEmailSearchQuery(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && findEmailInSystem()}
-                  placeholder="Enter email to search..."
+                  placeholder="Search by name, email, phone, company..."
                   className="flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <button
@@ -24982,7 +26345,7 @@ const FinancesPage = ({ adminKey }) => {
                     <p className="text-sm text-green-700">{emailSearchResult.message}</p>
                   ) : (
                     <div>
-                      <p className="text-sm font-medium text-yellow-800 mb-2">Email found in {emailSearchResult.found_in.length} collection(s):</p>
+                      <p className="text-sm font-medium text-yellow-800 mb-2">Found {emailSearchResult.found_in.length} result(s):</p>
                       <div className="space-y-2">
                         {emailSearchResult.found_in.map((item, idx) => (
                           <div key={idx} className="flex items-center justify-between bg-white p-2 rounded border">
@@ -25018,17 +26381,147 @@ const FinancesPage = ({ adminKey }) => {
           {/* Partners Table */}
           <div className="bg-white rounded-lg shadow">
             <div className="p-4 border-b bg-gray-50">
-              <h2 className="text-sm font-bold text-gray-700">🤝 Partner Companies</h2>
-              <p className="text-xs text-gray-500 mt-1">Revenue from Partner Portal orders</p>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div>
+                    <h2 className="text-sm font-bold text-gray-700">🤝 Partner Companies</h2>
+                    <p className="text-xs text-gray-500 mt-1">Revenue from Partner Portal orders</p>
+                  </div>
+                  <button
+                    onClick={() => setShowAddProspectModal(true)}
+                    className="px-3 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700 flex items-center gap-1 font-medium"
+                    title="Add new prospect"
+                  >
+                    + Add Prospect
+                  </button>
+                </div>
+                {selectedPartnerIds.length > 0 && (
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs text-gray-600 font-medium">{selectedPartnerIds.length} selected</span>
+                    {(['prospect', 'new', 'first_email', 'follow_up_1', 'follow_up_2'].includes(partnerFilter)) && (
+                      <>
+                        <button
+                          onClick={bulkSendProspectStep}
+                          className="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 flex items-center gap-1"
+                        >
+                          📧 Send Next Step
+                        </button>
+                        <button
+                          onClick={bulkArchiveProspects}
+                          className="px-3 py-1.5 bg-gray-600 text-white text-xs rounded hover:bg-gray-700 flex items-center gap-1"
+                        >
+                          📁 Archive
+                        </button>
+                      </>
+                    )}
+                    <button
+                      onClick={() => { setShowBulkEmailModal(true); }}
+                      className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center gap-1"
+                    >
+                      📧 Send Email
+                    </button>
+                    <button
+                      onClick={bulkDeletePartners}
+                      className="px-3 py-1.5 bg-red-600 text-white text-xs rounded hover:bg-red-700 flex items-center gap-1"
+                    >
+                      🗑️ Delete Selected
+                    </button>
+                    <button
+                      onClick={() => setSelectedPartnerIds([])}
+                      className="px-2 py-1.5 text-gray-500 text-xs rounded hover:bg-gray-200"
+                      title="Clear selection"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+              </div>
+              {/* Filter Tabs and Search */}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => { setPartnerFilter('all'); setSelectedPartnerIds([]); }}
+                      className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${partnerFilter === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                    >
+                      All ({partnerStats.partners?.length || 0})
+                    </button>
+                    <button
+                      onClick={() => { setPartnerFilter('registered'); setSelectedPartnerIds([]); }}
+                      className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${partnerFilter === 'registered' ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                    >
+                      Registered ({partnerStats.partners?.filter(p => p.is_real_partner && p.payment_plan_approved && (p.payment_plan === 'biweekly' || p.payment_plan === 'monthly')).length || 0})
+                    </button>
+                    <button
+                      onClick={() => { setPartnerFilter('prospect'); setSelectedPartnerIds([]); }}
+                      className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${partnerFilter === 'prospect' ? 'bg-orange-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                    >
+                      Prospects ({partnerStats.partners?.filter(p => (!p.is_real_partner || !p.payment_plan_approved || (p.payment_plan !== 'biweekly' && p.payment_plan !== 'monthly')) && p.prospect_status !== 'archived').length || 0})
+                    </button>
+                  </div>
+                  <div className="flex-1 max-w-xs">
+                    <input
+                      type="text"
+                      value={partnerSearchQuery}
+                      onChange={(e) => setPartnerSearchQuery(e.target.value)}
+                      placeholder="Search by name, email, phone..."
+                      className="w-full px-3 py-1.5 border rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-gray-500 mr-1">Status:</span>
+                  <button
+                    onClick={() => { setPartnerFilter('new'); setSelectedPartnerIds([]); }}
+                    className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${partnerFilter === 'new' ? 'bg-orange-500 text-white' : 'bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100'}`}
+                  >
+                    New ({partnerStats.partners?.filter(p => (!p.is_real_partner || !p.payment_plan_approved || (p.payment_plan !== 'biweekly' && p.payment_plan !== 'monthly')) && (!p.prospect_status || p.prospect_status === 'new')).length || 0})
+                  </button>
+                  <button
+                    onClick={() => { setPartnerFilter('first_email'); setSelectedPartnerIds([]); }}
+                    className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${partnerFilter === 'first_email' ? 'bg-blue-500 text-white' : 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'}`}
+                  >
+                    1st Email ({partnerStats.partners?.filter(p => p.prospect_status === 'first_email').length || 0})
+                  </button>
+                  <button
+                    onClick={() => { setPartnerFilter('follow_up_1'); setSelectedPartnerIds([]); }}
+                    className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${partnerFilter === 'follow_up_1' ? 'bg-yellow-500 text-white' : 'bg-yellow-50 text-yellow-700 border border-yellow-200 hover:bg-yellow-100'}`}
+                  >
+                    2nd Email ({partnerStats.partners?.filter(p => p.prospect_status === 'follow_up_1').length || 0})
+                  </button>
+                  <button
+                    onClick={() => { setPartnerFilter('follow_up_2'); setSelectedPartnerIds([]); }}
+                    className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${partnerFilter === 'follow_up_2' ? 'bg-red-500 text-white' : 'bg-red-50 text-red-700 border border-red-200 hover:bg-red-100'}`}
+                  >
+                    3rd Email ({partnerStats.partners?.filter(p => p.prospect_status === 'follow_up_2').length || 0})
+                  </button>
+                  <button
+                    onClick={() => { setPartnerFilter('archived'); setSelectedPartnerIds([]); }}
+                    className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${partnerFilter === 'archived' ? 'bg-gray-600 text-white' : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200'}`}
+                  >
+                    Archived ({partnerStats.partners?.filter(p => p.prospect_status === 'archived').length || 0})
+                  </button>
+                </div>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50">
                   <tr>
+                    <th className="px-2 py-3 text-center w-10">
+                      <input
+                        type="checkbox"
+                        checked={selectedPartnerIds.length > 0}
+                        onChange={toggleSelectAllPartners}
+                        className="rounded border-gray-300"
+                        title="Select all partners"
+                      />
+                    </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Company Name</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Orders Paid</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Orders Pending</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Tier</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Payment Plan</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Received</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Pending</th>
@@ -25037,21 +26530,75 @@ const FinancesPage = ({ adminKey }) => {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {partnerStats.partners?.length === 0 ? (
-                    <tr>
-                      <td colSpan="9" className="px-4 py-8 text-center text-gray-500">
-                        No partner orders found
-                      </td>
-                    </tr>
-                  ) : (
-                    partnerStats.partners?.map((partner) => (
-                      <tr key={partner.partner_id} className={`hover:bg-gray-50 ${!partner.is_real_partner ? 'bg-orange-50' : ''}`}>
+                  {(() => {
+                    const isRegisteredPartner = (p) => p.is_real_partner && p.payment_plan_approved && (p.payment_plan === 'biweekly' || p.payment_plan === 'monthly');
+                    const filteredPartners = (partnerStats.partners || []).filter(p => {
+                      // Filter by type
+                      if (partnerFilter === 'registered' && !isRegisteredPartner(p)) return false;
+                      if (partnerFilter === 'prospect' && (isRegisteredPartner(p) || p.prospect_status === 'archived')) return false;
+                      if (partnerFilter === 'new' && (isRegisteredPartner(p) || (p.prospect_status && p.prospect_status !== 'new'))) return false;
+                      if (partnerFilter === 'first_email' && p.prospect_status !== 'first_email') return false;
+                      if (partnerFilter === 'follow_up_1' && p.prospect_status !== 'follow_up_1') return false;
+                      if (partnerFilter === 'follow_up_2' && p.prospect_status !== 'follow_up_2') return false;
+                      if (partnerFilter === 'archived' && p.prospect_status !== 'archived') return false;
+                      // Filter by search query
+                      if (partnerSearchQuery.trim()) {
+                        const q = partnerSearchQuery.toLowerCase();
+                        return (p.company_name || '').toLowerCase().includes(q) || (p.email || '').toLowerCase().includes(q) || (p.contact_name || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q);
+                      }
+                      return true;
+                    });
+                    if (filteredPartners.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan="10" className="px-4 py-8 text-center text-gray-500">
+                            {partnerSearchQuery.trim() ? 'No partners matching your search' : partnerFilter !== 'all' ? `No ${
+                              partnerFilter === 'registered' ? 'registered' :
+                              partnerFilter === 'new' ? 'new' :
+                              partnerFilter === 'first_email' ? '1st email' :
+                              partnerFilter === 'follow_up_1' ? '2nd email' :
+                              partnerFilter === 'follow_up_2' ? '3rd email' :
+                              partnerFilter === 'archived' ? 'archived' :
+                              'prospect'
+                            } partners found` : 'No partner orders found'}
+                          </td>
+                        </tr>
+                      );
+                    }
+                    return filteredPartners.map((partner) => {
+                      const isApproved = isRegisteredPartner(partner);
+                      return (
+                      <tr key={partner.partner_id} className={`hover:bg-gray-50 ${!isApproved ? 'bg-orange-50' : ''} ${selectedPartnerIds.includes(partner.partner_id) ? 'bg-blue-50' : ''}`}>
+                        <td className="px-2 py-3 text-center">
+                          <input
+                            type="checkbox"
+                            checked={selectedPartnerIds.includes(partner.partner_id)}
+                            onChange={() => togglePartnerSelection(partner.partner_id)}
+                            className="rounded border-gray-300"
+                          />
+                        </td>
                         <td className="px-4 py-3">
                           <div className="font-medium text-gray-800">
                             {partner.company_name}
-                            {!partner.is_real_partner && (
-                              <span className="ml-2 px-1.5 py-0.5 text-xs bg-orange-200 text-orange-700 rounded" title="This is not a registered partner - orders created manually or from other sources">
-                                Not Registered
+                            {!isApproved && (
+                              <span className={`ml-2 px-1.5 py-0.5 text-xs rounded ${
+                                partner.prospect_status === 'archived' ? 'bg-gray-200 text-gray-600' :
+                                partner.prospect_status === 'follow_up_2' ? 'bg-red-100 text-red-700' :
+                                partner.prospect_status === 'follow_up_1' ? 'bg-yellow-100 text-yellow-700' :
+                                partner.prospect_status === 'first_email' ? 'bg-blue-100 text-blue-700' :
+                                'bg-orange-200 text-orange-700'
+                              }`} title={
+                                partner.prospect_status === 'archived' ? 'Archived - no response after all follow-ups' :
+                                partner.prospect_status === 'follow_up_2' ? 'Follow-up 2 sent - awaiting response' :
+                                partner.prospect_status === 'follow_up_1' ? 'Follow-up 1 sent - awaiting response' :
+                                partner.prospect_status === 'first_email' ? '1st email sent - awaiting response' :
+                                'New prospect - no emails sent yet'
+                              }>
+                                {partner.prospect_status === 'archived' ? 'Archived' :
+                                 partner.prospect_status === 'follow_up_2' ? 'Follow-up 2' :
+                                 partner.prospect_status === 'follow_up_1' ? 'Follow-up 1' :
+                                 partner.prospect_status === 'first_email' ? '1st Email' :
+                                 'New'}
                               </span>
                             )}
                           </div>
@@ -25095,6 +26642,33 @@ const FinancesPage = ({ adminKey }) => {
                         <td className="px-4 py-3 text-center">
                           {partner.is_real_partner ? (
                             <select
+                              value={partner.tier_override || partner.achieved_tier || 'standard'}
+                              onChange={(e) => {
+                                if (window.confirm(`Set tier for ${partner.company_name} to ${e.target.options[e.target.selectedIndex].text}?`)) {
+                                  setPartnerTier(partner.partner_id, e.target.value);
+                                }
+                              }}
+                              className={`text-xs px-2 py-1 rounded border ${
+                                (partner.tier_override || partner.achieved_tier) === 'platinum' ? 'bg-blue-100 border-blue-300 text-blue-700' :
+                                (partner.tier_override || partner.achieved_tier) === 'gold' ? 'bg-yellow-100 border-yellow-300 text-yellow-700' :
+                                (partner.tier_override || partner.achieved_tier) === 'silver' ? 'bg-slate-100 border-slate-300 text-slate-700' :
+                                (partner.tier_override || partner.achieved_tier) === 'bronze' ? 'bg-amber-100 border-amber-300 text-amber-700' :
+                                'bg-gray-100 border-gray-300 text-gray-700'
+                              }`}
+                            >
+                              <option value="standard">Standard (auto)</option>
+                              <option value="bronze">Bronze (10%)</option>
+                              <option value="silver">Silver (15%)</option>
+                              <option value="gold">Gold (25%)</option>
+                              <option value="platinum">Platinum (35%)</option>
+                            </select>
+                          ) : (
+                            <span className="text-xs text-gray-400">N/A</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {partner.is_real_partner ? (
+                            <select
                               value={partner.payment_plan || 'pay_per_order'}
                               onChange={(e) => {
                                 if (window.confirm(`Change payment plan for ${partner.company_name} to ${e.target.options[e.target.selectedIndex].text}?`)) {
@@ -25126,7 +26700,7 @@ const FinancesPage = ({ adminKey }) => {
                         </td>
                         <td className="px-4 py-3 text-center">
                           <div className="flex items-center justify-center space-x-1">
-                            {partner.is_real_partner ? (
+                            {isApproved ? (
                               <>
                                 <button
                                   onClick={() => handleOpenCreateInvoice(partner)}
@@ -25174,15 +26748,68 @@ const FinancesPage = ({ adminKey }) => {
                                 </button>
                               </>
                             ) : (
-                              <span className="text-xs text-gray-400" title="Actions not available for non-registered entries">
-                                -
-                              </span>
+                              <div className="flex items-center gap-1">
+                                {partner.prospect_status === 'archived' ? (
+                                  <>
+                                    <button
+                                      onClick={() => unarchiveProspect(partner.partner_id, partner.company_name)}
+                                      className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                      title="Unarchive - move back to Prospects"
+                                    >
+                                      📤
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        if (window.confirm(`Delete "${partner.company_name}"?\n\nThis action cannot be undone.`)) deletePartner(partner.partner_id);
+                                      }}
+                                      className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                      title="Delete partner"
+                                    >
+                                      🗑️
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    {partner.email && (partner.prospect_status || 'new') !== 'follow_up_2' && (
+                                      <button
+                                        onClick={() => sendProspectStepEmail(partner.partner_id, partner.company_name, partner.prospect_status)}
+                                        className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                                        title={`Send ${
+                                          !partner.prospect_status || partner.prospect_status === 'new' ? '1st Email' :
+                                          partner.prospect_status === 'first_email' ? 'Follow-up 1' :
+                                          partner.prospect_status === 'follow_up_1' ? 'Follow-up 2' : 'Next step'
+                                        }`}
+                                      >
+                                        📧
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={() => archiveProspect(partner.partner_id, partner.company_name)}
+                                      className="p-1.5 text-gray-500 hover:bg-gray-100 rounded transition-colors"
+                                      title="Archive prospect"
+                                    >
+                                      📁
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        if (window.confirm(`Delete "${partner.company_name}"?\n\nThis action cannot be undone.`)) deletePartner(partner.partner_id);
+                                      }}
+                                      className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                      title="Delete partner"
+                                    >
+                                      🗑️
+                                    </button>
+                                  </>
+                                )}
+                              </div>
                             )}
                           </div>
                         </td>
                       </tr>
-                    ))
-                  )}
+                    );
+                    })
+                  })()}
+
                 </tbody>
               </table>
             </div>
@@ -25488,6 +27115,16 @@ const FinancesPage = ({ adminKey }) => {
                               <div className="text-xs text-gray-400">
                                 {new Date(order.created_at).toLocaleDateString()}
                               </div>
+                              {order.partner_tier && order.partner_tier !== 'standard' && order.discount_amount > 0 && (
+                                <div className="text-xs text-blue-600 mt-1">
+                                  Tier: {order.partner_tier} ({order.tier_discount_percent}% off) - Saved {formatCurrency(order.discount_amount)}
+                                </div>
+                              )}
+                              {order.coupon_code && (
+                                <div className="text-xs text-green-600 mt-1">
+                                  Coupon: {order.coupon_code} (-{formatCurrency(order.coupon_discount_amount)})
+                                </div>
+                              )}
                             </div>
                           </div>
                           <div className="font-medium text-sm">{formatCurrency(order.total_price)}</div>
@@ -25495,30 +27132,118 @@ const FinancesPage = ({ adminKey }) => {
                       </div>
                     ))}
                   </div>
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Due in (days)</label>
-                      <select
-                        value={invoiceDueDays}
-                        onChange={(e) => setInvoiceDueDays(parseInt(e.target.value))}
-                        className="w-full border rounded-md px-3 py-2 text-sm"
+                  {/* Discount Section */}
+                  <div className="mb-4 p-3 bg-gray-50 border rounded-lg">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Apply Discount</label>
+                    <div className="flex gap-2 mb-2">
+                      {[5, 10, 15, 20, 25].map(pct => (
+                        <button
+                          key={pct}
+                          type="button"
+                          onClick={() => {
+                            const total = partnerOrdersForInvoice.filter(o => selectedOrdersForInvoice.includes(o.id)).reduce((sum, o) => sum + (o.total_price || 0), 0);
+                            setInvoiceManualDiscount((total * pct / 100).toFixed(2));
+                            setInvoiceDiscountReason(`${pct}% partner discount`);
+                          }}
+                          className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-blue-50 hover:border-blue-300 transition-colors"
+                        >
+                          {pct}%
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => { setInvoiceManualDiscount(''); setInvoiceDiscountReason(''); }}
+                        className="px-2 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50 transition-colors"
                       >
-                        <option value={7}>7 days</option>
-                        <option value={15}>15 days</option>
-                        <option value={30}>30 days</option>
-                        <option value={45}>45 days</option>
-                        <option value={60}>60 days</option>
-                      </select>
+                        Clear
+                      </button>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={invoiceManualDiscount}
+                        onChange={(e) => setInvoiceManualDiscount(e.target.value)}
+                        className="border rounded-md px-3 py-1.5 text-sm"
+                        placeholder="Discount amount..."
+                      />
                       <input
                         type="text"
-                        value={invoiceNotes}
-                        onChange={(e) => setInvoiceNotes(e.target.value)}
-                        className="w-full border rounded-md px-3 py-2 text-sm"
-                        placeholder="Invoice notes..."
+                        value={invoiceDiscountReason}
+                        onChange={(e) => setInvoiceDiscountReason(e.target.value)}
+                        className="border rounded-md px-3 py-1.5 text-sm"
+                        placeholder="Reason (optional)"
                       />
+                    </div>
+                    {invoiceManualDiscount && parseFloat(invoiceManualDiscount) > 0 && (
+                      <div className="text-xs text-green-600 mt-1">
+                        New total: {formatCurrency(
+                          partnerOrdersForInvoice.filter(o => selectedOrdersForInvoice.includes(o.id)).reduce((sum, o) => sum + (o.total_price || 0), 0) - parseFloat(invoiceManualDiscount)
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Due Date Mode</label>
+                    <div className="flex space-x-2 mb-2">
+                      <button
+                        onClick={() => { setInvoiceDueDateMode('days'); setInvoiceFixedDueDay(''); }}
+                        className={`px-3 py-1.5 text-xs rounded-md border ${invoiceDueDateMode === 'days' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+                      >
+                        Due in X days
+                      </button>
+                      <button
+                        onClick={() => setInvoiceDueDateMode('fixed')}
+                        className={`px-3 py-1.5 text-xs rounded-md border ${invoiceDueDateMode === 'fixed' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+                      >
+                        Fixed day of month
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        {invoiceDueDateMode === 'days' ? (
+                          <>
+                            <label className="block text-xs text-gray-500 mb-1">Due in (days)</label>
+                            <select
+                              value={invoiceDueDays}
+                              onChange={(e) => setInvoiceDueDays(parseInt(e.target.value))}
+                              className="w-full border rounded-md px-3 py-2 text-sm"
+                            >
+                              <option value={7}>7 days</option>
+                              <option value={15}>15 days</option>
+                              <option value={30}>30 days</option>
+                              <option value={45}>45 days</option>
+                              <option value={60}>60 days</option>
+                            </select>
+                          </>
+                        ) : (
+                          <>
+                            <label className="block text-xs text-gray-500 mb-1">Fixed day (1-28)</label>
+                            <select
+                              value={invoiceFixedDueDay}
+                              onChange={(e) => setInvoiceFixedDueDay(e.target.value)}
+                              className="w-full border rounded-md px-3 py-2 text-sm"
+                            >
+                              <option value="">Select day...</option>
+                              {[1,5,10,15,20,25,28].map(d => (
+                                <option key={d} value={d}>Day {d} of each month</option>
+                              ))}
+                            </select>
+                            <p className="text-xs text-gray-400 mt-1">Invoice will be due on this day every month</p>
+                          </>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Notes (optional)</label>
+                        <input
+                          type="text"
+                          value={invoiceNotes}
+                          onChange={(e) => setInvoiceNotes(e.target.value)}
+                          className="w-full border rounded-md px-3 py-2 text-sm"
+                          placeholder="Invoice notes..."
+                        />
+                      </div>
                     </div>
                   </div>
                 </>
@@ -25570,7 +27295,19 @@ const FinancesPage = ({ adminKey }) => {
                     <div key={invoice.id} className="border rounded-lg p-4">
                       <div className="flex items-center justify-between mb-3">
                         <div>
-                          <div className="font-mono font-medium">{invoice.invoice_number}</div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-medium">{invoice.invoice_number}</span>
+                            {invoice.partner_tier && invoice.partner_tier !== 'standard' && (
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${
+                                invoice.partner_tier === 'platinum' ? 'bg-blue-100 text-blue-700' :
+                                invoice.partner_tier === 'gold' ? 'bg-yellow-100 text-yellow-700' :
+                                invoice.partner_tier === 'silver' ? 'bg-slate-100 text-slate-700' :
+                                'bg-amber-100 text-amber-700'
+                              }`}>
+                                {invoice.partner_tier} {invoice.tier_discount_percent ? `(${invoice.tier_discount_percent}% off)` : ''}
+                              </span>
+                            )}
+                          </div>
                           <div className="text-xs text-gray-500">
                             Created: {new Date(invoice.created_at).toLocaleDateString()} |
                             Due: {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : '-'}
@@ -25587,6 +27324,18 @@ const FinancesPage = ({ adminKey }) => {
                           <span className="font-bold text-lg">{formatCurrency(invoice.total_amount)}</span>
                         </div>
                       </div>
+                      {invoice.discount_amount > 0 && (
+                        <div className="mb-2 p-2 bg-green-50 border border-green-200 rounded">
+                          <div className="text-xs text-green-700 font-medium">
+                            Subtotal: {formatCurrency(invoice.subtotal)} | Coupon Discount: -{formatCurrency(invoice.discount_amount)} | Total: {formatCurrency(invoice.total_amount)}
+                          </div>
+                          {invoice.discount_details?.map((d, i) => (
+                            <div key={i} className="text-xs text-green-600 mt-1">
+                              Order {d.order_number}: coupon "{d.coupon_code}" -{formatCurrency(d.discount_amount)}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       <div className="text-xs text-gray-500 mb-2">
                         {invoice.order_ids?.length || 0} orders |
                         {invoice.payment_method && ` Payment: ${invoice.payment_method}`}
@@ -25596,6 +27345,22 @@ const FinancesPage = ({ adminKey }) => {
                           </a>
                         )}
                       </div>
+                      {invoice.manual_discount_amount > 0 && (
+                        <div className="mb-2 p-2 bg-orange-50 border border-orange-200 rounded">
+                          <div className="text-xs text-orange-700 font-medium">
+                            Original Total: {formatCurrency(invoice.original_total_amount)} | Manual Discount: -{formatCurrency(invoice.manual_discount_amount)} | Final: {formatCurrency(invoice.total_amount)}
+                          </div>
+                          {invoice.manual_discount_reason && (
+                            <div className="text-xs text-orange-600 mt-1">Reason: {invoice.manual_discount_reason}</div>
+                          )}
+                          {invoice.adjusted_at && (
+                            <div className="text-xs text-orange-500 mt-1">Adjusted: {new Date(invoice.adjusted_at).toLocaleDateString()}</div>
+                          )}
+                        </div>
+                      )}
+                      {invoice.fixed_due_day && (
+                        <div className="text-xs text-blue-600 mb-2">Fixed due day: {invoice.fixed_due_day}th of each month</div>
+                      )}
                       {invoice.notes && (
                         <div className="text-xs text-gray-600 mb-2">Notes: {invoice.notes}</div>
                       )}
@@ -25632,6 +27397,12 @@ const FinancesPage = ({ adminKey }) => {
                       {invoice.status !== 'paid' && (
                         <div className="flex space-x-2 mt-3">
                           <button
+                            onClick={() => handleOpenEditInvoice(invoice)}
+                            className="px-3 py-1.5 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600"
+                          >
+                            Edit Invoice
+                          </button>
+                          <button
                             onClick={() => handleMarkInvoicePaid(invoice.id, 'zelle')}
                             className="px-3 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700"
                           >
@@ -25662,6 +27433,147 @@ const FinancesPage = ({ adminKey }) => {
                 className="px-4 py-2 border rounded-md text-sm hover:bg-gray-100"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Invoice Modal */}
+      {editingInvoice && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
+            <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+              <div>
+                <h2 className="font-bold text-gray-800">Edit Invoice</h2>
+                <p className="text-sm text-gray-500">{editingInvoice.invoice_number} - {editingInvoice.partner_company}</p>
+              </div>
+              <button onClick={() => setEditingInvoice(null)} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            <div className="p-4 space-y-4">
+              {/* Current Amount */}
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <div className="text-sm text-gray-500">Current Total</div>
+                <div className="text-2xl font-bold">{formatCurrency(editingInvoice.total_amount)}</div>
+                {editingInvoice.original_total_amount && (
+                  <div className="text-xs text-gray-400">Original: {formatCurrency(editingInvoice.original_total_amount)}</div>
+                )}
+              </div>
+
+              {/* Tier Info Display */}
+              {editingInvoice.partner_tier && editingInvoice.partner_tier !== 'standard' && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-blue-700 capitalize">
+                      Partner Tier: {editingInvoice.partner_tier}
+                    </span>
+                    <span className="text-sm font-bold text-blue-700">
+                      {editingInvoice.tier_discount_percent}% discount applied at order level
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Manual Discount */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Apply Manual Discount ($)</label>
+                {/* Quick discount buttons */}
+                <div className="flex gap-2 mb-2">
+                  {[5, 10, 15, 20, 25].map(pct => (
+                    <button
+                      key={pct}
+                      type="button"
+                      onClick={() => {
+                        const base = editingInvoice.original_total_amount || editingInvoice.total_amount;
+                        setEditInvoiceDiscount((base * pct / 100).toFixed(2));
+                        setEditInvoiceDiscountReason(`${pct}% discount`);
+                      }}
+                      className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-blue-50 hover:border-blue-300 transition-colors"
+                    >
+                      {pct}%
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={editInvoiceDiscount}
+                  onChange={(e) => setEditInvoiceDiscount(e.target.value)}
+                  className="w-full border rounded-md px-3 py-2 text-sm"
+                  placeholder="e.g. 10.00"
+                />
+                {editInvoiceDiscount && parseFloat(editInvoiceDiscount) > 0 && (
+                  <div className="text-xs text-green-600 mt-1">
+                    New total will be: {formatCurrency((editingInvoice.original_total_amount || editingInvoice.total_amount) - parseFloat(editInvoiceDiscount))}
+                  </div>
+                )}
+              </div>
+
+              {/* Discount Reason */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Discount Reason</label>
+                <input
+                  type="text"
+                  value={editInvoiceDiscountReason}
+                  onChange={(e) => setEditInvoiceDiscountReason(e.target.value)}
+                  className="w-full border rounded-md px-3 py-2 text-sm"
+                  placeholder="e.g. Partner loyalty discount, correction..."
+                />
+              </div>
+
+              {/* Due Date */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+                <input
+                  type="date"
+                  value={editInvoiceDueDate}
+                  onChange={(e) => setEditInvoiceDueDate(e.target.value)}
+                  className="w-full border rounded-md px-3 py-2 text-sm"
+                />
+              </div>
+
+              {/* Fixed Due Day */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Fixed Due Day (partner preference)</label>
+                <select
+                  value={editInvoiceFixedDueDay}
+                  onChange={(e) => setEditInvoiceFixedDueDay(e.target.value)}
+                  className="w-full border rounded-md px-3 py-2 text-sm"
+                >
+                  <option value="">No fixed day</option>
+                  {[1,5,10,15,20,25,28].map(d => (
+                    <option key={d} value={d}>Day {d} of each month</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-400 mt-1">This will also save as the partner's default preference for future invoices</p>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                <input
+                  type="text"
+                  value={editInvoiceNotes}
+                  onChange={(e) => setEditInvoiceNotes(e.target.value)}
+                  className="w-full border rounded-md px-3 py-2 text-sm"
+                  placeholder="Invoice notes..."
+                />
+              </div>
+            </div>
+            <div className="p-4 border-t bg-gray-50 flex justify-end space-x-2">
+              <button
+                onClick={() => setEditingInvoice(null)}
+                className="px-4 py-2 border rounded-md text-sm hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveInvoiceEdit}
+                disabled={savingInvoiceEdit}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:bg-gray-300"
+              >
+                {savingInvoiceEdit ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
           </div>
@@ -25753,6 +27665,130 @@ const FinancesPage = ({ adminKey }) => {
                 className="px-4 py-2 border rounded-md text-sm hover:bg-gray-100"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Email Modal */}
+      {showBulkEmailModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
+            <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+              <div>
+                <h2 className="font-bold text-gray-800">Send Email to Partners</h2>
+                <p className="text-sm text-gray-500">{selectedPartnerIds.length} partner(s) selected</p>
+              </div>
+              <button onClick={() => setShowBulkEmailModal(false)} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                <input
+                  type="text"
+                  value={bulkEmailSubject}
+                  onChange={(e) => setBulkEmailSubject(e.target.value)}
+                  className="w-full border rounded-md px-3 py-2 text-sm"
+                  placeholder="Email subject..."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+                <textarea
+                  value={bulkEmailMessage}
+                  onChange={(e) => setBulkEmailMessage(e.target.value)}
+                  className="w-full border rounded-md px-3 py-2 text-sm"
+                  rows={6}
+                  placeholder="Write your message here..."
+                />
+              </div>
+            </div>
+            <div className="p-4 border-t bg-gray-50 flex justify-between items-center">
+              <button
+                onClick={() => setShowBulkEmailModal(false)}
+                className="px-4 py-2 border rounded-md text-sm hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkEmailSend}
+                disabled={sendingBulkEmail || !bulkEmailSubject.trim() || !bulkEmailMessage.trim()}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+              >
+                {sendingBulkEmail ? 'Sending...' : `Send to ${selectedPartnerIds.length} Partner(s)`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Prospect Modal */}
+      {showAddProspectModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+              <div>
+                <h2 className="font-bold text-gray-800">Add New Prospect</h2>
+                <p className="text-sm text-gray-500">Add a new prospect partner manually</p>
+              </div>
+              <button onClick={() => setShowAddProspectModal(false)} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Company Name *</label>
+                <input
+                  type="text"
+                  value={addProspectForm.company_name}
+                  onChange={(e) => setAddProspectForm({...addProspectForm, company_name: e.target.value})}
+                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="Company name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Contact Name</label>
+                <input
+                  type="text"
+                  value={addProspectForm.contact_name}
+                  onChange={(e) => setAddProspectForm({...addProspectForm, contact_name: e.target.value})}
+                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="Contact person name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={addProspectForm.email}
+                  onChange={(e) => setAddProspectForm({...addProspectForm, email: e.target.value})}
+                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="contact@company.com"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                <input
+                  type="tel"
+                  value={addProspectForm.phone}
+                  onChange={(e) => setAddProspectForm({...addProspectForm, phone: e.target.value})}
+                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="(11) 9999-9999"
+                />
+              </div>
+            </div>
+            <div className="p-4 border-t bg-gray-50 flex justify-between items-center">
+              <button
+                onClick={() => { setShowAddProspectModal(false); setAddProspectForm({ company_name: '', contact_name: '', email: '', phone: '' }); }}
+                className="px-4 py-2 border rounded-md text-sm hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddProspect}
+                disabled={addingProspect || !addProspectForm.company_name.trim()}
+                className="px-4 py-2 bg-green-600 text-white rounded-md text-sm hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+              >
+                {addingProspect ? 'Adding...' : 'Add Prospect'}
               </button>
             </div>
           </div>
@@ -26451,7 +28487,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
   // PM Upload Translation state
   const [projectModalTab, setProjectModalTab] = useState('files'); // 'files' or 'upload'
-  const [pmUploadFile, setPmUploadFile] = useState(null);
+  const [pmUploadFiles, setPmUploadFiles] = useState([]);
   const [pmUploadLoading, setPmUploadLoading] = useState(false);
   const [pmAcceptLoading, setPmAcceptLoading] = useState(false);
 
@@ -26840,7 +28876,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       const documentType = DOCUMENT_TYPES.find(d => d.value === orderData.document_type)?.label || orderData.document_type || 'Document';
       const sourceLanguage = orderData.translate_from || orderData.source_language || 'Portuguese';
       const targetLanguage = orderData.translate_to || orderData.target_language || 'English';
-      const translationDateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      const translationDateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/New_York' });
 
       // Letterhead HTML
       const letterheadHTML = `
@@ -27041,19 +29077,43 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
   // PM Upload Translation functions
   const uploadPmTranslationPM = async (orderId) => {
-    if (!pmUploadFile || !orderId) return;
+    if (!pmUploadFiles.length || !orderId) return;
     setPmUploadLoading(true);
     try {
-      const formData = new FormData();
-      formData.append('order_id', orderId);
-      formData.append('admin_key', adminKey);
-      formData.append('file', pmUploadFile);
-      await axios.post(`${API}/admin/upload-pm-translation`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      // Upload each file using the same method as admin (base64 + JSON)
+      for (const file of pmUploadFiles) {
+        const base64Data = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result.split(',')[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        await axios.post(`${API}/admin/orders/${orderId}/documents?admin_key=${adminKey}`, {
+          filename: file.name,
+          file_data: base64Data,
+          content_type: file.type || 'application/octet-stream',
+          source: 'translated_document'
+        });
+      }
+      // Update order status to pm_upload_ready
+      await axios.put(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`, {
+        translation_status: 'pm_upload_ready',
+        pm_uploaded_at: new Date().toISOString()
       });
-      showToast('Translation uploaded successfully! Status set to READY.');
-      setPmUploadFile(null);
-      // Refresh the order data in selectedProject
+      // Notify admin via email
+      try {
+        await axios.post(`${API}/admin/notify-pm-upload`, {
+          order_id: orderId,
+          admin_key: adminKey,
+          file_count: pmUploadFiles.length,
+          filenames: pmUploadFiles.map(f => f.name)
+        });
+      } catch (notifyErr) {
+        console.warn('Admin notification email failed:', notifyErr);
+      }
+      showToast(`${pmUploadFiles.length} file(s) uploaded and sent to Admin!`);
+      setPmUploadFiles([]);
+      // Refresh the order data
       try {
         const resp = await axios.get(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`);
         if (resp.data.order) setSelectedProject(resp.data.order);
@@ -27069,14 +29129,14 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
   const acceptPmUploadPM = async (orderId) => {
     if (!orderId) return;
-    if (!confirm('Aceitar esta tradução e enviar para o admin? O status será alterado para READY.')) return;
+    if (!confirm('Accept this translation and send to admin for review?')) return;
     setPmAcceptLoading(true);
     try {
       await axios.post(`${API}/admin/accept-pm-upload`, {
         order_id: orderId,
         admin_key: adminKey
       });
-      showToast('Tradução aceita e enviada para o admin!');
+      showToast('Translation accepted and sent to admin for review!');
       // Refresh the order data in selectedProject
       try {
         const resp = await axios.get(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`);
@@ -27104,7 +29164,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       fetchDashboardData();
     } catch (err) {
       console.error('Failed to archive order:', err);
-      showToast('Erro ao arquivar: ' + (err.response?.data?.detail || err.message));
+      showToast('Error archiving: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -27127,7 +29187,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       fetchDashboardData();
     } catch (err) {
       console.error('Bulk archive failed:', err);
-      showToast('Erro ao arquivar projetos: ' + (err.response?.data?.detail || err.message));
+      showToast('Error archiving projects: ' + (err.response?.data?.detail || err.message));
     } finally {
       setDeletingOrders(false);
     }
@@ -27137,7 +29197,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   const archiveAllCompletedOrders = async () => {
     const completedOrders = orders.filter(o => ['final', 'delivered'].includes(o.translation_status));
     if (completedOrders.length === 0) {
-      showToast('Nenhum projeto finalizado para arquivar');
+      showToast('No completed projects to archive');
       return;
     }
     if (!window.confirm(`Arquivar TODOS os ${completedOrders.length} projetos finalizados/entregues?\n\nOs projetos serão removidos do seu painel, mas o admin ainda terá acesso.`)) return;
@@ -27152,7 +29212,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       fetchDashboardData();
     } catch (err) {
       console.error('Bulk archive completed failed:', err);
-      showToast('Erro ao arquivar projetos: ' + (err.response?.data?.detail || err.message));
+      showToast('Error archiving projects: ' + (err.response?.data?.detail || err.message));
     } finally {
       setDeletingOrders(false);
     }
@@ -27189,6 +29249,14 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         assigned_translator_id: translatorId,
         assigned_translator_name: translatorName
       });
+
+      // Also track this translator on the order so they can see the project when they log in
+      if (selectedProject?.id) {
+        await axios.put(`${API}/admin/orders/${selectedProject.id}/add-file-translator?admin_key=${adminKey}`, {
+          translator_id: translatorId,
+          translator_name: translatorName
+        });
+      }
     } catch (err) {
       console.error('Failed to assign translator:', err);
       setFileAssignments(prev => {
@@ -27837,7 +29905,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     </div>
                     <div class="verification-row">
                         <span class="verification-label">Issue Date:</span>
-                        <span class="verification-value">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                        <span class="verification-value">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/New_York' })}</span>
                     </div>
                     <div class="verification-row">
                         <span class="verification-label">Page Count:</span>
@@ -27893,7 +29961,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     </div>
                     <div class="verification-row">
                         <span class="verification-label">Issue Date:</span>
-                        <span class="verification-value">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                        <span class="verification-value">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/New_York' })}</span>
                     </div>
                 </div>
             </div>
@@ -27928,7 +29996,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     </div>
                     <div class="verification-row">
                         <span class="verification-label">Issue Date:</span>
-                        <span class="verification-value">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                        <span class="verification-value">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/New_York' })}</span>
                     </div>
                 </div>
             </div>
@@ -28808,63 +30876,106 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                       <td className="py-2 px-2">{order.client_name}</td>
                       <td className="py-2 px-2">{order.translate_from} → {order.translate_to}</td>
                       <td className="py-2 px-2">
-                        {(order.assigned_translator_name || order.assigned_translator) ? (
-                          <div className="flex flex-col gap-1">
-                            <span
-                              onClick={() => openAssignTranslatorModal(order)}
-                              className="text-xs text-green-700 font-medium cursor-pointer hover:text-green-900 hover:underline"
-                              title="Click to change translator"
-                            >
-                              {order.assigned_translator_name || order.assigned_translator}
-                            </span>
-                            {order.translator_assignment_status === 'pending' && (
-                              <span
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (confirm('Mark translator as Accepted?')) {
-                                    updateTranslatorAssignmentStatus(order.id, 'accepted');
-                                  }
-                                }}
-                                className="text-[10px] px-1.5 py-0.5 bg-yellow-50 text-yellow-600 rounded w-fit border border-yellow-200 cursor-pointer hover:bg-yellow-100"
-                                title="Click to mark as Accepted"
-                              >
-                                Pending
-                              </span>
-                            )}
-                            {order.translator_assignment_status === 'accepted' && (
-                              <span
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (confirm('Change status back to Pending?')) {
-                                    updateTranslatorAssignmentStatus(order.id, 'pending');
-                                  }
-                                }}
-                                className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 rounded w-fit cursor-pointer hover:bg-green-200"
-                                title="Click to change status"
-                              >
-                                ✓ Accepted
-                              </span>
-                            )}
-                            {order.translator_assignment_status === 'declined' && (
-                              <div className="flex flex-col gap-1">
-                                <span className="text-[10px] px-1.5 py-0.5 bg-red-100 text-red-700 rounded w-fit">✕ Declined</span>
-                                <button
+                        {(() => {
+                          // Determine all assigned translators (order-level + file-level)
+                          const allTranslatorNames = [];
+                          if (order.assigned_translator_name || order.assigned_translator) {
+                            allTranslatorNames.push(order.assigned_translator_name || order.assigned_translator);
+                          }
+                          if (order.file_translator_names && order.file_translator_names.length > 0) {
+                            for (const name of order.file_translator_names) {
+                              if (name && !allTranslatorNames.includes(name)) {
+                                allTranslatorNames.push(name);
+                              }
+                            }
+                          }
+                          const isMultiple = allTranslatorNames.length > 1;
+
+                          return allTranslatorNames.length > 0 ? (
+                            <div className="flex flex-col gap-1">
+                              {isMultiple ? (
+                                <div>
+                                  <span
+                                    onClick={() => openAssignTranslatorModal(order)}
+                                    className="text-xs text-purple-700 font-bold cursor-pointer hover:text-purple-900 hover:underline"
+                                    title={`Assigned translators: ${allTranslatorNames.join(', ')}\nClick to manage`}
+                                  >
+                                    MULTIPLE ({allTranslatorNames.length})
+                                  </span>
+                                  <div className="flex flex-wrap gap-0.5 mt-1">
+                                    {allTranslatorNames.map((name, i) => (
+                                      <span key={i} className="text-[9px] px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded border border-purple-200">
+                                        {name}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : (
+                                <span
                                   onClick={() => openAssignTranslatorModal(order)}
-                                  className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 flex items-center gap-1 w-fit"
+                                  className="text-xs text-green-700 font-medium cursor-pointer hover:text-green-900 hover:underline"
+                                  title="Click to change translator"
                                 >
-                                  🔄 Reassign
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => openAssignTranslatorModal(order)}
-                            className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-[10px] hover:bg-blue-200 flex items-center gap-1"
-                          >
-                            📧 Email Invite
-                          </button>
-                        )}
+                                  {allTranslatorNames[0]}
+                                </span>
+                              )}
+                              {order.translator_assignment_status === 'bulk_pending' && (
+                                <span
+                                  className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded w-fit border border-purple-200"
+                                  title={`Bulk invite sent to ${order.bulk_invite_count || '?'} translators. Waiting for first acceptance.`}
+                                >
+                                  📢 BULK INVITE ({order.bulk_invite_count || '?'}) - Awaiting
+                                </span>
+                              )}
+                              {order.translator_assignment_status === 'pending' && (
+                                <span
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (confirm('Mark translator as Accepted?')) {
+                                      updateTranslatorAssignmentStatus(order.id, 'accepted');
+                                    }
+                                  }}
+                                  className="text-[10px] px-1.5 py-0.5 bg-yellow-50 text-yellow-600 rounded w-fit border border-yellow-200 cursor-pointer hover:bg-yellow-100"
+                                  title="Click to mark as Accepted"
+                                >
+                                  Pending
+                                </span>
+                              )}
+                              {order.translator_assignment_status === 'accepted' && (
+                                <span
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (confirm('Change status back to Pending?')) {
+                                      updateTranslatorAssignmentStatus(order.id, 'pending');
+                                    }
+                                  }}
+                                  className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 rounded w-fit cursor-pointer hover:bg-green-200"
+                                  title="Click to change status"
+                                >
+                                  ✓ Accepted
+                                </span>
+                              )}
+                              {order.translator_assignment_status === 'declined' && (
+                                <div className="flex flex-col gap-1">
+                                  <span className="text-[10px] px-1.5 py-0.5 bg-red-100 text-red-700 rounded w-fit">✕ Declined</span>
+                                  <button
+                                    onClick={() => openAssignTranslatorModal(order)}
+                                    className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 flex items-center gap-1 w-fit"
+                                  >
+                                    🔄 Reassign
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => openAssignTranslatorModal(order)}
+                              className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-[10px] hover:bg-blue-200 flex items-center gap-1"
+                            >
+                              📧 Email Invite
+                            </button>
+                          );
+                        })()}
                       </td>
                       <td className="py-2 px-2">
                         <span className={`px-2 py-0.5 rounded text-[10px] ${STATUS_COLORS[order.translation_status] || 'bg-gray-100'}`}>
@@ -30702,7 +32813,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 <h3 className="font-bold">📁 Project Files {selectedProject.order_number}</h3>
                 <p className="text-xs opacity-80">{selectedProject.client_name} • {selectedProject.translate_from} → {selectedProject.translate_to}</p>
               </div>
-              <button onClick={() => { setSelectedProject(null); setProjectTrDeadline({ date: '', time: '17:00' }); setProjectModalTab('files'); setPmUploadFile(null); }} className="text-white hover:text-gray-200 text-xl">×</button>
+              <button onClick={() => { setSelectedProject(null); setProjectTrDeadline({ date: '', time: '17:00' }); setProjectModalTab('files'); setPmUploadFiles([]); }} className="text-white hover:text-gray-200 text-xl">×</button>
             </div>
 
             {/* Tabs */}
@@ -30746,7 +32857,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-6 text-center">
                       <div className="text-5xl mb-3">🏁</div>
                       <div className="text-xl font-bold text-blue-800 mb-1">FINAL</div>
-                      <p className="text-sm text-blue-600">Esta tradução foi aprovada pelo admin e entregue ao cliente.</p>
+                      <p className="text-sm text-blue-600">This translation has been approved by the admin and delivered to the client.</p>
                       {selectedProject.completed_at && (
                         <p className="text-xs text-blue-500 mt-2">Completed: {new Date(selectedProject.completed_at).toLocaleString()}</p>
                       )}
@@ -30763,13 +32874,13 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     </div>
                   )}
 
-                  {/* READY status - review/accept */}
+                  {/* READY status - sent to admin, waiting for review */}
                   {selectedProject.translation_status === 'pm_upload_ready' && selectedProject.pm_upload_filename && (
                     <div className="bg-green-100 border border-green-400 rounded-lg p-4">
                       <div className="flex items-center gap-2 mb-3">
                         <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white text-sm">✓</div>
                         <div>
-                          <div className="text-sm font-bold text-green-800">Translation Uploaded - READY</div>
+                          <div className="text-sm font-bold text-green-800">Translation Uploaded - Sent to Admin</div>
                           <div className="text-xs text-green-700">Waiting for admin review and approval</div>
                         </div>
                       </div>
@@ -30780,88 +32891,97 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                           <div className="col-span-2"><span className="font-bold text-gray-600">Uploaded:</span> {selectedProject.pm_uploaded_at ? new Date(selectedProject.pm_uploaded_at).toLocaleString() : 'N/A'}</div>
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => downloadPmTranslationPM(selectedProject.id)}
-                          className="flex-1 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700"
-                        >
-                          Open & Review File
-                        </button>
-                        <button
-                          onClick={() => acceptPmUploadPM(selectedProject.id)}
-                          disabled={pmAcceptLoading}
-                          className="flex-1 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded hover:bg-green-700 disabled:opacity-50"
-                        >
-                          {pmAcceptLoading ? 'Sending...' : 'Accept & Send to Admin'}
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => downloadPmTranslationPM(selectedProject.id)}
+                        className="w-full px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700"
+                      >
+                        Download Uploaded File
+                      </button>
                     </div>
                   )}
 
                   {/* Upload area - always visible so PM can upload/re-upload and send to admin */}
                   <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-lg p-4">
                       <h3 className="text-xs font-bold text-orange-800 mb-3">
-                        {selectedProject.pm_upload_filename ? 'Re-upload Translation File' : 'Upload External Translation'}
+                        {selectedProject.pm_upload_filename ? 'Re-upload Translation Files' : 'Upload External Translation'}
                       </h3>
-                      <p className="text-xs text-orange-600 mb-3">Upload the final translated file (PDF, DOCX, TXT, XLSX). Max 20MB.</p>
+                      <p className="text-xs text-orange-600 mb-3">Upload translated files (PDF, DOCX, TXT, XLSX). Multiple files allowed. Max 20MB per file.</p>
                       <div
                         className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-                          pmUploadFile ? 'border-orange-400 bg-orange-100' : 'border-orange-300 hover:border-orange-500 cursor-pointer'
+                          pmUploadFiles.length > 0 ? 'border-orange-400 bg-orange-100' : 'border-orange-300 hover:border-orange-500 cursor-pointer'
                         }`}
                         onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                         onDrop={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          const files = e.dataTransfer.files;
-                          if (files.length > 0) {
-                            const file = files[0];
-                            if (file.size > 20 * 1024 * 1024) {
-                              showToast('File too large. Maximum size is 20MB.');
-                              return;
+                          const droppedFiles = Array.from(e.dataTransfer.files);
+                          const validFiles = droppedFiles.filter(f => {
+                            if (f.size > 20 * 1024 * 1024) {
+                              showToast(`File "${f.name}" too large. Maximum 20MB per file.`);
+                              return false;
                             }
-                            setPmUploadFile(file);
-                          }
+                            return true;
+                          });
+                          if (validFiles.length > 0) setPmUploadFiles(prev => [...prev, ...validFiles]);
                         }}
-                        onClick={() => { if (!pmUploadFile) document.getElementById('pm-upload-input-modal').click(); }}
+                        onClick={() => { if (pmUploadFiles.length === 0) document.getElementById('pm-upload-input-modal').click(); }}
                       >
-                        {pmUploadFile ? (
+                        {pmUploadFiles.length > 0 ? (
                           <div>
                             <div className="text-3xl mb-2">📎</div>
-                            <div className="text-sm font-medium text-orange-800">{pmUploadFile.name}</div>
-                            <div className="text-xs text-orange-600 mt-1">{(pmUploadFile.size / 1024).toFixed(1)} KB</div>
+                            <div className="text-sm font-medium text-orange-800">{pmUploadFiles.length} file(s) selected</div>
+                            <div className="mt-1 space-y-1">
+                              {pmUploadFiles.map((f, i) => (
+                                <div key={i} className="text-xs text-orange-700 flex items-center justify-center gap-2">
+                                  <span>{f.name} ({(f.size / 1024).toFixed(1)} KB)</span>
+                                  <button onClick={(e) => { e.stopPropagation(); setPmUploadFiles(prev => prev.filter((_, idx) => idx !== i)); }} className="text-red-500 hover:text-red-700 font-bold">x</button>
+                                </div>
+                              ))}
+                            </div>
                             <button
-                              onClick={(e) => { e.stopPropagation(); setPmUploadFile(null); }}
+                              onClick={(e) => { e.stopPropagation(); setPmUploadFiles([]); }}
                               className="mt-2 text-xs text-red-500 hover:text-red-700 underline"
                             >
-                              Remove
+                              Remove All
                             </button>
                           </div>
                         ) : (
                           <div>
                             <div className="text-3xl mb-2">📤</div>
-                            <p className="text-sm text-orange-700 mb-1">Drag & drop your translation file here</p>
-                            <p className="text-xs text-orange-500">or click to browse</p>
+                            <p className="text-sm text-orange-700 mb-1">Drag & drop your translation files here</p>
+                            <p className="text-xs text-orange-500">or click to browse (multiple files allowed)</p>
                           </div>
                         )}
                         <input
                           type="file"
                           accept=".pdf,.docx,.doc,.txt,.xlsx,.xls,.pptx,.rtf"
+                          multiple
                           onChange={(e) => {
-                            const file = e.target.files[0];
-                            if (file) {
-                              if (file.size > 20 * 1024 * 1024) {
-                                showToast('File too large. Maximum size is 20MB.');
-                                return;
+                            const newFiles = Array.from(e.target.files).filter(f => {
+                              if (f.size > 20 * 1024 * 1024) {
+                                showToast(`File "${f.name}" too large. Maximum 20MB per file.`);
+                                return false;
                               }
-                              setPmUploadFile(file);
-                            }
+                              return true;
+                            });
+                            if (newFiles.length > 0) setPmUploadFiles(prev => [...prev, ...newFiles]);
+                            e.target.value = '';
                           }}
                           className="hidden"
                           id="pm-upload-input-modal"
                         />
+                        {pmUploadFiles.length > 0 && (
+                          <label
+                            htmlFor="pm-upload-input-modal"
+                            className="mt-2 inline-block px-3 py-1 bg-orange-400 text-white text-xs rounded cursor-pointer hover:bg-orange-500 transition"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            + Add More Files
+                          </label>
+                        )}
                       </div>
 
-                      {pmUploadFile && (
+                      {pmUploadFiles.length > 0 && (
                         <button
                           onClick={() => uploadPmTranslationPM(selectedProject.id)}
                           disabled={pmUploadLoading}
@@ -30870,10 +32990,10 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                           {pmUploadLoading ? (
                             <>
                               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                              Uploading...
+                              Uploading {pmUploadFiles.length} file(s)...
                             </>
                           ) : (
-                            'Upload & Send to Admin'
+                            `Upload ${pmUploadFiles.length} File(s) & Send to Admin`
                           )}
                         </button>
                       )}
@@ -30993,7 +33113,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                           <button
                             onClick={() => deleteProjectDocument(doc.id, doc.filename)}
                             className="px-2 py-1.5 bg-red-500 text-white rounded text-xs hover:bg-red-600"
-                            title="Excluir documento"
+                            title="Delete document"
                           >
                             🗑️
                           </button>
@@ -31060,10 +33180,10 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
             {/* Footer */}
             <div className="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end">
               <button
-                onClick={() => { setSelectedProject(null); setProjectTrDeadline({ date: '', time: '17:00' }); setProjectModalTab('files'); setPmUploadFile(null); }}
+                onClick={() => { setSelectedProject(null); setProjectTrDeadline({ date: '', time: '17:00' }); setProjectModalTab('files'); setPmUploadFiles([]); }}
                 className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
               >
-                Fechar
+                Close
               </button>
             </div>
           </div>
@@ -31092,6 +33212,7 @@ const SalesControlPage = ({ adminKey }) => {
   const [loading, setLoading] = useState(true);
   const [showAddSalesperson, setShowAddSalesperson] = useState(false);
   const [showAddAcquisition, setShowAddAcquisition] = useState(false);
+  const [acquisitionSearchQuery, setAcquisitionSearchQuery] = useState('');
   const [showSetGoal, setShowSetGoal] = useState(false);
   const [editingSalesperson, setEditingSalesperson] = useState(null);
   const [ranking, setRanking] = useState([]);
@@ -31225,7 +33346,7 @@ const SalesControlPage = ({ adminKey }) => {
   };
 
   const handleInviteSalesperson = async (id) => {
-    if (!window.confirm('Enviar email de convite para este vendedor?')) return;
+    if (!window.confirm('Send invitation email to this salesperson?')) return;
     try {
       const res = await fetch(`${API_URL}/api/admin/salespeople/${id}/invite`, {
         method: 'POST',
@@ -31233,14 +33354,14 @@ const SalesControlPage = ({ adminKey }) => {
       });
       const data = await res.json();
       if (res.ok) {
-        showToast(`Convite enviado! Link: ${data.invite_link}`);
+        showToast(`Invite sent! Link: ${data.invite_link}`);
         fetchAllData();
       } else {
-        showToast(data.detail || 'Falha ao enviar convite');
+        showToast(data.detail || 'Failed to send invite');
       }
     } catch (error) {
       console.error('Error inviting salesperson:', error);
-      showToast('Erro ao enviar convite');
+      showToast('Error sending invite');
     }
   };
 
@@ -31251,12 +33372,12 @@ const SalesControlPage = ({ adminKey }) => {
         headers: { 'admin-key': adminKey }
       });
       if (res.ok) {
-        showToast('Comissão aprovada! Vendedor será notificado.');
+        showToast('Commission approved! Salesperson will be notified.');
         fetchAllData();
       }
     } catch (error) {
       console.error('Error approving commission:', error);
-      showToast('Erro ao aprovar comissão');
+      showToast('Error approving commission');
     }
   };
 
@@ -31276,14 +33397,14 @@ const SalesControlPage = ({ adminKey }) => {
       });
 
       if (res.ok) {
-        showToast(`Pagamento de $${spData.total_amount.toFixed(2)} processado! Vendedor notificado.`);
+        showToast(`Payment of $${spData.total_amount.toFixed(2)} processed! Salesperson notified.`);
         setShowPaymentModal(null);
         setPaymentForm({ method: 'bank_transfer', reference: '', notes: '' });
         fetchAllData();
       }
     } catch (error) {
       console.error('Error processing payment:', error);
-      showToast('Erro ao processar pagamento');
+      showToast('Error processing payment');
     }
   };
 
@@ -31327,16 +33448,16 @@ const SalesControlPage = ({ adminKey }) => {
         body: JSON.stringify(editAcquisitionForm)
       });
       if (res.ok) {
-        showToast('Aquisição atualizada com sucesso!');
+        showToast('Acquisition updated successfully!');
         setEditingAcquisition(null);
         setEditAcquisitionForm({});
         fetchAllData();
       } else {
-        showToast('Erro ao atualizar aquisição');
+        showToast('Error updating acquisition');
       }
     } catch (error) {
       console.error('Error updating acquisition:', error);
-      showToast('Erro ao atualizar aquisição');
+      showToast('Error updating acquisition');
     }
   };
 
@@ -31348,15 +33469,15 @@ const SalesControlPage = ({ adminKey }) => {
         headers: { 'admin-key': adminKey }
       });
       if (res.ok) {
-        showToast('Aquisição deletada com sucesso!');
+        showToast('Acquisition deleted successfully!');
         setDeletingAcquisition(null);
         fetchAllData();
       } else {
-        showToast('Erro ao deletar aquisição');
+        showToast('Error deleting acquisition');
       }
     } catch (error) {
       console.error('Error deleting acquisition:', error);
-      showToast('Erro ao deletar aquisição');
+      showToast('Error deleting acquisition');
     }
   };
 
@@ -31380,23 +33501,23 @@ const SalesControlPage = ({ adminKey }) => {
   };
 
   const outreachLabels = {
-    'not_contacted': { label: 'Não contatado', color: 'bg-gray-100 text-gray-600', dot: 'bg-gray-400' },
-    'first_contact': { label: '1o Contato enviado', color: 'bg-blue-100 text-blue-700', dot: 'bg-blue-500' },
-    'followup_1': { label: 'Follow-up 1 enviado', color: 'bg-yellow-100 text-yellow-700', dot: 'bg-yellow-500' },
-    'followup_2': { label: 'Follow-up 2 enviado', color: 'bg-orange-100 text-orange-700', dot: 'bg-orange-500' },
-    'followup_3': { label: 'Sequência completa', color: 'bg-green-100 text-green-700', dot: 'bg-green-500' }
+    'not_contacted': { label: 'Not Contacted', color: 'bg-gray-100 text-gray-600', dot: 'bg-gray-400' },
+    'first_contact': { label: '1st Contact Sent', color: 'bg-blue-100 text-blue-700', dot: 'bg-blue-500' },
+    'followup_1': { label: 'Follow-up 1 Sent', color: 'bg-yellow-100 text-yellow-700', dot: 'bg-yellow-500' },
+    'followup_2': { label: 'Follow-up 2 Sent', color: 'bg-orange-100 text-orange-700', dot: 'bg-orange-500' },
+    'followup_3': { label: 'Sequence Complete', color: 'bg-green-100 text-green-700', dot: 'bg-green-500' }
   };
 
   const nextStepLabels = {
-    'first_contact': 'Enviar 1o Contato',
-    'followup_1': 'Enviar Follow-up 1 (Dia 3)',
-    'followup_2': 'Enviar Follow-up 2 (Dia 7)',
-    'followup_3': 'Enviar Follow-up 3 (Dia 14)'
+    'first_contact': 'Send 1st Contact',
+    'followup_1': 'Send Follow-up 1 (Day 3)',
+    'followup_2': 'Send Follow-up 2 (Day 7)',
+    'followup_3': 'Send Follow-up 3 (Day 14)'
   };
 
   const handleSendOutreach = async (acq, emailType) => {
     if (!acq.partner_email) {
-      showToast('Este parceiro não tem email cadastrado. Edite para adicionar.');
+      showToast('This partner has no registered email. Edit to add one.');
       return;
     }
     setSendingOutreach(acq.id + '_' + emailType);
@@ -31413,13 +33534,13 @@ const SalesControlPage = ({ adminKey }) => {
       });
       const data = await res.json();
       if (res.ok) {
-        showToast(`Email enviado para ${acq.partner_name}!`);
+        showToast(`Email sent to ${acq.partner_name}!`);
         fetchAllData();
       } else {
-        showToast(data.detail || 'Erro ao enviar email');
+        showToast(data.detail || 'Error sending email');
       }
     } catch (error) {
-      showToast('Erro ao enviar email');
+      showToast('Error sending email');
     }
     setSendingOutreach(null);
   };
@@ -31431,10 +33552,10 @@ const SalesControlPage = ({ adminKey }) => {
       return nextStep === emailType;
     });
     if (eligible.length === 0) {
-      showToast('Nenhum parceiro elegível para este envio.');
+      showToast('No eligible partners for this send.');
       return;
     }
-    if (!window.confirm(`Enviar "${nextStepLabels[emailType]}" para ${eligible.length} parceiro(s)?`)) return;
+    if (!window.confirm(`Send "${nextStepLabels[emailType]}" to ${eligible.length} partner(s)?`)) return;
     setSendingOutreach('bulk_' + emailType);
     try {
       const res = await fetch(`${API_URL}/api/admin/outreach/send-bulk`, {
@@ -31448,11 +33569,11 @@ const SalesControlPage = ({ adminKey }) => {
       const data = await res.json();
       if (res.ok) {
         setOutreachResult(data);
-        showToast(`Enviados: ${data.sent} | Ignorados: ${data.skipped} | Falhas: ${data.failed}`);
+        showToast(`Sent: ${data.sent} | Skipped: ${data.skipped} | Failed: ${data.failed}`);
         fetchAllData();
       }
     } catch (error) {
-      showToast('Erro ao enviar emails em lote');
+      showToast('Error sending bulk emails');
     }
     setSendingOutreach(null);
   };
@@ -31541,11 +33662,11 @@ const SalesControlPage = ({ adminKey }) => {
       <div className="flex gap-2 mb-6 border-b border-gray-200 overflow-x-auto">
         {[
           { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-          { id: 'salespeople', label: 'Vendedores', icon: '👥' },
-          { id: 'acquisitions', label: 'Aquisições', icon: '🤝' },
-          { id: 'goals', label: 'Metas', icon: '🎯' },
+          { id: 'salespeople', label: 'Salespeople', icon: '👥' },
+          { id: 'acquisitions', label: 'Acquisitions', icon: '🤝' },
+          { id: 'goals', label: 'Goals', icon: '🎯' },
           { id: 'ranking', label: 'Ranking', icon: '🏆' },
-          { id: 'payments', label: 'Pagamentos', icon: '💳' }
+          { id: 'payments', label: 'Payments', icon: '💳' }
         ].map(tab => (
           <button
             key={tab.id}
@@ -31730,10 +33851,10 @@ const SalesControlPage = ({ adminKey }) => {
                             onClick={() => {
                               const link = `${window.location.origin}/#/partner?ref=${sp.referral_code}`;
                               navigator.clipboard.writeText(link);
-                              showToast('Link copiado!\n' + link);
+                              showToast('Link copied!\n' + link);
                             }}
                             className="text-xs text-purple-500 hover:text-purple-700"
-                            title="Copiar link de referral"
+                            title="Copy referral link"
                           >
                             📋
                           </button>
@@ -31818,33 +33939,64 @@ const SalesControlPage = ({ adminKey }) => {
       {activeTab === 'acquisitions' && (
         <div>
           <div className="flex justify-between items-center mb-4">
-            <h3 className="font-semibold text-gray-700">Aquisições de Parceiros ({acquisitions.length})</h3>
-            <button
-              onClick={() => setShowAddAcquisition(true)}
-              className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2"
-              disabled={salespeople.length === 0}
-            >
-              <span>🤝</span> Registrar Aquisição
-            </button>
+            <h3 className="font-semibold text-gray-700">Partner Acquisitions ({acquisitions.length})</h3>
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="text"
+                  value={acquisitionSearchQuery}
+                  onChange={(e) => setAcquisitionSearchQuery(e.target.value)}
+                  placeholder="Search by name, email, salesperson..."
+                  className="w-72 pl-9 pr-3 py-1.5 border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {acquisitionSearchQuery && (
+                  <button
+                    onClick={() => setAcquisitionSearchQuery('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+              <button
+                onClick={() => setShowAddAcquisition(true)}
+                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2"
+                disabled={salespeople.length === 0}
+              >
+                <span>🤝</span> Register Acquisition
+              </button>
+            </div>
           </div>
 
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Data</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Parceiro</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Date</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Partner</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Email</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Tier</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Vendedor</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Comissão</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Salesperson</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Commission</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Outreach</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Ações</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {acquisitions.map(acq => (
+                {acquisitions.filter(acq => {
+                  if (!acquisitionSearchQuery.trim()) return true;
+                  const q = acquisitionSearchQuery.toLowerCase();
+                  return (acq.partner_name || '').toLowerCase().includes(q) ||
+                    (acq.partner_email || '').toLowerCase().includes(q) ||
+                    (acq.salesperson_name || '').toLowerCase().includes(q) ||
+                    (acq.partner_id || '').toLowerCase().includes(q) ||
+                    (acq.partner_tier || '').toLowerCase().includes(q) ||
+                    (acq.commission_status || '').toLowerCase().includes(q);
+                }).map(acq => (
                   <tr key={acq.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-sm text-gray-600">{acq.acquisition_date}</td>
                     <td className="px-4 py-3">
@@ -31857,8 +34009,8 @@ const SalesControlPage = ({ adminKey }) => {
                           {acq.partner_email.length > 25 ? acq.partner_email.substring(0, 25) + '...' : acq.partner_email}
                         </a>
                       ) : (
-                        <span className="text-xs text-red-500 bg-red-50 px-2 py-1 rounded cursor-pointer" onClick={() => handleEditAcquisition(acq)} title="Clique para adicionar email">
-                          Sem email
+                        <span className="text-xs text-red-500 bg-red-50 px-2 py-1 rounded cursor-pointer" onClick={() => handleEditAcquisition(acq)} title="Click to add email">
+                          No email
                         </span>
                       )}
                     </td>
@@ -31873,7 +34025,7 @@ const SalesControlPage = ({ adminKey }) => {
                     </td>
                     <td className="px-4 py-3">
                       <span className={`px-2 py-1 rounded text-xs font-medium ${statusColors[acq.commission_status]}`}>
-                        {acq.commission_status === 'pending' ? 'Pendente' : acq.commission_status === 'approved' ? 'Aprovado' : 'Pago'}
+                        {acq.commission_status === 'pending' ? 'Pending' : acq.commission_status === 'approved' ? 'Approved' : 'Paid'}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -31894,7 +34046,7 @@ const SalesControlPage = ({ adminKey }) => {
                                 className="px-2 py-1 bg-indigo-500 text-white text-xs rounded hover:bg-indigo-600 disabled:opacity-50"
                                 title={nextStepLabels[nextStep]}
                               >
-                                {sendingOutreach === acq.id + '_' + nextStep ? 'Enviando...' : nextStepLabels[nextStep]}
+                                {sendingOutreach === acq.id + '_' + nextStep ? 'Sending...' : nextStepLabels[nextStep]}
                               </button>
                             )}
                           </div>
@@ -31906,44 +34058,44 @@ const SalesControlPage = ({ adminKey }) => {
                         <button
                           onClick={() => setViewingAcquisition(acq)}
                           className="px-2 py-1 bg-gray-500 text-white text-xs rounded hover:bg-gray-600"
-                          title="Ver detalhes do parceiro"
+                          title="View partner details"
                         >
-                          Ver Detalhes
+                          View Details
                         </button>
                         {acq.commission_status === 'pending' && (
                           <button
                             onClick={() => handleEditAcquisition(acq)}
                             className="px-2 py-1 bg-orange-500 text-white text-xs rounded hover:bg-orange-600"
-                            title="Editar dados da aquisição"
+                            title="Edit acquisition data"
                           >
-                            Editar
+                            Edit
                           </button>
                         )}
                         {acq.commission_status === 'pending' && (
                           <button
                             onClick={() => handleApproveCommission(acq.id)}
                             className="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
-                            title="Aprovar e notificar vendedor"
+                            title="Approve and notify salesperson"
                           >
-                            ✓ Aprovar
+                            ✓ Approve
                           </button>
                         )}
                         {acq.commission_status === 'approved' && (
                           <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded">
-                            Aguardando pagamento
+                            Awaiting payment
                           </span>
                         )}
                         {acq.commission_status === 'paid' && (
                           <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded">
-                            ✓ Pago
+                            ✓ Paid
                           </span>
                         )}
                         <button
                           onClick={() => setDeletingAcquisition(acq)}
                           className="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
-                          title="Deletar aquisição"
+                          title="Delete acquisition"
                         >
-                          Deletar
+                          Delete
                         </button>
                       </div>
                     </td>
@@ -31954,7 +34106,7 @@ const SalesControlPage = ({ adminKey }) => {
             {acquisitions.length === 0 && (
               <div className="text-center py-12 text-gray-400">
                 <p className="text-4xl mb-2">🤝</p>
-                <p>Nenhuma aquisição registrada ainda</p>
+                <p>No acquisitions registered yet</p>
               </div>
             )}
           </div>
@@ -31963,7 +34115,7 @@ const SalesControlPage = ({ adminKey }) => {
           {acquisitions.length > 0 && (
             <div className="mt-6 bg-white rounded-xl shadow-sm p-6">
               <h4 className="font-semibold text-gray-700 mb-4 flex items-center gap-2">
-                <span>📧</span> Painel de Outreach
+                <span>📧</span> Outreach Panel
               </h4>
 
               {/* Stats */}
@@ -31981,35 +34133,35 @@ const SalesControlPage = ({ adminKey }) => {
 
               {/* Bulk Actions */}
               <div className="border-t pt-4">
-                <p className="text-sm text-gray-500 mb-3">Envio em lote (apenas parceiros com email cadastrado e elegíveis para o próximo passo):</p>
+                <p className="text-sm text-gray-500 mb-3">Bulk send (only partners with registered email and eligible for the next step):</p>
                 <div className="flex flex-wrap gap-2">
                   <button
                     onClick={() => handleSendBulkOutreach('first_contact')}
                     disabled={sendingOutreach === 'bulk_first_contact'}
                     className="px-4 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 disabled:opacity-50 transition-colors"
                   >
-                    {sendingOutreach === 'bulk_first_contact' ? 'Enviando...' : `Enviar 1o Contato (${acquisitions.filter(a => a.partner_email && getNextOutreachStep(a.id) === 'first_contact').length})`}
+                    {sendingOutreach === 'bulk_first_contact' ? 'Sending...' : `Send 1st Contact (${acquisitions.filter(a => a.partner_email && getNextOutreachStep(a.id) === 'first_contact').length})`}
                   </button>
                   <button
                     onClick={() => handleSendBulkOutreach('followup_1')}
                     disabled={sendingOutreach === 'bulk_followup_1'}
                     className="px-4 py-2 bg-yellow-500 text-white text-sm rounded-lg hover:bg-yellow-600 disabled:opacity-50 transition-colors"
                   >
-                    {sendingOutreach === 'bulk_followup_1' ? 'Enviando...' : `Follow-up 1 (${acquisitions.filter(a => a.partner_email && getNextOutreachStep(a.id) === 'followup_1').length})`}
+                    {sendingOutreach === 'bulk_followup_1' ? 'Sending...' : `Follow-up 1 (${acquisitions.filter(a => a.partner_email && getNextOutreachStep(a.id) === 'followup_1').length})`}
                   </button>
                   <button
                     onClick={() => handleSendBulkOutreach('followup_2')}
                     disabled={sendingOutreach === 'bulk_followup_2'}
                     className="px-4 py-2 bg-orange-500 text-white text-sm rounded-lg hover:bg-orange-600 disabled:opacity-50 transition-colors"
                   >
-                    {sendingOutreach === 'bulk_followup_2' ? 'Enviando...' : `Follow-up 2 (${acquisitions.filter(a => a.partner_email && getNextOutreachStep(a.id) === 'followup_2').length})`}
+                    {sendingOutreach === 'bulk_followup_2' ? 'Sending...' : `Follow-up 2 (${acquisitions.filter(a => a.partner_email && getNextOutreachStep(a.id) === 'followup_2').length})`}
                   </button>
                   <button
                     onClick={() => handleSendBulkOutreach('followup_3')}
                     disabled={sendingOutreach === 'bulk_followup_3'}
                     className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
                   >
-                    {sendingOutreach === 'bulk_followup_3' ? 'Enviando...' : `Follow-up 3 (${acquisitions.filter(a => a.partner_email && getNextOutreachStep(a.id) === 'followup_3').length})`}
+                    {sendingOutreach === 'bulk_followup_3' ? 'Sending...' : `Follow-up 3 (${acquisitions.filter(a => a.partner_email && getNextOutreachStep(a.id) === 'followup_3').length})`}
                   </button>
                 </div>
               </div>
@@ -32018,13 +34170,13 @@ const SalesControlPage = ({ adminKey }) => {
               {outreachResult && (
                 <div className="mt-4 p-4 bg-gray-50 rounded-lg">
                   <div className="flex justify-between items-center mb-2">
-                    <h5 className="font-medium text-gray-700">Resultado do envio em lote</h5>
-                    <button onClick={() => setOutreachResult(null)} className="text-gray-400 hover:text-gray-600 text-sm">Fechar</button>
+                    <h5 className="font-medium text-gray-700">Bulk send results</h5>
+                    <button onClick={() => setOutreachResult(null)} className="text-gray-400 hover:text-gray-600 text-sm">Close</button>
                   </div>
                   <div className="flex gap-4 text-sm mb-2">
-                    <span className="text-green-600 font-medium">Enviados: {outreachResult.sent}</span>
-                    <span className="text-gray-500">Ignorados: {outreachResult.skipped}</span>
-                    <span className="text-red-500">Falhas: {outreachResult.failed}</span>
+                    <span className="text-green-600 font-medium">Sent: {outreachResult.sent}</span>
+                    <span className="text-gray-500">Skipped: {outreachResult.skipped}</span>
+                    <span className="text-red-500">Failed: {outreachResult.failed}</span>
                   </div>
                   {outreachResult.details && outreachResult.details.length > 0 && (
                     <div className="max-h-40 overflow-y-auto text-xs text-gray-500">
@@ -32032,7 +34184,7 @@ const SalesControlPage = ({ adminKey }) => {
                         <div key={i} className="flex gap-2 py-1 border-b border-gray-100">
                           <span className="font-medium">{d.partner}</span>
                           <span className={d.status === 'sent' ? 'text-green-600' : d.status === 'skipped' ? 'text-yellow-600' : 'text-red-600'}>
-                            {d.status === 'sent' ? 'Enviado' : d.status === 'skipped' ? `Ignorado (${d.reason})` : `Falha (${d.reason})`}
+                            {d.status === 'sent' ? 'Sent' : d.status === 'skipped' ? `Skipped (${d.reason})` : `Failed (${d.reason})`}
                           </span>
                         </div>
                       ))}
@@ -32043,15 +34195,15 @@ const SalesControlPage = ({ adminKey }) => {
 
               {/* Recommended Sequence */}
               <div className="mt-4 p-4 bg-indigo-50 rounded-lg">
-                <p className="text-sm font-medium text-indigo-700 mb-2">Sequência recomendada:</p>
+                <p className="text-sm font-medium text-indigo-700 mb-2">Recommended sequence:</p>
                 <div className="flex items-center gap-2 text-xs text-indigo-600">
-                  <span className="bg-blue-200 px-2 py-1 rounded">Dia 0: 1o Contato</span>
+                  <span className="bg-blue-200 px-2 py-1 rounded">Day 0: 1st Contact</span>
                   <span>→</span>
-                  <span className="bg-yellow-200 px-2 py-1 rounded">Dia 3: Follow-up 1</span>
+                  <span className="bg-yellow-200 px-2 py-1 rounded">Day 3: Follow-up 1</span>
                   <span>→</span>
-                  <span className="bg-orange-200 px-2 py-1 rounded">Dia 7: Follow-up 2</span>
+                  <span className="bg-orange-200 px-2 py-1 rounded">Day 7: Follow-up 2</span>
                   <span>→</span>
-                  <span className="bg-green-200 px-2 py-1 rounded">Dia 14: Follow-up 3</span>
+                  <span className="bg-green-200 px-2 py-1 rounded">Day 14: Follow-up 3</span>
                 </div>
               </div>
             </div>
@@ -32111,7 +34263,7 @@ const SalesControlPage = ({ adminKey }) => {
           {goals.length === 0 && (
             <div className="text-center py-12 text-gray-400 bg-white rounded-xl">
               <p className="text-4xl mb-2">🎯</p>
-              <p>Nenhuma meta definida. Defina metas para seus vendedores!</p>
+              <p>No goals set. Set goals for your salespeople!</p>
             </div>
           )}
         </div>
@@ -32122,22 +34274,22 @@ const SalesControlPage = ({ adminKey }) => {
         <div className="space-y-6">
           <div className="bg-gradient-to-r from-yellow-500 via-yellow-400 to-amber-500 rounded-xl p-6 text-white">
             <h2 className="text-2xl font-bold flex items-center gap-3">
-              <span className="text-4xl">🏆</span> Ranking de Vendedores
+              <span className="text-4xl">🏆</span> Salesperson Ranking
             </h2>
-            <p className="text-yellow-100 mt-2">Desempenho do mês atual</p>
+            <p className="text-yellow-100 mt-2">Current month performance</p>
           </div>
 
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Posição</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Vendedor</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Este Mês</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Meta</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Progresso</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Total Ganho</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Pendente</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Position</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Salesperson</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">This Month</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Target</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Progress</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Total Earned</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Pending</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -32181,7 +34333,7 @@ const SalesControlPage = ({ adminKey }) => {
             {ranking.length === 0 && (
               <div className="text-center py-12 text-gray-400">
                 <p className="text-4xl mb-2">🏆</p>
-                <p>Nenhum vendedor ativo ainda.</p>
+                <p>No active salespeople yet.</p>
               </div>
             )}
           </div>
@@ -32194,7 +34346,7 @@ const SalesControlPage = ({ adminKey }) => {
           {/* Pending Payments Section */}
           <div className="bg-white rounded-xl shadow-sm p-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <span>⏳</span> Comissões Pendentes de Pagamento
+              <span>⏳</span> Commissions Pending Payment
             </h3>
             {pendingPayments.length > 0 ? (
               <div className="space-y-4">
@@ -32207,7 +34359,7 @@ const SalesControlPage = ({ adminKey }) => {
                       </div>
                       <div className="text-right">
                         <p className="text-2xl font-bold text-green-600">${sp.total_amount.toFixed(2)}</p>
-                        <p className="text-xs text-gray-400">{sp.acquisitions.length} parceiros</p>
+                        <p className="text-xs text-gray-400">{sp.acquisitions.length} partners</p>
                       </div>
                     </div>
                     <div className="flex gap-2 flex-wrap mb-3">
@@ -32221,7 +34373,7 @@ const SalesControlPage = ({ adminKey }) => {
                       onClick={() => setShowPaymentModal(sp)}
                       className="w-full py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 font-medium"
                     >
-                      💳 Processar Pagamento
+                      💳 Process Payment
                     </button>
                   </div>
                 ))}
@@ -32229,8 +34381,8 @@ const SalesControlPage = ({ adminKey }) => {
             ) : (
               <div className="text-center py-8 text-gray-400">
                 <p className="text-4xl mb-2">✅</p>
-                <p>Nenhuma comissão pendente de pagamento!</p>
-                <p className="text-sm">Aprove comissões na aba Aquisições primeiro.</p>
+                <p>No commissions pending payment!</p>
+                <p className="text-sm">Approve commissions in the Acquisitions tab first.</p>
               </div>
             )}
           </div>
@@ -32238,25 +34390,25 @@ const SalesControlPage = ({ adminKey }) => {
           {/* Payment History Section */}
           <div className="bg-white rounded-xl shadow-sm p-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <span>📜</span> Histórico de Pagamentos
+              <span>📜</span> Payment History
             </h3>
             {paymentHistory.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Data</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Vendedor</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Valor</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Método</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Referência</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Date</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Salesperson</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Amount</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Method</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Reference</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {paymentHistory.map(payment => (
                       <tr key={payment.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 text-sm text-gray-600">
-                          {new Date(payment.paid_at).toLocaleDateString('pt-BR')}
+                          {new Date(payment.paid_at).toLocaleDateString('en-US')}
                         </td>
                         <td className="px-4 py-3 font-medium text-gray-800">{payment.salesperson_name}</td>
                         <td className="px-4 py-3 font-semibold text-green-600">${payment.total_amount.toFixed(2)}</td>
@@ -32274,7 +34426,7 @@ const SalesControlPage = ({ adminKey }) => {
             ) : (
               <div className="text-center py-8 text-gray-400">
                 <p className="text-4xl mb-2">📜</p>
-                <p>Nenhum pagamento realizado ainda.</p>
+                <p>No payments made yet.</p>
               </div>
             )}
           </div>
@@ -32289,43 +34441,43 @@ const SalesControlPage = ({ adminKey }) => {
               <span>💳</span> Processar Pagamento
             </h3>
             <div className="bg-green-50 rounded-lg p-4 mb-4">
-              <p className="text-sm text-gray-600">Vendedor:</p>
+              <p className="text-sm text-gray-600">Salesperson:</p>
               <p className="font-semibold text-gray-800">{showPaymentModal.salesperson_name}</p>
               <p className="text-3xl font-bold text-green-600 mt-2">${showPaymentModal.total_amount.toFixed(2)}</p>
-              <p className="text-xs text-gray-500">{showPaymentModal.acquisitions.length} comissões</p>
+              <p className="text-xs text-gray-500">{showPaymentModal.acquisitions.length} commissions</p>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Método de Pagamento</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
                 <select
                   value={paymentForm.method}
                   onChange={(e) => setPaymentForm({...paymentForm, method: e.target.value})}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500"
                 >
-                  <option value="bank_transfer">Transferência Bancária</option>
+                  <option value="bank_transfer">Bank Transfer</option>
                   <option value="zelle">Zelle</option>
                   <option value="paypal">PayPal</option>
-                  <option value="check">Cheque</option>
+                  <option value="check">Check</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Referência/Comprovante</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Reference/Receipt</label>
                 <input
                   type="text"
                   value={paymentForm.reference}
                   onChange={(e) => setPaymentForm({...paymentForm, reference: e.target.value})}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500"
-                  placeholder="ID da transação, número do cheque, etc."
+                  placeholder="Transaction ID, check number, etc."
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Observações</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
                 <textarea
                   value={paymentForm.notes}
                   onChange={(e) => setPaymentForm({...paymentForm, notes: e.target.value})}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500"
                   rows={2}
-                  placeholder="Notas adicionais..."
+                  placeholder="Additional notes..."
                 />
               </div>
             </div>
@@ -32334,13 +34486,13 @@ const SalesControlPage = ({ adminKey }) => {
                 onClick={() => setShowPaymentModal(null)}
                 className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
               >
-                Cancelar
+                Cancel
               </button>
               <button
                 onClick={() => handleProcessPayment(showPaymentModal)}
                 className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
               >
-                Confirmar Pagamento
+                Confirm Payment
               </button>
             </div>
           </div>
@@ -32399,21 +34551,21 @@ const SalesControlPage = ({ adminKey }) => {
                   </div>
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-xs font-medium text-gray-700 mb-0.5">Tipo de Comissão</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-0.5">Commission Type</label>
                   <select
                     value={newSalesperson.commission_type}
                     onChange={(e) => setNewSalesperson({...newSalesperson, commission_type: e.target.value})}
                     className="w-full px-2 py-1.5 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                   >
-                    <option value="tier">Por Tier ($50-150/parceiro)</option>
-                    <option value="fixed">Valor Fixo por Parceiro</option>
-                    <option value="percentage">Percentual sobre Vendas</option>
-                    <option value="referral_plus_commission">Bônus Referral + Comissão %</option>
+                    <option value="tier">Per Tier ($50-150/partner)</option>
+                    <option value="fixed">Fixed Amount per Partner</option>
+                    <option value="percentage">Percentage on Sales</option>
+                    <option value="referral_plus_commission">Referral Bonus + Commission %</option>
                   </select>
                 </div>
                 {newSalesperson.commission_type === 'fixed' && (
                   <div className="col-span-2">
-                    <label className="block text-xs font-medium text-gray-700 mb-0.5">Comissão Fixa ($)</label>
+                    <label className="block text-xs font-medium text-gray-700 mb-0.5">Fixed Commission ($)</label>
                     <input
                       type="number"
                       value={newSalesperson.commission_rate}
@@ -32425,7 +34577,7 @@ const SalesControlPage = ({ adminKey }) => {
                 )}
                 {newSalesperson.commission_type === 'percentage' && (
                   <div className="col-span-2">
-                    <label className="block text-xs font-medium text-gray-700 mb-0.5">Comissão (%)</label>
+                    <label className="block text-xs font-medium text-gray-700 mb-0.5">Commission (%)</label>
                     <input
                       type="number"
                       value={newSalesperson.commission_rate}
@@ -32441,7 +34593,7 @@ const SalesControlPage = ({ adminKey }) => {
                 {newSalesperson.commission_type === 'referral_plus_commission' && (
                   <>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-0.5">Bônus Referral ($)</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-0.5">Referral Bonus ($)</label>
                       <input
                         type="number"
                         value={newSalesperson.referral_bonus}
@@ -32451,7 +34603,7 @@ const SalesControlPage = ({ adminKey }) => {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-0.5">Comissão (%)</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-0.5">Commission (%)</label>
                       <input
                         type="number"
                         value={newSalesperson.commission_rate}
@@ -32476,7 +34628,7 @@ const SalesControlPage = ({ adminKey }) => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-0.5">Meta Mensal</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-0.5">Monthly Target</label>
                   <input
                     type="number"
                     value={newSalesperson.monthly_target}
@@ -32486,7 +34638,7 @@ const SalesControlPage = ({ adminKey }) => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-0.5">Idioma</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-0.5">Language</label>
                   <select
                     value={newSalesperson.preferred_language}
                     onChange={(e) => setNewSalesperson({...newSalesperson, preferred_language: e.target.value})}
@@ -32516,14 +34668,14 @@ const SalesControlPage = ({ adminKey }) => {
                 onClick={() => setShowAddSalesperson(false)}
                 className="px-3 py-1.5 text-gray-600 hover:bg-gray-100 rounded-lg text-sm"
               >
-                Cancelar
+                Cancel
               </button>
               <button
                 onClick={handleAddSalesperson}
                 disabled={!newSalesperson.name || !newSalesperson.email}
                 className="px-3 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 text-sm"
               >
-                Adicionar
+                Add
               </button>
             </div>
           </div>
@@ -32538,12 +34690,12 @@ const SalesControlPage = ({ adminKey }) => {
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
                 <span className="text-3xl">✅</span>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900">Salesperson Criado!</h3>
-              <p className="text-gray-600 mt-1">{createdSalesperson.name} foi cadastrado com sucesso.</p>
+              <h3 className="text-lg font-semibold text-gray-900">Salesperson Created!</h3>
+              <p className="text-gray-600 mt-1">{createdSalesperson.name} was registered successfully.</p>
             </div>
 
             <div className="bg-gray-50 rounded-lg p-4 mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Código de Referral</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Referral Code</label>
               <div className="flex items-center gap-2">
                 <code className="flex-1 bg-white px-3 py-2 rounded border text-lg font-mono font-bold text-blue-600">
                   {createdSalesperson.referral_code}
@@ -32551,7 +34703,7 @@ const SalesControlPage = ({ adminKey }) => {
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(createdSalesperson.referral_code);
-                    showToast('Código copiado!');
+                    showToast('Code copied!');
                   }}
                   className="px-3 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm"
                 >
@@ -32561,7 +34713,7 @@ const SalesControlPage = ({ adminKey }) => {
             </div>
 
             <div className="bg-blue-50 rounded-lg p-4 mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Link de Referral para Parceiros</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Partner Referral Link</label>
               <div className="flex items-center gap-2">
                 <input
                   type="text"
@@ -32572,15 +34724,15 @@ const SalesControlPage = ({ adminKey }) => {
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(`${window.location.origin}/#/partner/login?ref=${createdSalesperson.referral_code}`);
-                    showToast('Link copiado!');
+                    showToast('Link copied!');
                   }}
                   className="px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm"
                 >
-                  📋 Copiar
+                  📋 Copy
                 </button>
               </div>
               <p className="text-xs text-gray-500 mt-2">
-                Envie este link para o salesperson. Quando um parceiro se cadastrar usando este link, será automaticamente vinculado a {createdSalesperson.name}.
+                Send this link to the salesperson. When a partner registers using this link, they will be automatically linked to {createdSalesperson.name}.
               </p>
             </div>
 
@@ -32588,7 +34740,7 @@ const SalesControlPage = ({ adminKey }) => {
               onClick={() => setCreatedSalesperson(null)}
               className="w-full px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900"
             >
-              Fechar
+              Close
             </button>
           </div>
         </div>
@@ -32759,7 +34911,7 @@ const SalesControlPage = ({ adminKey }) => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <span>🤝</span> Registrar Aquisição de Parceiro
+              <span>🤝</span> Register Partner Acquisition
             </h3>
             <div className="space-y-4">
               <div>
@@ -32776,7 +34928,7 @@ const SalesControlPage = ({ adminKey }) => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Parceiro *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Partner Name *</label>
                 <input
                   type="text"
                   value={newAcquisition.partner_name}
@@ -32786,27 +34938,27 @@ const SalesControlPage = ({ adminKey }) => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Contato</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Contact Name</label>
                 <input
                   type="text"
                   value={newAcquisition.partner_contact_name}
                   onChange={(e) => setNewAcquisition({...newAcquisition, partner_contact_name: e.target.value})}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="Nome da pessoa de contato"
+                  placeholder="Contact person name"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email do Parceiro</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Partner Email</label>
                 <input
                   type="email"
                   value={newAcquisition.partner_email}
                   onChange={(e) => setNewAcquisition({...newAcquisition, partner_email: e.target.value})}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="contato@parceiro.com"
+                  placeholder="contact@partner.com"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Telefone do Parceiro</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Partner Phone</label>
                 <input
                   type="tel"
                   value={newAcquisition.partner_phone}
@@ -32822,7 +34974,7 @@ const SalesControlPage = ({ adminKey }) => {
                   value={newAcquisition.partner_website}
                   onChange={(e) => setNewAcquisition({...newAcquisition, partner_website: e.target.value})}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="https://www.parceiro.com"
+                  placeholder="https://www.partner.com"
                 />
               </div>
               <div>
@@ -32832,7 +34984,7 @@ const SalesControlPage = ({ adminKey }) => {
                   value={newAcquisition.partner_id}
                   onChange={(e) => setNewAcquisition({...newAcquisition, partner_id: e.target.value})}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="Opcional - ID do parceiro no sistema"
+                  placeholder="Optional - Partner ID in system"
                 />
               </div>
               <div>
@@ -32884,7 +35036,7 @@ const SalesControlPage = ({ adminKey }) => {
           <div className="bg-white rounded-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-start mb-4">
               <h3 className="text-lg font-semibold flex items-center gap-2">
-                Detalhes da Aquisição
+                Acquisition Details
               </h3>
               <span className={`px-3 py-1 rounded-full text-white text-xs font-medium ${tierColors[viewingAcquisition.partner_tier]}`}>
                 {viewingAcquisition.partner_tier === 'platinum' ? '💎' : viewingAcquisition.partner_tier === 'gold' ? '🥇' : viewingAcquisition.partner_tier === 'silver' ? '🥈' : '🥉'} {viewingAcquisition.partner_tier}
@@ -32893,15 +35045,15 @@ const SalesControlPage = ({ adminKey }) => {
 
             <div className="space-y-4">
               <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="text-sm font-semibold text-gray-500 uppercase mb-3">Dados do Parceiro</h4>
+                <h4 className="text-sm font-semibold text-gray-500 uppercase mb-3">Partner Data</h4>
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-500">Nome da Empresa:</span>
+                    <span className="text-sm text-gray-500">Company Name:</span>
                     <span className="text-sm font-medium text-gray-800">{viewingAcquisition.partner_name}</span>
                   </div>
                   {viewingAcquisition.partner_contact_name && (
                     <div className="flex justify-between">
-                      <span className="text-sm text-gray-500">Nome do Contato:</span>
+                      <span className="text-sm text-gray-500">Contact Name:</span>
                       <span className="text-sm font-medium text-gray-800">{viewingAcquisition.partner_contact_name}</span>
                     </div>
                   )}
@@ -32913,7 +35065,7 @@ const SalesControlPage = ({ adminKey }) => {
                   )}
                   {viewingAcquisition.partner_phone && (
                     <div className="flex justify-between">
-                      <span className="text-sm text-gray-500">Telefone:</span>
+                      <span className="text-sm text-gray-500">Phone:</span>
                       <a href={`tel:${viewingAcquisition.partner_phone}`} className="text-sm font-medium text-blue-600 hover:underline">{viewingAcquisition.partner_phone}</a>
                     </div>
                   )}
@@ -32932,29 +35084,29 @@ const SalesControlPage = ({ adminKey }) => {
 
               {(!viewingAcquisition.partner_email && !viewingAcquisition.partner_phone) && (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                  <p className="text-sm text-yellow-700">Nenhum dado de contato cadastrado. Clique em "Editar" para adicionar email e telefone do parceiro.</p>
+                  <p className="text-sm text-yellow-700">No contact data registered. Click "Edit" to add the partner's email and phone.</p>
                 </div>
               )}
 
               <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="text-sm font-semibold text-gray-500 uppercase mb-3">Informações da Aquisição</h4>
+                <h4 className="text-sm font-semibold text-gray-500 uppercase mb-3">Acquisition Information</h4>
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-500">Data:</span>
+                    <span className="text-sm text-gray-500">Date:</span>
                     <span className="text-sm font-medium text-gray-800">{viewingAcquisition.acquisition_date}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-500">Vendedor:</span>
+                    <span className="text-sm text-gray-500">Salesperson:</span>
                     <span className="text-sm font-medium text-gray-800">{viewingAcquisition.salesperson_name}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-500">Comissão:</span>
+                    <span className="text-sm text-gray-500">Commission:</span>
                     <span className="text-sm font-semibold text-green-600">${viewingAcquisition.commission_paid}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-500">Status:</span>
                     <span className={`px-2 py-1 rounded text-xs font-medium ${statusColors[viewingAcquisition.commission_status]}`}>
-                      {viewingAcquisition.commission_status === 'pending' ? 'Pendente' : viewingAcquisition.commission_status === 'approved' ? 'Aprovado' : 'Pago'}
+                      {viewingAcquisition.commission_status === 'pending' ? 'Pending' : viewingAcquisition.commission_status === 'approved' ? 'Approved' : 'Paid'}
                     </span>
                   </div>
                 </div>
@@ -32962,7 +35114,7 @@ const SalesControlPage = ({ adminKey }) => {
 
               {viewingAcquisition.notes && (
                 <div className="bg-gray-50 rounded-lg p-4">
-                  <h4 className="text-sm font-semibold text-gray-500 uppercase mb-2">Notas</h4>
+                  <h4 className="text-sm font-semibold text-gray-500 uppercase mb-2">Notes</h4>
                   <p className="text-sm text-gray-700">{viewingAcquisition.notes}</p>
                 </div>
               )}
@@ -32974,14 +35126,14 @@ const SalesControlPage = ({ adminKey }) => {
                   onClick={() => { handleEditAcquisition(viewingAcquisition); setViewingAcquisition(null); }}
                   className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
                 >
-                  Editar
+                  Edit
                 </button>
               )}
               <button
                 onClick={() => setViewingAcquisition(null)}
                 className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
               >
-                Fechar
+                Close
               </button>
             </div>
           </div>
@@ -32993,11 +35145,11 @@ const SalesControlPage = ({ adminKey }) => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              Editar Aquisição - {editingAcquisition.partner_name}
+              Edit Acquisition - {editingAcquisition.partner_name}
             </h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Parceiro *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Partner Name *</label>
                 <input
                   type="text"
                   value={editAcquisitionForm.partner_name}
@@ -33006,27 +35158,27 @@ const SalesControlPage = ({ adminKey }) => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Contato</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Contact Name</label>
                 <input
                   type="text"
                   value={editAcquisitionForm.partner_contact_name}
                   onChange={(e) => setEditAcquisitionForm({...editAcquisitionForm, partner_contact_name: e.target.value})}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="Nome da pessoa de contato"
+                  placeholder="Contact person name"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email do Parceiro</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Partner Email</label>
                 <input
                   type="email"
                   value={editAcquisitionForm.partner_email}
                   onChange={(e) => setEditAcquisitionForm({...editAcquisitionForm, partner_email: e.target.value})}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="contato@parceiro.com"
+                  placeholder="contact@partner.com"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Telefone do Parceiro</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Partner Phone</label>
                 <input
                   type="tel"
                   value={editAcquisitionForm.partner_phone}
@@ -33042,7 +35194,7 @@ const SalesControlPage = ({ adminKey }) => {
                   value={editAcquisitionForm.partner_website}
                   onChange={(e) => setEditAcquisitionForm({...editAcquisitionForm, partner_website: e.target.value})}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="https://www.parceiro.com"
+                  placeholder="https://www.partner.com"
                 />
               </div>
               <div>
@@ -33052,11 +35204,11 @@ const SalesControlPage = ({ adminKey }) => {
                   value={editAcquisitionForm.partner_id}
                   onChange={(e) => setEditAcquisitionForm({...editAcquisitionForm, partner_id: e.target.value})}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="ID do parceiro no sistema"
+                  placeholder="Partner ID in system"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tier do Parceiro *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Partner Tier *</label>
                 <select
                   value={editAcquisitionForm.partner_tier}
                   onChange={(e) => setEditAcquisitionForm({...editAcquisitionForm, partner_tier: e.target.value})}
@@ -33069,13 +35221,13 @@ const SalesControlPage = ({ adminKey }) => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Notas</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
                 <textarea
                   value={editAcquisitionForm.notes}
                   onChange={(e) => setEditAcquisitionForm({...editAcquisitionForm, notes: e.target.value})}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   rows={3}
-                  placeholder="Notas sobre a aquisição..."
+                  placeholder="Notes about the acquisition..."
                 />
               </div>
             </div>
@@ -33084,14 +35236,14 @@ const SalesControlPage = ({ adminKey }) => {
                 onClick={() => { setEditingAcquisition(null); setEditAcquisitionForm({}); }}
                 className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
               >
-                Cancelar
+                Cancel
               </button>
               <button
                 onClick={handleUpdateAcquisition}
                 disabled={!editAcquisitionForm.partner_name}
                 className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
               >
-                Salvar Alterações
+                Save Changes
               </button>
             </div>
           </div>
@@ -33103,28 +35255,28 @@ const SalesControlPage = ({ adminKey }) => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-full max-w-md">
             <h3 className="text-lg font-semibold mb-4 text-red-600">
-              Confirmar Exclusão
+              Confirm Deletion
             </h3>
             <p className="text-gray-700 mb-2">
-              Tem certeza que deseja deletar a aquisição do parceiro:
+              Are you sure you want to delete the acquisition for partner:
             </p>
             <p className="font-semibold text-gray-900 mb-1">{deletingAcquisition.partner_name}</p>
             <p className="text-sm text-gray-500 mb-4">ID: {deletingAcquisition.id}</p>
             <p className="text-sm text-red-500 mb-6">
-              Esta ação não pode ser desfeita. Os emails de outreach relacionados também serão removidos.
+              This action cannot be undone. Related outreach emails will also be removed.
             </p>
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setDeletingAcquisition(null)}
                 className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
               >
-                Cancelar
+                Cancel
               </button>
               <button
                 onClick={handleDeleteAcquisition}
                 className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
               >
-                Deletar
+                Delete
               </button>
             </div>
           </div>
@@ -33207,14 +35359,16 @@ const SalesControlPage = ({ adminKey }) => {
 // ==================== FLOATING CHAT WIDGET ====================
 const FloatingChatWidget = ({ adminKey, user }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [recipientType, setRecipientType] = useState('translator'); // 'translator' or 'partner'
+  const [recipientType, setRecipientType] = useState('translator'); // 'translator', 'partner', or 'pm'
   const [selectedRecipient, setSelectedRecipient] = useState('');
   const [messageContent, setMessageContent] = useState('');
   const [sending, setSending] = useState(false);
   const [translators, setTranslators] = useState([]);
   const [partners, setPartners] = useState([]);
+  const [pms, setPms] = useState([]);
   const [partnerUnreadCount, setPartnerUnreadCount] = useState(0);
   const [externalUnreadCount, setExternalUnreadCount] = useState(0);
+  const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
     if (isOpen) {
@@ -33223,13 +35377,15 @@ const FloatingChatWidget = ({ adminKey, user }) => {
   }, [isOpen, recipientType]);
 
   useEffect(() => {
-    // Fetch unread partner messages count
+    // Fetch unread partner messages count (admin only)
     const fetchUnread = async () => {
       try {
-        // Partner messages
-        const partnerResponse = await axios.get(`${API}/admin/partner-messages?admin_key=${adminKey}&limit=100`);
-        const partnerUnread = (partnerResponse.data.messages || []).filter(m => !m.read).length;
-        setPartnerUnreadCount(partnerUnread);
+        // Partner messages - only for admin
+        if (isAdmin) {
+          const partnerResponse = await axios.get(`${API}/admin/partner-messages?admin_key=${adminKey}&limit=100`);
+          const partnerUnread = (partnerResponse.data.messages || []).filter(m => !m.read).length;
+          setPartnerUnreadCount(partnerUnread);
+        }
 
         // External messages (WhatsApp bot quotes pending review)
         const botResponse = await axios.get(`${API}/bot/quotes?admin_key=${adminKey}&status=pending`);
@@ -33242,13 +35398,16 @@ const FloatingChatWidget = ({ adminKey, user }) => {
     fetchUnread();
     const interval = setInterval(fetchUnread, 30000);
     return () => clearInterval(interval);
-  }, [adminKey]);
+  }, [adminKey, isAdmin]);
 
   const fetchRecipients = async () => {
     try {
       if (recipientType === 'translator') {
         const response = await axios.get(`${API}/admin/users/by-role/translator?admin_key=${adminKey}`);
         setTranslators(response.data || []);
+      } else if (recipientType === 'pm') {
+        const response = await axios.get(`${API}/admin/users/by-role/pm?admin_key=${adminKey}`);
+        setPms(response.data || []);
       } else {
         const response = await axios.get(`${API}/admin/partners?admin_key=${adminKey}`);
         setPartners(response.data.partners || []);
@@ -33268,6 +35427,15 @@ const FloatingChatWidget = ({ adminKey, user }) => {
           translator_id: selectedRecipient,
           translator_name: translator?.name || 'Translator',
           translator_email: translator?.email || '',
+          content: messageContent,
+          admin_name: user?.name || 'Admin'
+        });
+      } else if (recipientType === 'pm') {
+        const pm = pms.find(p => p.id === selectedRecipient);
+        await axios.post(`${API}/admin/translator-messages?admin_key=${adminKey}`, {
+          translator_id: selectedRecipient,
+          translator_name: pm?.name || 'PM',
+          translator_email: pm?.email || '',
           content: messageContent,
           admin_name: user?.name || 'Admin'
         });
@@ -33334,7 +35502,7 @@ const FloatingChatWidget = ({ adminKey, user }) => {
           {/* Header */}
           <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4">
             <h3 className="font-bold text-lg">Send Message</h3>
-            <p className="text-xs text-blue-100">Contact translators or partners</p>
+            <p className="text-xs text-blue-100">Contact translators, PMs{isAdmin ? ' or partners' : ''}</p>
           </div>
 
           {/* Content */}
@@ -33352,6 +35520,17 @@ const FloatingChatWidget = ({ adminKey, user }) => {
                 Translator
               </button>
               <button
+                onClick={() => { setRecipientType('pm'); setSelectedRecipient(''); }}
+                className={`flex-1 py-2 text-sm font-medium transition-colors ${
+                  recipientType === 'pm'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                PM
+              </button>
+              {isAdmin && (
+              <button
                 onClick={() => { setRecipientType('partner'); setSelectedRecipient(''); }}
                 className={`flex-1 py-2 text-sm font-medium transition-colors ${
                   recipientType === 'partner'
@@ -33361,12 +35540,13 @@ const FloatingChatWidget = ({ adminKey, user }) => {
               >
                 Partner
               </button>
+              )}
             </div>
 
             {/* Recipient Select */}
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">
-                Select {recipientType === 'translator' ? 'Translator' : 'Partner'}:
+                Select {recipientType === 'translator' ? 'Translator' : recipientType === 'pm' ? 'PM' : 'Partner'}:
               </label>
               <select
                 value={selectedRecipient}
@@ -33377,6 +35557,10 @@ const FloatingChatWidget = ({ adminKey, user }) => {
                 {recipientType === 'translator'
                   ? translators.map(t => (
                       <option key={t.id} value={t.id}>{t.name}</option>
+                    ))
+                  : recipientType === 'pm'
+                  ? pms.map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
                     ))
                   : partners.map(p => (
                       <option key={p.id} value={p.id}>{p.company_name || p.contact_name}</option>
@@ -33572,6 +35756,10 @@ function AdminApp() {
       case 'production':
         return userRole === 'admin'
           ? <ProductionPage adminKey={adminKey} />
+          : <div className="p-6 text-center text-gray-500">Access denied</div>;
+      case 'expenses':
+        return userRole === 'admin'
+          ? <ExpensesPage adminKey={adminKey} />
           : <div className="p-6 text-center text-gray-500">Access denied</div>;
       case 'finances':
         return userRole === 'admin'

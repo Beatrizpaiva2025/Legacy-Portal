@@ -311,9 +311,11 @@ class EmailDeliveryError(Exception):
 class EmailService:
     def __init__(self):
         self.api_key = os.environ.get('RESEND_API_KEY') or os.environ.get('SENDGRID_API_KEY')
-        # For production: use verified domain like "Legacy Translations <noreply@legacytranslations.com>"
-        # For testing: use "Legacy Translations <onboarding@resend.dev>"
-        self.sender_email = os.environ.get('SENDER_EMAIL', 'Legacy Translations <onboarding@resend.dev>')
+        # Use verified domain for production to avoid spam filters
+        # IMPORTANT: Set SENDER_EMAIL env var to your verified domain, e.g.:
+        #   "Legacy Translations <noreply@legacytranslations.com>"
+        # Using onboarding@resend.dev (Resend's test domain) causes emails to land in spam
+        self.sender_email = os.environ.get('SENDER_EMAIL', 'Legacy Translations <noreply@legacytranslations.com>')
         self.reply_to = os.environ.get('REPLY_TO_EMAIL', 'contact@legacytranslations.com')
         # Initialize Resend
         resend.api_key = self.api_key
@@ -603,26 +605,6 @@ def get_email_footer(include_review_button: bool = False) -> str:
                             </table>'''
 
     return f'''{review_section}
-                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 30px 0;">
-                                <tr>
-                                    <td style="border-top: 1px solid #e2e8f0;"></td>
-                                </tr>
-                            </table>
-                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
-                                <tr>
-                                    <td style="padding-top: 15px; border-top: 1px solid #e2e8f0;">
-                                        <p style="color: #1a2a4a; font-size: 15px; font-weight: 600; margin: 0 0 3px 0;">
-                                            Eduarda Quadra
-                                        </p>
-                                        <p style="color: #64748b; font-size: 13px; margin: 0 0 2px 0;">
-                                            Business Support Administrator
-                                        </p>
-                                        <p style="color: #64748b; font-size: 13px; margin: 0;">
-                                            Legacy Translations Inc.
-                                        </p>
-                                    </td>
-                                </tr>
-                            </table>
                         </td>
                     </tr>
                     <tr>
@@ -1333,7 +1315,7 @@ TRADUX · contact@tradux.online
 
 def generate_tradux_certification_id() -> str:
     """Generate unique TRADUX certification ID"""
-    return f"TX-{datetime.now().strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}"
+    return f"TX-{datetime.now(ZoneInfo('America/New_York')).strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}"
 
 
 def generate_translation_html_for_email(order: dict) -> str:
@@ -2153,6 +2135,7 @@ class TranslationOrderCreate(BaseModel):
     total_price: Optional[float] = None
     shipping_address: Optional[Dict[str, str]] = None
     create_invoice: Optional[bool] = True
+    coupon_code: Optional[str] = None  # Coupon code applied at checkout
 
 class TranslationOrderUpdate(BaseModel):
     translation_status: Optional[str] = None
@@ -2200,9 +2183,11 @@ class PartnerInvoice(BaseModel):
     # Order IDs included in this invoice
     order_ids: List[str] = []
     # Financial info
-    subtotal: float = 0.0
+    subtotal: float = 0.0  # Total before coupon discounts
     tax: float = 0.0
-    total_amount: float = 0.0
+    discount_amount: float = 0.0  # Total coupon discount applied
+    discount_details: Optional[List[Dict]] = None  # Per-order discount breakdown
+    total_amount: float = 0.0  # Final amount after discounts
     # Status
     status: str = "pending"  # pending, paid, partial, overdue, cancelled
     # Payment tracking
@@ -2228,11 +2213,31 @@ class PartnerInvoice(BaseModel):
     # Reminder tracking
     reminder_sent_count: int = 0  # Number of reminders sent
     last_reminder_at: Optional[datetime] = None  # When last reminder was sent
+    # Manual adjustment tracking
+    manual_discount_amount: float = 0.0  # Manual discount applied by admin
+    manual_discount_reason: Optional[str] = None  # Reason for manual discount
+    original_total_amount: Optional[float] = None  # Total before manual discount
+    adjusted_by: Optional[str] = None  # Admin who made the adjustment
+    adjusted_at: Optional[datetime] = None  # When the adjustment was made
+    # Fixed due date settings (per-partner preference)
+    fixed_due_day: Optional[int] = None  # Day of month for fixed due date (1-28)
+    partner_tier: Optional[str] = None  # Partner's effective tier at invoice creation
+    tier_discount_percent: Optional[int] = None  # Tier discount percentage applied
 
 class PartnerInvoiceCreate(BaseModel):
     partner_id: str
     order_ids: List[str]
     due_days: int = 30  # Days until due
+    notes: Optional[str] = None
+    fixed_due_day: Optional[int] = None  # Day of month for fixed due date (1-28)
+    manual_discount_amount: Optional[float] = None  # Manual discount to apply
+    manual_discount_reason: Optional[str] = None  # Reason for manual discount
+
+class PartnerInvoiceEdit(BaseModel):
+    manual_discount_amount: Optional[float] = None  # Manual discount to apply
+    manual_discount_reason: Optional[str] = None  # Reason for the discount
+    new_due_date: Optional[str] = None  # New due date (ISO format)
+    fixed_due_day: Optional[int] = None  # Fixed day of month for due date (1-28)
     notes: Optional[str] = None
 
 class PartnerInvoicePayStripe(BaseModel):
@@ -2290,7 +2295,7 @@ class ManualProjectCreate(BaseModel):
 
 # Document Certification Model
 class DocumentCertification(BaseModel):
-    certification_id: str = Field(default_factory=lambda: f"LT-{datetime.now().strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}")
+    certification_id: str = Field(default_factory=lambda: f"LT-{datetime.now(ZoneInfo('America/New_York')).strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}")
     order_id: Optional[str] = None
     order_number: Optional[str] = None
     # Document info
@@ -2311,7 +2316,7 @@ class DocumentCertification(BaseModel):
     # Client info
     client_name: Optional[str] = None
     # Timestamps
-    certified_at: datetime = Field(default_factory=datetime.utcnow)
+    certified_at: datetime = Field(default_factory=lambda: datetime.now(ZoneInfo('America/New_York')))
     expires_at: Optional[datetime] = None  # Optional expiration
     # Status
     is_valid: bool = True
@@ -3620,6 +3625,7 @@ async def get_effective_partner_tier(partner: dict) -> dict:
     partner_id = partner.get("id")
     created_at = partner.get("created_at")
     achieved_tier = partner.get("achieved_tier", "standard")
+    tier_override = partner.get("tier_override")
 
     # Calculate months as partner
     months_as_partner = 0
@@ -3653,6 +3659,12 @@ async def get_effective_partner_tier(partner: dict) -> dict:
         effective_tier = best_3month_tier
         reason = f"Best tier from last 3 months ({best_month_pages} pages)"
 
+    # Apply admin tier override if set
+    if tier_override and tier_override != "standard":
+        effective_tier = get_higher_tier(effective_tier, tier_override)
+        if tier_override == effective_tier and tier_override != best_3month_tier:
+            reason = f"Admin override: tier set to {tier_override}"
+
     # Update achieved tier if current effective is higher
     if compare_tiers(effective_tier, achieved_tier) > 0:
         await db.partners.update_one(
@@ -3673,6 +3685,7 @@ async def get_effective_partner_tier(partner: dict) -> dict:
         "loyalty_lock_active": loyalty_lock_active,
         "months_as_partner": round(months_as_partner, 1),
         "monthly_volumes": monthly_volumes,
+        "tier_override": tier_override,
         "current_volume": current_volume,
         "reason": reason
     }
@@ -6505,18 +6518,22 @@ async def validate_coupon(token: str, code: str, order_total: float = 0):
     if not partner:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
-    # Find coupon (case-insensitive)
+    # Find coupon - prioritize partner-specific coupon, then fall back to global/template
     coupon = await db.coupons.find_one({
         "code": {"$regex": f"^{code}$", "$options": "i"},
-        "is_active": True
+        "is_active": True,
+        "partner_id": partner["id"]
     })
+    if not coupon:
+        # Fall back to global/template coupon (no partner_id)
+        coupon = await db.coupons.find_one({
+            "code": {"$regex": f"^{code}$", "$options": "i"},
+            "is_active": True,
+            "$or": [{"partner_id": None}, {"partner_id": {"$exists": False}}]
+        })
 
     if not coupon:
         raise HTTPException(status_code=404, detail="Invalid coupon code")
-
-    # Check if coupon belongs to this partner (if partner-specific)
-    if coupon.get("partner_id") and coupon["partner_id"] != partner["id"]:
-        raise HTTPException(status_code=400, detail="This coupon is not valid for your account")
 
     # Check usage limits
     if coupon["times_used"] >= coupon["max_uses"]:
@@ -8216,6 +8233,7 @@ async def submit_translation(
                     "file_data": doc_base64,
                     "content_type": "text/html",
                     "source": "translated_document",
+                    "uploaded_by": "translator",
                     "uploaded_at": datetime.utcnow()
                 }
                 await db.order_documents.insert_one(doc_record)
@@ -8241,6 +8259,7 @@ async def submit_translation(
                     "file_data": tf["data"],
                     "content_type": tf["content_type"],
                     "source": "translated_document",
+                    "uploaded_by": "translator",
                     "uploaded_at": datetime.utcnow()
                 }
                 await db.order_documents.insert_one(doc_record)
@@ -8849,6 +8868,55 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
             effective_tier
         )
 
+        # Apply coupon discount if provided
+        coupon_discount_amount = 0.0
+        coupon_code_applied = None
+        if order_data.coupon_code:
+            # First try to find a partner-specific coupon, then fall back to global/template
+            coupon = await db.coupons.find_one({
+                "code": {"$regex": f"^{order_data.coupon_code}$", "$options": "i"},
+                "is_active": True,
+                "partner_id": partner["id"]
+            })
+            if not coupon:
+                # Fall back to global/template coupon (no partner_id)
+                coupon = await db.coupons.find_one({
+                    "code": {"$regex": f"^{order_data.coupon_code}$", "$options": "i"},
+                    "is_active": True,
+                    "$or": [{"partner_id": None}, {"partner_id": {"$exists": False}}]
+                })
+            if coupon and coupon["times_used"] < coupon["max_uses"]:
+                # Coupon is already validated for this partner (found by partner_id or global)
+                if True:
+                    # Calculate coupon discount
+                    if coupon["discount_type"] == "certified_page":
+                        coupon_discount_amount = CERTIFIED_PAGE_PRICE * coupon["discount_value"]
+                    elif coupon["discount_type"] == "percentage":
+                        coupon_discount_amount = total_price * (coupon["discount_value"] / 100)
+                    elif coupon["discount_type"] == "fixed_amount":
+                        coupon_discount_amount = coupon["discount_value"]
+
+                    # Apply max discount cap
+                    if coupon.get("max_discount") and coupon_discount_amount > coupon["max_discount"]:
+                        coupon_discount_amount = coupon["max_discount"]
+
+                    # Don't exceed order total
+                    coupon_discount_amount = min(round(coupon_discount_amount, 2), total_price)
+
+                    # Apply coupon discount to total price
+                    total_price = round(max(0, total_price - coupon_discount_amount), 2)
+                    coupon_code_applied = coupon["code"]
+
+                    # Mark coupon as used
+                    await db.coupons.update_one(
+                        {"id": coupon["id"]},
+                        {"$set": {
+                            "times_used": coupon["times_used"] + 1,
+                            "used_at": datetime.utcnow()
+                        }}
+                    )
+                    logger.info(f"Coupon '{coupon['code']}' applied: -${coupon_discount_amount} on order for partner {partner['company_name']}")
+
         # Calculate page count
         page_count = max(1, math.ceil(order_data.word_count / 250))
 
@@ -8904,6 +8972,9 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
         order_dict["partner_tier"] = effective_tier
         order_dict["tier_discount_percent"] = int(tier_discount * 100)
         order_dict["discount_amount"] = round(discount_amount, 2)
+        # Store coupon discount info
+        order_dict["coupon_code"] = coupon_code_applied
+        order_dict["coupon_discount_amount"] = round(coupon_discount_amount, 2)
         # Calculate original price based on service type (price without tier discount)
         if order_data.service_type == "standard":
             original_price_per_page = 19.99
@@ -9131,6 +9202,64 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
         if quickbooks_invoice_id:
             order_dict["quickbooks_invoice_id"] = quickbooks_invoice_id
             order_dict["quickbooks_invoice_number"] = quickbooks_invoice_number
+
+        # Auto-generate partner invoice for this order
+        partner_invoice_id = None
+        try:
+            # Calculate due date using partner's fixed day or default 30 days
+            fixed_day = partner.get("invoice_fixed_due_day")
+            if fixed_day and 1 <= fixed_day <= 28:
+                now = datetime.utcnow()
+                if now.day < fixed_day:
+                    inv_due_date = now.replace(day=fixed_day, hour=23, minute=59, second=59)
+                else:
+                    if now.month == 12:
+                        inv_due_date = now.replace(year=now.year + 1, month=1, day=fixed_day, hour=23, minute=59, second=59)
+                    else:
+                        inv_due_date = now.replace(month=now.month + 1, day=fixed_day, hour=23, minute=59, second=59)
+            else:
+                inv_due_date = datetime.utcnow() + timedelta(days=30)
+                fixed_day = None
+
+            # Build discount details if coupon was applied
+            inv_discount_details = None
+            if coupon_code_applied and coupon_discount_amount > 0:
+                inv_discount_details = [{
+                    "order_id": order.id,
+                    "order_number": order.order_number,
+                    "coupon_code": coupon_code_applied,
+                    "discount_amount": round(coupon_discount_amount, 2)
+                }]
+
+            auto_invoice = PartnerInvoice(
+                partner_id=partner["id"],
+                partner_company=partner.get("company_name"),
+                partner_email=partner.get("email"),
+                order_ids=[order.id],
+                subtotal=round(total_price + coupon_discount_amount, 2),
+                discount_amount=round(coupon_discount_amount, 2),
+                discount_details=inv_discount_details,
+                total_amount=round(total_price, 2),
+                due_date=inv_due_date,
+                fixed_due_day=fixed_day,
+                partner_tier=effective_tier,
+                tier_discount_percent=int(tier_discount * 100)
+            )
+
+            await db.partner_invoices.insert_one(auto_invoice.dict())
+
+            # Link order to invoice
+            await db.translation_orders.update_one(
+                {"id": order.id},
+                {"$set": {"invoice_id": auto_invoice.id, "invoice_number": auto_invoice.invoice_number}}
+            )
+            order_dict["invoice_id"] = auto_invoice.id
+            order_dict["invoice_number"] = auto_invoice.invoice_number
+            partner_invoice_id = auto_invoice.id
+
+            logger.info(f"Auto-created invoice {auto_invoice.invoice_number} for order {order.order_number} (partner: {partner.get('company_name')})")
+        except Exception as e:
+            logger.error(f"Failed to auto-create partner invoice: {str(e)}")
 
         return {
             "status": "success",
@@ -9450,9 +9579,11 @@ async def get_my_projects(token: str, admin_key: str):
 async def upload_pm_translation(
     order_id: str = Form(...),
     admin_key: str = Form(...),
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    clear_previous: str = Form("false")
 ):
-    """PM uploads an external translation file. Status becomes pm_upload_ready."""
+    """PM uploads an external translation file. Supports uploading multiple files via multiple calls.
+    Set clear_previous=true on the first call to remove old PM uploads."""
     # Validate admin key or user token (admin/pm)
     is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
     if not is_valid:
@@ -9468,19 +9599,30 @@ async def upload_pm_translation(
         raise HTTPException(status_code=404, detail="Order not found")
 
     try:
+        now = datetime.utcnow()
+
+        # Only clear previous PM uploads when explicitly requested (first file in batch)
+        if clear_previous.lower() == "true":
+            await db.order_documents.delete_many({
+                "order_id": order_id,
+                "source": "translated_document",
+                "uploaded_by": "pm"
+            })
+            logger.info(f"Cleared previous PM uploads for order {order_id}")
+
         # Read file content
         file_content = await file.read()
         file_size = len(file_content)
 
-        # Max 20MB
+        # Max 20MB per file
         if file_size > 20 * 1024 * 1024:
-            raise HTTPException(status_code=400, detail="File too large. Maximum size is 20MB.")
+            raise HTTPException(status_code=400, detail=f"File too large. Maximum size is 20MB.")
 
         # Store in GridFS
         file_metadata = {
             "filename": file.filename,
             "content_type": file.content_type or "application/octet-stream",
-            "uploaded_at": datetime.utcnow(),
+            "uploaded_at": now,
             "order_id": order_id,
             "source": "pm_upload_translation"
         }
@@ -9490,8 +9632,24 @@ async def upload_pm_translation(
             metadata=file_metadata
         )
 
+        # Add to order_documents so admin sees it in Files tab
+        doc_record = {
+            "id": str(uuid.uuid4()),
+            "order_id": order_id,
+            "filename": file.filename,
+            "content_type": file.content_type or "application/octet-stream",
+            "source": "translated_document",
+            "uploaded_by": "pm",
+            "uploaded_at": now,
+            "gridfs_id": str(file_id),
+            "file_size": file_size,
+            "data": None,
+            "file_data": None
+        }
+        result = await db.order_documents.insert_one(doc_record)
+        logger.info(f"PM translation added to order_documents: {file.filename} (inserted_id={result.inserted_id}, order_id={order_id})")
+
         # Update order with PM upload info
-        now = datetime.utcnow()
         await db.translation_orders.update_one(
             {"id": order_id},
             {"$set": {
@@ -9513,7 +9671,7 @@ async def upload_pm_translation(
             {get_email_header()}
             <div style="padding: 30px;">
                 <h2 style="color: #10b981;">Translation Ready for Review</h2>
-                <p>A PM has uploaded an external translation for project <strong>{order_number}</strong>.</p>
+                <p>A PM has uploaded a translation file for project <strong>{order_number}</strong>.</p>
                 <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
                     <tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Project:</td><td style="padding: 8px; border-bottom: 1px solid #eee;">{order_number}</td></tr>
                     <tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Client:</td><td style="padding: 8px; border-bottom: 1px solid #eee;">{client_name}</td></tr>
@@ -9531,7 +9689,7 @@ async def upload_pm_translation(
 
         return {
             "success": True,
-            "message": "Translation uploaded successfully. Status set to READY.",
+            "message": f"File '{file.filename}' uploaded successfully. Status set to READY.",
             "pm_upload_filename": file.filename,
             "pm_upload_file_size": file_size,
             "pm_uploaded_at": now.isoformat(),
@@ -9542,6 +9700,53 @@ async def upload_pm_translation(
     except Exception as e:
         logger.error(f"Error uploading PM translation for order {order_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
+
+@api_router.post("/admin/notify-pm-upload")
+async def notify_pm_upload(data: dict = Body(...)):
+    """Notify admin via email that PM has uploaded translation files."""
+    admin_key = data.get("admin_key", "")
+    order_id = data.get("order_id", "")
+    file_count = data.get("file_count", 1)
+    filenames = data.get("filenames", [])
+
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin", "pm"]:
+            is_valid = True
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    order = await db.translation_orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    try:
+        admin_email = os.environ.get("ADMIN_EMAIL", "contact@legacytranslations.com")
+        order_number = order.get("order_number", order_id)
+        client_name = order.get("client_name", "Unknown")
+        files_list = "".join([f"<li>{fn}</li>" for fn in filenames]) if filenames else f"<li>{file_count} file(s)</li>"
+        email_html = f"""
+        {get_email_header()}
+        <div style="padding: 30px;">
+            <h2 style="color: #10b981;">Translation Ready for Review</h2>
+            <p>A PM has uploaded translation file(s) for project <strong>{order_number}</strong>.</p>
+            <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+                <tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Project:</td><td style="padding: 8px; border-bottom: 1px solid #eee;">{order_number}</td></tr>
+                <tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Client:</td><td style="padding: 8px; border-bottom: 1px solid #eee;">{client_name}</td></tr>
+                <tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Files:</td><td style="padding: 8px; border-bottom: 1px solid #eee;"><ul style="margin:0;padding-left:20px;">{files_list}</ul></td></tr>
+            </table>
+            <p>Please log in to the admin panel to review and approve this translation.</p>
+        </div>
+        {get_email_footer()}
+        """
+        await email_service.send_email(admin_email, f"Translation READY - {order_number}", email_html)
+        logger.info(f"PM upload notification sent to admin for order {order_id}")
+        return {"success": True, "message": "Admin notified successfully"}
+    except Exception as e:
+        logger.error(f"Failed to send PM upload notification email: {str(e)}")
+        return {"success": False, "message": f"Notification failed: {str(e)}"}
 
 
 @api_router.post("/admin/accept-pm-upload")
@@ -11124,7 +11329,10 @@ async def get_partner_statistics(admin_key: str):
                 "payment_plan_approved": partner.get("payment_plan_approved", False),
                 "total_paid_orders": partner.get("total_paid_orders", 0),
                 "invoice_manually_unlocked": partner.get("invoice_manually_unlocked", False),
-                "is_real_partner": True  # This is a registered partner
+                "is_real_partner": True,  # This is a registered partner
+                "prospect_status": partner.get("prospect_status", "new"),
+                "achieved_tier": partner.get("achieved_tier", "standard"),
+                "tier_override": partner.get("tier_override")
             }
 
     # Track special entries separately
@@ -11358,6 +11566,397 @@ async def set_partner_payment_plan(partner_id: str, admin_key: str, plan: str, s
         raise HTTPException(status_code=500, detail="Failed to set payment plan")
 
 
+@api_router.post("/admin/partners/{partner_id}/set-tier")
+async def set_partner_tier(partner_id: str, admin_key: str, tier: str):
+    """Manually set a partner's tier override (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    valid_tiers = ["standard", "bronze", "silver", "gold", "platinum"]
+    if tier not in valid_tiers:
+        raise HTTPException(status_code=400, detail=f"Invalid tier. Must be one of: {', '.join(valid_tiers)}")
+
+    partner = await db.partners.find_one({"id": partner_id})
+    if not partner:
+        raise HTTPException(status_code=404, detail="Partner not found")
+
+    update_data = {
+        "tier_override": tier if tier != "standard" else None,
+        "tier_override_at": datetime.utcnow(),
+    }
+
+    # Also update achieved_tier if override is higher
+    current_achieved = partner.get("achieved_tier", "standard")
+    if compare_tiers(tier, current_achieved) > 0:
+        update_data["achieved_tier"] = tier
+        update_data["tier_achieved_at"] = datetime.utcnow()
+
+    await db.partners.update_one(
+        {"id": partner_id},
+        {"$set": update_data}
+    )
+
+    tier_names = {"standard": "Standard (auto)", "bronze": "Bronze (10%)", "silver": "Silver (15%)", "gold": "Gold (25%)", "platinum": "Platinum (35%)"}
+
+    logger.info(f"Admin set tier override for partner {partner.get('company_name')} to {tier}")
+
+    return {
+        "success": True,
+        "message": f"Tier set to {tier_names.get(tier, tier)} for {partner.get('company_name')}",
+        "tier": tier,
+        "partner_id": partner_id
+    }
+
+
+@api_router.post("/admin/partners/{partner_id}/send-invite")
+async def send_partner_invite(partner_id: str, admin_key: str):
+    """Send a registration/upgrade invite email to a prospect partner"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        partner = await db.partners.find_one({"id": partner_id})
+        if not partner:
+            raise HTTPException(status_code=404, detail="Partner not found")
+
+        partner_email = partner.get("email")
+        if not partner_email:
+            raise HTTPException(status_code=400, detail="Partner has no email address")
+
+        company_name = partner.get("company_name", "Partner")
+        contact_name = partner.get("contact_name") or partner.get("name", "Partner")
+        invite_count = partner.get("invite_sent_count", 0) + 1
+        is_followup = invite_count > 1
+
+        if is_followup:
+            subject = f"Follow-up: Partner Registration Invite - Legacy Translations"
+            greeting = f"<p>We're reaching out again because we'd love to have <strong>{company_name}</strong> as a registered partner!"
+        else:
+            subject = f"You're Invited: Become a Registered Partner - Legacy Translations"
+            greeting = f"<p>We'd love to invite <strong>{company_name}</strong> to become a registered partner with Legacy Translations!</p>"
+
+        email_html = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); padding: 30px; text-align: center;">
+                <h1 style="color: white; margin: 0;">{'Welcome Back!' if is_followup else 'Partner Invitation'}</h1>
+            </div>
+            <div style="padding: 30px; background: #f9fafb;">
+                <p>Dear {contact_name},</p>
+                {greeting}
+
+                <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                    <h3 style="margin-top: 0; color: #1e40af;">Why Become a Registered Partner?</h3>
+                    <ul style="color: #374151; line-height: 1.8;">
+                        <li><strong>Biweekly/Monthly Invoicing</strong> - No more pay-per-order</li>
+                        <li><strong>Volume Discounts</strong> - Better rates as you grow</li>
+                        <li><strong>Dedicated Portal</strong> - Manage orders, invoices & translations</li>
+                        <li><strong>Priority Support</strong> - Faster turnaround times</li>
+                        <li><strong>Free Certified Page</strong> - On your first order!</li>
+                    </ul>
+                </div>
+
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="https://portal.legacytranslations.com/#/partner-register"
+                       style="display: inline-block; background: #1e40af; color: white; padding: 14px 35px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
+                        Register as Partner
+                    </a>
+                </div>
+
+                <p style="color: #6b7280; font-size: 14px;">
+                    Already have an account? <a href="https://portal.legacytranslations.com/#/partner">Log in here</a> to upgrade your payment plan.
+                </p>
+
+                <p style="color: #6b7280; font-size: 14px;">
+                    Questions? Contact us at <a href="mailto:contact@legacytranslations.com">contact@legacytranslations.com</a>.
+                </p>
+            </div>
+            <div style="background: #1f2937; padding: 20px; text-align: center;">
+                <p style="color: #9ca3af; margin: 0; font-size: 12px;">
+                    &copy; {datetime.now().year} Legacy Translations. All rights reserved.
+                </p>
+            </div>
+        </div>
+        """
+
+        await email_service.send_email(partner_email, subject, email_html)
+
+        # Track invite sent
+        await db.partners.update_one(
+            {"id": partner_id},
+            {"$set": {
+                "last_invite_sent_at": datetime.utcnow(),
+                "invite_sent_count": invite_count
+            }}
+        )
+
+        logger.info(f"Sent partner invite #{invite_count} to {company_name} ({partner_email})")
+        return {
+            "status": "success",
+            "message": f"{'Follow-up invite' if is_followup else 'Invite'} sent to {partner_email}",
+            "invite_count": invite_count
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error sending partner invite: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to send invite email")
+
+
+@api_router.post("/admin/partners/{partner_id}/prospect-step")
+async def send_prospect_step_email(partner_id: str, admin_key: str):
+    """Send the next outreach email step and advance prospect_status"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    partner = await db.partners.find_one({"id": partner_id})
+    if not partner:
+        raise HTTPException(status_code=404, detail="Partner not found")
+
+    partner_email = partner.get("email")
+    if not partner_email:
+        raise HTTPException(status_code=400, detail="Partner has no email address")
+
+    company_name = partner.get("company_name", "Partner")
+    current_status = partner.get("prospect_status", "new")
+
+    step_map = {
+        "new": ("first_contact", "first_email"),
+        "first_email": ("followup_1", "follow_up_1"),
+        "follow_up_1": ("followup_2", "follow_up_2"),
+    }
+
+    if current_status not in step_map:
+        raise HTTPException(status_code=400, detail=f"All email steps already completed (current: {current_status})")
+
+    email_type, next_status = step_map[current_status]
+
+    subjects = {
+        "first_contact": "Certified Translation Services with Digital Verification",
+        "followup_1": f"A free translation for {company_name} — try us risk-free",
+        "followup_2": f"Why firms trust Legacy Translations — plus your free trial",
+    }
+
+    if email_type == "first_contact":
+        html_content = get_outreach_first_contact_template()
+    elif email_type == "followup_1":
+        html_content = get_outreach_followup1_template(company_name)
+    else:
+        html_content = get_outreach_followup2_template(company_name)
+
+    try:
+        email_service = EmailService()
+        await email_service.send_email(partner_email, subjects[email_type], html_content)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
+
+    await db.partners.update_one(
+        {"id": partner_id},
+        {"$set": {
+            "prospect_status": next_status,
+            f"prospect_{email_type}_sent_at": datetime.utcnow().isoformat()
+        }}
+    )
+
+    step_labels = {"first_email": "1st Email", "follow_up_1": "Follow-up 1", "follow_up_2": "Follow-up 2"}
+    return {"success": True, "message": f"{step_labels[next_status]} sent to {company_name}"}
+
+
+@api_router.post("/admin/partners/{partner_id}/archive")
+async def archive_prospect(partner_id: str, admin_key: str):
+    """Archive a prospect partner"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    result = await db.partners.update_one(
+        {"id": partner_id},
+        {"$set": {"prospect_status": "archived", "archived_at": datetime.utcnow().isoformat()}}
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Partner not found")
+    return {"success": True, "message": "Partner archived"}
+
+
+@api_router.post("/admin/partners/{partner_id}/unarchive")
+async def unarchive_prospect(partner_id: str, admin_key: str):
+    """Unarchive a prospect partner - moves back to prospects with current email status"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    partner = await db.partners.find_one({"id": partner_id})
+    if not partner:
+        raise HTTPException(status_code=404, detail="Partner not found")
+
+    # Restore to last email step before archiving
+    previous_status = "new"
+    if partner.get("prospect_followup_2_sent_at") or partner.get("prospect_followup2_sent_at"):
+        previous_status = "follow_up_2"
+    elif partner.get("prospect_followup_1_sent_at") or partner.get("prospect_followup1_sent_at"):
+        previous_status = "follow_up_1"
+    elif partner.get("prospect_first_contact_sent_at"):
+        previous_status = "first_email"
+
+    await db.partners.update_one(
+        {"id": partner_id},
+        {"$set": {"prospect_status": previous_status}, "$unset": {"archived_at": ""}}
+    )
+    return {"success": True, "message": "Partner unarchived"}
+
+
+class BulkPartnerIdsRequest(BaseModel):
+    partner_ids: list
+
+
+@api_router.post("/admin/partners/bulk-prospect-step")
+async def bulk_send_prospect_step(request: BulkPartnerIdsRequest, admin_key: str):
+    """Send next outreach email step to multiple prospects"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    sent = 0
+    skipped = 0
+    failed = 0
+    email_service = EmailService()
+
+    step_map = {
+        "new": ("first_contact", "first_email"),
+        "first_email": ("followup_1", "follow_up_1"),
+        "follow_up_1": ("followup_2", "follow_up_2"),
+    }
+
+    subjects = {
+        "first_contact": "Certified Translation Services with Digital Verification",
+        "followup_1": "A free translation — try us risk-free",
+        "followup_2": "Why firms trust Legacy Translations — plus your free trial",
+    }
+
+    for pid in request.partner_ids:
+        partner = await db.partners.find_one({"id": pid})
+        if not partner or not partner.get("email"):
+            skipped += 1
+            continue
+
+        current_status = partner.get("prospect_status", "new")
+        if current_status not in step_map:
+            skipped += 1
+            continue
+
+        email_type, next_status = step_map[current_status]
+        company_name = partner.get("company_name", "Partner")
+
+        if email_type == "first_contact":
+            html_content = get_outreach_first_contact_template()
+        elif email_type == "followup_1":
+            html_content = get_outreach_followup1_template(company_name)
+        else:
+            html_content = get_outreach_followup2_template(company_name)
+
+        subject = subjects[email_type]
+        if email_type != "first_contact":
+            subject = subject.replace("your firm", company_name)
+
+        try:
+            await email_service.send_email(partner["email"], subject, html_content)
+            await db.partners.update_one(
+                {"id": pid},
+                {"$set": {
+                    "prospect_status": next_status,
+                    f"prospect_{email_type}_sent_at": datetime.utcnow().isoformat()
+                }}
+            )
+            sent += 1
+        except Exception:
+            failed += 1
+
+    return {"success": True, "message": f"Sent: {sent}, Skipped: {skipped}, Failed: {failed}"}
+
+
+@api_router.post("/admin/partners/bulk-archive")
+async def bulk_archive_prospects(request: BulkPartnerIdsRequest, admin_key: str):
+    """Archive multiple prospects at once"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    now = datetime.utcnow().isoformat()
+    result = await db.partners.update_many(
+        {"id": {"$in": request.partner_ids}},
+        {"$set": {"prospect_status": "archived", "archived_at": now}}
+    )
+    return {"success": True, "message": f"{result.modified_count} prospect(s) archived"}
+
+
+class AddProspectRequest(BaseModel):
+    company_name: str
+    contact_name: Optional[str] = ""
+    email: Optional[str] = ""
+    phone: Optional[str] = ""
+
+
+@api_router.post("/admin/partners/add-prospect")
+async def add_prospect(request: AddProspectRequest, admin_key: str):
+    """Add a new prospect partner manually from admin panel (no password/registration required)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    if not request.company_name.strip():
+        raise HTTPException(status_code=400, detail="Company name is required")
+
+    # Check for duplicate email if provided
+    if request.email and request.email.strip():
+        existing = await db.partners.find_one({"email": request.email.strip()})
+        if existing:
+            raise HTTPException(status_code=400, detail=f"A partner with email {request.email} already exists")
+
+    partner_id = str(uuid.uuid4())
+    now = datetime.utcnow()
+
+    prospect_doc = {
+        "id": partner_id,
+        "company_name": request.company_name.strip(),
+        "contact_name": (request.contact_name or "").strip(),
+        "email": (request.email or "").strip(),
+        "phone": (request.phone or "").strip(),
+        "password_hash": "",
+        "payment_plan": "pay_per_order",
+        "default_payment_method": "zelle",
+        "payment_plan_approved": False,
+        "is_active": True,
+        "is_approved": True,
+        "agreed_to_terms": False,
+        "total_orders": 0,
+        "total_paid_orders": 0,
+        "total_revenue": 0.0,
+        "credit_limit": 0.0,
+        "current_balance": 0.0,
+        "prospect_status": "new",
+        "created_at": now.isoformat(),
+        "has_seen_welcome_coupon": False,
+    }
+
+    await db.partners.insert_one(prospect_doc)
+
+    return {
+        "success": True,
+        "message": f"Prospect '{request.company_name.strip()}' added successfully",
+        "partner_id": partner_id
+    }
+
+
 @api_router.post("/admin/partners/{partner_id}/toggle-invoice-unlock")
 async def toggle_partner_invoice_unlock(partner_id: str, admin_key: str, unlock: bool):
     """Manually unlock or lock invoice payments for a partner (admin only)
@@ -11479,67 +12078,180 @@ async def delete_partner_by_email(email: str, admin_key: str):
         raise HTTPException(status_code=500, detail="Failed to delete partner")
 
 
-@api_router.get("/admin/find-email/{email}")
-async def find_email_in_system(email: str, admin_key: str):
-    """Find where an email is registered in the system (admin only)"""
+class BulkPartnerDeleteRequest(BaseModel):
+    partner_ids: List[str]
+
+@api_router.post("/admin/partners/bulk-delete")
+async def bulk_delete_partners(request: BulkPartnerDeleteRequest, admin_key: str):
+    """Delete multiple partners at once (admin only)"""
     if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
         user = await get_current_admin_user(admin_key)
         if not user or user.get("role") != "admin":
             raise HTTPException(status_code=401, detail="Admin access required")
 
-    email_lower = email.lower().strip()
+    try:
+        deleted = 0
+        failed = []
+        for partner_id in request.partner_ids:
+            partner = await db.partners.find_one({"id": partner_id})
+            if not partner:
+                failed.append({"partner_id": partner_id, "reason": "Not found"})
+                continue
+
+            partner_name = partner.get("company_name", "Unknown")
+            await db.partners.delete_one({"id": partner_id})
+            await db.translation_orders.update_many(
+                {"partner_id": partner_id},
+                {"$set": {"partner_deleted": True, "partner_deleted_at": datetime.utcnow()}}
+            )
+            deleted += 1
+            logger.info(f"Bulk delete: Partner '{partner_name}' (ID: {partner_id}) deleted")
+
+        return {
+            "status": "success",
+            "deleted": deleted,
+            "failed": len(failed),
+            "details": failed,
+            "message": f"{deleted} partner(s) deleted successfully"
+        }
+    except Exception as e:
+        logger.error(f"Error in bulk delete partners: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to bulk delete partners")
+
+
+class BulkPartnerEmailRequest(BaseModel):
+    partner_ids: List[str]
+    subject: str
+    message: str
+
+@api_router.post("/admin/partners/bulk-email")
+async def bulk_email_partners(request: BulkPartnerEmailRequest, admin_key: str):
+    """Send email to multiple partners at once (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        sent = 0
+        failed = []
+        email_service = EmailService()
+
+        for partner_id in request.partner_ids:
+            partner = await db.partners.find_one({"id": partner_id})
+            if not partner or not partner.get("email"):
+                failed.append({"partner_id": partner_id, "reason": "Not found or no email"})
+                continue
+
+            try:
+                html_content = f"""
+                {get_email_header()}
+                <div style="padding: 20px;">
+                    <p>Dear {partner.get('contact_name', partner.get('company_name', 'Partner'))},</p>
+                    <div style="margin: 20px 0; white-space: pre-wrap;">{request.message}</div>
+                    <p>Best regards,<br>Legacy Translations Team</p>
+                </div>
+                {get_email_footer()}
+                """
+                await email_service.send_email(partner["email"], request.subject, html_content)
+                sent += 1
+            except Exception as e:
+                failed.append({"partner_id": partner_id, "email": partner.get("email"), "reason": str(e)})
+                logger.error(f"Failed to send email to partner {partner.get('email')}: {str(e)}")
+
+        return {
+            "status": "success",
+            "sent": sent,
+            "failed": len(failed),
+            "details": failed,
+            "message": f"Email sent to {sent} partner(s)"
+        }
+    except Exception as e:
+        logger.error(f"Error in bulk email partners: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to send bulk emails")
+
+
+@api_router.get("/admin/find-email/{email}")
+async def find_email_in_system(email: str, admin_key: str):
+    """Find where an email/name/phone is registered in the system (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") != "admin":
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    import re
+    query_str = email.strip()
+    query_escaped = re.escape(query_str)
     found_in = []
 
     try:
-        # Check partners collection
-        partner = await db.partners.find_one({"email": {"$regex": f"^{email_lower}$", "$options": "i"}})
-        if partner:
+        # Check partners collection - search by email, company_name, contact_name, phone
+        partner_query = {"$or": [
+            {"email": {"$regex": query_escaped, "$options": "i"}},
+            {"company_name": {"$regex": query_escaped, "$options": "i"}},
+            {"contact_name": {"$regex": query_escaped, "$options": "i"}},
+            {"name": {"$regex": query_escaped, "$options": "i"}},
+            {"phone": {"$regex": query_escaped, "$options": "i"}}
+        ]}
+        async for partner in db.partners.find(partner_query):
             found_in.append({
                 "collection": "partners",
                 "id": partner.get("id"),
-                "name": partner.get("company_name") or partner.get("name"),
-                "email": partner.get("email")
+                "name": partner.get("company_name") or partner.get("contact_name") or partner.get("name"),
+                "email": partner.get("email") or "N/A"
             })
 
-        # Check customers collection
-        customer = await db.customers.find_one({"email": {"$regex": f"^{email_lower}$", "$options": "i"}})
-        if customer:
+        # Check customers collection - search by email, name, phone
+        customer_query = {"$or": [
+            {"email": {"$regex": query_escaped, "$options": "i"}},
+            {"full_name": {"$regex": query_escaped, "$options": "i"}},
+            {"name": {"$regex": query_escaped, "$options": "i"}},
+            {"phone": {"$regex": query_escaped, "$options": "i"}}
+        ]}
+        async for customer in db.customers.find(customer_query):
             found_in.append({
                 "collection": "customers",
                 "id": customer.get("id"),
                 "name": customer.get("full_name") or customer.get("name"),
-                "email": customer.get("email")
+                "email": customer.get("email") or "N/A"
             })
 
-        # Check admin_users collection
-        admin_user = await db.admin_users.find_one({"email": {"$regex": f"^{email_lower}$", "$options": "i"}})
-        if admin_user:
+        # Check admin_users collection - search by email, name
+        admin_query = {"$or": [
+            {"email": {"$regex": query_escaped, "$options": "i"}},
+            {"name": {"$regex": query_escaped, "$options": "i"}}
+        ]}
+        async for admin_user in db.admin_users.find(admin_query):
             found_in.append({
                 "collection": "admin_users",
                 "id": admin_user.get("id"),
                 "name": admin_user.get("name"),
-                "email": admin_user.get("email"),
+                "email": admin_user.get("email") or "N/A",
                 "role": admin_user.get("role")
             })
 
-        # Check salespersons collection
-        salesperson = await db.salespersons.find_one({"email": {"$regex": f"^{email_lower}$", "$options": "i"}})
-        if salesperson:
+        # Check salespersons collection - search by email, name, phone
+        sales_query = {"$or": [
+            {"email": {"$regex": query_escaped, "$options": "i"}},
+            {"name": {"$regex": query_escaped, "$options": "i"}},
+            {"phone": {"$regex": query_escaped, "$options": "i"}}
+        ]}
+        async for salesperson in db.salespersons.find(sales_query):
             found_in.append({
                 "collection": "salespersons",
                 "id": salesperson.get("id"),
                 "name": salesperson.get("name"),
-                "email": salesperson.get("email")
+                "email": salesperson.get("email") or "N/A"
             })
 
         if not found_in:
-            return {"status": "not_found", "message": f"Email '{email}' not found in any collection"}
+            return {"status": "not_found", "message": f"'{query_str}' not found in any collection"}
 
-        return {"status": "found", "email": email, "found_in": found_in}
+        return {"status": "found", "query": query_str, "found_in": found_in}
 
     except Exception as e:
         logger.error(f"Error finding email: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to search for email")
+        raise HTTPException(status_code=500, detail="Failed to search")
 
 
 @api_router.delete("/admin/delete-email/{email}")
@@ -11700,8 +12412,66 @@ async def create_partner_invoice(invoice_data: PartnerInvoiceCreate, admin_key: 
         if not orders:
             raise HTTPException(status_code=400, detail="No valid orders found")
 
-        subtotal = sum(order.get("total_price", 0) for order in orders)
-        total_amount = subtotal  # No tax for now
+        # Calculate totals including coupon discounts
+        # subtotal = sum of order prices (already includes coupon discount in total_price)
+        # We also track the original prices and discount breakdown
+        total_coupon_discount = 0.0
+        discount_details = []
+        subtotal_before_discounts = 0.0
+
+        for order in orders:
+            order_price = order.get("total_price", 0)
+            coupon_disc = order.get("coupon_discount_amount", 0)
+            coupon_code = order.get("coupon_code")
+            original_price = order.get("original_price", order_price + coupon_disc)
+
+            subtotal_before_discounts += order_price + coupon_disc  # Price before coupon
+            total_coupon_discount += coupon_disc
+
+            if coupon_code and coupon_disc > 0:
+                discount_details.append({
+                    "order_id": order.get("id"),
+                    "order_number": order.get("order_number"),
+                    "coupon_code": coupon_code,
+                    "discount_amount": coupon_disc
+                })
+
+        # total_amount = sum of actual order prices (already discounted)
+        total_amount = sum(order.get("total_price", 0) for order in orders)
+
+        # Calculate due date
+        # If fixed_due_day is provided, use partner's preferred fixed day of month
+        # Otherwise check partner's stored preference, then fall back to due_days
+        fixed_day = invoice_data.fixed_due_day or partner.get("invoice_fixed_due_day")
+        if fixed_day and 1 <= fixed_day <= 28:
+            now = datetime.utcnow()
+            # If the fixed day is in the future this month, use this month
+            # Otherwise use next month
+            if now.day < fixed_day:
+                due_date = now.replace(day=fixed_day, hour=23, minute=59, second=59)
+            else:
+                # Move to next month
+                if now.month == 12:
+                    due_date = now.replace(year=now.year + 1, month=1, day=fixed_day, hour=23, minute=59, second=59)
+                else:
+                    due_date = now.replace(month=now.month + 1, day=fixed_day, hour=23, minute=59, second=59)
+        else:
+            due_date = datetime.utcnow() + timedelta(days=invoice_data.due_days)
+            fixed_day = None
+
+        # Get partner's effective tier for invoice
+        tier_result = await get_effective_partner_tier(partner)
+        effective_tier = tier_result["effective_tier"]
+        tier_discount_pct = int(PARTNER_TIERS[effective_tier]["discount"] * 100)
+
+        # Apply manual discount if provided
+        manual_disc = 0.0
+        if invoice_data.manual_discount_amount and invoice_data.manual_discount_amount > 0:
+            manual_disc = round(invoice_data.manual_discount_amount, 2)
+            if manual_disc > total_amount:
+                raise HTTPException(status_code=400, detail="Discount cannot exceed the invoice total")
+
+        final_amount = round(total_amount - manual_disc, 2)
 
         # Create invoice
         invoice = PartnerInvoice(
@@ -11709,10 +12479,18 @@ async def create_partner_invoice(invoice_data: PartnerInvoiceCreate, admin_key: 
             partner_company=partner.get("company_name"),
             partner_email=partner.get("email"),
             order_ids=invoice_data.order_ids,
-            subtotal=subtotal,
-            total_amount=total_amount,
-            due_date=datetime.utcnow() + timedelta(days=invoice_data.due_days),
-            notes=invoice_data.notes
+            subtotal=round(subtotal_before_discounts, 2),
+            discount_amount=round(total_coupon_discount, 2),
+            discount_details=discount_details if discount_details else None,
+            total_amount=final_amount,
+            due_date=due_date,
+            fixed_due_day=fixed_day,
+            notes=invoice_data.notes,
+            partner_tier=effective_tier,
+            tier_discount_percent=tier_discount_pct,
+            manual_discount_amount=manual_disc,
+            manual_discount_reason=invoice_data.manual_discount_reason or "",
+            original_total_amount=round(total_amount, 2) if manual_disc > 0 else None
         )
 
         await db.partner_invoices.insert_one(invoice.dict())
@@ -11765,6 +12543,87 @@ async def delete_partner_invoice(invoice_id: str, admin_key: str):
     except Exception as e:
         logger.error(f"Error deleting invoice: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to delete invoice")
+
+
+@api_router.put("/admin/partner-invoices/{invoice_id}/edit")
+async def edit_partner_invoice(invoice_id: str, edit_data: PartnerInvoiceEdit, admin_key: str):
+    """Edit an existing partner invoice - apply manual discount, change due date, etc."""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        invoice = await db.partner_invoices.find_one({"id": invoice_id})
+        if not invoice:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+
+        if invoice.get("status") == "paid":
+            raise HTTPException(status_code=400, detail="Cannot edit a paid invoice")
+
+        update_fields = {}
+
+        # Apply manual discount
+        if edit_data.manual_discount_amount is not None and edit_data.manual_discount_amount > 0:
+            # Store original total if not already stored (first adjustment)
+            original_total = invoice.get("original_total_amount") or invoice.get("total_amount", 0)
+            new_total = round(original_total - edit_data.manual_discount_amount, 2)
+            if new_total < 0:
+                raise HTTPException(status_code=400, detail="Discount cannot exceed the invoice total")
+
+            update_fields["original_total_amount"] = original_total
+            update_fields["manual_discount_amount"] = round(edit_data.manual_discount_amount, 2)
+            update_fields["manual_discount_reason"] = edit_data.manual_discount_reason or ""
+            update_fields["total_amount"] = new_total
+            update_fields["adjusted_by"] = admin_key[:20]
+            update_fields["adjusted_at"] = datetime.utcnow()
+
+        # Update due date
+        if edit_data.new_due_date:
+            try:
+                new_due = datetime.fromisoformat(edit_data.new_due_date.replace("Z", "+00:00"))
+                update_fields["due_date"] = new_due
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid due date format")
+
+        # Update fixed due day
+        if edit_data.fixed_due_day is not None:
+            if edit_data.fixed_due_day < 1 or edit_data.fixed_due_day > 28:
+                raise HTTPException(status_code=400, detail="Fixed due day must be between 1 and 28")
+            update_fields["fixed_due_day"] = edit_data.fixed_due_day
+            # Also save as partner preference
+            await db.partners.update_one(
+                {"id": invoice.get("partner_id")},
+                {"$set": {"invoice_fixed_due_day": edit_data.fixed_due_day}}
+            )
+
+        # Update notes
+        if edit_data.notes is not None:
+            update_fields["notes"] = edit_data.notes
+
+        if not update_fields:
+            raise HTTPException(status_code=400, detail="No changes provided")
+
+        await db.partner_invoices.update_one(
+            {"id": invoice_id},
+            {"$set": update_fields}
+        )
+
+        updated_invoice = await db.partner_invoices.find_one({"id": invoice_id})
+        if updated_invoice and '_id' in updated_invoice:
+            del updated_invoice['_id']
+
+        logger.info(f"Updated invoice {invoice.get('invoice_number')}: {list(update_fields.keys())}")
+
+        return {
+            "status": "success",
+            "invoice": updated_invoice
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error editing partner invoice: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to edit invoice")
 
 
 @api_router.put("/admin/partner-invoices/{invoice_id}/mark-paid")
@@ -12294,11 +13153,7 @@ async def send_invoice_payment_reminder(invoice_id: str, admin_key: str):
         """
 
         # Send email
-        await send_email(
-            to_email=partner_email,
-            subject=subject,
-            html_content=email_html
-        )
+        await email_service.send_email(partner_email, subject, email_html)
 
         # Update invoice with reminder info
         await db.partner_invoices.update_one(
@@ -12472,11 +13327,7 @@ async def send_bulk_invoice_reminders(admin_key: str, days_before_due: int = 3, 
                 </div>
                 """
 
-                await send_email(
-                    to_email=partner_email,
-                    subject=subject,
-                    html_content=email_html
-                )
+                await email_service.send_email(partner_email, subject, email_html)
 
                 # Update invoice
                 await db.partner_invoices.update_one(
@@ -13703,6 +14554,8 @@ class TranslationData(BaseModel):
     submitted_by: Optional[str] = None
     submitted_by_role: Optional[str] = None
     translator_notes: Optional[str] = None  # Notes from translator to PM
+    batch_file_ids: Optional[List[str]] = None  # File IDs included in batch translation
+    batch_file_info: Optional[List[dict]] = None  # File metadata for batch translation
 
 @api_router.post("/admin/orders/{order_id}/translation")
 async def admin_save_translation(order_id: str, data: TranslationData, admin_key: str):
@@ -13755,36 +14608,63 @@ async def admin_save_translation(order_id: str, data: TranslationData, admin_key
         status_message = "Translation saved and sent to Admin for review"
         translation_ready = True
 
+    # Build update fields
+    update_fields = {
+        "translation_html": data.translation_html,
+        "translation_original_text": data.translation_original_text or "",
+        "translation_source_language": data.source_language,
+        "translation_target_language": data.target_language,
+        "translation_document_type": data.document_type,
+        "translation_translator_name": data.translator_name,
+        "translation_date": data.translation_date,
+        "translation_include_cover": data.include_cover,
+        "translation_page_format": data.page_format,
+        "translation_type_setting": data.translation_type,
+        "translation_original_images": data.original_images,
+        "translation_logo_left": data.logo_left,
+        "translation_logo_right": data.logo_right,
+        "translation_logo_stamp": data.logo_stamp,
+        "translation_signature_image": data.signature_image,
+        "translation_status": new_status,
+        "translation_sent_to": destination,
+        "translation_ready": translation_ready,
+        "translation_ready_at": datetime.utcnow().isoformat(),
+        "translation_submitted_by": data.submitted_by or (current_user.get("name") if current_user else "Admin"),
+        "translation_submitted_by_role": data.submitted_by_role or (current_user.get("role") if current_user else "admin"),
+        "translator_notes": data.translator_notes or ""
+    }
+
+    # Store batch translation metadata if present
+    if data.batch_file_ids:
+        update_fields["batch_file_ids"] = data.batch_file_ids
+        update_fields["batch_file_info"] = data.batch_file_info or []
+
     # Update order with translation data
     await db.translation_orders.update_one(
         {"id": order_id},
-        {"$set": {
-            "translation_html": data.translation_html,
-            "translation_original_text": data.translation_original_text or "",
-            "translation_source_language": data.source_language,
-            "translation_target_language": data.target_language,
-            "translation_document_type": data.document_type,
-            "translation_translator_name": data.translator_name,
-            "translation_date": data.translation_date,
-            "translation_include_cover": data.include_cover,
-            "translation_page_format": data.page_format,
-            "translation_type_setting": data.translation_type,
-            "translation_original_images": data.original_images,
-            "translation_logo_left": data.logo_left,
-            "translation_logo_right": data.logo_right,
-            "translation_logo_stamp": data.logo_stamp,
-            "translation_signature_image": data.signature_image,
-            "translation_status": new_status,
-            "translation_sent_to": destination,
-            "translation_ready": translation_ready,
-            "translation_ready_at": datetime.utcnow().isoformat(),
-            "translation_submitted_by": data.submitted_by or (current_user.get("name") if current_user else "Admin"),
-            "translation_submitted_by_role": data.submitted_by_role or (current_user.get("role") if current_user else "admin"),
-            "translator_notes": data.translator_notes or ""
-        }}
+        {"$set": update_fields}
     )
 
     logger.info(f"Translation saved for order {order_id}, sent to {destination}, status: {new_status}")
+
+    # Update file statuses for batch-translated files
+    if data.batch_file_ids and len(data.batch_file_ids) > 0:
+        batch_status = "review" if destination != "save" else "in_translation"
+        for file_id in data.batch_file_ids:
+            try:
+                await db.order_documents.update_one(
+                    {"id": file_id},
+                    {"$set": {
+                        "status": batch_status,
+                        "translation_status": batch_status,
+                        "batch_translated": True,
+                        "batch_translated_at": datetime.utcnow().isoformat(),
+                        "batch_translated_by": data.submitted_by or (current_user.get("name") if current_user else "Admin")
+                    }}
+                )
+            except Exception as e:
+                logger.error(f"Failed to update batch file status for {file_id}: {str(e)}")
+        logger.info(f"Updated batch file statuses for {len(data.batch_file_ids)} files in order {order_id}")
 
     # Save translation to order_documents when it's being sent (not just saved as draft)
     # This ensures the delivery flow can find it via order_documents query
@@ -13794,10 +14674,12 @@ async def admin_save_translation(order_id: str, data: TranslationData, admin_key
             doc_filename = f"{order_number}_Translation.html"
             doc_base64 = base64.b64encode(data.translation_html.encode('utf-8')).decode('utf-8')
 
-            # Remove any existing translated documents for this order to avoid duplicates
+            # Remove only workspace/translator-generated translated documents
+            # PM and admin file uploads must be preserved
             await db.order_documents.delete_many({
                 "order_id": order_id,
-                "source": "translated_document"
+                "source": "translated_document",
+                "uploaded_by": {"$in": ["workspace", "translator", None]}
             })
 
             doc_record = {
@@ -13808,6 +14690,7 @@ async def admin_save_translation(order_id: str, data: TranslationData, admin_key
                 "file_data": doc_base64,
                 "content_type": "text/html",
                 "source": "translated_document",
+                "uploaded_by": "workspace",
                 "uploaded_at": datetime.utcnow()
             }
             await db.order_documents.insert_one(doc_record)
@@ -13961,7 +14844,7 @@ async def generate_combined_delivery_pdf(
     source_lang = order.get("translation_source_language") or order.get("translate_from") or order.get("source_language") or "Portuguese"
     target_lang = order.get("translation_target_language") or order.get("translate_to") or order.get("target_language") or "English"
     client_name = order.get("client_name", "")
-    translation_date = datetime.utcnow().strftime("%B %d, %Y")
+    translation_date = get_ny_now().strftime("%B %d, %Y")
 
     # ==================== PAGE 1: COVER PAGE / CERTIFICATE ====================
     if include_certificate:
@@ -14314,7 +15197,7 @@ async def generate_combined_delivery_pdf(
         verification_url = certification_data.get("verification_url", "")
         qr_code_data = certification_data.get("qr_code_data", "")
         document_hash = certification_data.get("document_hash", "")[:20]
-        certified_date = datetime.utcnow().strftime("%B %d, %Y")
+        certified_date = get_ny_now().strftime("%B %d, %Y")
 
         # Header banner background
         page.draw_rect(fitz.Rect(0, 0, page_width, 100), color=blue_color, fill=blue_color)
@@ -14458,7 +15341,7 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
         if include_verification_page:
             try:
                 # Generate certification ID
-                cert_id = f"LT-{datetime.now().strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}"
+                cert_id = f"LT-{get_ny_now().strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}"
 
                 # Create document hash from translation content
                 translation_content = order.get('translation_html', '') or 'Translation Content'
@@ -14494,7 +15377,7 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                     "company_phone": "(857) 316-7770",
                     "company_email": "contact@legacytranslations.com",
                     "client_name": order.get("client_name", ""),
-                    "certified_at": datetime.utcnow(),
+                    "certified_at": get_ny_now(),
                     "is_valid": True,
                     "verification_url": verification_url,
                     "qr_code_data": qr_code_data
@@ -14507,7 +15390,7 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                 logger.info(f"Created certification for delivery: {cert_id}")
 
                 # Generate verification page HTML
-                certified_date = datetime.utcnow().strftime('%B %d, %Y')
+                certified_date = get_ny_now().strftime('%B %d, %Y')
                 # Get document info with fallbacks (orders may have different field names)
                 doc_type = order.get("translation_document_type") or order.get("document_type") or "Document"
                 src_lang = order.get("translation_source_language") or order.get("translate_from") or order.get("source_language") or "Portuguese"
@@ -14768,6 +15651,50 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                 import traceback
                 traceback.print_exc()
 
+                # CRITICAL: Retry certification creation with minimal data so verification page still appears
+                try:
+                    cert_id = f"LT-{get_ny_now().strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}"
+                    base_url = os.environ.get("FRONTEND_URL", "https://portal.legacytranslations.com")
+                    verification_url = f"{base_url}/#/verify/{cert_id}"
+
+                    # Minimal certification data so the verification page can still be generated
+                    certification_data = {
+                        "certification_id": cert_id,
+                        "order_id": order_id,
+                        "order_number": order.get("order_number"),
+                        "document_type": order.get("document_type", "Document"),
+                        "source_language": order.get("source_language", ""),
+                        "target_language": order.get("target_language", ""),
+                        "page_count": 1,
+                        "document_hash": "",
+                        "certifier_name": certifier_name if certifier_name not in ["Admin (Self)", "Admin", "Self", None, ""] else "Beatriz Paiva",
+                        "certifier_title": "Legal Representative",
+                        "certifier_credentials": "ATA Member # 275993",
+                        "company_name": "Legacy Translations Inc.",
+                        "company_address": "867 Boylston Street, 5th Floor, #2073, Boston, MA 02116",
+                        "company_phone": "(857) 316-7770",
+                        "company_email": "contact@legacytranslations.com",
+                        "client_name": order.get("client_name", ""),
+                        "certified_at": get_ny_now(),
+                        "is_valid": True,
+                        "verification_url": verification_url,
+                        "qr_code_data": None
+                    }
+
+                    # Try to store in DB but don't fail if it doesn't work
+                    try:
+                        await db.certifications.insert_one(certification_data)
+                        logger.info(f"Retry certification succeeded: {cert_id}")
+                    except Exception:
+                        logger.warning(f"Could not store certification in DB, but verification page will still be generated: {cert_id}")
+
+                except Exception as retry_err:
+                    logger.error(f"Retry certification also failed: {str(retry_err)}")
+                    # certification_data remains None - verification page will be skipped
+
+        if include_verification_page and not certification_data:
+            logger.warning(f"VERIFICATION PAGE WILL BE MISSING for order {order.get('order_number')} - certification_data is None")
+
         # ==================== GENERATE COMBINED PDF OR SEPARATE ATTACHMENTS ====================
         if generate_combined_pdf:
             # Generate a single combined PDF with all parts
@@ -14800,6 +15727,11 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                 # If still no docs, try to get from order itself
                 original_file_data = None
                 original_file_list = []  # Support multiple originals
+
+                # Sort original docs by page_number if page grouping is set
+                if original_docs:
+                    original_docs.sort(key=lambda d: (d.get("page_group_id") or "", d.get("page_number") or 999))
+
                 if original_docs:
                     for doc in original_docs:
                         # Check for GridFS storage first
@@ -14817,7 +15749,9 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                             original_file_list.append({
                                 "data": doc_data,
                                 "filename": doc.get("filename", "original.pdf"),
-                                "content_type": doc.get("content_type", "application/pdf")
+                                "content_type": doc.get("content_type", "application/pdf"),
+                                "page_group_id": doc.get("page_group_id"),
+                                "page_number": doc.get("page_number")
                             })
                             if not original_file_data:
                                 original_file_data = doc_data  # Keep first for backward compatibility
@@ -15137,7 +16071,7 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                 document_type = order.get("translation_document_type") or order.get("document_type") or "Document"
                 source_lang = order.get("translation_source_language") or order.get("translate_from") or order.get("source_language") or "Portuguese"
                 target_lang = order.get("translation_target_language") or order.get("translate_to") or order.get("target_language") or "English"
-                translation_date = datetime.utcnow().strftime("%B %d, %Y")
+                translation_date = get_ny_now().strftime("%B %d, %Y")
 
                 # ==================== PAGE 1: CERTIFICATE OF ACCURACY ====================
                 if include_certificate:
@@ -15328,6 +16262,10 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                             "order_id": order_id,
                             "source": {"$ne": "translated_document"}
                         }).to_list(10)
+
+                    # Sort by page_group_id and page_number for correct ordering
+                    if original_docs:
+                        original_docs.sort(key=lambda d: (d.get("page_group_id") or "", d.get("page_number") or 999))
 
                     if original_docs:
                         # Add separator page
@@ -16121,12 +17059,169 @@ async def download_translated_document(order_id: str, admin_key: str):
     else:
         raise HTTPException(status_code=404, detail="No translated document found")
 
+# ==================== BULK TRANSLATOR ASSIGNMENT ====================
+
+@api_router.post("/admin/orders/{order_id}/bulk-assign")
+async def bulk_assign_translators(order_id: str, admin_key: str, data: dict = Body(...)):
+    """Send bulk invite to multiple translators - first to accept gets the project"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+    if user_info.get("role") not in ["admin", "pm"]:
+        raise HTTPException(status_code=403, detail="Only admin or PM can bulk assign")
+
+    translator_ids = data.get("translator_ids", [])
+    translator_deadline = data.get("translator_deadline")
+    project_notes = data.get("project_notes", "")
+
+    if len(translator_ids) < 2:
+        raise HTTPException(status_code=400, detail="Select at least 2 translators for bulk invite")
+
+    order = await db.translation_orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    order_number = order.get("order_number", order_id)
+
+    # Build bulk invite tokens - one per translator
+    bulk_invite_tokens = []
+    translator_names = []
+
+    for tid in translator_ids:
+        translator = await db.admin_users.find_one({"id": tid})
+        if not translator:
+            continue
+
+        token = str(uuid.uuid4())
+        tname = translator.get("name", "Translator")
+        translator_names.append(tname)
+
+        bulk_invite_tokens.append({
+            "translator_id": tid,
+            "translator_name": tname,
+            "translator_email": translator.get("email", ""),
+            "token": token,
+            "status": "pending",
+            "sent_at": datetime.utcnow().isoformat()
+        })
+
+    if len(bulk_invite_tokens) < 2:
+        raise HTTPException(status_code=400, detail="Could not find enough valid translators")
+
+    # Update order with bulk invite data
+    update_fields = {
+        "bulk_invite_tokens": bulk_invite_tokens,
+        "bulk_invite_status": "pending",
+        "bulk_invite_count": len(bulk_invite_tokens),
+        "bulk_invite_sent_at": datetime.utcnow().isoformat(),
+        "bulk_invite_sent_by": user_info.get("name", "Admin"),
+        "translator_assignment_status": "bulk_pending",
+    }
+    if translator_deadline:
+        update_fields["translator_deadline"] = translator_deadline
+    if project_notes:
+        update_fields["internal_notes"] = project_notes
+
+    # Add all translator IDs so they can see the project
+    await db.translation_orders.update_one(
+        {"id": order_id},
+        {
+            "$set": update_fields,
+            "$addToSet": {
+                "file_translator_ids": {"$each": translator_ids},
+                "file_translator_names": {"$each": translator_names}
+            }
+        }
+    )
+
+    # Build deadline string for emails
+    deadline_str = "To be confirmed"
+    deadline = translator_deadline or order.get("translator_deadline") or order.get("deadline")
+    if deadline:
+        try:
+            if isinstance(deadline, str):
+                from dateutil import parser
+                parsed = parser.parse(deadline)
+                ny_parsed = parsed.replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo("America/New_York")) if parsed.tzinfo is None else parsed.astimezone(ZoneInfo("America/New_York"))
+                deadline_str = ny_parsed.strftime("%B %d, %Y at %I:%M %p") + " (EST)"
+            elif isinstance(deadline, datetime):
+                ny_deadline = deadline.replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo("America/New_York")) if deadline.tzinfo is None else deadline.astimezone(ZoneInfo("America/New_York"))
+                deadline_str = ny_deadline.strftime("%B %d, %Y at %I:%M %p") + " (EST)"
+        except:
+            deadline_str = str(deadline)
+
+    order_details = {
+        "order_number": order_number,
+        "client_name": order.get("client_name", "N/A"),
+        "translate_from": order.get("translate_from", ""),
+        "translate_to": order.get("translate_to", ""),
+        "document_type": order.get("document_type", "Document"),
+        "document_category": order.get("document_category", "General"),
+        "page_count": order.get("page_count", 1),
+        "word_count": order.get("word_count", 0),
+        "deadline": deadline_str
+    }
+
+    # Send emails to each translator
+    frontend_url = os.environ.get("FRONTEND_URL", "https://legacy-portal-frontend.onrender.com")
+    emails_sent = 0
+
+    for invite in bulk_invite_tokens:
+        if not invite["translator_email"]:
+            continue
+        try:
+            accept_url = f"{frontend_url}/#/assignment/{invite['token']}/accept"
+            decline_url = f"{frontend_url}/#/assignment/{invite['token']}/decline"
+
+            email_html = get_translator_assignment_email_template(
+                invite["translator_name"],
+                order_details,
+                accept_url,
+                decline_url
+            )
+            await email_service.send_email(
+                invite["translator_email"],
+                f"New Translation Assignment - {order_number}",
+                email_html
+            )
+            emails_sent += 1
+            logger.info(f"Bulk invite email sent to {invite['translator_name']} ({invite['translator_email']}) for order {order_id}")
+        except Exception as e:
+            logger.error(f"Failed to send bulk invite email to {invite['translator_name']}: {str(e)}")
+
+        # Create notification for each translator
+        await create_notification(
+            user_id=invite["translator_id"],
+            notif_type="project_assigned",
+            title="New Project Available",
+            message=f"You have been invited to translate project {order_number}. First translator to accept gets the assignment!",
+            order_id=order_id,
+            order_number=order_number
+        )
+
+    logger.info(f"Bulk invite sent for order {order_id}: {emails_sent}/{len(bulk_invite_tokens)} emails sent")
+
+    return {
+        "success": True,
+        "message": f"Bulk invite sent to {emails_sent} translators",
+        "translator_count": len(bulk_invite_tokens),
+        "emails_sent": emails_sent,
+        "translator_names": translator_names
+    }
+
+
 # ==================== TRANSLATOR ASSIGNMENT RESPONSE ENDPOINTS ====================
 
-# Helper to find assignment by token - checks both order-level and document-level tokens
+# Helper to find assignment by token - checks bulk invites, order-level and document-level tokens
 async def find_assignment_by_token(token: str):
     """Find assignment by token. Returns (order, document_or_none, is_document_level)"""
-    # First check order-level tokens (from "Send Complete Project")
+    # Check bulk invite tokens first
+    order = await db.translation_orders.find_one({"bulk_invite_tokens.token": token})
+    if order:
+        # Return as order-level but mark it as bulk for the accept handler
+        return order, None, False
+
+    # Then check order-level tokens (from "Send Complete Project")
     order = await db.translation_orders.find_one({"translator_assignment_token": token})
     if order:
         return order, None, False
@@ -16149,6 +17244,84 @@ async def accept_translator_assignment(token: str):
     if not order and not doc:
         return HTMLResponse(content=get_assignment_response_page("error", "Invalid or expired link. This assignment token was not found."), status_code=404)
 
+    order_number = order.get("order_number", order["id"]) if order else "Unknown"
+
+    # Check if this is a BULK invite token
+    bulk_tokens = order.get("bulk_invite_tokens", []) if order else []
+    bulk_invite = None
+    for bt in bulk_tokens:
+        if bt.get("token") == token:
+            bulk_invite = bt
+            break
+
+    if bulk_invite:
+        # BULK INVITE FLOW - first-come-first-served
+        # Check if this specific translator already responded
+        if bulk_invite.get("status") in ["accepted", "declined"]:
+            return HTMLResponse(content=get_assignment_response_page("already_responded", f"You have already {bulk_invite['status']} this assignment."))
+
+        # Check if ANOTHER translator already accepted this bulk invite
+        if order.get("bulk_invite_status") == "accepted":
+            accepted_by = order.get("assigned_translator_name", "another translator")
+            return HTMLResponse(content=get_assignment_response_page("already_taken",
+                f"This project ({order_number}) has already been accepted by {accepted_by}. The assignment is no longer available."))
+
+        # This translator is the first to accept!
+        translator_name = bulk_invite.get("translator_name", "Unknown")
+        translator_id = bulk_invite.get("translator_id")
+
+        # Update this token status to accepted, all others to expired
+        updated_tokens = []
+        for bt in bulk_tokens:
+            if bt["token"] == token:
+                bt["status"] = "accepted"
+                bt["responded_at"] = datetime.utcnow().isoformat()
+            elif bt["status"] == "pending":
+                bt["status"] = "expired"
+            updated_tokens.append(bt)
+
+        # Set this translator as THE assigned translator for the order
+        await db.translation_orders.update_one(
+            {"id": order["id"]},
+            {"$set": {
+                "bulk_invite_tokens": updated_tokens,
+                "bulk_invite_status": "accepted",
+                "bulk_invite_accepted_by": translator_id,
+                "bulk_invite_accepted_at": datetime.utcnow().isoformat(),
+                "assigned_translator_id": translator_id,
+                "assigned_translator_name": translator_name,
+                "translator_assignment_status": "accepted",
+                "translator_assignment_responded_at": datetime.utcnow()
+            }}
+        )
+
+        # Notify admin/PM
+        await create_notification(
+            user_id=(order.get("assigned_pm_id") or "admin"),
+            notif_type="assignment_accepted",
+            title="Bulk Invite - Translator Accepted",
+            message=f"Translator {translator_name} was the FIRST to accept the bulk invite for project {order_number}. They are now assigned to this project.",
+            order_id=order["id"],
+            order_number=order_number
+        )
+
+        # Notify other translators that the project is no longer available
+        for bt in updated_tokens:
+            if bt["token"] != token and bt.get("translator_id"):
+                await create_notification(
+                    user_id=bt["translator_id"],
+                    notif_type="assignment_expired",
+                    title="Project No Longer Available",
+                    message=f"Project {order_number} has been accepted by another translator and is no longer available.",
+                    order_id=order["id"],
+                    order_number=order_number
+                )
+
+        logger.info(f"Bulk invite for order {order['id']}: {translator_name} accepted first")
+        return HTMLResponse(content=get_assignment_response_page("accepted",
+            f"Thank you, {translator_name}! You were the first to accept and have been assigned to project {order_number}. You can now access it in your translator portal."))
+
+    # STANDARD (non-bulk) FLOW
     # Check if already responded
     if is_doc_level:
         if doc.get("assignment_status") in ["accepted", "declined"]:
@@ -16161,7 +17334,6 @@ async def accept_translator_assignment(token: str):
 
     # Update assignment status
     if is_doc_level:
-        # Update the document-level assignment
         collection = db.order_documents if await db.order_documents.find_one({"id": doc["id"]}) else db.documents
         await collection.update_one(
             {"id": doc["id"]},
@@ -16184,9 +17356,9 @@ async def accept_translator_assignment(token: str):
         doc_name = None
 
     # Create notification for admin/PM
-    order_number = order.get("order_number", order["id"]) if order else "Unknown"
     msg = f"Translator {translator_name} has ACCEPTED the assignment for project {order_number}"
-    if doc_name:
+    if is_doc_level and doc:
+        doc_name = doc.get("filename", "document")
         msg += f" (file: {doc_name})"
     msg += "."
     await create_notification(
@@ -16394,6 +17566,17 @@ def get_assignment_response_page(status: str, message: str) -> str:
         color = "#dc3545"
         title = "Assignment Declined"
         button_html = ""
+        redirect_script = ""
+    elif status == "already_taken":
+        icon = "🚫"
+        color = "#e65100"
+        title = "Project No Longer Available"
+        button_html = f'''
+        <p style="color: #64748b; font-size: 14px; margin-top: 15px;">This project was part of a bulk invite and another translator accepted first.</p>
+        <a href="{portal_url}/#/admin" style="display: inline-block; background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); color: white; text-decoration: none; padding: 14px 30px; border-radius: 50px; font-size: 15px; font-weight: 600; margin-top: 20px; box-shadow: 0 4px 15px rgba(13, 148, 136, 0.3);">
+            🔐 Go to Portal
+        </a>
+        '''
         redirect_script = ""
     elif status == "already_responded":
         icon = "ℹ"
@@ -16678,9 +17861,9 @@ async def mark_conversation_read(conversation_id: str, token: str):
 
 @api_router.get("/admin/partner-messages")
 async def get_admin_partner_messages(admin_key: str, limit: int = 50):
-    """Get messages sent by partners for admin view"""
+    """Get messages sent by partners - admin only"""
     user_info = await validate_admin_or_user_token(admin_key)
-    if not user_info or user_info.get("role") not in ["admin", "pm", "translator", "contractor", "inhouse"]:
+    if not user_info or user_info.get("role") not in ["admin"]:
         raise HTTPException(status_code=401, detail="Invalid admin key or insufficient permissions")
 
     messages = await db.partner_messages.find().sort("created_at", -1).limit(limit).to_list(limit)
@@ -16695,9 +17878,9 @@ async def get_admin_partner_messages(admin_key: str, limit: int = 50):
 
 @api_router.put("/admin/partner-messages/{message_id}/read")
 async def mark_partner_message_read(message_id: str, admin_key: str):
-    """Mark a partner message as read by admin"""
+    """Mark a partner message as read - admin only"""
     user_info = await validate_admin_or_user_token(admin_key)
-    if not user_info or user_info.get("role") not in ["admin", "pm", "translator", "contractor", "inhouse"]:
+    if not user_info or user_info.get("role") not in ["admin"]:
         raise HTTPException(status_code=401, detail="Invalid admin key or insufficient permissions")
 
     result = await db.partner_messages.update_one(
@@ -16720,9 +17903,9 @@ class ReplyToPartnerRequest(BaseModel):
 
 @api_router.post("/admin/partner-messages/{message_id}/reply")
 async def reply_to_partner_message(message_id: str, request: ReplyToPartnerRequest, admin_key: str):
-    """Admin replies to a partner message via email and stores in portal"""
+    """Admin replies to a partner message via email and stores in portal - admin only"""
     user_info = await validate_admin_or_user_token(admin_key)
-    if not user_info or user_info.get("role") not in ["admin", "pm", "translator", "contractor", "inhouse"]:
+    if not user_info or user_info.get("role") not in ["admin"]:
         raise HTTPException(status_code=401, detail="Invalid admin key or insufficient permissions")
 
     # Get the original message
@@ -17819,20 +19002,41 @@ async def admin_get_order_documents(order_id: str, admin_key: str):
             "assigned_translator_id": doc.get("assigned_translator_id"),
             "assigned_translator_name": doc.get("assigned_translator_name"),
             "assignment_status": doc.get("assignment_status"),
+            "page_group_id": doc.get("page_group_id"),
+            "page_number": doc.get("page_number"),
+            "status": doc.get("status"),
+            "translation_status": doc.get("translation_status"),
+            "batch_translated": doc.get("batch_translated", False),
         })
 
     for doc in docs_manual:
         doc["_id"] = str(doc["_id"])
+        # Handle uploaded_at safely - could be datetime or string
+        uploaded_at_val = doc.get("uploaded_at")
+        if uploaded_at_val:
+            try:
+                uploaded_at_str = uploaded_at_val.isoformat() if hasattr(uploaded_at_val, 'isoformat') else str(uploaded_at_val)
+            except Exception:
+                uploaded_at_str = str(uploaded_at_val)
+        else:
+            uploaded_at_str = None
         all_docs.append({
             "id": doc.get("id"),
             "filename": doc.get("filename"),
             "content_type": doc.get("content_type", "application/pdf"),
-            "has_data": bool(doc.get("data") or doc.get("gridfs_id")),
+            "has_data": bool(doc.get("data") or doc.get("file_data") or doc.get("gridfs_id")),
             "source": doc.get("source", "manual_upload"),
-            "uploaded_at": doc.get("uploaded_at").isoformat() if doc.get("uploaded_at") else None,
+            "uploaded_at": uploaded_at_str,
+            "uploaded_by": doc.get("uploaded_by"),
+            "file_size": doc.get("file_size"),
             "assigned_translator_id": doc.get("assigned_translator_id"),
             "assigned_translator_name": doc.get("assigned_translator_name"),
             "assignment_status": doc.get("assignment_status"),
+            "page_group_id": doc.get("page_group_id"),
+            "page_number": doc.get("page_number"),
+            "status": doc.get("status"),
+            "translation_status": doc.get("translation_status"),
+            "batch_translated": doc.get("batch_translated", False),
         })
 
     return {"documents": all_docs, "count": len(all_docs)}
@@ -17931,12 +19135,20 @@ async def admin_upload_order_document(order_id: str, doc_data: OrderDocumentUplo
                 import traceback
                 traceback.print_exc()
 
+        # Determine who uploaded this document
+        uploader = "admin"
+        if user_info and isinstance(user_info, dict):
+            uploader = user_info.get("role", "admin")
+            if user_info.get("role") == "pm":
+                uploader = "pm"
+
         doc_record = {
             "id": str(uuid.uuid4()),
             "order_id": order_id,
             "filename": final_filename,
             "content_type": final_content_type,
             "source": doc_data.source,
+            "uploaded_by": uploader,
             "uploaded_at": datetime.utcnow()
         }
 
@@ -18049,6 +19261,30 @@ async def admin_download_order_document(doc_id: str, admin_key: str):
 
     raise HTTPException(status_code=404, detail="Document not found")
 
+@api_router.put("/admin/orders/{order_id}/add-file-translator")
+async def add_file_translator_to_order(order_id: str, admin_key: str, data: dict = Body(...)):
+    """Add a translator to file_translator_ids/names so they can see the project"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+    if user_info.get("role") not in ["admin", "pm"]:
+        raise HTTPException(status_code=403, detail="Only admin or PM can assign translators")
+
+    translator_id = data.get("translator_id")
+    translator_name = data.get("translator_name")
+    if not translator_id:
+        raise HTTPException(status_code=400, detail="translator_id is required")
+
+    await db.translation_orders.update_one(
+        {"id": order_id},
+        {"$addToSet": {
+            "file_translator_ids": translator_id,
+            "file_translator_names": translator_name or ""
+        }}
+    )
+    return {"success": True, "message": f"Translator {translator_name} added to project"}
+
+
 @api_router.patch("/admin/order-documents/{doc_id}")
 async def admin_update_order_document(doc_id: str, admin_key: str, update_data: dict = Body(...)):
     """Admin/PM: Update document metadata (e.g., assign translator to specific document)"""
@@ -18056,13 +19292,19 @@ async def admin_update_order_document(doc_id: str, admin_key: str, update_data: 
     if not user_info:
         raise HTTPException(status_code=401, detail="Invalid admin key or token")
 
-    # Only allow admin or PM to update
+    # Translators can only update page grouping fields
+    translator_allowed_fields = ["page_group_id", "page_number"]
     if user_info.get("role") not in ["admin", "pm"]:
-        raise HTTPException(status_code=403, detail="Only admin or PM can update document assignments")
+        # Check if translator is only updating page grouping fields
+        if user_info.get("role") == "translator" and all(k in translator_allowed_fields for k in update_data.keys()):
+            pass  # Allow translators to set page grouping
+        else:
+            raise HTTPException(status_code=403, detail="Only admin or PM can update document assignments")
 
     # Fields that can be updated
     allowed_fields = ["assigned_translator_id", "assigned_translator_name", "notes", "status",
-                      "assignment_token", "assignment_status", "assignment_responded_at"]
+                      "assignment_token", "assignment_status", "assignment_responded_at",
+                      "page_group_id", "page_number"]
     update_dict = {k: v for k, v in update_data.items() if k in allowed_fields}
 
     if not update_dict:
@@ -18155,6 +19397,83 @@ async def admin_delete_order_document(doc_id: str, admin_key: str):
 
     logger.info(f"Document {doc_id} deleted by {user_info.get('name', 'Unknown')}")
     return {"success": True, "message": "Document deleted successfully"}
+
+
+# ==================== PAGE GROUPING ENDPOINTS ====================
+
+class PageGroupItem(BaseModel):
+    doc_id: str
+    page_number: int
+
+class PageGroupRequest(BaseModel):
+    page_group_id: str
+    items: List[PageGroupItem]
+
+@api_router.post("/admin/orders/{order_id}/page-group")
+async def set_page_group(order_id: str, admin_key: str, request: PageGroupRequest):
+    """Set page grouping for multiple documents at once"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    if user_info.get("role") not in ["admin", "pm", "translator"]:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    updated_count = 0
+    for item in request.items:
+        update_dict = {
+            "page_group_id": request.page_group_id,
+            "page_number": item.page_number
+        }
+        # Try order_documents first
+        result = await db.order_documents.update_one(
+            {"id": item.doc_id, "order_id": order_id},
+            {"$set": update_dict}
+        )
+        if result.matched_count == 0:
+            # Try main documents collection
+            result = await db.documents.update_one(
+                {"id": item.doc_id, "order_id": order_id},
+                {"$set": update_dict}
+            )
+        if result.matched_count > 0:
+            updated_count += 1
+
+    return {
+        "success": True,
+        "message": f"Page group set for {updated_count} documents",
+        "page_group_id": request.page_group_id,
+        "updated_count": updated_count
+    }
+
+@api_router.delete("/admin/orders/{order_id}/page-group/{page_group_id}")
+async def remove_page_group(order_id: str, page_group_id: str, admin_key: str):
+    """Remove page grouping from all documents in a group"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    if user_info.get("role") not in ["admin", "pm", "translator"]:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    # Remove page_group_id and page_number from all matching documents
+    unset_fields = {"page_group_id": "", "page_number": ""}
+
+    result1 = await db.order_documents.update_many(
+        {"order_id": order_id, "page_group_id": page_group_id},
+        {"$unset": unset_fields}
+    )
+    result2 = await db.documents.update_many(
+        {"order_id": order_id, "page_group_id": page_group_id},
+        {"$unset": unset_fields}
+    )
+
+    total = result1.modified_count + result2.modified_count
+    return {
+        "success": True,
+        "message": f"Page group removed from {total} documents",
+        "removed_count": total
+    }
 
 
 # ==================== TRANSLATION WORKSPACE ENDPOINTS ====================
@@ -18501,6 +19820,49 @@ CRITICAL INSTRUCTIONS:
     except Exception as e:
         logger.error(f"OCR error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"OCR failed: {str(e)}")
+
+
+def parse_claude_api_error(error_text: str, status_code: int = None) -> str:
+    """Parse Claude API error responses and return user-friendly messages in Portuguese."""
+    try:
+        error_data = json.loads(error_text)
+        error_type = error_data.get("error", {}).get("type", "")
+        error_message = error_data.get("error", {}).get("message", "")
+    except (json.JSONDecodeError, TypeError):
+        error_type = ""
+        error_message = str(error_text)
+
+    # Map known API error types to user-friendly messages
+    if "credit balance" in error_message.lower() or "billing" in error_message.lower():
+        return (
+            "Saldo insuficiente na API do Claude. "
+            "A chave de API utilizada não possui créditos suficientes. "
+            "Acesse console.anthropic.com → Plans & Billing para adicionar créditos ou atualizar seu plano."
+        )
+    elif error_type == "authentication_error" or status_code == 401:
+        return (
+            "Chave de API inválida ou expirada. "
+            "Verifique se a chave está correta nas configurações (Settings → API Key)."
+        )
+    elif error_type == "rate_limit_error" or status_code == 429:
+        return (
+            "Limite de requisições excedido na API do Claude. "
+            "Aguarde alguns segundos e tente novamente."
+        )
+    elif error_type == "overloaded_error" or status_code == 529:
+        return (
+            "O servidor da API do Claude está sobrecarregado no momento. "
+            "Tente novamente em alguns instantes."
+        )
+    elif "model" in error_message.lower() and "not found" in error_message.lower():
+        return (
+            "O modelo de IA solicitado não está disponível. "
+            "Entre em contato com o suporte técnico."
+        )
+    elif error_type == "invalid_request_error":
+        return f"Erro na requisição para a API do Claude: {error_message}"
+    else:
+        return f"Erro na API do Claude (código {status_code}): {error_message or error_text}"
 
 
 async def fetch_matching_instructions(source_lang: str, target_lang: str, document_type: str = None) -> str:
@@ -19064,7 +20426,8 @@ CRITICAL INSTRUCTIONS:
             if response.status_code != 200:
                 error_detail = response.text
                 logger.error(f"Claude API error: {response.status_code} - {error_detail}")
-                raise HTTPException(status_code=response.status_code, detail=f"Claude API error: {error_detail}")
+                friendly_msg = parse_claude_api_error(error_detail, response.status_code)
+                raise HTTPException(status_code=response.status_code, detail=friendly_msg)
 
             result = response.json()
             translation = result.get("content", [{}])[0].get("text", "")
@@ -19108,6 +20471,7 @@ class ProofreadRequest(BaseModel):
     document_type: str = "General Document"
     claude_api_key: str
     original_image: Optional[str] = None  # Base64 encoded image for vision-based proofreading
+    original_images: Optional[List[str]] = None  # Multiple images for multi-page documents
 
 # Special characters by language
 LANGUAGE_SPECIAL_CHARS = {
@@ -19370,7 +20734,8 @@ Retorne o JSON com a análise completa."""
             if response.status_code != 200:
                 error_detail = response.text
                 logger.error(f"Claude API error in simple proofread: {response.status_code} - {error_detail}")
-                raise HTTPException(status_code=response.status_code, detail=f"AI analysis failed: {error_detail}")
+                friendly_msg = parse_claude_api_error(error_detail, response.status_code)
+                raise HTTPException(status_code=response.status_code, detail=friendly_msg)
 
             result = response.json()
             proofreading_result = result.get("content", [{}])[0].get("text", "")
@@ -19555,66 +20920,67 @@ Referência de traduções aprovadas - verifique se foram seguidas:
             glossary_and_tm_terms
         )
 
-        # Build the message content based on whether we have an image or just text
-        if request.original_image:
-            # Compress image if too large to avoid Claude API size limits
-            image_data = request.original_image
+        # Collect all original images (single or multiple)
+        all_images = []
+        if request.original_images and len(request.original_images) > 0:
+            all_images = request.original_images
+        elif request.original_image:
+            all_images = [request.original_image]
+
+        # Helper to compress a single image for proofreading
+        def compress_proofread_image(raw_b64: str) -> tuple:
             media_type = "image/png"
             try:
-                # Decode base64 image
-                import io
-                image_bytes = base64.b64decode(image_data)
-                img = Image.open(io.BytesIO(image_bytes))
-
-                # Check if image needs resizing (max 1500px on longest side for API limits)
-                max_dimension = 1500
-                if img.width > max_dimension or img.height > max_dimension:
-                    # Calculate new size maintaining aspect ratio
-                    ratio = min(max_dimension / img.width, max_dimension / img.height)
-                    new_size = (int(img.width * ratio), int(img.height * ratio))
-                    img = img.resize(new_size, Image.Resampling.LANCZOS)
-                    logger.info(f"Resized image from {request.original_image[:50]}... to {new_size}")
-
-                # Convert to RGB if necessary (for JPEG)
-                if img.mode in ('RGBA', 'P'):
-                    img = img.convert('RGB')
-
-                # Compress as JPEG with quality 85
-                buffer = io.BytesIO()
-                img.save(buffer, format='JPEG', quality=85, optimize=True)
-                image_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
-                media_type = "image/jpeg"
-                logger.info(f"Compressed image for proofreading: original ~{len(request.original_image)//1024}KB, compressed ~{len(image_data)//1024}KB")
+                image_bytes = base64.b64decode(raw_b64)
+                compressed_bytes, final_media_type = compress_image_for_claude_api(image_bytes, media_type)
+                return base64.b64encode(compressed_bytes).decode('utf-8'), final_media_type
             except Exception as e:
                 logger.warning(f"Could not compress image, using original: {str(e)}")
-                # Use original image if compression fails
-                image_data = request.original_image
+                return raw_b64, media_type
 
-            # Use Claude Vision API with image
-            user_content = [
-                {
+        # Build the message content based on whether we have images or just text
+        if all_images:
+            user_content = []
+
+            total_pages = len(all_images)
+            if total_pages > 1:
+                user_content.append({
+                    "type": "text",
+                    "text": f"Este DOCUMENTO ORIGINAL em {request.source_language} tem {total_pages} páginas. Analise TODAS as páginas:"
+                })
+            else:
+                user_content.append({
                     "type": "text",
                     "text": f"Este é o DOCUMENTO ORIGINAL em {request.source_language} (veja a imagem anexa):"
-                },
-                {
+                })
+
+            # Add all images
+            for idx, img_b64 in enumerate(all_images):
+                compressed_data, media_type = compress_proofread_image(img_b64)
+                if total_pages > 1:
+                    user_content.append({
+                        "type": "text",
+                        "text": f"--- Página {idx + 1} de {total_pages} ---"
+                    })
+                user_content.append({
                     "type": "image",
                     "source": {
                         "type": "base64",
                         "media_type": media_type,
-                        "data": image_data
+                        "data": compressed_data
                     }
-                },
-                {
-                    "type": "text",
-                    "text": f"""
+                })
+
+            user_content.append({
+                "type": "text",
+                "text": f"""
 === TRADUÇÃO ({request.target_language}) ===
 {request.translated_text}
 === FIM DA TRADUÇÃO ===
 
-Compare a imagem do documento original acima com a tradução fornecida.
-Analise minuciosamente e retorne o JSON com todos os erros encontrados."""
-                }
-            ]
+Compare {'todas as páginas do' if total_pages > 1 else 'a imagem do'} documento original acima com a tradução fornecida.
+Analise minuciosamente TODAS as páginas e retorne o JSON com todos os erros encontrados."""
+            })
             messages = [{"role": "user", "content": user_content}]
         else:
             # Text-only proofreading
@@ -19648,7 +21014,8 @@ Analise minuciosamente e retorne o JSON com todos os erros encontrados."""
             if response.status_code != 200:
                 error_detail = response.text
                 logger.error(f"Claude API error: {response.status_code} - {error_detail}")
-                raise HTTPException(status_code=response.status_code, detail=f"Claude API error: {error_detail}")
+                friendly_msg = parse_claude_api_error(error_detail, response.status_code)
+                raise HTTPException(status_code=response.status_code, detail=friendly_msg)
 
             result = response.json()
             proofreading_result = result.get("content", [{}])[0].get("text", "")
@@ -23482,11 +24849,109 @@ async def delete_shared_api_key(admin_key: str):
     logger.info("Shared Claude API key deleted")
     return {"status": "success", "message": "API key removed"}
 
+@api_router.post("/admin/settings/api-key/test")
+async def test_api_key(admin_key: str, api_key: str = Body(..., embed=True)):
+    """Test a Claude API key by making a minimal API call"""
+    await validate_admin_or_user_token(admin_key)
+
+    if not api_key or not api_key.startswith("sk-"):
+        return {"valid": False, "message": "Formato de chave inválido. A chave deve começar com 'sk-'."}
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json"
+                },
+                json={
+                    "model": "claude-sonnet-4-5-20250929",
+                    "max_tokens": 10,
+                    "messages": [{"role": "user", "content": "Hi"}]
+                }
+            )
+
+            if response.status_code == 200:
+                return {"valid": True, "message": "Chave de API válida! Conexão e créditos OK."}
+            else:
+                friendly_msg = parse_claude_api_error(response.text, response.status_code)
+                return {"valid": False, "message": friendly_msg}
+
+    except httpx.TimeoutException:
+        return {"valid": False, "message": "Timeout ao conectar com a API do Claude. Verifique sua conexão."}
+    except Exception as e:
+        return {"valid": False, "message": f"Erro ao testar a chave: {str(e)}"}
+
 @api_router.get("/settings/api-key/check")
 async def check_shared_api_key_available():
     """Public endpoint to check if a shared API key is configured (for translators)"""
     settings = await db.app_settings.find_one({"key": "shared_claude_api_key"})
     return {"available": bool(settings and settings.get("value"))}
+
+@api_router.get("/admin/settings/api-key/diagnose")
+async def diagnose_api_keys(admin_key: str):
+    """Diagnose all API key sources and test each one"""
+    await validate_admin_or_user_token(admin_key)
+
+    sources = []
+
+    # Source 1: Environment variable
+    env_key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("CLAUDE_API_KEY")
+    if env_key:
+        sources.append({
+            "source": "Variável de ambiente (ANTHROPIC_API_KEY)",
+            "key_preview": f"{env_key[:7]}...{env_key[-4:]}",
+            "status": "encontrada"
+        })
+
+    # Source 2: Database shared key
+    settings = await db.app_settings.find_one({"key": "shared_claude_api_key"})
+    db_key = settings.get("value") if settings else None
+    if db_key:
+        sources.append({
+            "source": "Chave compartilhada (banco de dados)",
+            "key_preview": f"{db_key[:7]}...{db_key[-4:]}",
+            "status": "encontrada",
+            "updated_at": settings.get("updated_at", "desconhecido")
+        })
+
+    if not sources:
+        return {
+            "sources": [],
+            "message": "Nenhuma chave de API encontrada no sistema. Configure uma chave na aba START."
+        }
+
+    # Test each key
+    for source in sources:
+        key = env_key if "ambiente" in source["source"] else db_key
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                response = await client.post(
+                    "https://api.anthropic.com/v1/messages",
+                    headers={
+                        "x-api-key": key,
+                        "anthropic-version": "2023-06-01",
+                        "content-type": "application/json"
+                    },
+                    json={
+                        "model": "claude-sonnet-4-5-20250929",
+                        "max_tokens": 10,
+                        "messages": [{"role": "user", "content": "Hi"}]
+                    }
+                )
+                if response.status_code == 200:
+                    source["test_result"] = "OK - Funcionando"
+                    source["test_ok"] = True
+                else:
+                    source["test_result"] = parse_claude_api_error(response.text, response.status_code)
+                    source["test_ok"] = False
+        except Exception as e:
+            source["test_result"] = f"Erro: {str(e)}"
+            source["test_ok"] = False
+
+    return {"sources": sources}
 
 @api_router.get("/settings/api-key/use")
 async def get_api_key_for_translation(token: str = None):
@@ -24166,29 +25631,53 @@ async def chunk_document_for_translation(original_text: str, original_images: li
     return chunks
 
 
-def compress_image_for_claude_api(img_bytes: bytes, media_type: str = "image/jpeg", max_size: int = 5 * 1024 * 1024) -> tuple:
+def compress_image_for_claude_api(img_bytes: bytes, media_type: str = "image/jpeg", max_size: int = 5 * 1024 * 1024, max_dimension: int = 7900) -> tuple:
     """
-    Compress an image to stay under Claude API's 5MB limit.
+    Compress an image to stay under Claude API's 5MB size limit and 8000px dimension limit.
 
     Args:
         img_bytes: Raw image bytes
         media_type: MIME type of the image
         max_size: Maximum size in bytes (default 5MB)
+        max_dimension: Maximum pixel dimension for width or height (default 7900, API limit is 8000)
 
     Returns:
         tuple: (compressed_bytes, media_type) - always returns JPEG if compression needed
     """
-    # Check if already under limit
-    if len(img_bytes) <= max_size:
-        return img_bytes, media_type
-
     try:
-        # Load image with PIL
+        # Always check pixel dimensions first, even if file size is OK
         img = Image.open(io.BytesIO(img_bytes))
+        needs_resize = img.width > max_dimension or img.height > max_dimension
 
-        # Convert to RGB if necessary (for JPEG output)
-        if img.mode in ('RGBA', 'P', 'LA'):
-            img = img.convert('RGB')
+        if needs_resize:
+            logger.info(f"Image dimensions {img.width}x{img.height} exceed {max_dimension}px limit, resizing...")
+            # Convert to RGB if necessary (for JPEG output)
+            if img.mode in ('RGBA', 'P', 'LA'):
+                img = img.convert('RGB')
+
+            # Calculate new dimensions maintaining aspect ratio
+            ratio = min(max_dimension / img.width, max_dimension / img.height)
+            new_size = (int(img.width * ratio), int(img.height * ratio))
+            img = img.resize(new_size, Image.LANCZOS)
+            logger.info(f"Image resized to {new_size[0]}x{new_size[1]}")
+
+            # Save resized image
+            jpeg_buffer = io.BytesIO()
+            img.save(jpeg_buffer, format='JPEG', quality=85, optimize=True)
+            img_bytes = jpeg_buffer.getvalue()
+            media_type = "image/jpeg"
+
+            # Check if resized image is under size limit
+            if len(img_bytes) <= max_size:
+                return img_bytes, media_type
+        else:
+            # No resize needed - check if file size is already OK
+            if len(img_bytes) <= max_size:
+                return img_bytes, media_type
+
+            # Need to compress - load for processing
+            if img.mode in ('RGBA', 'P', 'LA'):
+                img = img.convert('RGB')
 
         # Try progressively lower quality settings
         quality_levels = [85, 70, 55, 40]
@@ -25117,7 +26606,7 @@ OUTPUT: Complete corrected HTML document."""
         }
 
     except anthropic.APIError as api_error:
-        error_msg = f"Claude API error: {str(api_error)}"
+        error_msg = parse_claude_api_error(str(api_error), getattr(api_error, 'status_code', None))
         logger.error(f"AI Layout stage API error: {error_msg}")
         # Return the original translation so the pipeline can continue
         return {
@@ -25125,7 +26614,7 @@ OUTPUT: Complete corrected HTML document."""
             "result": previous_translation,
             "tokens_used": 0,
             "changes_made": [],
-            "notes": f"Layout skipped due to API error. Translation preserved."
+            "notes": f"Layout pulado por erro na API: {error_msg}"
         }
 
     except Exception as e:
@@ -25384,14 +26873,14 @@ OUTPUT: Complete corrected HTML with proofreading report."""
         }
 
     except anthropic.APIError as api_error:
-        error_msg = f"Claude API error: {str(api_error)}"
+        error_msg = parse_claude_api_error(str(api_error), getattr(api_error, 'status_code', None))
         logger.error(f"AI Proofreader stage API error: {error_msg}")
         return {
             "success": True,  # Mark as success to continue pipeline
             "result": previous_translation,
             "tokens_used": 0,
             "changes_made": [],
-            "notes": "Proofreading skipped due to API error. Translation preserved.",
+            "notes": f"Revisão pulada por erro na API: {error_msg}",
             "quality_score": "not_evaluated"
         }
 
@@ -25494,8 +26983,9 @@ async def start_ai_pipeline(request: AIPipelineCreate, admin_key: str):
                         original_filename = doc.get("filename")
 
                 except Exception as e:
-                    print(f"Error extracting text from document: {e}")
-                    extracted_texts.append(f"--- Document: {doc.get('filename', 'unknown')} ---\n[Error extracting text: {str(e)}]")
+                    friendly_msg = parse_claude_api_error(str(e), getattr(e, 'status_code', None))
+                    logger.error(f"Error extracting text from document: {friendly_msg}")
+                    extracted_texts.append(f"--- Document: {doc.get('filename', 'unknown')} ---\n[Erro ao extrair texto: {friendly_msg}]")
 
         if extracted_texts:
             original_text = "\n\n".join(extracted_texts)
@@ -26810,7 +28300,7 @@ async def client_approve_translation(token: str, feedback: Optional[str] = None)
     if is_tradux:
         certification_id = generate_tradux_certification_id()
     else:
-        certification_id = f"LT-{datetime.now().strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}"
+        certification_id = f"LT-{get_ny_now().strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}"
 
     # Generate QR code for verification
     base_url = os.environ.get("FRONTEND_URL", "https://portal.legacytranslations.com")
@@ -26835,7 +28325,7 @@ async def client_approve_translation(token: str, feedback: Optional[str] = None)
         "certifier_title": "Professional Translation Services" if is_tradux else "Certified Translator",
         "company_name": "TRADUX" if is_tradux else "Legacy Translations Inc.",
         "client_name": order.get("client_name"),
-        "certified_at": datetime.utcnow(),
+        "certified_at": get_ny_now(),
         "is_valid": True,
         "verification_url": verification_url,
         "qr_code_data": qr_code_base64,
@@ -27825,7 +29315,7 @@ async def create_certification(data: CertificationCreate, admin_key: str):
 
     try:
         # Generate certification ID
-        cert_id = f"LT-{datetime.now().strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}"
+        cert_id = f"LT-{get_ny_now().strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}"
 
         # Create document hash from content
         document_hash = hashlib.sha256(data.document_content.encode('utf-8')).hexdigest()
@@ -27860,7 +29350,7 @@ async def create_certification(data: CertificationCreate, admin_key: str):
             "company_phone": data.company_phone,
             "company_email": data.company_email,
             "client_name": data.client_name,
-            "certified_at": datetime.utcnow(),
+            "certified_at": get_ny_now(),
             "is_valid": True,
             "verification_url": verification_url,
             "qr_code_data": qr_code_data
@@ -30491,7 +31981,7 @@ def get_outreach_first_contact_template() -> str:
                             </p>
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                                 <tr><td align="center" style="padding-bottom: 12px;">
-                                    <a href="https://portal.legacytranslations.com/partner" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #c9a227 0%, #d4af37 100%); color: #1a2a4a; text-decoration: none; padding: 16px 40px; border-radius: 50px; font-size: 15px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(201, 162, 39, 0.4); width: 280px; text-align: center;">REGISTER FOR ACCESS</a>
+                                    <a href="https://portal.legacytranslations.com/#/partner" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #c9a227 0%, #d4af37 100%); color: #1a2a4a; text-decoration: none; padding: 16px 40px; border-radius: 50px; font-size: 15px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(201, 162, 39, 0.4); width: 280px; text-align: center;">REGISTER FOR ACCESS</a>
                                 </td></tr>
                                 <tr><td align="center" style="padding-top: 8px;">
                                     <a href="https://calendly.com/legacytranslations/30min" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); color: #ffffff; text-decoration: none; padding: 14px 40px; border-radius: 50px; font-size: 14px; font-weight: 600; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(26, 42, 74, 0.3); width: 280px; text-align: center;">SCHEDULE A BRIEF CALL</a>
@@ -30541,7 +32031,7 @@ def get_outreach_followup1_template(partner_name: str) -> str:
                             </p>
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                                 <tr><td align="center">
-                                    <a href="https://portal.legacytranslations.com/partner" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 50px; font-size: 15px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(34, 197, 94, 0.4); width: 280px; text-align: center;">CLAIM YOUR FREE TRANSLATION</a>
+                                    <a href="https://portal.legacytranslations.com/#/partner" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 50px; font-size: 15px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(34, 197, 94, 0.4); width: 280px; text-align: center;">CLAIM YOUR FREE TRANSLATION</a>
                                 </td></tr>
                             </table>'''
     signature = get_outreach_signature()
@@ -30595,7 +32085,7 @@ def get_outreach_followup2_template(partner_name: str) -> str:
                             </p>
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                                 <tr><td align="center" style="padding-bottom: 12px;">
-                                    <a href="https://portal.legacytranslations.com/partner" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #c9a227 0%, #d4af37 100%); color: #1a2a4a; text-decoration: none; padding: 16px 40px; border-radius: 50px; font-size: 15px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(201, 162, 39, 0.4); width: 280px; text-align: center;">START YOUR FREE TRIAL</a>
+                                    <a href="https://portal.legacytranslations.com/#/partner" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #c9a227 0%, #d4af37 100%); color: #1a2a4a; text-decoration: none; padding: 16px 40px; border-radius: 50px; font-size: 15px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(201, 162, 39, 0.4); width: 280px; text-align: center;">START YOUR FREE TRIAL</a>
                                 </td></tr>
                                 <tr><td align="center" style="padding-top: 8px;">
                                     <a href="https://calendly.com/legacytranslations/30min" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); color: #ffffff; text-decoration: none; padding: 14px 40px; border-radius: 50px; font-size: 14px; font-weight: 600; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(26, 42, 74, 0.3); width: 280px; text-align: center;">SCHEDULE A QUICK CALL</a>
@@ -30638,7 +32128,7 @@ def get_outreach_followup3_template(partner_name: str) -> str:
                             </p>
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                                 <tr><td align="center">
-                                    <a href="https://portal.legacytranslations.com/partner" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #c9a227 0%, #d4af37 100%); color: #1a2a4a; text-decoration: none; padding: 16px 40px; border-radius: 50px; font-size: 15px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(201, 162, 39, 0.4); width: 280px; text-align: center;">REGISTER FOR FREE TRIAL</a>
+                                    <a href="https://portal.legacytranslations.com/#/partner" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #c9a227 0%, #d4af37 100%); color: #1a2a4a; text-decoration: none; padding: 16px 40px; border-radius: 50px; font-size: 15px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(201, 162, 39, 0.4); width: 280px; text-align: center;">REGISTER FOR FREE TRIAL</a>
                                 </td></tr>
                             </table>'''
     signature = get_outreach_signature()
@@ -30661,7 +32151,7 @@ def get_outreach_signature() -> str:
                                             <a href="mailto:contact@legacytranslations.com" style="color: #c9a227; text-decoration: none;">contact@legacytranslations.com</a>
                                         </p>
                                         <p style="color: #64748b; font-size: 13px; margin: 4px 0 0;">
-                                            <a href="https://www.legacytranslations.com" style="color: #c9a227; text-decoration: none;">www.legacytranslations.com</a>
+                                            <a href="https://www.legacytranslations.com" target="_blank" style="color: #c9a227; text-decoration: none;">www.legacytranslations.com</a>
                                         </p>
                                     </td>
                                 </tr>
