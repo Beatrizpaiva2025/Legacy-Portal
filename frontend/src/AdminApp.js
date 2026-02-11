@@ -8764,12 +8764,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 </div>
                 <div className="text-center">
                   {logoStamp ? (
-                    <img src={logoStamp} alt="Stamp" className="w-28 h-28 object-contain" />
+                    <img src={logoStamp} alt="Stamp" className="w-[146px] h-[146px] object-contain" />
                   ) : (
-                    <div className="w-28 h-28 rounded-full border-4 border-blue-600 flex flex-col items-center justify-center p-2" style={{borderStyle: 'double'}}>
-                      <div className="text-[8px] text-blue-600 font-bold">CERTIFIED TRANSLATOR</div>
-                      <div className="text-[10px] text-blue-600 font-bold mt-1">LEGACY TRANSLATIONS</div>
-                      <div className="text-[8px] text-blue-600">ATA # 275993</div>
+                    <div className="w-[146px] h-[146px] rounded-full border-[5px] border-blue-600 flex flex-col items-center justify-center p-3" style={{borderStyle: 'double'}}>
+                      <div className="text-[10px] text-blue-600 font-bold">CERTIFIED TRANSLATOR</div>
+                      <div className="text-[13px] text-blue-600 font-bold mt-1">LEGACY TRANSLATIONS</div>
+                      <div className="text-[10px] text-blue-600">ATA # 275993</div>
                     </div>
                   )}
                 </div>
