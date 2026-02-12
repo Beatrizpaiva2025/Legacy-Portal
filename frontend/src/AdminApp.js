@@ -24953,6 +24953,7 @@ const FinancesPage = ({ adminKey }) => {
   const [bulkEmailSubject, setBulkEmailSubject] = useState('');
   const [bulkEmailMessage, setBulkEmailMessage] = useState('');
   const [sendingBulkEmail, setSendingBulkEmail] = useState(false);
+  const [bulkEmailMode, setBulkEmailMode] = useState('template'); // 'template' or 'custom'
   // Add prospect modal state
   const [showAddProspectModal, setShowAddProspectModal] = useState(false);
   const [addProspectForm, setAddProspectForm] = useState({ company_name: '', contact_name: '', email: '', phone: '' });
@@ -26692,7 +26693,7 @@ const FinancesPage = ({ adminKey }) => {
                       </>
                     )}
                     <button
-                      onClick={() => { setShowBulkEmailModal(true); }}
+                      onClick={() => { setBulkEmailMode(['prospect', 'new', 'first_email', 'follow_up_1', 'follow_up_2'].includes(partnerFilter) ? 'template' : 'custom'); setShowBulkEmailModal(true); }}
                       className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center gap-1"
                     >
                       📧 Send Email
@@ -27951,7 +27952,7 @@ const FinancesPage = ({ adminKey }) => {
       {/* Bulk Email Modal */}
       {showBulkEmailModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
             <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
               <div>
                 <h2 className="font-bold text-gray-800">Send Email to Partners</h2>
@@ -27959,43 +27960,136 @@ const FinancesPage = ({ adminKey }) => {
               </div>
               <button onClick={() => setShowBulkEmailModal(false)} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
             </div>
-            <div className="p-4 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
-                <input
-                  type="text"
-                  value={bulkEmailSubject}
-                  onChange={(e) => setBulkEmailSubject(e.target.value)}
-                  className="w-full border rounded-md px-3 py-2 text-sm"
-                  placeholder="Email subject..."
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
-                <textarea
-                  value={bulkEmailMessage}
-                  onChange={(e) => setBulkEmailMessage(e.target.value)}
-                  className="w-full border rounded-md px-3 py-2 text-sm"
-                  rows={6}
-                  placeholder="Write your message here..."
-                />
-              </div>
-            </div>
-            <div className="p-4 border-t bg-gray-50 flex justify-between items-center">
+            {/* Mode toggle tabs */}
+            <div className="px-4 pt-3 flex gap-2 border-b">
               <button
-                onClick={() => setShowBulkEmailModal(false)}
-                className="px-4 py-2 border rounded-md text-sm hover:bg-gray-100"
+                onClick={() => setBulkEmailMode('template')}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${bulkEmailMode === 'template' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
               >
-                Cancel
+                Prospecting Templates
               </button>
               <button
-                onClick={handleBulkEmailSend}
-                disabled={sendingBulkEmail || !bulkEmailSubject.trim() || !bulkEmailMessage.trim()}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                onClick={() => setBulkEmailMode('custom')}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${bulkEmailMode === 'custom' ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
               >
-                {sendingBulkEmail ? 'Sending...' : `Send to ${selectedPartnerIds.length} Partner(s)`}
+                Custom Email
               </button>
             </div>
+            {bulkEmailMode === 'template' ? (
+              <>
+                <div className="p-4 space-y-3 overflow-y-auto">
+                  <p className="text-xs text-gray-600 bg-indigo-50 border border-indigo-100 rounded-lg p-2.5">
+                    The system automatically sends the correct next email to each prospect based on their current status. Click <strong>Send</strong> below to send the next prospecting step.
+                  </p>
+                  {/* Template 1 - First Contact */}
+                  <div className="border rounded-lg p-3 bg-orange-50 border-orange-200">
+                    <div className="flex items-start gap-3">
+                      <div className="w-7 h-7 rounded-full bg-orange-500 text-white flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">1</div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-sm text-orange-800">1st Email &mdash; Introduction</h3>
+                        <p className="text-xs text-gray-500 mt-0.5 italic">Subject: &quot;Certified Translation Services with Digital Verification&quot;</p>
+                        <p className="text-xs text-gray-600 mt-1">Professional introduction to Legacy Translations. Highlights QR code verification, 100% USCIS acceptance rate, 24-hour turnaround, pricing ($16.24-$24.99/page), and Net 15/30 invoicing. CTAs: Register for Access &amp; Schedule a Call.</p>
+                        <p className="text-xs text-orange-600 mt-1.5 font-medium">Sent to: New prospects (no emails sent yet)</p>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Template 2 - Follow-up 1 */}
+                  <div className="border rounded-lg p-3 bg-green-50 border-green-200">
+                    <div className="flex items-start gap-3">
+                      <div className="w-7 h-7 rounded-full bg-green-500 text-white flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">2</div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-sm text-green-800">2nd Email &mdash; Free Trial Offer</h3>
+                        <p className="text-xs text-gray-500 mt-0.5 italic">Subject: &quot;A free translation for [Company] &mdash; try us risk-free&quot;</p>
+                        <p className="text-xs text-gray-600 mt-1">Follow-up offering a complimentary trial translation with no commitment required. Showcases portal features, QR code verification, and quality firsthand. CTA: Claim Your Free Translation.</p>
+                        <p className="text-xs text-green-600 mt-1.5 font-medium">Sent to: Prospects who already received the 1st Email</p>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Template 3 - Follow-up 2 */}
+                  <div className="border rounded-lg p-3 bg-blue-50 border-blue-200">
+                    <div className="flex items-start gap-3">
+                      <div className="w-7 h-7 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">3</div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-sm text-blue-800">3rd Email &mdash; Social Proof &amp; Final Reminder</h3>
+                        <p className="text-xs text-gray-500 mt-0.5 italic">Subject: &quot;Why firms trust Legacy Translations &mdash; plus your free trial&quot;</p>
+                        <p className="text-xs text-gray-600 mt-1">Social proof highlighting 15+ years experience, 100% USCIS acceptance, and 50+ languages. Includes client testimonial and continued free trial offer. CTAs: Start Free Trial &amp; Schedule a Call.</p>
+                        <p className="text-xs text-blue-600 mt-1.5 font-medium">Sent to: Prospects who already received the 2nd Email</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-4 border-t bg-gray-50 flex justify-between items-center">
+                  <button
+                    onClick={() => setShowBulkEmailModal(false)}
+                    className="px-4 py-2 border rounded-md text-sm hover:bg-gray-100"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setSendingBulkEmail(true);
+                      try {
+                        const res = await axios.post(`${API}/admin/partners/bulk-prospect-step?admin_key=${adminKey}`, {
+                          partner_ids: selectedPartnerIds
+                        });
+                        showToast(res.data.message || 'Prospecting emails sent!');
+                        setShowBulkEmailModal(false);
+                        setSelectedPartnerIds([]);
+                        fetchPartnerStats();
+                      } catch (err) {
+                        showToast('Error: ' + (err.response?.data?.detail || err.message));
+                      } finally {
+                        setSendingBulkEmail(false);
+                      }
+                    }}
+                    disabled={sendingBulkEmail}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  >
+                    {sendingBulkEmail ? 'Sending...' : `Send Prospecting Email to ${selectedPartnerIds.length} Partner(s)`}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="p-4 space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                    <input
+                      type="text"
+                      value={bulkEmailSubject}
+                      onChange={(e) => setBulkEmailSubject(e.target.value)}
+                      className="w-full border rounded-md px-3 py-2 text-sm"
+                      placeholder="Email subject..."
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+                    <textarea
+                      value={bulkEmailMessage}
+                      onChange={(e) => setBulkEmailMessage(e.target.value)}
+                      className="w-full border rounded-md px-3 py-2 text-sm"
+                      rows={6}
+                      placeholder="Write your message here..."
+                    />
+                  </div>
+                </div>
+                <div className="p-4 border-t bg-gray-50 flex justify-between items-center">
+                  <button
+                    onClick={() => setShowBulkEmailModal(false)}
+                    className="px-4 py-2 border rounded-md text-sm hover:bg-gray-100"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleBulkEmailSend}
+                    disabled={sendingBulkEmail || !bulkEmailSubject.trim() || !bulkEmailMessage.trim()}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  >
+                    {sendingBulkEmail ? 'Sending...' : `Send to ${selectedPartnerIds.length} Partner(s)`}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
