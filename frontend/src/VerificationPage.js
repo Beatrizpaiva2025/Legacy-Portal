@@ -56,7 +56,7 @@ const VerificationPage = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [pdfVerificationResult, setPdfVerificationResult] = useState(null);
   const [verifyingPdf, setVerifyingPdf] = useState(false);
-  const [showPdfVerifier, setShowPdfVerifier] = useState(true); // Default to expanded
+  const [showPdfModal, setShowPdfModal] = useState(false);
   const [dragActive, setDragActive] = useState(false);
 
   useEffect(() => {
@@ -340,185 +340,134 @@ const VerificationPage = () => {
                 </div>
               </div>
 
-              {/* DIGITAL SIGNATURE VERIFICATION - Critical Section */}
-              <div className="mt-6 border-2 border-amber-400 rounded-lg overflow-hidden bg-amber-50">
-                {/* Warning banner if PDF not yet verified */}
-                {!pdfVerificationResult && (
-                  <div className="bg-amber-500 text-white px-5 py-3 flex items-center gap-3">
-                    <svg className="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                    <div>
-                      <p className="font-bold">Important: Verify Document Integrity</p>
-                      <p className="text-sm text-amber-100">Upload the PDF file below to confirm it has not been altered since certification</p>
-                    </div>
-                  </div>
-                )}
-
+              {/* Advanced PDF Verification - Discreet link */}
+              <div className="mt-6 text-center">
                 <button
-                  onClick={() => setShowPdfVerifier(!showPdfVerifier)}
-                  className="w-full px-5 py-4 bg-white hover:bg-slate-50 transition-colors flex items-center justify-between border-b border-amber-200"
+                  onClick={() => { setShowPdfModal(true); setSelectedFile(null); setPdfVerificationResult(null); }}
+                  className="text-sm text-slate-400 hover:text-slate-600 transition-colors underline underline-offset-2"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center">
-                      <svg className="w-7 h-7 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                      </svg>
-                    </div>
-                    <div className="text-left">
-                      <h3 className="font-bold text-slate-800 text-lg">🔐 Digital Signature Verification</h3>
-                      <p className="text-sm text-slate-600">Upload the PDF to verify it matches the certified original - any modification will be detected</p>
-                    </div>
-                  </div>
-                  <svg
-                    className={`w-5 h-5 text-slate-400 transition-transform ${showPdfVerifier ? 'rotate-180' : ''}`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
+                  Advanced: Verify PDF file integrity
                 </button>
+              </div>
 
-                {showPdfVerifier && (
-                  <div className="p-5 bg-white">
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                      <h4 className="font-bold text-blue-800 mb-2 flex items-center gap-2">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        How Digital Signature Verification Works
-                      </h4>
-                      <ul className="text-sm text-blue-700 space-y-1">
-                        <li>• When this document was certified, a unique cryptographic hash (SHA-256) was calculated</li>
-                        <li>• This hash acts as a "digital fingerprint" - any change to the document changes this hash</li>
-                        <li>• Upload your PDF below - we'll calculate its hash and compare with the original</li>
-                        <li>• <strong>If hashes match</strong>: Document is authentic and unaltered ✓</li>
-                        <li>• <strong>If hashes differ</strong>: Document has been modified after certification ⚠</li>
-                      </ul>
+              {/* PDF Verification Modal */}
+              {showPdfModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowPdfModal(false)}>
+                  <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                    {/* Modal Header */}
+                    <div className="flex items-center justify-between p-5 border-b border-slate-200">
+                      <h3 className="font-bold text-slate-800 text-lg">PDF File Integrity Check</h3>
+                      <button onClick={() => setShowPdfModal(false)} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
                     </div>
 
-                    {/* Drag and Drop Zone */}
-                    <div
-                      className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                        dragActive
-                          ? 'border-slate-500 bg-slate-50'
-                          : selectedFile
-                          ? 'border-emerald-300 bg-emerald-50'
-                          : 'border-slate-300 hover:border-slate-400'
-                      }`}
-                      onDragEnter={handleDrag}
-                      onDragLeave={handleDrag}
-                      onDragOver={handleDrag}
-                      onDrop={handleDrop}
-                    >
-                      {selectedFile ? (
-                        <div className="flex flex-col items-center">
-                          <svg className="w-12 h-12 text-emerald-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          <p className="font-medium text-slate-800">{selectedFile.name}</p>
-                          <p className="text-sm text-slate-500 mt-1">
-                            {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                          </p>
-                          <button
-                            onClick={() => setSelectedFile(null)}
-                            className="mt-3 text-sm text-red-600 hover:text-red-700 font-medium"
-                          >
-                            Remove file
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center">
-                          <svg className="w-12 h-12 text-slate-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                          </svg>
-                          <p className="font-medium text-slate-700">Drag and drop your PDF here</p>
-                          <p className="text-sm text-slate-500 mt-1">or</p>
-                          <label className="mt-3 cursor-pointer">
-                            <span className="px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-colors text-sm font-medium">
-                              Select PDF File
-                            </span>
-                            <input
-                              type="file"
-                              accept=".pdf,application/pdf"
-                              className="hidden"
-                              onChange={(e) => handleFileSelect(e.target.files[0])}
-                            />
-                          </label>
-                        </div>
-                      )}
-                    </div>
-
-                    <button
-                      onClick={verifyPdfDocument}
-                      disabled={!selectedFile || verifyingPdf}
-                      className="mt-4 w-full px-6 py-3 bg-slate-800 text-white rounded-lg hover:bg-slate-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors font-medium"
-                    >
-                      {verifyingPdf ? (
-                        <span className="flex items-center justify-center gap-2">
-                          <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          Verifying PDF...
-                        </span>
-                      ) : (
-                        'Verify PDF Document'
-                      )}
-                    </button>
-
-                    {/* PDF Verification Result */}
-                    {pdfVerificationResult && (
-                      <div className={`mt-4 p-4 rounded-lg ${
-                        pdfVerificationResult.pdf_matches
-                          ? 'bg-emerald-50 border border-emerald-200'
-                          : 'bg-amber-50 border border-amber-200'
-                      }`}>
-                        <div className="flex items-start gap-3">
-                          {pdfVerificationResult.pdf_matches ? (
-                            <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0">
-                              <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                              </svg>
-                            </div>
-                          ) : (
-                            <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
-                              <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                              </svg>
-                            </div>
-                          )}
-                          <div>
-                            <h4 className={`font-bold ${
-                              pdfVerificationResult.pdf_matches ? 'text-emerald-800' : 'text-amber-800'
-                            }`}>
-                              {pdfVerificationResult.pdf_matches
-                                ? 'PDF Authentic - No Alterations'
-                                : 'PDF Hash Mismatch'}
-                            </h4>
-                            <p className={`text-sm mt-1 ${
-                              pdfVerificationResult.pdf_matches ? 'text-emerald-700' : 'text-amber-700'
-                            }`}>
-                              {pdfVerificationResult.message}
-                            </p>
-                            {pdfVerificationResult.original_hash && pdfVerificationResult.submitted_hash && (
-                              <div className="mt-3 text-xs space-y-1">
-                                <p className="font-mono text-slate-500">
-                                  Original hash: {pdfVerificationResult.original_hash}
-                                </p>
-                                <p className="font-mono text-slate-500">
-                                  Uploaded hash: {pdfVerificationResult.submitted_hash}
-                                </p>
-                              </div>
-                            )}
-                          </div>
+                    {/* Modal Body */}
+                    <div className="p-5">
+                      {/* Explanation */}
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-5">
+                        <h4 className="font-bold text-blue-800 mb-2">How does this work?</h4>
+                        <p className="text-sm text-blue-700 leading-relaxed mb-3">
+                          When your document was certified, we calculated a unique digital fingerprint (SHA-256 hash) of the PDF file.
+                          This check compares your file's fingerprint against the original to confirm the file is identical.
+                        </p>
+                        <div className="bg-blue-100/50 rounded p-3">
+                          <h5 className="font-semibold text-blue-800 text-sm mb-1">Important:</h5>
+                          <ul className="text-sm text-blue-700 space-y-1">
+                            <li>- This only works with the <strong>original downloaded PDF file</strong></li>
+                            <li>- Opening a PDF in any reader (Adobe, Chrome, Preview) and re-saving it changes the file's fingerprint, even without editing the content</li>
+                            <li>- Printing and scanning the document also changes the fingerprint</li>
+                            <li>- <strong>A mismatch does NOT mean the translation is invalid</strong> - the certification shown on the main page confirms authenticity</li>
+                          </ul>
                         </div>
                       </div>
-                    )}
+
+                      {/* Drag and Drop Zone */}
+                      <div
+                        className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                          dragActive
+                            ? 'border-slate-500 bg-slate-50'
+                            : selectedFile
+                            ? 'border-emerald-300 bg-emerald-50'
+                            : 'border-slate-300 hover:border-slate-400'
+                        }`}
+                        onDragEnter={handleDrag}
+                        onDragLeave={handleDrag}
+                        onDragOver={handleDrag}
+                        onDrop={handleDrop}
+                      >
+                        {selectedFile ? (
+                          <div className="flex flex-col items-center">
+                            <svg className="w-10 h-10 text-emerald-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <p className="font-medium text-slate-800">{selectedFile.name}</p>
+                            <p className="text-sm text-slate-500 mt-1">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                            <button onClick={() => { setSelectedFile(null); setPdfVerificationResult(null); }} className="mt-2 text-sm text-red-600 hover:text-red-700 font-medium">Remove</button>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center">
+                            <svg className="w-10 h-10 text-slate-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                            </svg>
+                            <p className="font-medium text-slate-700 text-sm">Drag and drop your PDF here</p>
+                            <p className="text-xs text-slate-500 mt-1">or</p>
+                            <label className="mt-2 cursor-pointer">
+                              <span className="px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-colors text-sm font-medium">Select PDF</span>
+                              <input type="file" accept=".pdf,application/pdf" className="hidden" onChange={(e) => handleFileSelect(e.target.files[0])} />
+                            </label>
+                          </div>
+                        )}
+                      </div>
+
+                      <button
+                        onClick={verifyPdfDocument}
+                        disabled={!selectedFile || verifyingPdf}
+                        className="mt-4 w-full px-6 py-3 bg-slate-800 text-white rounded-lg hover:bg-slate-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors font-medium text-sm"
+                      >
+                        {verifyingPdf ? (
+                          <span className="flex items-center justify-center gap-2">
+                            <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Verifying...
+                          </span>
+                        ) : 'Check File Integrity'}
+                      </button>
+
+                      {/* Result */}
+                      {pdfVerificationResult && (
+                        <div className={`mt-4 p-4 rounded-lg ${
+                          pdfVerificationResult.pdf_matches
+                            ? 'bg-emerald-50 border border-emerald-200'
+                            : 'bg-amber-50 border border-amber-200'
+                        }`}>
+                          <div className="flex items-start gap-3">
+                            {pdfVerificationResult.pdf_matches ? (
+                              <svg className="w-6 h-6 text-emerald-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            ) : (
+                              <svg className="w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                            )}
+                            <div>
+                              <h4 className={`font-bold text-sm ${pdfVerificationResult.pdf_matches ? 'text-emerald-800' : 'text-amber-800'}`}>
+                                {pdfVerificationResult.pdf_matches ? 'File Integrity Confirmed' : 'File Fingerprint Mismatch'}
+                              </h4>
+                              <p className={`text-sm mt-1 ${pdfVerificationResult.pdf_matches ? 'text-emerald-700' : 'text-amber-700'}`}>
+                                {pdfVerificationResult.pdf_matches
+                                  ? 'The uploaded file is identical to the certified original.'
+                                  : 'The file fingerprint does not match. This is normal if the PDF was opened and re-saved, or saved from Print Preview. The certification itself remains valid.'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
 
             {/* Company Footer */}
