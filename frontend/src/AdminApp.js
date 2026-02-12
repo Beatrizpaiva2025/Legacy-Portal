@@ -1610,7 +1610,10 @@ const reconstructFullHtml = (originalHtml, newBodyContent) => {
   if (!originalHtml.includes('<body') && !originalHtml.includes('<html')) {
     const styleMatches = originalHtml.match(/<style[^>]*>[\s\S]*?<\/style>/gi);
     if (styleMatches && styleMatches.length > 0) {
-      return styleMatches.join('\n') + '\n' + newBodyContent;
+      // Strip any <style> blocks already in newBodyContent to avoid duplication
+      // (the browser may keep <style> blocks in body.innerHTML)
+      const cleanBody = newBodyContent.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+      return styleMatches.join('\n') + '\n' + cleanBody;
     }
     return newBodyContent;
   }
@@ -11438,11 +11441,21 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         ref={editableRef}
                         srcDoc={(() => {
                           const content = translationResults[selectedResultIndex]?.translatedText || '<p>No translation</p>';
-                          // Inject contenteditable into existing body tag, or wrap in editable body
+                          // Inject contenteditable into existing body tag, preserving original formatting
                           if (content.match(/<body/i)) {
-                            return content.replace(/<body([^>]*)>/i, '<body$1 contenteditable="true" style="outline:none; padding:12px; margin:0;">');
+                            // Merge outline:none into existing style or add new style attribute
+                            let result = content;
+                            if (content.match(/<body[^>]*style\s*=/i)) {
+                              result = content.replace(/<body([^>]*?)style\s*=\s*"([^"]*)"([^>]*)>/i, '<body$1style="$2; outline:none; cursor:text;"$3 contenteditable="true">');
+                            } else {
+                              result = content.replace(/<body([^>]*)>/i, '<body$1 contenteditable="true" style="outline:none; cursor:text;">');
+                            }
+                            return result;
                           }
-                          return `<!DOCTYPE html><html><head></head><body contenteditable="true" style="outline:none; padding:12px; margin:0;">${content}</body></html>`;
+                          // For fragments: extract <style> blocks into <head> to preserve them properly
+                          const styleBlocks = content.match(/<style[^>]*>[\s\S]*?<\/style>/gi) || [];
+                          const bodyContent = content.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+                          return `<!DOCTYPE html><html><head>${styleBlocks.join('\n')}</head><body contenteditable="true" style="outline:none; cursor:text;">${bodyContent}</body></html>`;
                         })()}
                         title="Translation Edit"
                         className="w-full border-0"
@@ -11846,11 +11859,21 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         ref={editableRef}
                         srcDoc={(() => {
                           const content = translationResults[selectedResultIndex]?.translatedText || '<p>No translation</p>';
-                          // Inject contenteditable into existing body tag, or wrap in editable body
+                          // Inject contenteditable into existing body tag, preserving original formatting
                           if (content.match(/<body/i)) {
-                            return content.replace(/<body([^>]*)>/i, '<body$1 contenteditable="true" style="outline:none; padding:12px; margin:0;">');
+                            // Merge outline:none into existing style or add new style attribute
+                            let result = content;
+                            if (content.match(/<body[^>]*style\s*=/i)) {
+                              result = content.replace(/<body([^>]*?)style\s*=\s*"([^"]*)"([^>]*)>/i, '<body$1style="$2; outline:none; cursor:text;"$3 contenteditable="true">');
+                            } else {
+                              result = content.replace(/<body([^>]*)>/i, '<body$1 contenteditable="true" style="outline:none; cursor:text;">');
+                            }
+                            return result;
                           }
-                          return `<!DOCTYPE html><html><head></head><body contenteditable="true" style="outline:none; padding:12px; margin:0;">${content}</body></html>`;
+                          // For fragments: extract <style> blocks into <head> to preserve them properly
+                          const styleBlocks = content.match(/<style[^>]*>[\s\S]*?<\/style>/gi) || [];
+                          const bodyContent = content.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+                          return `<!DOCTYPE html><html><head>${styleBlocks.join('\n')}</head><body contenteditable="true" style="outline:none; cursor:text;">${bodyContent}</body></html>`;
                         })()}
                         title="Translation Edit"
                         className="w-full border-0"
