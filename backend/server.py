@@ -3222,6 +3222,16 @@ def get_ny_now():
     """Get current datetime in New York timezone"""
     return datetime.now(NY_TIMEZONE)
 
+def ensure_ny_tz(dt):
+    """Ensure a datetime (typically from MongoDB UTC) is converted to New York timezone.
+    MongoDB stores datetimes in UTC and may return naive (no tzinfo) datetimes.
+    This ensures proper timezone info so ISO serialization includes the offset."""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+    return dt.astimezone(NY_TIMEZONE)
+
 def get_ny_date_str(fmt="%m/%d/%Y"):
     """Get current date string in New York timezone"""
     return get_ny_now().strftime(fmt)
@@ -29515,12 +29525,15 @@ async def verify_certification(certification_id: str):
                 message="Certification not found. This document may not be certified by Legacy Translations."
             )
 
+        # Convert certified_at from MongoDB (UTC) to NY timezone for correct date display
+        certified_at_ny = ensure_ny_tz(certification.get("certified_at"))
+
         # Check if revoked
         if certification.get("revoked_at"):
             return CertificationVerifyResponse(
                 is_valid=False,
                 certification_id=certification_id,
-                certified_at=certification.get("certified_at"),
+                certified_at=certified_at_ny,
                 message=f"This certification was revoked on {certification.get('revoked_at').strftime('%Y-%m-%d')}. Reason: {certification.get('revocation_reason', 'Not specified')}"
             )
 
@@ -29528,7 +29541,7 @@ async def verify_certification(certification_id: str):
         return CertificationVerifyResponse(
             is_valid=True,
             certification_id=certification_id,
-            certified_at=certification.get("certified_at"),
+            certified_at=certified_at_ny,
             document_type=certification.get("document_type"),
             source_language=certification.get("source_language"),
             target_language=certification.get("target_language"),
@@ -29567,6 +29580,9 @@ async def verify_document_content(certification_id: str, data: DocumentVerifyReq
                 message="Certification not found. This document may not be certified by Legacy Translations."
             )
 
+        # Convert certified_at from MongoDB (UTC) to NY timezone for correct date display
+        certified_at_ny = ensure_ny_tz(certification.get("certified_at"))
+
         # Check if revoked
         if certification.get("revoked_at"):
             return DocumentVerifyResponse(
@@ -29575,7 +29591,7 @@ async def verify_document_content(certification_id: str, data: DocumentVerifyReq
                 content_matches=False,
                 original_hash=certification.get("document_hash", "")[:20] + "...",
                 submitted_hash="N/A",
-                certified_at=certification.get("certified_at"),
+                certified_at=certified_at_ny,
                 message=f"This certification was revoked. Reason: {certification.get('revocation_reason', 'Not specified')}"
             )
 
@@ -29593,7 +29609,7 @@ async def verify_document_content(certification_id: str, data: DocumentVerifyReq
                 content_matches=True,
                 original_hash=original_hash[:20] + "...",
                 submitted_hash=submitted_hash[:20] + "...",
-                certified_at=certification.get("certified_at"),
+                certified_at=certified_at_ny,
                 document_type=certification.get("document_type"),
                 source_language=certification.get("source_language"),
                 target_language=certification.get("target_language"),
@@ -29606,7 +29622,7 @@ async def verify_document_content(certification_id: str, data: DocumentVerifyReq
                 content_matches=False,
                 original_hash=original_hash[:20] + "...",
                 submitted_hash=submitted_hash[:20] + "...",
-                certified_at=certification.get("certified_at"),
+                certified_at=certified_at_ny,
                 document_type=certification.get("document_type"),
                 source_language=certification.get("source_language"),
                 target_language=certification.get("target_language"),
@@ -29646,6 +29662,9 @@ async def verify_pdf_document(certification_id: str, file: UploadFile = File(...
                 "message": "Certification not found. This document may not be certified by Legacy Translations."
             }
 
+        # Convert certified_at from MongoDB (UTC) to NY timezone for correct date display
+        certified_at_ny = ensure_ny_tz(certification.get("certified_at"))
+
         # Check if revoked
         if certification.get("revoked_at"):
             return {
@@ -29654,7 +29673,7 @@ async def verify_pdf_document(certification_id: str, file: UploadFile = File(...
                 "pdf_matches": False,
                 "original_hash": certification.get("pdf_hash", "")[:20] + "..." if certification.get("pdf_hash") else "N/A",
                 "submitted_hash": "N/A",
-                "certified_at": certification.get("certified_at"),
+                "certified_at": certified_at_ny.isoformat() if certified_at_ny else None,
                 "message": f"This certification was revoked. Reason: {certification.get('revocation_reason', 'Not specified')}"
             }
 
@@ -29667,7 +29686,7 @@ async def verify_pdf_document(certification_id: str, file: UploadFile = File(...
                 "pdf_matches": False,
                 "original_hash": "NOT AVAILABLE",
                 "submitted_hash": "N/A",
-                "certified_at": certification.get("certified_at"),
+                "certified_at": certified_at_ny.isoformat() if certified_at_ny else None,
                 "message": "⚠ PDF verification not available for this certification. This document was certified before PDF hash tracking was implemented. Please use text content verification instead."
             }
 
@@ -29684,7 +29703,7 @@ async def verify_pdf_document(certification_id: str, file: UploadFile = File(...
                 "pdf_matches": True,
                 "original_hash": original_pdf_hash[:20] + "...",
                 "submitted_hash": submitted_pdf_hash[:20] + "...",
-                "certified_at": certification.get("certified_at"),
+                "certified_at": certified_at_ny.isoformat() if certified_at_ny else None,
                 "document_type": certification.get("document_type"),
                 "source_language": certification.get("source_language"),
                 "target_language": certification.get("target_language"),
@@ -29697,7 +29716,7 @@ async def verify_pdf_document(certification_id: str, file: UploadFile = File(...
                 "pdf_matches": False,
                 "original_hash": original_pdf_hash[:20] + "...",
                 "submitted_hash": submitted_pdf_hash[:20] + "...",
-                "certified_at": certification.get("certified_at"),
+                "certified_at": certified_at_ny.isoformat() if certified_at_ny else None,
                 "document_type": certification.get("document_type"),
                 "source_language": certification.get("source_language"),
                 "target_language": certification.get("target_language"),

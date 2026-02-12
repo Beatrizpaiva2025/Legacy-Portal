@@ -5057,7 +5057,7 @@ const VerificationPage = ({ certificationId }) => {
                 </div>
                 <div className="flex justify-between py-2 border-b border-green-200">
                   <span className="text-gray-600">Certified Date:</span>
-                  <span className="font-medium">{new Date(verification.certified_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                  <span className="font-medium">{new Date(verification.certified_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/New_York' })}</span>
                 </div>
                 {verification.document_type && (
                   <div className="flex justify-between py-2 border-b border-green-200">
