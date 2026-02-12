@@ -20250,12 +20250,13 @@ Provide a corrected version of the translation if needed, and briefly note what 
 Follow the user's instructions to modify or improve the translation.
 
 CRITICAL OUTPUT RULES:
-- Output ONLY the corrected/modified HTML translation
+- Output ONLY the corrected/modified translation (preserve the original format: if HTML, output HTML)
 - Do NOT include any notes, comments, or explanations about what you changed
 - Do NOT add text like "Changes made:", "I corrected:", "Here are the modifications:"
-- The output must be clean HTML ready for printing - no meta-commentary
-- Start with <!DOCTYPE html> or <html> and end with </html>"""
-            user_message = f"Original text ({request.source_language}):\n{request.text}\n\nCurrent translation ({request.target_language}):\n{request.current_translation}\n\nInstruction: {request.action}\n\nIMPORTANT: Output ONLY the corrected HTML. No explanations or notes."
+- The output must be clean and ready for use - no meta-commentary
+- If the input is HTML, preserve the complete HTML structure (start with <!DOCTYPE html> or <html> and end with </html>)
+- Return the COMPLETE document, not just the changed parts"""
+            user_message = f"Current translation ({request.target_language}):\n{request.current_translation}\n\nInstruction: {request.action}\n\nIMPORTANT: Output ONLY the corrected translation. No explanations or notes. Return the COMPLETE document."
 
         # Call Claude API - with image if available for layout preservation
         async with httpx.AsyncClient(timeout=120.0) as client:
@@ -20425,7 +20426,7 @@ CRITICAL INSTRUCTIONS:
                 },
                 json={
                     "model": "claude-sonnet-4-5-20250929",
-                    "max_tokens": 8192,
+                    "max_tokens": 16384,
                     "system": system_prompt,
                     "messages": [
                         {"role": "user", "content": message_content}
