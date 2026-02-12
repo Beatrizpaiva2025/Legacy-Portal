@@ -215,18 +215,13 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
   // Load admin/PM list for messaging
   const fetchAdminPmList = async () => {
     try {
-      const [adminsRes, pmsRes] = await Promise.all([
-        axios.get(`${API}/admin/users/by-role/admin?admin_key=${adminKey}`),
-        axios.get(`${API}/admin/users/by-role/pm?admin_key=${adminKey}`)
-      ]);
-      const admins = (Array.isArray(adminsRes.data) ? adminsRes.data : adminsRes.data.users || []).map(u => ({ ...u, role: 'admin' }));
+      const pmsRes = await axios.get(`${API}/admin/users/by-role/pm?admin_key=${adminKey}`);
       const pms = (Array.isArray(pmsRes.data) ? pmsRes.data : pmsRes.data.users || []).map(u => ({ ...u, role: 'pm' }));
-      setAdminPmList([...pms, ...admins]);
-      // Auto-select first PM if available
+      setAdminPmList(pms);
+      // Auto-select first PM
       if (pms.length > 0) setSelectedRecipient(pms[0].id);
-      else if (admins.length > 0) setSelectedRecipient(admins[0].id);
     } catch (err) {
-      console.log('Could not load admin/PM list');
+      console.log('Could not load PM list');
     }
   };
 

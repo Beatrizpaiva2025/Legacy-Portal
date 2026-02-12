@@ -1169,6 +1169,7 @@ const TopBar = ({
     { id: 'finances', label: 'Partners', icon: '🤝', roles: ['admin'] },
     { id: 'followups', label: 'Follow-ups', icon: '🔔', roles: ['admin'] },
     { id: 'pm-dashboard', label: 'PM Dashboard', icon: '🎯', roles: ['pm'] },
+    { id: 'messages', label: 'Messages', icon: '💬', roles: ['pm'] },
     { id: 'sales-control', label: 'Sales', icon: '📈', roles: ['admin'] },
     { id: 'users', label: 'Translators', icon: '👥', roles: ['admin'] },
     { id: 'settings', label: 'Settings', icon: '⚙️', roles: ['admin'] },
@@ -16605,6 +16606,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       setReplyingToTranslatorMsg(null);
       setTranslatorReplyContent('');
       fetchTranslatorInbox();
+      fetchNotifications(); // Refresh to dismiss notification bell
     } catch (err) {
       console.error('Failed to reply:', err);
       showToast('Failed to send reply. Please try again.');
@@ -36277,6 +36279,13 @@ function AdminApp() {
   const [globalPendingZelle, setGlobalPendingZelle] = useState([]);
   const [globalUnreadCount, setGlobalUnreadCount] = useState(0);
 
+  // PM Messages tab state
+  const [pmConversations, setPmConversations] = useState([]);
+  const [loadingConversations, setLoadingConversations] = useState(false);
+  const [conversationReplyTo, setConversationReplyTo] = useState(null);
+  const [conversationReplyContent, setConversationReplyContent] = useState('');
+  const [sendingConversationReply, setSendingConversationReply] = useState(false);
+
   // Check for invite_token or reset_token in URL
   const urlParams = new URLSearchParams(window.location.search);
   const inviteToken = urlParams.get('invite_token');
@@ -36368,6 +36377,53 @@ function AdminApp() {
     }
   }, [adminKey, user]);
 
+  // Fetch PM conversations (full bidirectional history)
+  const fetchPmConversations = async () => {
+    setLoadingConversations(true);
+    try {
+      const response = await axios.get(`${API}/admin/translator-messages/conversations?admin_key=${adminKey}`);
+      setPmConversations(response.data.messages || []);
+    } catch (err) {
+      console.error('Failed to fetch conversations:', err);
+    } finally {
+      setLoadingConversations(false);
+    }
+  };
+
+  // Reply from conversations tab
+  const replyFromConversation = async (msg) => {
+    if (!conversationReplyContent.trim()) return;
+    setSendingConversationReply(true);
+    try {
+      await axios.post(`${API}/admin/translator-messages?admin_key=${adminKey}`, {
+        translator_id: msg.from_translator_id,
+        translator_name: msg.from_translator_name,
+        translator_email: '',
+        content: conversationReplyContent,
+        order_number: msg.order_number || '',
+        admin_name: user?.name || 'PM'
+      });
+      // Mark original message as read (also dismisses notification)
+      await axios.put(`${API}/translator/messages/${msg.id}/read?admin_key=${adminKey}`);
+      showToast('Reply sent!');
+      setConversationReplyTo(null);
+      setConversationReplyContent('');
+      fetchPmConversations();
+    } catch (err) {
+      console.error('Failed to reply:', err);
+      showToast('Failed to send reply.');
+    } finally {
+      setSendingConversationReply(false);
+    }
+  };
+
+  // Fetch conversations when Messages tab is active
+  useEffect(() => {
+    if (activeTab === 'messages' && adminKey && user?.role === 'pm') {
+      fetchPmConversations();
+    }
+  }, [activeTab, adminKey]);
+
   // Navigate to translation with order
   const navigateToTranslation = (order) => {
     setSelectedOrder(order);
@@ -36388,6 +36444,118 @@ function AdminApp() {
         return ['admin', 'pm'].includes(userRole)
           ? <PMDashboard adminKey={adminKey} user={user} onNavigateToTranslation={navigateToTranslation} />
           : <div className="p-6 text-center text-gray-500">Access denied</div>;
+      case 'messages':
+        return ['pm'].includes(userRole) ? (() => {
+          // Group conversations by translator
+          const grouped = {};
+          pmConversations.forEach(msg => {
+            const key = msg.type === 'translator_to_admin'
+              ? (msg.from_translator_id || msg.from_translator_name)
+              : (msg.to_translator_id || msg.to_translator_name);
+            const name = msg.type === 'translator_to_admin'
+              ? msg.from_translator_name
+              : msg.to_translator_name;
+            if (!grouped[key]) grouped[key] = { name, messages: [] };
+            grouped[key].messages.push(msg);
+          });
+          // Sort each group by date ascending for conversation flow
+          Object.values(grouped).forEach(g => {
+            g.messages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+          });
+
+          return (
+            <div className="p-6 max-w-4xl mx-auto">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-gray-800">Messages</h2>
+                <button
+                  onClick={fetchPmConversations}
+                  className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+                >
+                  Refresh
+                </button>
+              </div>
+              {loadingConversations && pmConversations.length === 0 ? (
+                <div className="text-center py-12 text-gray-500">Loading conversations...</div>
+              ) : Object.keys(grouped).length === 0 ? (
+                <div className="text-center py-12 text-gray-400">No messages yet</div>
+              ) : (
+                <div className="space-y-4">
+                  {Object.entries(grouped).map(([translatorKey, group]) => (
+                    <div key={translatorKey} className="bg-white border rounded-lg shadow-sm">
+                      <div className="px-4 py-3 border-b bg-gray-50 rounded-t-lg flex items-center justify-between">
+                        <span className="font-semibold text-gray-800">{group.name}</span>
+                        <span className="text-xs text-gray-400">{group.messages.length} message{group.messages.length !== 1 ? 's' : ''}</span>
+                      </div>
+                      <div className="p-4 space-y-3 max-h-96 overflow-y-auto">
+                        {group.messages.map(msg => (
+                          <div
+                            key={msg.id || msg._id}
+                            className={`flex ${msg.type === 'admin_to_translator' ? 'justify-end' : 'justify-start'}`}
+                          >
+                            <div className={`max-w-[75%] rounded-lg px-3 py-2 ${
+                              msg.type === 'admin_to_translator'
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              <div className="text-sm">{msg.content}</div>
+                              <div className={`text-[10px] mt-1 ${
+                                msg.type === 'admin_to_translator' ? 'text-blue-200' : 'text-gray-400'
+                              }`}>
+                                {msg.order_number && <span className="mr-2">[{msg.order_number}]</span>}
+                                {msg.created_at ? new Date(msg.created_at).toLocaleString() : ''}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      {/* Reply box */}
+                      {conversationReplyTo === translatorKey ? (
+                        <div className="p-3 border-t bg-gray-50">
+                          <textarea
+                            value={conversationReplyContent}
+                            onChange={(e) => setConversationReplyContent(e.target.value)}
+                            rows="2"
+                            className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-2"
+                            placeholder="Type your reply..."
+                            autoFocus
+                          />
+                          <div className="flex justify-end gap-2">
+                            <button
+                              onClick={() => { setConversationReplyTo(null); setConversationReplyContent(''); }}
+                              className="px-3 py-1 text-gray-600 text-sm hover:text-gray-800"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => {
+                                // Find the last incoming message from this translator
+                                const lastIncoming = [...group.messages].reverse().find(m => m.type === 'translator_to_admin');
+                                if (lastIncoming) replyFromConversation(lastIncoming);
+                              }}
+                              disabled={sendingConversationReply || !conversationReplyContent.trim()}
+                              className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:bg-gray-400"
+                            >
+                              {sendingConversationReply ? 'Sending...' : 'Send'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-3 border-t bg-gray-50 flex justify-end">
+                          <button
+                            onClick={() => { setConversationReplyTo(translatorKey); setConversationReplyContent(''); }}
+                            className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+                          >
+                            Reply
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })() : <div className="p-6 text-center text-gray-500">Access denied</div>;
       case 'projects':
         return userRole !== 'translator'
           ? <ProjectsPage adminKey={adminKey} onTranslate={navigateToTranslation} user={user} />
