@@ -3368,6 +3368,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         // Reset state for new order
         setSelectedOrderId(null);
         setTranslationResults([]);
+        setSelectedOriginalPageIndex(0);
+        setSelectedResultIndex(0);
 
         // Auto-select the project to load its documents
         await selectProject(selectedOrder);
@@ -3948,6 +3950,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             setProcessingStatus('⚠️ Translation data is corrupted (binary Word file). Please re-upload the translation.');
             return false;
           }
+          // Reset page indices for new data
+          setSelectedOriginalPageIndex(0);
+          setSelectedResultIndex(0);
+
           // Set translation results with original text for proofreading
           setTranslationResults([{
             translatedText: orderData.translation_html,
@@ -3989,6 +3995,76 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               return { filename: img.filename, data: data, type: type };
             });
             setQuickOriginalFiles(convertedForQuickPackage);
+          } else {
+            // Fallback: try to auto-load original from project documents
+            try {
+              const docsRes = await axios.get(`${API}/admin/orders/${order.id}/documents?admin_key=${adminKey}`);
+              const docs = docsRes.data.documents || [];
+              const originalDocs = docs.filter(d => d.source !== 'translated_document' && (d.document_type === 'original' || !d.document_type || d.source === 'manual_upload' || d.source === 'partner_upload'));
+              if (originalDocs.length > 0) {
+                const loadedImages = [];
+                for (const doc of originalDocs) {
+                  try {
+                    const origData = await axios.get(`${API}/admin/order-documents/${doc.id}/download?admin_key=${adminKey}`);
+                    if (origData.data.file_data) {
+                      const contentType = origData.data.content_type || 'application/pdf';
+                      const filename = doc.filename || 'document';
+                      const fileData = origData.data.file_data;
+
+                      if (contentType === 'application/pdf' || filename.toLowerCase().endsWith('.pdf')) {
+                        try {
+                          const base64Content = fileData.startsWith('data:') ? fileData.split(',')[1] : fileData;
+                          const binaryString = atob(base64Content);
+                          const bytes = new Uint8Array(binaryString.length);
+                          for (let i = 0; i < binaryString.length; i++) {
+                            bytes[i] = binaryString.charCodeAt(i);
+                          }
+                          const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+                          for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                            const page = await pdf.getPage(pageNum);
+                            let scale = 3;
+                            let viewport = page.getViewport({ scale });
+                            const maxDimension = 7900;
+                            if (viewport.width > maxDimension || viewport.height > maxDimension) {
+                              const dimensionScale = Math.min(maxDimension / viewport.width, maxDimension / viewport.height);
+                              scale = scale * dimensionScale;
+                              viewport = page.getViewport({ scale });
+                            }
+                            const canvas = document.createElement('canvas');
+                            const context = canvas.getContext('2d');
+                            canvas.height = viewport.height;
+                            canvas.width = viewport.width;
+                            await page.render({ canvasContext: context, viewport }).promise;
+                            const base64Image = canvas.toDataURL('image/png').split(',')[1];
+                            loadedImages.push({
+                              filename: `${filename}_page_${pageNum}.png`,
+                              data: base64Image,
+                              type: 'image/png'
+                            });
+                          }
+                        } catch (pdfErr) {
+                          console.error('PDF conversion error for original:', pdfErr);
+                          loadedImages.push({ filename, data: fileData, type: contentType });
+                        }
+                      } else {
+                        loadedImages.push({
+                          filename,
+                          data: fileData.startsWith('data:') ? fileData : `data:${contentType};base64,${fileData}`,
+                          type: contentType
+                        });
+                      }
+                    }
+                  } catch (docErr) {
+                    console.error('Failed to load original doc:', doc.id, docErr);
+                  }
+                }
+                if (loadedImages.length > 0) {
+                  setOriginalImages(loadedImages);
+                }
+              }
+            } catch (docsErr) {
+              console.error('Failed to load project documents for originals:', docsErr);
+            }
           }
 
           // Set other translation settings
@@ -28894,6 +28970,10 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   // PM Convert to HTML state
   const [pmConverting, setPmConverting] = useState(false);
 
+  // PM Claude AI correction state
+  const [pmCorrectionCommand, setPmCorrectionCommand] = useState('');
+  const [pmApplyingCorrection, setPmApplyingCorrection] = useState(false);
+
   // PM Proofreading error highlight state
   const [highlightedPmErrorIndex, setHighlightedPmErrorIndex] = useState(null);
 
@@ -28963,8 +29043,12 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       currentHtml = translatedContent.html;
     } else if (pmTranslationHtml) {
       currentHtml = pmTranslationHtml;
+    } else if (selectedReview?.translation_html) {
+      // Fallback: use translation_html from the order
+      currentHtml = selectedReview.translation_html;
+      setPmTranslationHtml(currentHtml);
     } else {
-      showToast('No translation content available to apply corrections');
+      showToast('No HTML translation content available. Run proofreading first to enable corrections.');
       return;
     }
 
@@ -29002,8 +29086,12 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       currentHtml = translatedContent.html;
     } else if (pmTranslationHtml) {
       currentHtml = pmTranslationHtml;
+    } else if (selectedReview?.translation_html) {
+      // Fallback: use translation_html from the order
+      currentHtml = selectedReview.translation_html;
+      setPmTranslationHtml(currentHtml);
     } else {
-      showToast('No translation content available to apply corrections');
+      showToast('No HTML translation content available. Run proofreading first to enable corrections.');
       return;
     }
 
@@ -29043,6 +29131,102 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
     setProcessingStatus(`✅ ${appliedCount} correction(s) applied successfully!`);
     setTimeout(() => setProcessingStatus(''), 3000);
+  };
+
+  // Apply Claude AI corrections to translation in PM Dashboard
+  const handlePmClaudeCorrection = async () => {
+    if (!pmCorrectionCommand.trim()) return;
+
+    // Get current translation HTML
+    let currentHtml = '';
+    if (translatedContent?.html) {
+      currentHtml = translatedContent.html;
+    } else if (pmTranslationHtml) {
+      currentHtml = pmTranslationHtml;
+    } else if (selectedReview?.translation_html) {
+      currentHtml = selectedReview.translation_html;
+      setPmTranslationHtml(currentHtml);
+    }
+
+    if (!currentHtml) {
+      showToast('No translation content available. Run proofreading first.');
+      return;
+    }
+
+    setPmApplyingCorrection(true);
+    setProcessingStatus('🤖 Claude is applying corrections...');
+
+    try {
+      const claudeApiKey = localStorage.getItem('claude_api_key') || '';
+      if (!claudeApiKey) {
+        showToast('Claude API key not configured. Please set it in Settings.');
+        setPmApplyingCorrection(false);
+        setProcessingStatus('');
+        return;
+      }
+
+      const response = await axios.post(`${API}/admin/translate?admin_key=${adminKey}`, {
+        text: currentHtml,
+        source_language: selectedReview?.translate_from || 'Portuguese (Brazil)',
+        target_language: selectedReview?.translate_to || 'English',
+        document_type: selectedReview?.document_type || 'General Document',
+        claude_api_key: claudeApiKey,
+        action: pmCorrectionCommand,
+        current_translation: currentHtml
+      });
+
+      if (response.data.status === 'success' || response.data.translation) {
+        let translationText = response.data.translation;
+
+        // Extract notes from Claude's response
+        const notesPatterns = [
+          /(\*\*Changes made:\*\*[\s\S]*?)$/i,
+          /(\*\*Corrections:\*\*[\s\S]*?)$/i,
+          /(\*\*Notes:\*\*[\s\S]*?)$/i,
+          /(\*\*Altera[çc][õo]es:\*\*[\s\S]*?)$/i,
+          /(\*\*Corre[çc][õo]es:\*\*[\s\S]*?)$/i,
+          /(I (?:made|applied|corrected|changed|fixed)[\s\S]*?)$/i,
+          /(Here are the changes[\s\S]*?)$/i,
+          /(Summary of changes[\s\S]*?)$/i
+        ];
+
+        for (const pattern of notesPatterns) {
+          const match = translationText.match(pattern);
+          if (match) {
+            translationText = translationText.replace(pattern, '').trim();
+            break;
+          }
+        }
+
+        // Also check for notes at the beginning (outside of HTML)
+        if (!translationText.startsWith('<!DOCTYPE') && !translationText.startsWith('<html')) {
+          const htmlStart = translationText.search(/<(!DOCTYPE|html)/i);
+          if (htmlStart > 0) {
+            translationText = translationText.substring(htmlStart).trim();
+          }
+        }
+
+        // Update translation content
+        if (translatedContent?.html) {
+          setTranslatedContent({ ...translatedContent, html: translationText });
+        } else {
+          setPmTranslationHtml(translationText);
+        }
+
+        setPmCorrectionCommand('');
+        setProcessingStatus('✅ Claude corrections applied successfully!');
+        setTimeout(() => setProcessingStatus(''), 3000);
+      } else {
+        showToast('Claude did not return a correction. Please try again.');
+        setProcessingStatus('');
+      }
+    } catch (error) {
+      console.error('PM Claude correction error:', error);
+      showToast('Error applying Claude corrections: ' + (error.response?.data?.detail || error.message));
+      setProcessingStatus('');
+    } finally {
+      setPmApplyingCorrection(false);
+    }
   };
 
   // Translator Assignment Modal state (for email invites)
@@ -31231,6 +31415,13 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     } else if (translatedContent && translatedContent.data) {
       try {
         translatedText = atob(translatedContent.data);
+        // If we got text from base64 data but have no HTML, create an HTML version
+        // so corrections can be applied later
+        if (translatedText.trim() && !pmTranslationHtml && !translatedContent.html) {
+          const generatedHtml = `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.6;">${translatedText.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>`;
+          setPmTranslationHtml(generatedHtml);
+          setTranslatedContent({ ...translatedContent, html: generatedHtml });
+        }
       } catch (e) {
         translatedText = 'Não foi possível extrair texto da translation';
       }
@@ -32700,20 +32891,18 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     {proofreadingResult.erros && proofreadingResult.erros.length > 0 && (
                       <div>
                         {/* Apply All Corrections Button */}
-                        {(translatedContent?.html || pmTranslationHtml) && (
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs text-gray-500">
-                              {proofreadingResult.erros.filter(e => e.applied).length}/{proofreadingResult.erros.length} corrections applied
-                            </span>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); applyAllPmProofreadingCorrections(); }}
-                              disabled={proofreadingResult.erros.every(e => e.applied)}
-                              className="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-1"
-                            >
-                              ✅ Apply All Corrections
-                            </button>
-                          </div>
-                        )}
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs text-gray-500">
+                            {proofreadingResult.erros.filter(e => e.applied).length}/{proofreadingResult.erros.length} corrections applied
+                          </span>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); applyAllPmProofreadingCorrections(); }}
+                            disabled={proofreadingResult.erros.every(e => e.applied)}
+                            className="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-1"
+                          >
+                            ✅ Apply All Corrections
+                          </button>
+                        </div>
                         <div className="max-h-60 overflow-y-auto border rounded">
                           <table className="w-full text-[10px]">
                             <thead className="bg-gray-100 sticky top-0">
@@ -32723,9 +32912,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                                 <th className="p-2 text-left">Encontrado</th>
                                 <th className="p-2 text-left">Sugerido</th>
                                 <th className="p-2 text-center">Gravidade</th>
-                                {(translatedContent?.html || pmTranslationHtml) && (
-                                  <th className="p-2 text-center">Ação</th>
-                                )}
+                                <th className="p-2 text-center">Ação</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -32762,20 +32949,20 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                                       {severity}
                                     </span>
                                   </td>
-                                  {(translatedContent?.html || pmTranslationHtml) && (
-                                    <td className="p-2 text-center">
-                                      {erro.applied ? (
-                                        <span className="text-green-600 text-[10px] font-medium">✓ Applied</span>
-                                      ) : (
-                                        <button
-                                          onClick={(e) => { e.stopPropagation(); applyPmProofreadingCorrection(erro, idx); }}
-                                          className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
-                                        >
-                                          Apply
-                                        </button>
-                                      )}
-                                    </td>
-                                  )}
+                                  <td className="p-2 text-center">
+                                    {erro.applied ? (
+                                      <span className="text-green-600 text-[10px] font-medium">✓ Applied</span>
+                                    ) : foundText && suggestionText ? (
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); applyPmProofreadingCorrection(erro, idx); }}
+                                        className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
+                                      >
+                                        Apply
+                                      </button>
+                                    ) : (
+                                      <span className="text-gray-400 text-[10px]">-</span>
+                                    )}
+                                  </td>
                                 </tr>
                                 );
                               })}
@@ -32800,6 +32987,67 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         )}
                       </div>
                     )}
+
+                    {/* Claude AI Final Corrections - Always available for PMs */}
+                    <div className="p-3 bg-purple-50 border border-purple-200 rounded">
+                      <h5 className="text-xs font-bold text-purple-700 mb-2 flex items-center gap-2">
+                        🤖 Claude AI - Final Corrections
+                      </h5>
+                      <p className="text-[10px] text-gray-600 mb-2">
+                        Send instructions to Claude to automatically fix issues in the translation.
+                      </p>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={pmCorrectionCommand}
+                          onChange={(e) => setPmCorrectionCommand(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter' && pmCorrectionCommand.trim()) handlePmClaudeCorrection(); }}
+                          placeholder='e.g., "Fix all encoding errors", "Fix special characters", "Change word X to Y"'
+                          className="flex-1 px-3 py-2 text-xs border border-purple-300 rounded focus:ring-2 focus:ring-purple-400 focus:outline-none"
+                          disabled={pmApplyingCorrection}
+                        />
+                        <button
+                          onClick={handlePmClaudeCorrection}
+                          disabled={!pmCorrectionCommand.trim() || pmApplyingCorrection}
+                          className="px-4 py-2 bg-purple-600 text-white text-xs font-medium rounded hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-1 whitespace-nowrap"
+                        >
+                          {pmApplyingCorrection ? (
+                            <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Applying...</>
+                          ) : (
+                            <>🤖 Apply with Claude</>
+                          )}
+                        </button>
+                      </div>
+                      {proofreadingResult.erros && proofreadingResult.erros.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          <span className="text-[10px] text-gray-500">Quick:</span>
+                          <button
+                            onClick={() => setPmCorrectionCommand('Fix all special character encoding errors (ã, õ, é, ç, etc)')}
+                            className="text-[10px] px-2 py-0.5 bg-purple-100 text-purple-700 rounded hover:bg-purple-200"
+                          >
+                            Fix encoding
+                          </button>
+                          <button
+                            onClick={() => setPmCorrectionCommand('Apply all suggested corrections from the proofreading analysis')}
+                            className="text-[10px] px-2 py-0.5 bg-purple-100 text-purple-700 rounded hover:bg-purple-200"
+                          >
+                            Apply all corrections
+                          </button>
+                          <button
+                            onClick={() => setPmCorrectionCommand('Fix formatting, spacing, and punctuation issues')}
+                            className="text-[10px] px-2 py-0.5 bg-purple-100 text-purple-700 rounded hover:bg-purple-200"
+                          >
+                            Fix formatting
+                          </button>
+                          <button
+                            onClick={() => setPmCorrectionCommand('Review and fix any translation errors or mistranslations')}
+                            className="text-[10px] px-2 py-0.5 bg-purple-100 text-purple-700 rounded hover:bg-purple-200"
+                          >
+                            Fix translations
+                          </button>
+                        </div>
+                      )}
+                    </div>
 
                     {/* PM APPROVAL SECTION - Required step after proofreading */}
                     <div className={`mt-4 p-4 rounded-lg border-2 ${
