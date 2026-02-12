@@ -29720,7 +29720,7 @@ async def verify_pdf_document(certification_id: str, file: UploadFile = File(...
                 "document_type": certification.get("document_type"),
                 "source_language": certification.get("source_language"),
                 "target_language": certification.get("target_language"),
-                "message": "⚠ ALTERATIONS DETECTED: The uploaded PDF does NOT match the certified original. This document has been modified after certification."
+                "message": "⚠ PDF hash mismatch: The uploaded file's digital fingerprint does not match our records. This can happen if the PDF was opened in a reader, re-saved, or saved from Print Preview instead of using the direct download. Please upload the original downloaded file for exact verification. Note: the certification itself (shown above) remains valid."
             }
 
     except HTTPException:

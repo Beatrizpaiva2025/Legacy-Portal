@@ -6493,13 +6493,42 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 </body>
 </html>`;
 
-    // Generate PDF - use print window approach which is more reliable
-    setQuickPackageProgress(`Opening preview window...`);
+    // Generate PDF - use generatePdfWithHash for reliable hash-tracked downloads
+    setQuickPackageProgress(`Generating PDF...`);
 
     try {
       const filename = `${orderNumber || 'LT'}_Certified_Translation.pdf`;
 
-      // Open print window - larger and more visible
+      // Generate PDF with hash tracking using html2pdf (deterministic blob)
+      const { blob: pdfBlob, hash: pdfHash } = await generatePdfWithHash(fullHTML, filename, {
+        margin: [5, 5, 5, 5],
+        image: { type: 'jpeg', quality: 0.95 },
+        html2canvas: { scale: 2, useCORS: true, allowTaint: true },
+        jsPDF: { unit: 'mm', format: pageFormat === 'a4' ? 'a4' : 'letter', orientation: 'portrait' }
+      });
+
+      // Update PDF hash in backend for verification
+      if (certData?.certification_id) {
+        setQuickPackageProgress('Registering digital signature...');
+        const hashResult = await updatePdfHashInBackend(certData.certification_id, pdfHash, adminKey);
+        if (hashResult.success) {
+          setQuickPackageProgress('✅ Digital signature registered!');
+        }
+      }
+
+      // Download the PDF directly (same blob that was hashed)
+      const downloadUrl = URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(downloadUrl);
+
+      // Also open preview window for viewing
+      setQuickPackageProgress('Opening preview...');
+
       const screenWidth = window.screen.width;
       const screenHeight = window.screen.height;
       const windowWidth = Math.min(1200, screenWidth - 100);
@@ -6509,90 +6538,65 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
       const printWindow = window.open('', 'PDFPreview', `width=${windowWidth},height=${windowHeight},left=${left},top=${top},scrollbars=yes,resizable=yes`);
 
-      if (!printWindow || printWindow.closed || typeof printWindow.closed === 'undefined') {
-        alert('⚠️ Pop-up blocked!\n\nPlease allow pop-ups for this site:\n1. Click the blocked pop-up icon in the address bar\n2. Select "Always allow pop-ups"\n3. Try again');
-        setQuickPackageLoading(false);
-        setQuickPackageProgress('');
-        return;
-      }
+      if (printWindow && !printWindow.closed) {
+        printWindow.document.open();
+        printWindow.document.write(fullHTML);
+        printWindow.document.close();
 
-      // Write HTML to the window
-      printWindow.document.open();
-      printWindow.document.write(fullHTML);
-      printWindow.document.close();
+        // Wait for content to load
+        await new Promise(resolve => {
+          if (printWindow.document.readyState === 'complete') {
+            resolve();
+          } else {
+            printWindow.onload = resolve;
+            setTimeout(resolve, 2000);
+          }
+        });
 
-      // Wait for content to load
-      await new Promise(resolve => {
-        if (printWindow.document.readyState === 'complete') {
-          resolve();
-        } else {
-          printWindow.onload = resolve;
-          setTimeout(resolve, 2000);
+        // Wait for images to load
+        const images = printWindow.document.querySelectorAll('img');
+        if (images.length > 0) {
+          await Promise.all(Array.from(images).map(img => {
+            return new Promise((resolve) => {
+              if (img.complete && img.naturalHeight !== 0) {
+                resolve();
+              } else {
+                img.onload = resolve;
+                img.onerror = resolve;
+                setTimeout(resolve, 5000);
+              }
+            });
+          }));
         }
-      });
 
-      // Wait for images to load
-      const images = printWindow.document.querySelectorAll('img');
-      if (images.length > 0) {
-        setQuickPackageProgress(`Loading ${images.length} images...`);
-        await Promise.all(Array.from(images).map(img => {
-          return new Promise((resolve) => {
-            if (img.complete && img.naturalHeight !== 0) {
-              resolve();
-            } else {
-              img.onload = resolve;
-              img.onerror = resolve;
-              setTimeout(resolve, 5000);
-            }
-          });
-        }));
-      }
+        await new Promise(resolve => setTimeout(resolve, 500));
 
-      // Small delay for final rendering
-      await new Promise(resolve => setTimeout(resolve, 500));
+        printWindow.focus();
 
-      // Update certification hash using document content hash
-      if (certData?.certification_id) {
-        setQuickPackageProgress('Registering digital signature...');
-        // Calculate hash from HTML content for verification
-        const encoder = new TextEncoder();
-        const data = encoder.encode(fullHTML);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        const contentHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-
-        const hashResult = await updatePdfHashInBackend(certData.certification_id, contentHash, adminKey);
-        if (hashResult.success) {
-          setQuickPackageProgress('✅ Digital signature registered!');
-        }
+        // Add instruction bar
+        const instructionDiv = printWindow.document.createElement('div');
+        instructionDiv.id = 'print-instructions';
+        instructionDiv.innerHTML = `
+          <div style="position: fixed; top: 0; left: 0; right: 0; background: #1e40af; color: white; padding: 12px 20px; z-index: 99999; font-family: sans-serif; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <strong>📄 Document Preview</strong> - Your PDF has been downloaded. This is a preview for reference.
+            </div>
+            <div>
+              <button onclick="window.print()" style="background: white; color: #1e40af; border: none; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-right: 10px;">
+                🖨️ Print
+              </button>
+              <button onclick="document.getElementById('print-instructions').remove()" style="background: transparent; color: white; border: 1px solid white; padding: 8px 16px; border-radius: 6px; cursor: pointer;">
+                ✕ Close Bar
+              </button>
+            </div>
+          </div>
+          <style>@media print { #print-instructions { display: none !important; } }</style>
+        `;
+        printWindow.document.body.insertBefore(instructionDiv, printWindow.document.body.firstChild);
       }
 
       setQuickPackageProgress('');
       setQuickPackageLoading(false);
-
-      // Focus and print
-      printWindow.focus();
-
-      // Add print instructions
-      const instructionDiv = printWindow.document.createElement('div');
-      instructionDiv.id = 'print-instructions';
-      instructionDiv.innerHTML = `
-        <div style="position: fixed; top: 0; left: 0; right: 0; background: #1e40af; color: white; padding: 12px 20px; z-index: 99999; font-family: sans-serif; display: flex; justify-content: space-between; align-items: center;">
-          <div>
-            <strong>📄 Document Preview</strong> - Use "Save as PDF" or print to get your certified translation
-          </div>
-          <div>
-            <button onclick="window.print()" style="background: white; color: #1e40af; border: none; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-right: 10px;">
-              🖨️ Print / Save as PDF
-            </button>
-            <button onclick="document.getElementById('print-instructions').remove()" style="background: transparent; color: white; border: 1px solid white; padding: 8px 16px; border-radius: 6px; cursor: pointer;">
-              ✕ Close Bar
-            </button>
-          </div>
-        </div>
-        <style>@media print { #print-instructions { display: none !important; } }</style>
-      `;
-      printWindow.document.body.insertBefore(instructionDiv, printWindow.document.body.firstChild);
 
     } catch (err) {
       console.error('Error generating package:', err);
