@@ -18600,6 +18600,37 @@ async def get_translator_messages_for_admin(admin_key: str, recipient_id: str = 
     return {"messages": messages}
 
 
+@api_router.get("/admin/translator-messages/conversations")
+async def get_translator_conversations(admin_key: str):
+    """Get all translator message conversations for this PM (both directions)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    pm_id = None
+    pm_name = None
+    if not is_valid:
+        user = await db.admin_users.find_one({"token": admin_key, "is_active": {"$ne": False}})
+        if user and user.get("role") in ("admin", "pm"):
+            is_valid = True
+            pm_id = user.get("id")
+            pm_name = user.get("name")
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    # Get messages TO this PM from translators + messages FROM this PM to translators
+    query = {"$or": [
+        {"type": "translator_to_admin", "to_recipient_id": pm_id} if pm_id else {"type": "translator_to_admin"},
+        {"type": "admin_to_translator", "from_admin_name": pm_name} if pm_name else {"type": "admin_to_translator"}
+    ]}
+
+    messages = await db.translator_messages.find(query).sort("created_at", -1).limit(200).to_list(200)
+
+    for msg in messages:
+        msg["_id"] = str(msg["_id"])
+        if msg.get("created_at"):
+            msg["created_at"] = msg["created_at"].isoformat()
+
+    return {"messages": messages}
+
+
 @api_router.get("/translator/messages")
 async def get_translator_messages(admin_key: str, translator_id: str = None, token: str = None):
     """Get messages for a translator"""
@@ -18646,6 +18677,12 @@ async def mark_translator_message_read(message_id: str, admin_key: str):
         {"$set": {"read": True, "read_at": datetime.utcnow()}}
     )
 
+    # Also mark the related notification as read (dismiss the bell alert)
+    await db.notifications.update_one(
+        {"translator_message_id": message_id, "type": "translator_message"},
+        {"$set": {"read": True}}
+    )
+
     return {"status": "success"}
 
 
@@ -18686,6 +18723,7 @@ async def translator_send_message_to_admin(admin_key: str, request: dict = Body(
         "id": str(uuid.uuid4()),
         "user_id": request.get("recipient_id"),
         "type": "translator_message",
+        "translator_message_id": message_id,
         "title": f"Message from {request.get('translator_name', 'Translator')}",
         "message": request.get("content", "")[:100] + ("..." if len(request.get("content", "")) > 100 else ""),
         "read": False,
