@@ -5836,7 +5836,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       const currentResult = translationResults[selectedResultIndex];
 
       const response = await axios.post(`${API}/admin/translate?admin_key=${adminKey}`, {
-        text: currentResult.translatedText,
+        text: '[See current_translation field]',
         source_language: sourceLanguage,
         target_language: targetLanguage,
         document_type: documentType,
@@ -5849,40 +5849,42 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         let translationText = response.data.translation;
         let notesText = '';
 
-        // Extract notes/changes made by Claude (text after "**Changes made:**" or similar patterns)
-        const notesPatterns = [
-          /(\*\*Changes made:\*\*[\s\S]*?)$/i,
-          /(\*\*Corrections:\*\*[\s\S]*?)$/i,
-          /(\*\*Notes:\*\*[\s\S]*?)$/i,
-          /(Note:[\s\S]*?changes[\s\S]*?)$/i,
-          /(\*\*Altera[çc][õo]es:\*\*[\s\S]*?)$/i,
-          /(\*\*Corre[çc][õo]es:\*\*[\s\S]*?)$/i,
-          /(\*\*Observa[çc][õo]es:\*\*[\s\S]*?)$/i,
-          /(---\s*\n[\s\S]*?(?:changes|alterações|correções|notes|notas)[\s\S]*?)$/i,
-          /(<hr[\s\S]*?>[\s\S]*?(?:changes|alterações|correções|notes|notas)[\s\S]*?)$/i,
-          /(I (?:made|applied|corrected|changed|fixed)[\s\S]*?)$/i,
-          /(Eu (?:fiz|apliquei|corrigi|mudei|alterei)[\s\S]*?)$/i,
-          /(Here are the changes[\s\S]*?)$/i,
-          /(The following changes[\s\S]*?)$/i,
-          /(Summary of changes[\s\S]*?)$/i,
-          /(As alterações foram[\s\S]*?)$/i
-        ];
-
-        for (const pattern of notesPatterns) {
-          const match = translationText.match(pattern);
-          if (match) {
-            notesText = match[1].trim();
-            translationText = translationText.replace(pattern, '').trim();
-            break;
+        // For HTML content, only extract notes OUTSIDE the HTML structure
+        // This prevents accidental matching of text inside the translation document
+        const htmlEndIdx = translationText.lastIndexOf('</html>');
+        if (htmlEndIdx !== -1) {
+          // Check for notes after </html> tag
+          const afterHtml = translationText.substring(htmlEndIdx + 7).trim();
+          if (afterHtml) {
+            notesText = afterHtml;
+            translationText = translationText.substring(0, htmlEndIdx + 7).trim();
           }
-        }
-
-        // Also check for notes at the beginning (outside of HTML)
-        if (!notesText && !translationText.startsWith('<!DOCTYPE') && !translationText.startsWith('<html')) {
+          // Check for notes before <!DOCTYPE or <html
           const htmlStart = translationText.search(/<(!DOCTYPE|html)/i);
           if (htmlStart > 0) {
-            notesText = translationText.substring(0, htmlStart).trim();
-            translationText = translationText.substring(htmlStart).trim();
+            const beforeHtml = translationText.substring(0, htmlStart).trim();
+            if (beforeHtml) {
+              notesText = notesText ? beforeHtml + '\n\n' + notesText : beforeHtml;
+              translationText = translationText.substring(htmlStart).trim();
+            }
+          }
+        } else {
+          // Non-HTML content: safely extract notes using patterns
+          const notesPatterns = [
+            /(\*\*Changes made:\*\*[\s\S]*?)$/i,
+            /(\*\*Corrections:\*\*[\s\S]*?)$/i,
+            /(\*\*Notes:\*\*[\s\S]*?)$/i,
+            /(\*\*Altera[çc][õo]es:\*\*[\s\S]*?)$/i,
+            /(\*\*Corre[çc][õo]es:\*\*[\s\S]*?)$/i
+          ];
+
+          for (const pattern of notesPatterns) {
+            const match = translationText.match(pattern);
+            if (match) {
+              notesText = match[1].trim();
+              translationText = translationText.replace(pattern, '').trim();
+              break;
+            }
           }
         }
 
@@ -9704,7 +9706,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         />
                       ) : (
                         <iframe
-                          key={`preview-${selectedResultIndex}`}
+                          key={`preview-${selectedResultIndex}-${(translationResults[selectedResultIndex]?.translatedText || '').length}`}
                           srcDoc={translationResults[selectedResultIndex]?.translatedText || '<p>No translation</p>'}
                           title={`Translation Page ${selectedResultIndex + 1}`}
                           className="w-full h-full border-0"
@@ -11437,6 +11439,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   <div className="overflow-hidden bg-white flex flex-col" ref={translatedTextRef} onScroll={() => handleScroll('translated')} style={{minHeight: 0, height: '100%'}}>
                     {reviewViewMode === 'preview' ? (
                       <iframe
+                        key={`review-preview-${selectedResultIndex}-${(translationResults[selectedResultIndex]?.translatedText || '').length}`}
                         srcDoc={translationResults[selectedResultIndex]?.translatedText || '<p>No translation</p>'}
                         title="Translation Preview"
                         className="w-full h-full border-0"
@@ -30286,10 +30289,10 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
   // Generate PM Package (same format as Quick Package)
   const handlePmPackageDownload = async () => {
-    // Check for any translation source: pmTranslationFiles, pmTranslationHtml, translatedContent, or translationResults
-    const hasTranslation = pmTranslationFiles.length > 0 || pmTranslationHtml || translatedContent || translationResults.length > 0;
-    // Check for any original source: originalContents or originalImages
-    const hasOriginal = originalContents.length > 0 || originalImages.length > 0;
+    // Check for any translation source available in PM Dashboard
+    const hasTranslation = pmTranslationFiles.length > 0 || pmTranslationHtml || translatedContent;
+    // Check for any original source
+    const hasOriginal = originalContents.length > 0;
 
     if (!hasTranslation) {
       showToast('Please upload or create a translation first');
@@ -30299,20 +30302,38 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     setPmPackageGenerating(true);
     setProcessingStatus('Generating package...');
 
+    try {
     await new Promise(resolve => setTimeout(resolve, 100));
 
     const order = selectedReview;
-    const pageSizeCSS = pageFormat === 'a4' ? 'A4' : 'Letter';
-    const certTitle = translationType === 'sworn' ? 'Sworn Translation Certificate' : 'Certification of Translation Accuracy';
+    // Use localStorage settings or order data (these variables are not in PMDashboard scope)
+    const pmPageFormat = localStorage.getItem('page_format') || 'letter';
+    const pmTranslationType = localStorage.getItem('translation_type') || 'certified';
+    const pmSourceLanguage = order?.translate_from || order?.source_language || 'Portuguese (Brazil)';
+    const pmTargetLanguage = order?.translate_to || order?.target_language || 'English';
+    const pmDocumentType = order?.document_type || 'Document';
+    const pmOrderNumber = order?.order_number || '';
+    const pmTranslationDate = new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York' });
+    const pmTranslatorName = localStorage.getItem('saved_translator_name') || 'Beatriz Paiva';
+    const pmLogoLeft = localStorage.getItem('logo_left') || '';
+    const pmLogoRight = localStorage.getItem('logo_right') || '';
+    const pmLogoStamp = localStorage.getItem('logo_stamp') || '';
+    const pmSignatureImage = localStorage.getItem('signature_image') || '';
+    const pmIncludeCover = true;
+    const pmIncludeLetterhead = true;
+    const pmIncludeOriginal = true;
+    const pmIncludeVerificationPage = true;
+    const pageSizeCSS = pmPageFormat === 'a4' ? 'A4' : 'Letter';
+    const certTitle = pmTranslationType === 'sworn' ? 'Sworn Translation Certificate' : 'Certification of Translation Accuracy';
 
-    // Cover Letter HTML (same as Quick Package)
+    // Cover Letter HTML (using PM-local variables)
     const coverLetterHTML = `
     <!-- COVER LETTER PAGE -->
     <div class="cover-page">
         <div class="header">
             <div class="logo-left">
-                ${logoLeft
-                  ? `<img src="${logoLeft}" alt="Logo" style="max-width: 120px; max-height: 50px; object-fit: contain;" />`
+                ${pmLogoLeft
+                  ? `<img src="${pmLogoLeft}" alt="Logo" style="max-width: 120px; max-height: 50px; object-fit: contain;" />`
                   : `<div class="logo-placeholder"><span style="text-align:center;">LEGACY<br/>TRANSLATIONS</span></div>`}
             </div>
             <div class="header-center">
@@ -30323,54 +30344,42 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 </div>
             </div>
             <div class="logo-right">
-                ${logoRight
-                  ? `<img src="${logoRight}" alt="ATA Logo" style="max-width: 80px; max-height: 50px; object-fit: contain;" />`
+                ${pmLogoRight
+                  ? `<img src="${pmLogoRight}" alt="ATA Logo" style="max-width: 80px; max-height: 50px; object-fit: contain;" />`
                   : `<div class="logo-placeholder-right"><span>ata<br/>Member #275993</span></div>`}
             </div>
         </div>
         <div class="header-line"></div>
 
         ${(() => {
-          const displayOrderNumber = order?.order_number || orderNumber;
+          const displayOrderNumber = order?.order_number || pmOrderNumber;
           return displayOrderNumber && !displayOrderNumber.toLowerCase().includes('order0') && displayOrderNumber !== 'P0000'
             ? `<div class="order-number">Order # <strong>${displayOrderNumber}</strong></div>`
             : '';
         })()}
         <h1 class="main-title">${certTitle}</h1>
         <div class="subtitle">
-            Translation of a <strong>${order?.document_type || documentType || 'Document'}</strong> from <strong>${order?.source_language || sourceLanguage || 'Portuguese'}</strong> to<br>
-            <strong>${order?.target_language || targetLanguage || 'English'}</strong>
+            Translation of a <strong>${pmDocumentType}</strong> from <strong>${pmSourceLanguage}</strong> to<br>
+            <strong>${pmTargetLanguage}</strong>
         </div>
 
-        ${(() => {
-          let templateParagraphs;
-          if (selectedCertificateTemplate.startsWith('custom-')) {
-            const customTemplate = customCertificateTemplates.find(t => `custom-${t.id}` === selectedCertificateTemplate);
-            templateParagraphs = customTemplate?.bodyParagraphs || CERTIFICATE_TEMPLATES['default'].bodyParagraphs;
-          } else {
-            templateParagraphs = CERTIFICATE_TEMPLATES[selectedCertificateTemplate]?.bodyParagraphs || CERTIFICATE_TEMPLATES['default'].bodyParagraphs;
-          }
-          return templateParagraphs.map(tograph => {
-            const processedParagraph = tograph
-              .replace(/\{\{sourceLanguage\}\}/g, order?.source_language || sourceLanguage || 'Portuguese')
-              .replace(/\{\{targetLanguage\}\}/g, order?.target_language || targetLanguage || 'English');
-            return `<p class="body-text">${processedParagraph}</p>`;
-          }).join('\n        ');
-        })()}
+        <p class="body-text">I, ${pmTranslatorName}, hereby certify that the following is a true and accurate translation of the attached document from ${pmSourceLanguage} to ${pmTargetLanguage}.</p>
+        <p class="body-text">This translation was prepared by Legacy Translations Inc., a professional translation company. I am competent to translate from ${pmSourceLanguage} to ${pmTargetLanguage} and certify that the translation is accurate and complete to the best of my knowledge and ability.</p>
+        <p class="body-text">I further certify that I am not a relative of any of the parties named in the document, nor do I have any personal interest in the matter to which the document relates.</p>
 
         <div class="footer-section">
             <div class="signature-block">
-                ${signatureImage
-                  ? `<img src="${signatureImage}" alt="Signature" style="max-height: 45px; max-width: 210px; object-fit: contain; margin-bottom: 2px;" />`
+                ${pmSignatureImage
+                  ? `<img src="${pmSignatureImage}" alt="Signature" style="max-height: 45px; max-width: 210px; object-fit: contain; margin-bottom: 2px;" />`
                   : `<div style="font-family: 'Rage Italic', cursive; font-size: 20px; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>`}
                 <div class="signature-name">Beatriz Paiva</div>
                 <div class="signature-title">Authorized Representative</div>
                 <div style="font-size: 12px;">Legacy Translations Inc.</div>
-                <div class="signature-date">Dated: ${translationDate}</div>
+                <div class="signature-date">Dated: ${pmTranslationDate}</div>
             </div>
             <div class="stamp-container">
-                ${logoStamp
-                  ? `<img src="${logoStamp}" alt="Stamp" style="width: 140px; height: 140px; object-fit: contain;" />`
+                ${pmLogoStamp
+                  ? `<img src="${pmLogoStamp}" alt="Stamp" style="width: 140px; height: 140px; object-fit: contain;" />`
                   : `<div class="stamp">
                     <div class="stamp-text-top">CERTIFIED TRANSLATOR</div>
                     <div class="stamp-center">
@@ -30386,8 +30395,8 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     const letterheadHTML = `
         <div class="header">
             <div class="logo-left">
-                ${logoLeft
-                  ? `<img src="${logoLeft}" alt="Logo" style="max-width: 120px; max-height: 50px; object-fit: contain;" />`
+                ${pmLogoLeft
+                  ? `<img src="${pmLogoLeft}" alt="Logo" style="max-width: 120px; max-height: 50px; object-fit: contain;" />`
                   : `<div class="logo-placeholder"><span style="text-align:center;">LEGACY<br/>TRANSLATIONS</span></div>`}
             </div>
             <div class="header-center">
@@ -30398,21 +30407,21 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 </div>
             </div>
             <div class="logo-right">
-                ${logoRight
-                  ? `<img src="${logoRight}" alt="ATA Logo" style="max-width: 80px; max-height: 50px; object-fit: contain;" />`
+                ${pmLogoRight
+                  ? `<img src="${pmLogoRight}" alt="ATA Logo" style="max-width: 80px; max-height: 50px; object-fit: contain;" />`
                   : `<div class="logo-placeholder-right"><span>ata<br/>Member #275993</span></div>`}
             </div>
         </div>
         <div class="header-line"></div>`;
 
-    // Translation pages - use pmTranslationHtml, pmTranslationFiles, or translationResults
+    // Translation pages - use pmTranslationHtml, pmTranslationFiles, or translatedContent
     let translationPagesHTML = '';
 
     // Priority 1: PM uploaded HTML content
     if (pmTranslationHtml) {
       translationPagesHTML = `
     <div class="translation-text-page">
-        ${includeLetterhead ? letterheadHTML : ''}
+        ${pmIncludeLetterhead ? letterheadHTML : ''}
         <div class="translation-content translation-text">
             ${pmTranslationHtml}
         </div>
@@ -30423,18 +30432,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       const translationHTML = translatedContent.html || translatedContent.data || '';
       translationPagesHTML = `
     <div class="translation-text-page">
-        ${includeLetterhead ? letterheadHTML : ''}
-        <div class="translation-content translation-text">
-            ${translationHTML}
-        </div>
-    </div>`;
-    }
-    // Priority 3: translationResults from Translation Workspace
-    else if (translationResults.length > 0 && pmTranslationFiles.length === 0) {
-      const translationHTML = translationResults.map(r => r.translatedText).join('\n\n');
-      translationPagesHTML = `
-    <div class="translation-text-page">
-        ${includeLetterhead ? letterheadHTML : ''}
+        ${pmIncludeLetterhead ? letterheadHTML : ''}
         <div class="translation-content translation-text">
             ${translationHTML}
         </div>
@@ -30445,23 +30443,23 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     if (pmTranslationFiles.length > 0) {
       translationPagesHTML += pmTranslationFiles.map((file, idx) => `
     <div class="translation-page">
-        ${includeLetterhead ? letterheadHTML : ''}
+        ${pmIncludeLetterhead ? letterheadHTML : ''}
         <div class="translation-content">
             <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Translation page ${idx + 1}" class="translation-image" />
         </div>
     </div>`).join('');
     }
 
-    // Original document pages - use originalContents or originalImages
+    // Original document pages
     let originalPagesHTML = '';
-    const origDocs = originalContents.length > 0 ? originalContents : originalImages;
+    const origDocs = originalContents;
 
-    if (includeOriginal && origDocs.length > 0) {
+    if (pmIncludeOriginal && origDocs.length > 0) {
       originalPagesHTML = origDocs.map((doc, idx) => {
         const imgSrc = doc.data?.startsWith('data:') ? doc.data : `data:${doc.contentType || doc.type || 'image/png'};base64,${doc.data}`;
         return `
     <div class="original-documents-page">
-        ${includeLetterhead ? letterheadHTML : ''}
+        ${pmIncludeLetterhead ? letterheadHTML : ''}
         ${idx === 0 ? '<div class="page-title">ORIGINAL DOCUMENT</div>' : ''}
         <div class="original-image-container">
             <img src="${imgSrc}" alt="Original page ${idx + 1}" class="original-image" />
@@ -30473,24 +30471,23 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     // Verification page HTML (with QR code) - Create certification in backend
     let verificationPageHTML = '';
     let pmCertificationId = null; // Store certification ID for hash update
-    if (includeVerificationPage) {
+    if (pmIncludeVerificationPage) {
       try {
         setProcessingStatus('Creating document certification...');
 
-        // Get translation content for hashing
-        const translationContent = translatedContent || pmTranslationHtml ||
-          translationResults.map(r => r.translatedText).join('\n');
+        // Get translation content for hashing (extract HTML string, not the full object)
+        const translationContent = translatedContent?.html || pmTranslationHtml || '';
 
-        // Create certification in backend
+        // Create certification in backend (with 15s timeout to prevent hanging)
         const certResponse = await axios.post(`${API}/certifications/create?admin_key=${adminKey}`, {
-          order_id: order?.id || selectedOrderId,
-          order_number: order?.order_number || orderNumber,
-          document_type: order?.document_type || documentType || 'Translation',
-          source_language: sourceLanguage,
-          target_language: targetLanguage,
+          order_id: order?.id || '',
+          order_number: order?.order_number || pmOrderNumber,
+          document_type: pmDocumentType,
+          source_language: pmSourceLanguage,
+          target_language: pmTargetLanguage,
           page_count: origDocs.length || 1,
-          document_content: translationContent || 'Certified Translation',
-          certifier_name: savedTranslatorName || 'Beatriz Paiva',
+          document_content: (translationContent || 'Certified Translation').substring(0, 50000),
+          certifier_name: pmTranslatorName,
           certifier_title: 'Certified Translator',
           certifier_credentials: 'ATA Member #275993',
           company_name: 'Legacy Translations Inc.',
@@ -30498,7 +30495,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
           company_phone: '(857) 316-7770',
           company_email: 'contact@legacytranslations.com',
           client_name: order?.client_name || ''
-        });
+        }, { timeout: 15000 });
 
         if (certResponse.data.success) {
           const certData = certResponse.data;
@@ -30509,7 +30506,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
           verificationPageHTML = `
     <div class="verification-page">
-        ${includeLetterhead ? letterheadHTML : ''}
+        ${pmIncludeLetterhead ? letterheadHTML : ''}
         <div class="verification-box">
             <div class="verification-header">
                 <div class="verification-icon">🔐</div>
@@ -30525,15 +30522,15 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     </div>
                     <div class="verification-row">
                         <span class="verification-label">Order Reference:</span>
-                        <span class="verification-value">${order?.order_number || orderNumber || 'N/A'}</span>
+                        <span class="verification-value">${order?.order_number || pmOrderNumber || 'N/A'}</span>
                     </div>
                     <div class="verification-row">
                         <span class="verification-label">Document Type:</span>
-                        <span class="verification-value">${order?.document_type || documentType || 'Translation'}</span>
+                        <span class="verification-value">${pmDocumentType}</span>
                     </div>
                     <div class="verification-row">
                         <span class="verification-label">Languages:</span>
-                        <span class="verification-value">${sourceLanguage} → ${targetLanguage}</span>
+                        <span class="verification-value">${pmSourceLanguage} → ${pmTargetLanguage}</span>
                     </div>
                     <div class="verification-row">
                         <span class="verification-label">Issue Date:</span>
@@ -30545,7 +30542,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     </div>
                     <div class="verification-row">
                         <span class="verification-label">Certified By:</span>
-                        <span class="verification-value">${savedTranslatorName || 'Beatriz Paiva'}</span>
+                        <span class="verification-value">${pmTranslatorName}</span>
                     </div>
                 </div>
 
@@ -30570,7 +30567,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
           const fallbackId = `LT-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
           verificationPageHTML = `
     <div class="verification-page">
-        ${includeLetterhead ? letterheadHTML : ''}
+        ${pmIncludeLetterhead ? letterheadHTML : ''}
         <div class="verification-box">
             <div class="verification-header">
                 <div class="verification-icon">🔐</div>
@@ -30585,11 +30582,11 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     </div>
                     <div class="verification-row">
                         <span class="verification-label">Document Type:</span>
-                        <span class="verification-value">${order?.document_type || documentType || 'Translation'}</span>
+                        <span class="verification-value">${pmDocumentType}</span>
                     </div>
                     <div class="verification-row">
                         <span class="verification-label">Languages:</span>
-                        <span class="verification-value">${sourceLanguage} → ${targetLanguage}</span>
+                        <span class="verification-value">${pmSourceLanguage} → ${pmTargetLanguage}</span>
                     </div>
                     <div class="verification-row">
                         <span class="verification-label">Issue Date:</span>
@@ -30609,7 +30606,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         const fallbackId = `LT-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
         verificationPageHTML = `
     <div class="verification-page">
-        ${includeLetterhead ? letterheadHTML : ''}
+        ${pmIncludeLetterhead ? letterheadHTML : ''}
         <div class="verification-box">
             <div class="verification-header">
                 <div class="verification-icon">🔐</div>
@@ -30624,7 +30621,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     </div>
                     <div class="verification-row">
                         <span class="verification-label">Document Type:</span>
-                        <span class="verification-value">${order?.document_type || documentType || 'Translation'}</span>
+                        <span class="verification-value">${pmDocumentType}</span>
                     </div>
                     <div class="verification-row">
                         <span class="verification-label">Issue Date:</span>
@@ -30769,7 +30766,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     </style>
 </head>
 <body>
-    ${includeCover ? coverLetterHTML : ''}
+    ${pmIncludeCover ? coverLetterHTML : ''}
     ${translationPagesHTML}
     ${originalPagesHTML}
     ${verificationPageHTML}
@@ -30778,14 +30775,14 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
     // Generate PDF with hash tracking for verification
     setProcessingStatus('Generating PDF...');
-    const filename = `${order?.order_number || orderNumber || 'PM'}_Certified_Translation.pdf`;
+    const filename = `${order?.order_number || pmOrderNumber || 'PM'}_Certified_Translation.pdf`;
 
     try {
       const { blob: pdfBlob, hash: pdfHash } = await generatePdfWithHash(fullHTML, filename, {
         margin: [5, 5, 5, 5],
         image: { type: 'jpeg', quality: 0.95 },
         html2canvas: { scale: 2, useCORS: true, allowTaint: true },
-        jsPDF: { unit: 'mm', format: pageFormat === 'a4' ? 'a4' : 'letter', orientation: 'portrait' }
+        jsPDF: { unit: 'mm', format: pmPageFormat === 'a4' ? 'a4' : 'letter', orientation: 'portrait' }
       });
 
       // Update PDF hash in backend if we have a certification
@@ -30814,9 +30811,13 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         printWindow.onload = () => { setTimeout(() => { printWindow.print(); }, 500); };
       }
     }
-
-    setPmPackageGenerating(false);
-    setProcessingStatus('');
+    } catch (err) {
+      console.error('Package generation failed:', err);
+      showToast('❌ Error generating package. Please try again.');
+    } finally {
+      setPmPackageGenerating(false);
+      setProcessingStatus('');
+    }
   };
 
   // Load review content
@@ -30825,9 +30826,16 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     setCorrectionNotes('');
     setCurrentDocIndex(0);
     setOriginalContents([]);
+    setTranslatedContent(null);
     // Reset PM package state
     setPmTranslationFiles([]);
     setPmTranslationHtml('');
+    // Reset proofreading and approval state
+    setProofreadingResult(null);
+    setProofreadingError('');
+    setPmApprovalStatus(null);
+    setPmReviewEditMode(false);
+    setHighlightedPmErrorIndex(null);
 
     try {
       // Fetch documents for this order
@@ -31202,10 +31210,11 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       return;
     }
 
-    // Get original text from the first original document
-    const originalText = originalContents.length > 0
-      ? (originalContents[0].text || 'Texto original não disponível em formato texto')
-      : 'Texto original não disponível';
+    // Get original text - originalContents are images, so text not directly available
+    // Use order metadata to provide context for proofreading
+    const originalText = selectedReview?.original_text ||
+      `Original document: ${selectedReview?.document_type || 'Document'} in ${selectedReview?.translate_from || selectedReview?.source_language || 'source language'}. ` +
+      `Original not available as text (image format). Please focus on the translation quality, grammar, and consistency.`;
 
     // Get translated text (extract from HTML if needed)
     let translatedText = '';
