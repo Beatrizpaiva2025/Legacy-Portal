@@ -25033,6 +25033,7 @@ const FinancesPage = ({ adminKey }) => {
   const [bulkEmailMessage, setBulkEmailMessage] = useState('');
   const [sendingBulkEmail, setSendingBulkEmail] = useState(false);
   const [bulkEmailMode, setBulkEmailMode] = useState('template'); // 'template' or 'custom'
+  const [selectedEmailTemplate, setSelectedEmailTemplate] = useState('auto'); // 'auto', 'first_contact', 'followup_1', 'followup_2'
   // Add prospect modal state
   const [showAddProspectModal, setShowAddProspectModal] = useState(false);
   const [addProspectForm, setAddProspectForm] = useState({ company_name: '', contact_name: '', email: '', phone: '' });
@@ -28058,44 +28059,66 @@ const FinancesPage = ({ adminKey }) => {
               <>
                 <div className="p-4 space-y-3 overflow-y-auto">
                   <p className="text-xs text-gray-600 bg-indigo-50 border border-indigo-100 rounded-lg p-2.5">
-                    The system automatically sends the correct next email to each prospect based on their current status. Click <strong>Send</strong> below to send the next prospecting step.
+                    Select which email template to send, or use <strong>Auto (Next Step)</strong> to automatically send the correct next email based on each prospect's status.
                   </p>
+                  {/* Auto option */}
+                  <label
+                    className={`border rounded-lg p-3 cursor-pointer block transition-all ${selectedEmailTemplate === 'auto' ? 'bg-indigo-50 border-indigo-400 ring-2 ring-indigo-200' : 'bg-gray-50 border-gray-200 hover:border-gray-300'}`}
+                    onClick={() => setSelectedEmailTemplate('auto')}
+                  >
+                    <div className="flex items-center gap-3">
+                      <input type="radio" name="emailTemplate" checked={selectedEmailTemplate === 'auto'} onChange={() => setSelectedEmailTemplate('auto')} className="accent-indigo-600" />
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-sm text-indigo-800">Auto (Next Step)</h3>
+                        <p className="text-xs text-gray-500 mt-0.5">Automatically sends the correct next email based on each prospect's current status</p>
+                      </div>
+                    </div>
+                  </label>
                   {/* Template 1 - First Contact */}
-                  <div className="border rounded-lg p-3 bg-orange-50 border-orange-200">
-                    <div className="flex items-start gap-3">
-                      <div className="w-7 h-7 rounded-full bg-orange-500 text-white flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">1</div>
+                  <label
+                    className={`border rounded-lg p-3 cursor-pointer block transition-all ${selectedEmailTemplate === 'first_contact' ? 'bg-orange-50 border-orange-400 ring-2 ring-orange-200' : 'bg-gray-50 border-gray-200 hover:border-gray-300'}`}
+                    onClick={() => setSelectedEmailTemplate('first_contact')}
+                  >
+                    <div className="flex items-center gap-3">
+                      <input type="radio" name="emailTemplate" checked={selectedEmailTemplate === 'first_contact'} onChange={() => setSelectedEmailTemplate('first_contact')} className="accent-orange-500" />
+                      <div className="w-7 h-7 rounded-full bg-orange-500 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">1</div>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-sm text-orange-800">1st Email &mdash; Introduction</h3>
                         <p className="text-xs text-gray-500 mt-0.5 italic">Subject: &quot;Certified Translation Services with Digital Verification&quot;</p>
-                        <p className="text-xs text-gray-600 mt-1">Professional introduction to Legacy Translations. Highlights QR code verification, 100% USCIS acceptance rate, 24-hour turnaround, pricing ($16.24-$24.99/page), and Net 15/30 invoicing. CTAs: Register for Access &amp; Schedule a Call.</p>
-                        <p className="text-xs text-orange-600 mt-1.5 font-medium">Sent to: New prospects (no emails sent yet)</p>
+                        <p className="text-xs text-gray-600 mt-1">Professional introduction to Legacy Translations. Highlights QR code verification, 100% USCIS acceptance rate, 24-hour turnaround, pricing ($16.24-$24.99/page), and Net 15/30 invoicing.</p>
                       </div>
                     </div>
-                  </div>
+                  </label>
                   {/* Template 2 - Follow-up 1 */}
-                  <div className="border rounded-lg p-3 bg-green-50 border-green-200">
-                    <div className="flex items-start gap-3">
-                      <div className="w-7 h-7 rounded-full bg-green-500 text-white flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">2</div>
+                  <label
+                    className={`border rounded-lg p-3 cursor-pointer block transition-all ${selectedEmailTemplate === 'followup_1' ? 'bg-green-50 border-green-400 ring-2 ring-green-200' : 'bg-gray-50 border-gray-200 hover:border-gray-300'}`}
+                    onClick={() => setSelectedEmailTemplate('followup_1')}
+                  >
+                    <div className="flex items-center gap-3">
+                      <input type="radio" name="emailTemplate" checked={selectedEmailTemplate === 'followup_1'} onChange={() => setSelectedEmailTemplate('followup_1')} className="accent-green-500" />
+                      <div className="w-7 h-7 rounded-full bg-green-500 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">2</div>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-sm text-green-800">2nd Email &mdash; Free Trial Offer</h3>
                         <p className="text-xs text-gray-500 mt-0.5 italic">Subject: &quot;A free translation for [Company] &mdash; try us risk-free&quot;</p>
-                        <p className="text-xs text-gray-600 mt-1">Follow-up offering a complimentary trial translation with no commitment required. Showcases portal features, QR code verification, and quality firsthand. CTA: Claim Your Free Translation.</p>
-                        <p className="text-xs text-green-600 mt-1.5 font-medium">Sent to: Prospects who already received the 1st Email</p>
+                        <p className="text-xs text-gray-600 mt-1">Follow-up offering a complimentary trial translation with no commitment required. Showcases portal features and quality firsthand.</p>
                       </div>
                     </div>
-                  </div>
+                  </label>
                   {/* Template 3 - Follow-up 2 */}
-                  <div className="border rounded-lg p-3 bg-blue-50 border-blue-200">
-                    <div className="flex items-start gap-3">
-                      <div className="w-7 h-7 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">3</div>
+                  <label
+                    className={`border rounded-lg p-3 cursor-pointer block transition-all ${selectedEmailTemplate === 'followup_2' ? 'bg-blue-50 border-blue-400 ring-2 ring-blue-200' : 'bg-gray-50 border-gray-200 hover:border-gray-300'}`}
+                    onClick={() => setSelectedEmailTemplate('followup_2')}
+                  >
+                    <div className="flex items-center gap-3">
+                      <input type="radio" name="emailTemplate" checked={selectedEmailTemplate === 'followup_2'} onChange={() => setSelectedEmailTemplate('followup_2')} className="accent-blue-500" />
+                      <div className="w-7 h-7 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">3</div>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-sm text-blue-800">3rd Email &mdash; Social Proof &amp; Final Reminder</h3>
                         <p className="text-xs text-gray-500 mt-0.5 italic">Subject: &quot;Why firms trust Legacy Translations &mdash; plus your free trial&quot;</p>
-                        <p className="text-xs text-gray-600 mt-1">Social proof highlighting 15+ years experience, 100% USCIS acceptance, and 50+ languages. Includes client testimonial and continued free trial offer. CTAs: Start Free Trial &amp; Schedule a Call.</p>
-                        <p className="text-xs text-blue-600 mt-1.5 font-medium">Sent to: Prospects who already received the 2nd Email</p>
+                        <p className="text-xs text-gray-600 mt-1">Social proof highlighting 15+ years experience, 100% USCIS acceptance, and 50+ languages. Includes client testimonial and free trial offer.</p>
                       </div>
                     </div>
-                  </div>
+                  </label>
                 </div>
                 <div className="p-4 border-t bg-gray-50 flex justify-between items-center">
                   <button
@@ -28108,12 +28131,15 @@ const FinancesPage = ({ adminKey }) => {
                     onClick={async () => {
                       setSendingBulkEmail(true);
                       try {
-                        const res = await axios.post(`${API}/admin/partners/bulk-prospect-step?admin_key=${adminKey}`, {
-                          partner_ids: selectedPartnerIds
-                        });
+                        const payload = { partner_ids: selectedPartnerIds };
+                        if (selectedEmailTemplate !== 'auto') {
+                          payload.email_type = selectedEmailTemplate;
+                        }
+                        const res = await axios.post(`${API}/admin/partners/bulk-prospect-step?admin_key=${adminKey}`, payload);
                         showToast(res.data.message || 'Prospecting emails sent!');
                         setShowBulkEmailModal(false);
                         setSelectedPartnerIds([]);
+                        setSelectedEmailTemplate('auto');
                         fetchPartnerStats();
                       } catch (err) {
                         showToast('Error: ' + (err.response?.data?.detail || err.message));
@@ -28124,7 +28150,7 @@ const FinancesPage = ({ adminKey }) => {
                     disabled={sendingBulkEmail}
                     className="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
                   >
-                    {sendingBulkEmail ? 'Sending...' : `Send Prospecting Email to ${selectedPartnerIds.length} Partner(s)`}
+                    {sendingBulkEmail ? 'Sending...' : selectedEmailTemplate === 'auto' ? `Send Next Step to ${selectedPartnerIds.length} Partner(s)` : `Send ${selectedEmailTemplate === 'first_contact' ? '1st Email' : selectedEmailTemplate === 'followup_1' ? '2nd Email' : '3rd Email'} to ${selectedPartnerIds.length} Partner(s)`}
                   </button>
                 </div>
               </>

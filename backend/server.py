@@ -11824,6 +11824,7 @@ async def unarchive_prospect(partner_id: str, admin_key: str):
 
 class BulkPartnerIdsRequest(BaseModel):
     partner_ids: list
+    email_type: str = None  # Optional: 'first_contact', 'followup_1', 'followup_2'. If None, auto-detect next step.
 
 
 @api_router.post("/admin/partners/bulk-prospect-step")
@@ -11845,11 +11846,20 @@ async def bulk_send_prospect_step(request: BulkPartnerIdsRequest, admin_key: str
         "follow_up_1": ("followup_2", "follow_up_2"),
     }
 
+    # Map email_type to the next prospect_status
+    type_to_status = {
+        "first_contact": "first_email",
+        "followup_1": "follow_up_1",
+        "followup_2": "follow_up_2",
+    }
+
     subjects = {
         "first_contact": "Certified Translation Services with Digital Verification",
         "followup_1": "A free translation — try us risk-free",
         "followup_2": "Why firms trust Legacy Translations — plus your free trial",
     }
+
+    forced_type = request.email_type  # None means auto
 
     for pid in request.partner_ids:
         partner = await db.partners.find_one({"id": pid})
@@ -11857,13 +11867,19 @@ async def bulk_send_prospect_step(request: BulkPartnerIdsRequest, admin_key: str
             skipped += 1
             continue
 
-        current_status = partner.get("prospect_status", "new")
-        if current_status not in step_map:
-            skipped += 1
-            continue
-
-        email_type, next_status = step_map[current_status]
         company_name = partner.get("company_name", "Partner")
+
+        if forced_type and forced_type in type_to_status:
+            # Use the specific template chosen by the user
+            email_type = forced_type
+            next_status = type_to_status[forced_type]
+        else:
+            # Auto: determine next step from current status
+            current_status = partner.get("prospect_status", "new")
+            if current_status not in step_map:
+                skipped += 1
+                continue
+            email_type, next_status = step_map[current_status]
 
         if email_type == "first_contact":
             html_content = get_outreach_first_contact_template()
