@@ -4000,7 +4000,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             try {
               const docsRes = await axios.get(`${API}/admin/orders/${order.id}/documents?admin_key=${adminKey}`);
               const docs = docsRes.data.documents || [];
-              const originalDocs = docs.filter(d => d.source !== 'translated_document' && (d.document_type === 'original' || !d.document_type || d.source === 'manual_upload' || d.source === 'partner_upload'));
+              // Prioritize workspace_original images (uploaded during translation submission)
+              // then fall back to other original document sources
+              const workspaceOriginals = docs.filter(d => d.source === 'workspace_original');
+              const otherOriginals = docs.filter(d => d.source !== 'translated_document' && d.source !== 'workspace_original' && (d.document_type === 'original' || !d.document_type || d.source === 'manual_upload' || d.source === 'partner_upload'));
+              const originalDocs = workspaceOriginals.length > 0 ? workspaceOriginals : otherOriginals;
               if (originalDocs.length > 0) {
                 const loadedImages = [];
                 for (const doc of originalDocs) {
@@ -4205,7 +4209,40 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         origImages = originalImages.map(img => ({ filename: img.filename, data: img.data, type: img.type || 'image/png' }));
       }
 
+      // Upload original images separately to order_documents to avoid large JSON payloads
+      // This prevents Network Error caused by MongoDB 16MB document size limit
+      // and request timeouts from sending huge base64 data inline
+      if (origImages.length > 0 && selectedOrderId) {
+        setProcessingStatus('📤 Uploading original images...');
+        // Clean up previous workspace originals before uploading new ones
+        try {
+          await axios.delete(`${API}/admin/orders/${selectedOrderId}/workspace-originals?admin_key=${adminKey}`);
+        } catch (cleanErr) {
+          console.warn('Failed to clean old workspace originals:', cleanErr);
+        }
+        for (let i = 0; i < origImages.length; i++) {
+          const img = origImages[i];
+          try {
+            // Strip data URL prefix if present to get raw base64
+            let rawData = img.data;
+            if (rawData && rawData.startsWith('data:')) {
+              const commaIdx = rawData.indexOf(',');
+              if (commaIdx !== -1) rawData = rawData.substring(commaIdx + 1);
+            }
+            await axios.post(`${API}/admin/orders/${selectedOrderId}/documents?admin_key=${adminKey}`, {
+              filename: img.filename || `original_page_${i + 1}.png`,
+              file_data: rawData,
+              content_type: img.type || 'image/png',
+              source: 'workspace_original'
+            }, { timeout: 60000 });
+          } catch (imgErr) {
+            console.warn(`Failed to upload original image ${i + 1}:`, imgErr);
+          }
+        }
+      }
+
       // Build payload with optional batch info
+      // Don't include original_images data - they're now stored in order_documents
       const translationPayload = {
         translation_html: translationHTML,
         translation_original_text: originalText,
@@ -4217,7 +4254,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         include_cover: includeCover,
         page_format: pageFormat,
         translation_type: translationType,
-        original_images: origImages,
+        original_images: [],  // Images uploaded separately to avoid Network Error
         logo_left: logoLeft,
         logo_right: logoRight,
         logo_stamp: logoStamp,
@@ -4233,8 +4270,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         translationPayload.batch_file_info = window.__batchTranslationFileInfo || [];
       }
 
-      // Send to backend with destination info
-      const response = await axios.post(`${API}/admin/orders/${selectedOrderId}/translation?admin_key=${adminKey}`, translationPayload);
+      // Send to backend with destination info (with timeout to prevent indefinite hanging)
+      setProcessingStatus(destination === 'save' ? '💾 Saving translation...' : '📤 Sending translation...');
+      const response = await axios.post(`${API}/admin/orders/${selectedOrderId}/translation?admin_key=${adminKey}`, translationPayload, { timeout: 120000 });
 
       const destinationLabels = {
         'save': 'Saved',
