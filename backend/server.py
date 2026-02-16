@@ -14646,7 +14646,6 @@ async def admin_save_translation(order_id: str, data: TranslationData, admin_key
         "translation_include_cover": data.include_cover,
         "translation_page_format": data.page_format,
         "translation_type_setting": data.translation_type,
-        "translation_original_images": data.original_images,
         "translation_logo_left": data.logo_left,
         "translation_logo_right": data.logo_right,
         "translation_logo_stamp": data.logo_stamp,
@@ -14664,6 +14663,14 @@ async def admin_save_translation(order_id: str, data: TranslationData, admin_key
     if data.batch_file_ids:
         update_fields["batch_file_ids"] = data.batch_file_ids
         update_fields["batch_file_info"] = data.batch_file_info or []
+
+    # Only store original images inline if they contain actual data
+    # Images are now uploaded separately to order_documents to avoid MongoDB 16MB limit
+    if data.original_images and len(data.original_images) > 0:
+        # Check if images have actual base64 data (not just metadata)
+        has_image_data = any(img.get("data") for img in data.original_images)
+        if has_image_data:
+            update_fields["translation_original_images"] = data.original_images
 
     # Update order with translation data
     await db.translation_orders.update_one(
@@ -19104,6 +19111,35 @@ async def admin_get_order_documents(order_id: str, admin_key: str):
         })
 
     return {"documents": all_docs, "count": len(all_docs)}
+
+@api_router.delete("/admin/orders/{order_id}/workspace-originals")
+async def delete_workspace_originals(order_id: str, admin_key: str):
+    """Delete workspace original images for an order (called before re-uploading)"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Find workspace originals to clean up GridFS files
+    workspace_docs = await db.order_documents.find({
+        "order_id": order_id,
+        "source": "workspace_original"
+    }).to_list(length=100)
+
+    # Delete GridFS files for each document
+    for doc in workspace_docs:
+        if doc.get("gridfs_id"):
+            try:
+                from bson import ObjectId
+                await fs_bucket.delete(ObjectId(doc["gridfs_id"]))
+            except Exception as gfs_err:
+                logger.warning(f"Failed to delete GridFS file {doc.get('gridfs_id')}: {gfs_err}")
+
+    result = await db.order_documents.delete_many({
+        "order_id": order_id,
+        "source": "workspace_original"
+    })
+    logger.info(f"Deleted {result.deleted_count} workspace original images for order {order_id}")
+    return {"status": "success", "deleted_count": result.deleted_count}
 
 class OrderDocumentUpload(BaseModel):
     filename: str
