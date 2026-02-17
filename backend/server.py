@@ -12909,88 +12909,114 @@ async def download_partner_invoice_pdf(invoice_id: str, token: str, lang: str = 
         # --- i18n labels ---
         pdf_labels = {
             "en": {
-                "subtitle": "Professional Translation Services",
-                "invoice_title": "INVOICE",
-                "invoice_number": "Invoice Number:",
-                "status": "Status:",
-                "status_paid": "PAID",
-                "status_overdue": "OVERDUE",
-                "status_pending": "PENDING",
-                "date": "Date:",
-                "due_date": "Due Date:",
-                "bill_to": "Bill To:",
-                "partner_tier": "Partner Tier:",
-                "discount_label": "discount",
-                "order_number": "Order #",
-                "client": "Client",
-                "languages": "Languages",
-                "date_col": "Date",
-                "amount": "Amount",
-                "coupon": "Coupon:",
-                "subtotal": "Subtotal:",
-                "coupon_discount": "Coupon Discount:",
-                "manual_discount": "Manual Discount:",
-                "total_due": "TOTAL DUE:",
-                "notes": "Notes:",
-                "generated": "Generated:",
+                "invoice_title": "I N V O I C E",
+                "bill_to": "Bill to",
+                "invoice_details": "Invoice details",
+                "invoice_no": "Invoice no.:",
+                "invoice_date": "Invoice date:",
+                "due_date": "Due date:",
+                "col_num": "#",
+                "col_product": "Product or service",
+                "col_description": "Description",
+                "col_qty": "Qty",
+                "col_rate": "Rate",
+                "col_amount": "Amount",
+                "col_code": "Code",
+                "col_client": "Client Contact",
+                "col_document": "Document",
+                "col_created": "Create at",
+                "col_quantity": "Quantity",
+                "col_total": "Total to receive USD",
+                "total": "Total:",
+                "service_certified": "Certified Translation",
+                "service_standard": "Standard Translation",
+                "service_professional": "Professional Translation",
+                "service_sworn": "Sworn Translation",
+                "service_rmv": "RMV Translation",
+                "page": "page",
+                "pages": "pages",
+                "word": "word",
+                "words": "words",
             },
             "es": {
-                "subtitle": "Servicios Profesionales de Traduccion",
-                "invoice_title": "FACTURA",
-                "invoice_number": "Numero de Factura:",
-                "status": "Estado:",
-                "status_paid": "PAGADO",
-                "status_overdue": "VENCIDO",
-                "status_pending": "PENDIENTE",
-                "date": "Fecha:",
-                "due_date": "Fecha de Vencimiento:",
-                "bill_to": "Facturar A:",
-                "partner_tier": "Nivel de Partner:",
-                "discount_label": "descuento",
-                "order_number": "Pedido #",
-                "client": "Cliente",
-                "languages": "Idiomas",
-                "date_col": "Fecha",
-                "amount": "Monto",
-                "coupon": "Cupon:",
-                "subtotal": "Subtotal:",
-                "coupon_discount": "Descuento Cupon:",
-                "manual_discount": "Descuento Manual:",
-                "total_due": "TOTAL A PAGAR:",
-                "notes": "Notas:",
-                "generated": "Generado:",
+                "invoice_title": "F A C T U R A",
+                "bill_to": "Facturar a",
+                "invoice_details": "Detalles de la factura",
+                "invoice_no": "Factura no.:",
+                "invoice_date": "Fecha de factura:",
+                "due_date": "Fecha de vencimiento:",
+                "col_num": "#",
+                "col_product": "Producto o servicio",
+                "col_description": "Descripcion",
+                "col_qty": "Cant",
+                "col_rate": "Tarifa",
+                "col_amount": "Monto",
+                "col_code": "Codigo",
+                "col_client": "Contacto del Cliente",
+                "col_document": "Documento",
+                "col_created": "Creado en",
+                "col_quantity": "Cantidad",
+                "col_total": "Total a recibir USD",
+                "total": "Total:",
+                "service_certified": "Traduccion Certificada",
+                "service_standard": "Traduccion Estandar",
+                "service_professional": "Traduccion Profesional",
+                "service_sworn": "Traduccion Juramentada",
+                "service_rmv": "Traduccion RMV",
+                "page": "pagina",
+                "pages": "paginas",
+                "word": "palabra",
+                "words": "palabras",
             },
             "pt": {
-                "subtitle": "Servicos Profissionais de Traducao",
-                "invoice_title": "FATURA",
-                "invoice_number": "Numero da Fatura:",
-                "status": "Status:",
-                "status_paid": "PAGO",
-                "status_overdue": "VENCIDO",
-                "status_pending": "PENDENTE",
-                "date": "Data:",
-                "due_date": "Data de Vencimento:",
-                "bill_to": "Faturar Para:",
-                "partner_tier": "Nivel do Parceiro:",
-                "discount_label": "desconto",
-                "order_number": "Pedido #",
-                "client": "Cliente",
-                "languages": "Idiomas",
-                "date_col": "Data",
-                "amount": "Valor",
-                "coupon": "Cupom:",
-                "subtotal": "Subtotal:",
-                "coupon_discount": "Desconto Cupom:",
-                "manual_discount": "Desconto Manual:",
-                "total_due": "TOTAL A PAGAR:",
-                "notes": "Notas:",
-                "generated": "Gerado:",
+                "invoice_title": "F A T U R A",
+                "bill_to": "Faturar para",
+                "invoice_details": "Detalhes da fatura",
+                "invoice_no": "Fatura no.:",
+                "invoice_date": "Data da fatura:",
+                "due_date": "Data de vencimento:",
+                "col_num": "#",
+                "col_product": "Produto ou servico",
+                "col_description": "Descricao",
+                "col_qty": "Qtd",
+                "col_rate": "Valor",
+                "col_amount": "Total",
+                "col_code": "Codigo",
+                "col_client": "Contato do Cliente",
+                "col_document": "Documento",
+                "col_created": "Criado em",
+                "col_quantity": "Quantidade",
+                "col_total": "Total a receber USD",
+                "total": "Total:",
+                "service_certified": "Traducao Certificada",
+                "service_standard": "Traducao Padrao",
+                "service_professional": "Traducao Profissional",
+                "service_sworn": "Traducao Juramentada",
+                "service_rmv": "Traducao RMV",
+                "page": "pagina",
+                "pages": "paginas",
+                "word": "palavra",
+                "words": "palavras",
             },
         }
         L = pdf_labels.get(lang, pdf_labels["en"])
 
         # Date format per locale
-        date_fmt = "%d/%m/%Y" if lang in ("pt", "es") else "%m/%d/%Y"
+        date_fmt = "%m/%d/%Y"
+
+        def fmt_date(dt):
+            if hasattr(dt, 'strftime'):
+                return dt.strftime(date_fmt)
+            return str(dt)[:10] if dt else "N/A"
+
+        # Service type label mapping
+        service_labels = {
+            "certified": L["service_certified"],
+            "standard": L["service_standard"],
+            "professional": L["service_professional"],
+            "sworn": L["service_sworn"],
+            "rmv": L["service_rmv"],
+        }
 
         # Generate PDF using PyMuPDF (fitz)
         import fitz
@@ -12999,159 +13025,203 @@ async def download_partner_invoice_pdf(invoice_id: str, token: str, lang: str = 
         page = doc.new_page(width=612, height=792)  # US Letter
 
         # Colors
-        teal = (0.07, 0.55, 0.52)
+        teal = (0.31, 0.69, 0.67)         # light teal for header text
+        dark_teal = (0.07, 0.45, 0.42)    # darker teal for table headers
         dark_gray = (0.2, 0.2, 0.2)
-        medium_gray = (0.4, 0.4, 0.4)
-        light_gray = (0.6, 0.6, 0.6)
+        medium_gray = (0.45, 0.45, 0.45)
+        light_gray = (0.65, 0.65, 0.65)
         white = (1, 1, 1)
+        bill_to_bg = (0.90, 0.96, 0.96)   # light teal background
+        table_header_bg = (0.93, 0.93, 0.93)  # light gray for summary table header
+        row_border = (0.82, 0.82, 0.82)
 
-        y = 40  # Starting Y position
+        LEFT = 40
+        RIGHT = 572
+        y = 40
 
-        # --- Header ---
-        page.insert_text((40, y + 18), "LEGACY TRANSLATIONS", fontsize=20, fontname="helv", color=teal)
-        page.insert_text((40, y + 34), L["subtitle"], fontsize=9, fontname="helv", color=medium_gray)
+        # =====================================================
+        # HEADER SECTION
+        # =====================================================
+        # "INVOICE" title - top left, teal, letter-spaced
+        page.insert_text((LEFT, y + 20), L["invoice_title"], fontsize=18, fontname="helv", color=teal)
+        y += 38
 
-        page.insert_text((430, y + 18), L["invoice_title"], fontsize=22, fontname="helv", color=dark_gray)
+        # Company name
+        page.insert_text((LEFT, y), "Legacy Translations Inc", fontsize=10, fontname="helv", color=dark_gray)
+        y += 13
+        page.insert_text((LEFT, y), "867 Boylston Street \u00b7 5th Floor \u00b7 #2073 \u00b7 Boston, MA \u00b7 02116", fontsize=8, fontname="helv", color=medium_gray)
+        y += 12
+        page.insert_text((LEFT, y), "(857) 316-7770 \u00b7 contact@legacytranslations.com", fontsize=8, fontname="helv", color=medium_gray)
 
-        y += 50
+        y += 24
 
-        # Separator line
-        page.draw_line((40, y), (572, y), color=teal, width=2)
-        y += 20
+        # =====================================================
+        # BILL TO SECTION
+        # =====================================================
+        bill_to_y = y
+        page.draw_rect(fitz.Rect(LEFT, bill_to_y, RIGHT, bill_to_y + 18), color=bill_to_bg, fill=bill_to_bg)
+        page.insert_text((LEFT + 8, bill_to_y + 13), L["bill_to"], fontsize=9, fontname="helv", color=dark_teal)
+        y = bill_to_y + 28
+        page.insert_text((LEFT + 8, y), invoice.get("partner_company", "N/A"), fontsize=10, fontname="helv", color=dark_gray)
 
-        # --- Invoice Info ---
-        page.insert_text((40, y), L["invoice_number"], fontsize=9, fontname="helv", color=medium_gray)
-        page.insert_text((150, y), invoice.get("invoice_number", "N/A"), fontsize=9, fontname="helv", color=dark_gray)
+        y += 24
 
-        page.insert_text((350, y), L["status"], fontsize=9, fontname="helv", color=medium_gray)
-        raw_status = invoice.get("status", "pending")
-        status_display = L.get(f"status_{raw_status}", raw_status.upper())
-        status_color = (0.13, 0.55, 0.13) if raw_status == "paid" else (0.8, 0.0, 0.0) if raw_status == "overdue" else (0.8, 0.6, 0.0)
-        page.insert_text((400, y), status_display, fontsize=9, fontname="helv", color=status_color)
+        # =====================================================
+        # DASHED SEPARATOR
+        # =====================================================
+        dash_y = y
+        x_pos = LEFT
+        while x_pos < RIGHT:
+            end_x = min(x_pos + 4, RIGHT)
+            page.draw_line((x_pos, dash_y), (end_x, dash_y), color=light_gray, width=0.5)
+            x_pos += 7
+        y += 12
+
+        # =====================================================
+        # INVOICE DETAILS SECTION
+        # =====================================================
+        page.insert_text((LEFT, y + 2), L["invoice_details"], fontsize=10, fontname="helv", color=dark_gray)
         y += 16
 
-        page.insert_text((40, y), L["date"], fontsize=9, fontname="helv", color=medium_gray)
-        created = invoice.get("created_at")
-        created_str = created.strftime(date_fmt) if hasattr(created, 'strftime') else str(created)[:10] if created else "N/A"
-        page.insert_text((150, y), created_str, fontsize=9, fontname="helv", color=dark_gray)
+        # Invoice no.
+        page.insert_text((LEFT + 8, y), L["invoice_no"], fontsize=8, fontname="helv", color=medium_gray)
+        page.insert_text((LEFT + 100, y), invoice.get("invoice_number", "N/A"), fontsize=8, fontname="helv", color=dark_gray)
+        y += 13
 
-        page.insert_text((350, y), L["due_date"], fontsize=9, fontname="helv", color=medium_gray)
-        due = invoice.get("due_date")
-        due_str = due.strftime(date_fmt) if hasattr(due, 'strftime') else str(due)[:10] if due else "N/A"
-        due_x = 350 + len(L["due_date"]) * 4.5 + 8
-        page.insert_text((due_x, y), due_str, fontsize=9, fontname="helv", color=dark_gray)
-        y += 28
+        # Invoice date
+        page.insert_text((LEFT + 8, y), L["invoice_date"], fontsize=8, fontname="helv", color=medium_gray)
+        page.insert_text((LEFT + 100, y), fmt_date(invoice.get("created_at")), fontsize=8, fontname="helv", color=dark_gray)
+        y += 13
 
-        # --- Bill To ---
-        page.insert_text((40, y), L["bill_to"], fontsize=10, fontname="helv", color=teal)
-        y += 16
-        page.insert_text((40, y), invoice.get("partner_company", "N/A"), fontsize=10, fontname="helv", color=dark_gray)
-        y += 14
-        if invoice.get("partner_email"):
-            page.insert_text((40, y), invoice.get("partner_email"), fontsize=9, fontname="helv", color=medium_gray)
-            y += 14
-        if invoice.get("partner_tier") and invoice.get("partner_tier") != "standard":
-            tier_text = f"{L['partner_tier']} {invoice.get('partner_tier', '').capitalize()}"
-            if invoice.get("tier_discount_percent"):
-                tier_text += f" ({invoice.get('tier_discount_percent')}% {L['discount_label']})"
-            page.insert_text((40, y), tier_text, fontsize=9, fontname="helv", color=medium_gray)
-            y += 14
+        # Due date (bold)
+        page.insert_text((LEFT + 8, y), L["due_date"], fontsize=8, fontname="helv", color=dark_gray)
+        page.insert_text((LEFT + 100, y), fmt_date(invoice.get("due_date")), fontsize=8, fontname="helv", color=dark_gray)
 
-        y += 16
+        y += 24
 
-        # --- Orders Table Header ---
+        # =====================================================
+        # PRODUCT/SERVICE SUMMARY TABLE
+        # =====================================================
+        # Group orders by service_type
+        from collections import defaultdict
+        service_groups = defaultdict(lambda: {"qty": 0, "total": 0.0, "orders": []})
+        for order in orders:
+            stype = order.get("service_type", "standard")
+            service_groups[stype]["qty"] += 1
+            service_groups[stype]["total"] += order.get("total_price", 0)
+            service_groups[stype]["orders"].append(order)
+
+        # Table header
         header_y = y
-        page.draw_rect(fitz.Rect(40, header_y - 4, 572, header_y + 14), color=teal, fill=teal)
-        page.insert_text((48, header_y + 10), L["order_number"], fontsize=8, fontname="helv", color=white)
-        page.insert_text((140, header_y + 10), L["client"], fontsize=8, fontname="helv", color=white)
-        page.insert_text((280, header_y + 10), L["languages"], fontsize=8, fontname="helv", color=white)
-        page.insert_text((420, header_y + 10), L["date_col"], fontsize=8, fontname="helv", color=white)
-        page.insert_text((500, header_y + 10), L["amount"], fontsize=8, fontname="helv", color=white)
+        page.draw_rect(fitz.Rect(LEFT, header_y - 2, RIGHT, header_y + 14), color=table_header_bg, fill=table_header_bg)
+        # Draw top border
+        page.draw_line((LEFT, header_y - 2), (RIGHT, header_y - 2), color=row_border, width=0.5)
+        page.draw_line((LEFT, header_y + 14), (RIGHT, header_y + 14), color=row_border, width=0.5)
+
+        page.insert_text((LEFT + 6, header_y + 10), L["col_num"], fontsize=7, fontname="helv", color=medium_gray)
+        page.insert_text((LEFT + 28, header_y + 10), L["col_product"], fontsize=7, fontname="helv", color=medium_gray)
+        page.insert_text((220, header_y + 10), L["col_description"], fontsize=7, fontname="helv", color=medium_gray)
+        page.insert_text((380, header_y + 10), L["col_qty"], fontsize=7, fontname="helv", color=medium_gray)
+        page.insert_text((430, header_y + 10), L["col_rate"], fontsize=7, fontname="helv", color=medium_gray)
+        page.insert_text((510, header_y + 10), L["col_amount"], fontsize=7, fontname="helv", color=medium_gray)
         y = header_y + 22
 
-        # --- Order Rows ---
-        for i, order in enumerate(orders):
-            if y > 660:
+        # Table rows - one per service type
+        row_num = 1
+        for stype, group in service_groups.items():
+            if y > 680:
                 page = doc.new_page(width=612, height=792)
                 y = 40
 
-            if i % 2 == 0:
-                page.draw_rect(fitz.Rect(40, y - 4, 572, y + 14), color=(0.97, 0.97, 0.97), fill=(0.97, 0.97, 0.97))
+            label = service_labels.get(stype, stype.capitalize() + " Translation")
+            # Build description from languages
+            lang_pairs = set()
+            total_pages = 0
+            total_words = 0
+            for o in group["orders"]:
+                fr = o.get("translate_from", "")
+                to = o.get("translate_to", "")
+                if fr and to:
+                    lang_pairs.add(f"{fr} > {to}")
+                total_pages += o.get("page_count", 0)
+                total_words += o.get("word_count", 0)
+            desc_parts = []
+            if lang_pairs:
+                desc_parts.append(", ".join(list(lang_pairs)[:2]))
+            if total_pages > 0:
+                p_label = L["page"] if total_pages == 1 else L["pages"]
+                desc_parts.append(f"{total_pages} {p_label}")
+            elif total_words > 0:
+                w_label = L["word"] if total_words == 1 else L["words"]
+                desc_parts.append(f"{total_words} {w_label}")
+            description = " - ".join(desc_parts) if desc_parts else ""
 
-            order_num = order.get("order_number", "N/A")
-            page.insert_text((48, y + 10), str(order_num)[:15], fontsize=8, fontname="helv", color=dark_gray)
+            rate = group["total"] / group["qty"] if group["qty"] > 0 else 0
 
-            client = order.get("client_name", "N/A")
-            page.insert_text((140, y + 10), str(client)[:22], fontsize=8, fontname="helv", color=dark_gray)
+            page.insert_text((LEFT + 6, y + 10), str(row_num), fontsize=8, fontname="helv", color=dark_gray)
+            page.insert_text((LEFT + 28, y + 10), str(label)[:28], fontsize=8, fontname="helv", color=dark_gray)
+            page.insert_text((220, y + 10), str(description)[:25], fontsize=8, fontname="helv", color=medium_gray)
+            page.insert_text((380, y + 10), str(group["qty"]), fontsize=8, fontname="helv", color=dark_gray)
+            page.insert_text((430, y + 10), f"${rate:.2f}", fontsize=8, fontname="helv", color=dark_gray)
+            page.insert_text((510, y + 10), f"${group['total']:.2f}", fontsize=8, fontname="helv", color=dark_gray)
+            # Row bottom border
+            page.draw_line((LEFT, y + 16), (RIGHT, y + 16), color=row_border, width=0.3)
+            y += 22
+            row_num += 1
 
-            langs = f"{order.get('translate_from', '')} > {order.get('translate_to', '')}"
-            page.insert_text((280, y + 10), str(langs)[:22], fontsize=8, fontname="helv", color=dark_gray)
+        y += 12
 
-            order_date = order.get("created_at")
-            order_date_str = order_date.strftime(date_fmt) if hasattr(order_date, 'strftime') else str(order_date)[:10] if order_date else "-"
-            page.insert_text((420, y + 10), order_date_str, fontsize=8, fontname="helv", color=dark_gray)
+        # =====================================================
+        # ORDERS DETAIL TABLE
+        # =====================================================
+        header_y = y
+        page.draw_rect(fitz.Rect(LEFT, header_y - 2, RIGHT, header_y + 14), color=dark_teal, fill=dark_teal)
+        page.insert_text((LEFT + 6, header_y + 10), L["col_code"], fontsize=7, fontname="helv", color=white)
+        page.insert_text((LEFT + 90, header_y + 10), L["col_client"], fontsize=7, fontname="helv", color=white)
+        page.insert_text((220, header_y + 10), L["col_document"], fontsize=7, fontname="helv", color=white)
+        page.insert_text((340, header_y + 10), L["col_created"], fontsize=7, fontname="helv", color=white)
+        page.insert_text((420, header_y + 10), L["col_quantity"], fontsize=7, fontname="helv", color=white)
+        page.insert_text((490, header_y + 10), L["col_total"], fontsize=7, fontname="helv", color=white)
+        y = header_y + 20
+
+        for i, order in enumerate(orders):
+            if y > 700:
+                page = doc.new_page(width=612, height=792)
+                y = 40
+
+            row_y = y
+            page.insert_text((LEFT + 6, row_y + 10), str(order.get("order_number", "N/A"))[:14], fontsize=7, fontname="helv", color=dark_gray)
+            page.insert_text((LEFT + 90, row_y + 10), str(order.get("client_name", "N/A"))[:20], fontsize=7, fontname="helv", color=dark_gray)
+
+            doc_type = order.get("document_type", "") or ""
+            doc_display = doc_type.replace("_", " ").title() if doc_type else "-"
+            page.insert_text((220, row_y + 10), str(doc_display)[:18], fontsize=7, fontname="helv", color=dark_gray)
+
+            page.insert_text((340, row_y + 10), fmt_date(order.get("created_at")), fontsize=7, fontname="helv", color=dark_gray)
+
+            qty = order.get("page_count", 0) or order.get("word_count", 0) or 1
+            page.insert_text((420, row_y + 10), str(qty), fontsize=7, fontname="helv", color=dark_gray)
 
             amount = order.get("total_price", 0)
-            page.insert_text((500, y + 10), f"${amount:.2f}", fontsize=8, fontname="helv", color=dark_gray)
+            page.insert_text((490, row_y + 10), f"${amount:.2f}", fontsize=7, fontname="helv", color=dark_gray)
 
-            if order.get("coupon_code"):
-                y += 14
-                coupon_text = f"  {L['coupon']} {order.get('coupon_code')} (-${order.get('coupon_discount_amount', 0):.2f})"
-                page.insert_text((140, y + 10), coupon_text, fontsize=7, fontname="helv", color=(0.13, 0.55, 0.13))
-
+            # Row bottom border
+            page.draw_line((LEFT, row_y + 16), (RIGHT, row_y + 16), color=row_border, width=0.3)
             y += 18
 
-        y += 10
-
-        # --- Totals Section ---
-        page.draw_line((350, y), (572, y), color=medium_gray, width=0.5)
         y += 16
 
-        subtotal = invoice.get("subtotal", invoice.get("total_amount", 0))
-        discount_amount = invoice.get("discount_amount", 0)
-        manual_discount = invoice.get("manual_discount_amount", 0)
+        # =====================================================
+        # TOTAL SECTION
+        # =====================================================
         total = invoice.get("total_amount", 0)
-
-        if discount_amount > 0 or manual_discount > 0:
-            page.insert_text((370, y), L["subtotal"], fontsize=9, fontname="helv", color=medium_gray)
-            page.insert_text((500, y), f"${subtotal:.2f}", fontsize=9, fontname="helv", color=dark_gray)
-            y += 16
-
-        if discount_amount > 0:
-            page.insert_text((370, y), L["coupon_discount"], fontsize=9, fontname="helv", color=(0.13, 0.55, 0.13))
-            page.insert_text((500, y), f"-${discount_amount:.2f}", fontsize=9, fontname="helv", color=(0.13, 0.55, 0.13))
-            y += 16
-
-        if manual_discount > 0:
-            reason = invoice.get("manual_discount_reason", "")
-            label = f"{reason}:" if reason and len(reason) < 20 else L["manual_discount"]
-            page.insert_text((370, y), label, fontsize=9, fontname="helv", color=(0.8, 0.5, 0.0))
-            page.insert_text((500, y), f"-${manual_discount:.2f}", fontsize=9, fontname="helv", color=(0.8, 0.5, 0.0))
-            y += 16
-
         # Total line
-        page.draw_line((350, y - 4), (572, y - 4), color=teal, width=1.5)
-        y += 4
-        page.insert_text((370, y), L["total_due"], fontsize=11, fontname="helv", color=dark_gray)
-        page.insert_text((490, y), f"${total:.2f}", fontsize=11, fontname="helv", color=teal)
-        y += 8
-        page.draw_line((350, y), (572, y), color=teal, width=1.5)
-
-        # --- Notes ---
-        if invoice.get("notes"):
-            y += 24
-            page.insert_text((40, y), L["notes"], fontsize=9, fontname="helv", color=teal)
-            y += 14
-            notes_text = invoice.get("notes", "")
-            for line in notes_text.split("\n")[:5]:
-                page.insert_text((40, y), str(line)[:80], fontsize=8, fontname="helv", color=medium_gray)
-                y += 12
-
-        # --- Footer ---
-        footer_y = 750
-        page.draw_line((40, footer_y - 10), (572, footer_y - 10), color=(0.9, 0.9, 0.9), width=0.5)
-        page.insert_text((40, footer_y + 4), "Legacy Translations | payments@legacytranslations.com", fontsize=7, fontname="helv", color=light_gray)
-        page.insert_text((420, footer_y + 4), f"{L['generated']} {datetime.utcnow().strftime(date_fmt + ' %H:%M UTC')}", fontsize=7, fontname="helv", color=light_gray)
+        page.draw_line((400, y), (RIGHT, y), color=dark_teal, width=1)
+        y += 14
+        page.insert_text((400, y), L["total"], fontsize=11, fontname="helv", color=dark_gray)
+        page.insert_text((500, y), f"${total:.2f}", fontsize=11, fontname="helv", color=dark_gray)
+        y += 6
+        page.draw_line((400, y), (RIGHT, y), color=dark_teal, width=1)
 
         # Write PDF to bytes
         pdf_bytes = doc.tobytes()
