@@ -3597,7 +3597,7 @@ const InvoicesPage = ({ token, t, currency, lang }) => {
 
   const handleDownloadPdf = async (invoice) => {
     try {
-      const response = await axios.get(`${API}/partner/invoices/${invoice.id}/download-pdf?token=${token}`, {
+      const response = await axios.get(`${API}/partner/invoices/${invoice.id}/download-pdf?token=${token}&lang=${lang || 'en'}`, {
         responseType: 'blob'
       });
       const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));

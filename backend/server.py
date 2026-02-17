@@ -12890,8 +12890,8 @@ async def submit_invoice_zelle_payment(invoice_id: str, request: PartnerInvoiceP
 
 
 @api_router.get("/partner/invoices/{invoice_id}/download-pdf")
-async def download_partner_invoice_pdf(invoice_id: str, token: str):
-    """Generate and download a PDF for a partner invoice"""
+async def download_partner_invoice_pdf(invoice_id: str, token: str, lang: str = "en"):
+    """Generate and download a PDF for a partner invoice (supports en, es, pt)"""
     partner = await get_current_partner(token)
     if not partner:
         raise HTTPException(status_code=401, detail="Invalid token")
@@ -12906,6 +12906,92 @@ async def download_partner_invoice_pdf(invoice_id: str, token: str):
             "id": {"$in": invoice.get("order_ids", [])}
         }).to_list(1000)
 
+        # --- i18n labels ---
+        pdf_labels = {
+            "en": {
+                "subtitle": "Professional Translation Services",
+                "invoice_title": "INVOICE",
+                "invoice_number": "Invoice Number:",
+                "status": "Status:",
+                "status_paid": "PAID",
+                "status_overdue": "OVERDUE",
+                "status_pending": "PENDING",
+                "date": "Date:",
+                "due_date": "Due Date:",
+                "bill_to": "Bill To:",
+                "partner_tier": "Partner Tier:",
+                "discount_label": "discount",
+                "order_number": "Order #",
+                "client": "Client",
+                "languages": "Languages",
+                "date_col": "Date",
+                "amount": "Amount",
+                "coupon": "Coupon:",
+                "subtotal": "Subtotal:",
+                "coupon_discount": "Coupon Discount:",
+                "manual_discount": "Manual Discount:",
+                "total_due": "TOTAL DUE:",
+                "notes": "Notes:",
+                "generated": "Generated:",
+            },
+            "es": {
+                "subtitle": "Servicios Profesionales de Traduccion",
+                "invoice_title": "FACTURA",
+                "invoice_number": "Numero de Factura:",
+                "status": "Estado:",
+                "status_paid": "PAGADO",
+                "status_overdue": "VENCIDO",
+                "status_pending": "PENDIENTE",
+                "date": "Fecha:",
+                "due_date": "Fecha de Vencimiento:",
+                "bill_to": "Facturar A:",
+                "partner_tier": "Nivel de Partner:",
+                "discount_label": "descuento",
+                "order_number": "Pedido #",
+                "client": "Cliente",
+                "languages": "Idiomas",
+                "date_col": "Fecha",
+                "amount": "Monto",
+                "coupon": "Cupon:",
+                "subtotal": "Subtotal:",
+                "coupon_discount": "Descuento Cupon:",
+                "manual_discount": "Descuento Manual:",
+                "total_due": "TOTAL A PAGAR:",
+                "notes": "Notas:",
+                "generated": "Generado:",
+            },
+            "pt": {
+                "subtitle": "Servicos Profissionais de Traducao",
+                "invoice_title": "FATURA",
+                "invoice_number": "Numero da Fatura:",
+                "status": "Status:",
+                "status_paid": "PAGO",
+                "status_overdue": "VENCIDO",
+                "status_pending": "PENDENTE",
+                "date": "Data:",
+                "due_date": "Data de Vencimento:",
+                "bill_to": "Faturar Para:",
+                "partner_tier": "Nivel do Parceiro:",
+                "discount_label": "desconto",
+                "order_number": "Pedido #",
+                "client": "Cliente",
+                "languages": "Idiomas",
+                "date_col": "Data",
+                "amount": "Valor",
+                "coupon": "Cupom:",
+                "subtotal": "Subtotal:",
+                "coupon_discount": "Desconto Cupom:",
+                "manual_discount": "Desconto Manual:",
+                "total_due": "TOTAL A PAGAR:",
+                "notes": "Notas:",
+                "generated": "Gerado:",
+            },
+        }
+        L = pdf_labels.get(lang, pdf_labels["en"])
+
+        # Date format per locale
+        date_fmt = "%d/%m/%Y" if lang in ("pt", "es") else "%m/%d/%Y"
+
         # Generate PDF using PyMuPDF (fitz)
         import fitz
 
@@ -12913,22 +12999,19 @@ async def download_partner_invoice_pdf(invoice_id: str, token: str):
         page = doc.new_page(width=612, height=792)  # US Letter
 
         # Colors
-        teal = (0.07, 0.55, 0.52)       # #129e85 approx
+        teal = (0.07, 0.55, 0.52)
         dark_gray = (0.2, 0.2, 0.2)
         medium_gray = (0.4, 0.4, 0.4)
         light_gray = (0.6, 0.6, 0.6)
         white = (1, 1, 1)
-        green_bg = (0.94, 0.99, 0.94)
 
         y = 40  # Starting Y position
 
         # --- Header ---
-        # Company name
         page.insert_text((40, y + 18), "LEGACY TRANSLATIONS", fontsize=20, fontname="helv", color=teal)
-        page.insert_text((40, y + 34), "Professional Translation Services", fontsize=9, fontname="helv", color=medium_gray)
+        page.insert_text((40, y + 34), L["subtitle"], fontsize=9, fontname="helv", color=medium_gray)
 
-        # INVOICE label on the right
-        page.insert_text((430, y + 18), "INVOICE", fontsize=22, fontname="helv", color=dark_gray)
+        page.insert_text((430, y + 18), L["invoice_title"], fontsize=22, fontname="helv", color=dark_gray)
 
         y += 50
 
@@ -12937,28 +13020,30 @@ async def download_partner_invoice_pdf(invoice_id: str, token: str):
         y += 20
 
         # --- Invoice Info ---
-        page.insert_text((40, y), "Invoice Number:", fontsize=9, fontname="helv", color=medium_gray)
-        page.insert_text((140, y), invoice.get("invoice_number", "N/A"), fontsize=9, fontname="helv", color=dark_gray)
+        page.insert_text((40, y), L["invoice_number"], fontsize=9, fontname="helv", color=medium_gray)
+        page.insert_text((150, y), invoice.get("invoice_number", "N/A"), fontsize=9, fontname="helv", color=dark_gray)
 
-        page.insert_text((350, y), "Status:", fontsize=9, fontname="helv", color=medium_gray)
-        status = invoice.get("status", "pending").upper()
-        status_color = (0.13, 0.55, 0.13) if status == "PAID" else (0.8, 0.0, 0.0) if status == "OVERDUE" else (0.8, 0.6, 0.0)
-        page.insert_text((400, y), status, fontsize=9, fontname="helv", color=status_color)
+        page.insert_text((350, y), L["status"], fontsize=9, fontname="helv", color=medium_gray)
+        raw_status = invoice.get("status", "pending")
+        status_display = L.get(f"status_{raw_status}", raw_status.upper())
+        status_color = (0.13, 0.55, 0.13) if raw_status == "paid" else (0.8, 0.0, 0.0) if raw_status == "overdue" else (0.8, 0.6, 0.0)
+        page.insert_text((400, y), status_display, fontsize=9, fontname="helv", color=status_color)
         y += 16
 
-        page.insert_text((40, y), "Date:", fontsize=9, fontname="helv", color=medium_gray)
+        page.insert_text((40, y), L["date"], fontsize=9, fontname="helv", color=medium_gray)
         created = invoice.get("created_at")
-        created_str = created.strftime("%m/%d/%Y") if hasattr(created, 'strftime') else str(created)[:10] if created else "N/A"
-        page.insert_text((140, y), created_str, fontsize=9, fontname="helv", color=dark_gray)
+        created_str = created.strftime(date_fmt) if hasattr(created, 'strftime') else str(created)[:10] if created else "N/A"
+        page.insert_text((150, y), created_str, fontsize=9, fontname="helv", color=dark_gray)
 
-        page.insert_text((350, y), "Due Date:", fontsize=9, fontname="helv", color=medium_gray)
+        page.insert_text((350, y), L["due_date"], fontsize=9, fontname="helv", color=medium_gray)
         due = invoice.get("due_date")
-        due_str = due.strftime("%m/%d/%Y") if hasattr(due, 'strftime') else str(due)[:10] if due else "N/A"
-        page.insert_text((410, y), due_str, fontsize=9, fontname="helv", color=dark_gray)
+        due_str = due.strftime(date_fmt) if hasattr(due, 'strftime') else str(due)[:10] if due else "N/A"
+        due_x = 350 + len(L["due_date"]) * 4.5 + 8
+        page.insert_text((due_x, y), due_str, fontsize=9, fontname="helv", color=dark_gray)
         y += 28
 
         # --- Bill To ---
-        page.insert_text((40, y), "Bill To:", fontsize=10, fontname="helv", color=teal)
+        page.insert_text((40, y), L["bill_to"], fontsize=10, fontname="helv", color=teal)
         y += 16
         page.insert_text((40, y), invoice.get("partner_company", "N/A"), fontsize=10, fontname="helv", color=dark_gray)
         y += 14
@@ -12966,9 +13051,9 @@ async def download_partner_invoice_pdf(invoice_id: str, token: str):
             page.insert_text((40, y), invoice.get("partner_email"), fontsize=9, fontname="helv", color=medium_gray)
             y += 14
         if invoice.get("partner_tier") and invoice.get("partner_tier") != "standard":
-            tier_text = f"Partner Tier: {invoice.get('partner_tier', '').capitalize()}"
+            tier_text = f"{L['partner_tier']} {invoice.get('partner_tier', '').capitalize()}"
             if invoice.get("tier_discount_percent"):
-                tier_text += f" ({invoice.get('tier_discount_percent')}% discount)"
+                tier_text += f" ({invoice.get('tier_discount_percent')}% {L['discount_label']})"
             page.insert_text((40, y), tier_text, fontsize=9, fontname="helv", color=medium_gray)
             y += 14
 
@@ -12976,23 +13061,20 @@ async def download_partner_invoice_pdf(invoice_id: str, token: str):
 
         # --- Orders Table Header ---
         header_y = y
-        # Header background
         page.draw_rect(fitz.Rect(40, header_y - 4, 572, header_y + 14), color=teal, fill=teal)
-        page.insert_text((48, header_y + 10), "Order #", fontsize=8, fontname="helv", color=white)
-        page.insert_text((140, header_y + 10), "Client", fontsize=8, fontname="helv", color=white)
-        page.insert_text((280, header_y + 10), "Languages", fontsize=8, fontname="helv", color=white)
-        page.insert_text((420, header_y + 10), "Date", fontsize=8, fontname="helv", color=white)
-        page.insert_text((500, header_y + 10), "Amount", fontsize=8, fontname="helv", color=white)
+        page.insert_text((48, header_y + 10), L["order_number"], fontsize=8, fontname="helv", color=white)
+        page.insert_text((140, header_y + 10), L["client"], fontsize=8, fontname="helv", color=white)
+        page.insert_text((280, header_y + 10), L["languages"], fontsize=8, fontname="helv", color=white)
+        page.insert_text((420, header_y + 10), L["date_col"], fontsize=8, fontname="helv", color=white)
+        page.insert_text((500, header_y + 10), L["amount"], fontsize=8, fontname="helv", color=white)
         y = header_y + 22
 
         # --- Order Rows ---
         for i, order in enumerate(orders):
             if y > 660:
-                # New page if running out of space
                 page = doc.new_page(width=612, height=792)
                 y = 40
 
-            # Alternate row background
             if i % 2 == 0:
                 page.draw_rect(fitz.Rect(40, y - 4, 572, y + 14), color=(0.97, 0.97, 0.97), fill=(0.97, 0.97, 0.97))
 
@@ -13002,20 +13084,19 @@ async def download_partner_invoice_pdf(invoice_id: str, token: str):
             client = order.get("client_name", "N/A")
             page.insert_text((140, y + 10), str(client)[:22], fontsize=8, fontname="helv", color=dark_gray)
 
-            langs = f"{order.get('translate_from', '')} → {order.get('translate_to', '')}"
+            langs = f"{order.get('translate_from', '')} > {order.get('translate_to', '')}"
             page.insert_text((280, y + 10), str(langs)[:22], fontsize=8, fontname="helv", color=dark_gray)
 
             order_date = order.get("created_at")
-            order_date_str = order_date.strftime("%m/%d/%Y") if hasattr(order_date, 'strftime') else str(order_date)[:10] if order_date else "-"
+            order_date_str = order_date.strftime(date_fmt) if hasattr(order_date, 'strftime') else str(order_date)[:10] if order_date else "-"
             page.insert_text((420, y + 10), order_date_str, fontsize=8, fontname="helv", color=dark_gray)
 
             amount = order.get("total_price", 0)
             page.insert_text((500, y + 10), f"${amount:.2f}", fontsize=8, fontname="helv", color=dark_gray)
 
-            # Show coupon if applicable
             if order.get("coupon_code"):
                 y += 14
-                coupon_text = f"  Coupon: {order.get('coupon_code')} (-${order.get('coupon_discount_amount', 0):.2f})"
+                coupon_text = f"  {L['coupon']} {order.get('coupon_code')} (-${order.get('coupon_discount_amount', 0):.2f})"
                 page.insert_text((140, y + 10), coupon_text, fontsize=7, fontname="helv", color=(0.13, 0.55, 0.13))
 
             y += 18
@@ -13023,7 +13104,6 @@ async def download_partner_invoice_pdf(invoice_id: str, token: str):
         y += 10
 
         # --- Totals Section ---
-        # Separator line
         page.draw_line((350, y), (572, y), color=medium_gray, width=0.5)
         y += 16
 
@@ -13033,18 +13113,18 @@ async def download_partner_invoice_pdf(invoice_id: str, token: str):
         total = invoice.get("total_amount", 0)
 
         if discount_amount > 0 or manual_discount > 0:
-            page.insert_text((370, y), "Subtotal:", fontsize=9, fontname="helv", color=medium_gray)
+            page.insert_text((370, y), L["subtotal"], fontsize=9, fontname="helv", color=medium_gray)
             page.insert_text((500, y), f"${subtotal:.2f}", fontsize=9, fontname="helv", color=dark_gray)
             y += 16
 
         if discount_amount > 0:
-            page.insert_text((370, y), "Coupon Discount:", fontsize=9, fontname="helv", color=(0.13, 0.55, 0.13))
+            page.insert_text((370, y), L["coupon_discount"], fontsize=9, fontname="helv", color=(0.13, 0.55, 0.13))
             page.insert_text((500, y), f"-${discount_amount:.2f}", fontsize=9, fontname="helv", color=(0.13, 0.55, 0.13))
             y += 16
 
         if manual_discount > 0:
-            reason = invoice.get("manual_discount_reason", "Discount")
-            label = f"{reason}:" if len(reason) < 20 else "Manual Discount:"
+            reason = invoice.get("manual_discount_reason", "")
+            label = f"{reason}:" if reason and len(reason) < 20 else L["manual_discount"]
             page.insert_text((370, y), label, fontsize=9, fontname="helv", color=(0.8, 0.5, 0.0))
             page.insert_text((500, y), f"-${manual_discount:.2f}", fontsize=9, fontname="helv", color=(0.8, 0.5, 0.0))
             y += 16
@@ -13052,7 +13132,7 @@ async def download_partner_invoice_pdf(invoice_id: str, token: str):
         # Total line
         page.draw_line((350, y - 4), (572, y - 4), color=teal, width=1.5)
         y += 4
-        page.insert_text((370, y), "TOTAL DUE:", fontsize=11, fontname="helv", color=dark_gray)
+        page.insert_text((370, y), L["total_due"], fontsize=11, fontname="helv", color=dark_gray)
         page.insert_text((490, y), f"${total:.2f}", fontsize=11, fontname="helv", color=teal)
         y += 8
         page.draw_line((350, y), (572, y), color=teal, width=1.5)
@@ -13060,10 +13140,9 @@ async def download_partner_invoice_pdf(invoice_id: str, token: str):
         # --- Notes ---
         if invoice.get("notes"):
             y += 24
-            page.insert_text((40, y), "Notes:", fontsize=9, fontname="helv", color=teal)
+            page.insert_text((40, y), L["notes"], fontsize=9, fontname="helv", color=teal)
             y += 14
             notes_text = invoice.get("notes", "")
-            # Wrap long notes
             for line in notes_text.split("\n")[:5]:
                 page.insert_text((40, y), str(line)[:80], fontsize=8, fontname="helv", color=medium_gray)
                 y += 12
@@ -13072,7 +13151,7 @@ async def download_partner_invoice_pdf(invoice_id: str, token: str):
         footer_y = 750
         page.draw_line((40, footer_y - 10), (572, footer_y - 10), color=(0.9, 0.9, 0.9), width=0.5)
         page.insert_text((40, footer_y + 4), "Legacy Translations | payments@legacytranslations.com", fontsize=7, fontname="helv", color=light_gray)
-        page.insert_text((430, footer_y + 4), f"Generated: {datetime.utcnow().strftime('%m/%d/%Y %H:%M UTC')}", fontsize=7, fontname="helv", color=light_gray)
+        page.insert_text((420, footer_y + 4), f"{L['generated']} {datetime.utcnow().strftime(date_fmt + ' %H:%M UTC')}", fontsize=7, fontname="helv", color=light_gray)
 
         # Write PDF to bytes
         pdf_bytes = doc.tobytes()
