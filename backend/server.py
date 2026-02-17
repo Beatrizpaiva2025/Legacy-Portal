@@ -12928,6 +12928,9 @@ async def download_partner_invoice_pdf(invoice_id: str, token: str, lang: str = 
                 "col_quantity": "Quantity",
                 "col_total": "Total to receive USD",
                 "total": "Total:",
+                "subtotal_full": "Subtotal (full price):",
+                "tier_discount": "Tier Discount",
+                "total_due": "Total Due:",
                 "service_certified": "Certified Translation",
                 "service_standard": "Standard Translation",
                 "service_professional": "Professional Translation",
@@ -12958,6 +12961,9 @@ async def download_partner_invoice_pdf(invoice_id: str, token: str, lang: str = 
                 "col_quantity": "Cantidad",
                 "col_total": "Total a recibir USD",
                 "total": "Total:",
+                "subtotal_full": "Subtotal (precio completo):",
+                "tier_discount": "Descuento de Nivel",
+                "total_due": "Total a Pagar:",
                 "service_certified": "Traduccion Certificada",
                 "service_standard": "Traduccion Estandar",
                 "service_professional": "Traduccion Profesional",
@@ -12988,6 +12994,9 @@ async def download_partner_invoice_pdf(invoice_id: str, token: str, lang: str = 
                 "col_quantity": "Quantidade",
                 "col_total": "Total a receber USD",
                 "total": "Total:",
+                "subtotal_full": "Subtotal (valor cheio):",
+                "tier_discount": "Desconto do Nivel",
+                "total_due": "Total a Pagar:",
                 "service_certified": "Traducao Certificada",
                 "service_standard": "Traducao Padrao",
                 "service_professional": "Traducao Profissional",
@@ -13212,16 +13221,45 @@ async def download_partner_invoice_pdf(invoice_id: str, token: str, lang: str = 
         y += 16
 
         # =====================================================
-        # TOTAL SECTION
+        # TOTAL SECTION (with full price, tier discount, final)
         # =====================================================
+        # Calculate full price (without tier discount) from orders
+        full_price = sum(order.get("original_price", order.get("total_price", 0)) for order in orders)
         total = invoice.get("total_amount", 0)
-        # Total line
-        page.draw_line((400, y), (RIGHT, y), color=dark_teal, width=1)
+        tier_name = (invoice.get("partner_tier") or "standard").capitalize()
+        tier_pct = invoice.get("tier_discount_percent", 0) or 0
+        tier_discount_value = round(full_price - total, 2) if tier_pct > 0 else 0.0
+
+        # Top line
+        page.draw_line((350, y), (RIGHT, y), color=dark_teal, width=1)
         y += 14
-        page.insert_text((400, y), L["total"], fontsize=11, fontname="helv", color=dark_gray)
-        page.insert_text((500, y), f"${total:.2f}", fontsize=11, fontname="helv", color=dark_gray)
+
+        # Subtotal (full price)
+        page.insert_text((350, y), L["subtotal_full"], fontsize=9, fontname="helv", color=medium_gray)
+        page.insert_text((510, y), f"${full_price:.2f}", fontsize=9, fontname="helv", color=medium_gray)
+        y += 15
+
+        # Tier discount line (e.g. "Tier Discount - Gold (25%):")
+        if tier_pct > 0:
+            tier_label = f"{L['tier_discount']} - {tier_name} ({tier_pct}%):"
+            page.insert_text((350, y), tier_label, fontsize=9, fontname="helv", color=teal)
+            page.insert_text((510, y), f"-${tier_discount_value:.2f}", fontsize=9, fontname="helv", color=teal)
+            y += 15
+        else:
+            tier_label = f"{L['tier_discount']} - {tier_name}:"
+            page.insert_text((350, y), tier_label, fontsize=9, fontname="helv", color=medium_gray)
+            page.insert_text((510, y), "$0.00", fontsize=9, fontname="helv", color=medium_gray)
+            y += 15
+
+        # Separator
+        page.draw_line((350, y), (RIGHT, y), color=dark_teal, width=1)
+        y += 14
+
+        # Final total (bold/larger)
+        page.insert_text((350, y), L["total_due"], fontsize=12, fontname="helv", color=dark_gray)
+        page.insert_text((505, y), f"${total:.2f}", fontsize=12, fontname="helv", color=dark_gray)
         y += 6
-        page.draw_line((400, y), (RIGHT, y), color=dark_teal, width=1)
+        page.draw_line((350, y), (RIGHT, y), color=dark_teal, width=1)
 
         # Write PDF to bytes
         pdf_bytes = doc.tobytes()
