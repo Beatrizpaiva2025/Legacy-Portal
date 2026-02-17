@@ -166,6 +166,7 @@ const TRANSLATIONS = {
     invoicePending: 'Pending',
     invoiceOverdue: 'Overdue',
     viewDetails: 'View Details',
+    downloadInvoice: 'Download PDF',
     ordersIncluded: 'Orders Included',
     // Service Types
     serviceType: 'Service Type',
@@ -423,6 +424,7 @@ const TRANSLATIONS = {
     invoicePending: 'Pendiente',
     invoiceOverdue: 'Vencido',
     viewDetails: 'Ver Detalles',
+    downloadInvoice: 'Descargar PDF',
     ordersIncluded: 'Pedidos Incluidos',
     serviceType: 'Tipo de Servicio',
     certifiedTranslation: 'Traducción Certificada',
@@ -679,6 +681,7 @@ const TRANSLATIONS = {
     invoicePending: 'Pendente',
     invoiceOverdue: 'Vencido',
     viewDetails: 'Ver Detalhes',
+    downloadInvoice: 'Baixar PDF',
     ordersIncluded: 'Pedidos Incluidos',
     serviceType: 'Tipo de Serviço',
     certifiedTranslation: 'Tradução Certificada',
@@ -3592,6 +3595,24 @@ const InvoicesPage = ({ token, t, currency, lang }) => {
     setShowPayModal(true);
   };
 
+  const handleDownloadPdf = async (invoice) => {
+    try {
+      const response = await axios.get(`${API}/partner/invoices/${invoice.id}/download-pdf?token=${token}&lang=${lang || 'en'}`, {
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `${invoice.invoice_number || 'invoice'}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      window.showAppToast('Error downloading invoice: ' + (err.response?.data?.detail || err.message), 'error');
+    }
+  };
+
   const handlePayWithStripe = async () => {
     if (!selectedInvoice) return;
     setSubmittingPayment(true);
@@ -3760,12 +3781,21 @@ const InvoicesPage = ({ token, t, currency, lang }) => {
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <button
-                    onClick={() => handleViewDetails(invoice)}
-                    className="text-teal-600 hover:text-teal-800 text-sm font-medium"
-                  >
-                    {t?.viewDetails || 'View Details'}
-                  </button>
+                  <div className="flex items-center space-x-4">
+                    <button
+                      onClick={() => handleViewDetails(invoice)}
+                      className="text-teal-600 hover:text-teal-800 text-sm font-medium"
+                    >
+                      {t?.viewDetails || 'View Details'}
+                    </button>
+                    <button
+                      onClick={() => handleDownloadPdf(invoice)}
+                      className="text-gray-500 hover:text-teal-700 text-sm font-medium flex items-center"
+                    >
+                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                      {t?.downloadInvoice || 'Download PDF'}
+                    </button>
+                  </div>
 
                   {invoice.status !== 'paid' && (
                     <button
@@ -3870,14 +3900,23 @@ const InvoicesPage = ({ token, t, currency, lang }) => {
               >
                 Close
               </button>
-              {selectedInvoice.status !== 'paid' && (
+              <div className="flex items-center space-x-3">
                 <button
-                  onClick={() => { setShowPayModal(true); }}
-                  className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+                  onClick={() => handleDownloadPdf(selectedInvoice)}
+                  className="px-4 py-2 border border-teal-600 text-teal-600 rounded-lg hover:bg-teal-50 flex items-center"
                 >
-                  {t?.payNow || 'Pay Now'}
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                  {t?.downloadInvoice || 'Download PDF'}
                 </button>
-              )}
+                {selectedInvoice.status !== 'paid' && (
+                  <button
+                    onClick={() => { setShowPayModal(true); }}
+                    className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+                  >
+                    {t?.payNow || 'Pay Now'}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
