@@ -12889,6 +12889,213 @@ async def submit_invoice_zelle_payment(invoice_id: str, request: PartnerInvoiceP
         raise HTTPException(status_code=500, detail="Failed to submit Zelle payment")
 
 
+@api_router.get("/partner/invoices/{invoice_id}/download-pdf")
+async def download_partner_invoice_pdf(invoice_id: str, token: str):
+    """Generate and download a PDF for a partner invoice"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    try:
+        invoice = await db.partner_invoices.find_one({"id": invoice_id, "partner_id": partner["id"]})
+        if not invoice:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+
+        # Get associated orders
+        orders = await db.translation_orders.find({
+            "id": {"$in": invoice.get("order_ids", [])}
+        }).to_list(1000)
+
+        # Generate PDF using PyMuPDF (fitz)
+        import fitz
+
+        doc = fitz.open()
+        page = doc.new_page(width=612, height=792)  # US Letter
+
+        # Colors
+        teal = (0.07, 0.55, 0.52)       # #129e85 approx
+        dark_gray = (0.2, 0.2, 0.2)
+        medium_gray = (0.4, 0.4, 0.4)
+        light_gray = (0.6, 0.6, 0.6)
+        white = (1, 1, 1)
+        green_bg = (0.94, 0.99, 0.94)
+
+        y = 40  # Starting Y position
+
+        # --- Header ---
+        # Company name
+        page.insert_text((40, y + 18), "LEGACY TRANSLATIONS", fontsize=20, fontname="helv", color=teal)
+        page.insert_text((40, y + 34), "Professional Translation Services", fontsize=9, fontname="helv", color=medium_gray)
+
+        # INVOICE label on the right
+        page.insert_text((430, y + 18), "INVOICE", fontsize=22, fontname="helv", color=dark_gray)
+
+        y += 50
+
+        # Separator line
+        page.draw_line((40, y), (572, y), color=teal, width=2)
+        y += 20
+
+        # --- Invoice Info ---
+        page.insert_text((40, y), "Invoice Number:", fontsize=9, fontname="helv", color=medium_gray)
+        page.insert_text((140, y), invoice.get("invoice_number", "N/A"), fontsize=9, fontname="helv", color=dark_gray)
+
+        page.insert_text((350, y), "Status:", fontsize=9, fontname="helv", color=medium_gray)
+        status = invoice.get("status", "pending").upper()
+        status_color = (0.13, 0.55, 0.13) if status == "PAID" else (0.8, 0.0, 0.0) if status == "OVERDUE" else (0.8, 0.6, 0.0)
+        page.insert_text((400, y), status, fontsize=9, fontname="helv", color=status_color)
+        y += 16
+
+        page.insert_text((40, y), "Date:", fontsize=9, fontname="helv", color=medium_gray)
+        created = invoice.get("created_at")
+        created_str = created.strftime("%m/%d/%Y") if hasattr(created, 'strftime') else str(created)[:10] if created else "N/A"
+        page.insert_text((140, y), created_str, fontsize=9, fontname="helv", color=dark_gray)
+
+        page.insert_text((350, y), "Due Date:", fontsize=9, fontname="helv", color=medium_gray)
+        due = invoice.get("due_date")
+        due_str = due.strftime("%m/%d/%Y") if hasattr(due, 'strftime') else str(due)[:10] if due else "N/A"
+        page.insert_text((410, y), due_str, fontsize=9, fontname="helv", color=dark_gray)
+        y += 28
+
+        # --- Bill To ---
+        page.insert_text((40, y), "Bill To:", fontsize=10, fontname="helv", color=teal)
+        y += 16
+        page.insert_text((40, y), invoice.get("partner_company", "N/A"), fontsize=10, fontname="helv", color=dark_gray)
+        y += 14
+        if invoice.get("partner_email"):
+            page.insert_text((40, y), invoice.get("partner_email"), fontsize=9, fontname="helv", color=medium_gray)
+            y += 14
+        if invoice.get("partner_tier") and invoice.get("partner_tier") != "standard":
+            tier_text = f"Partner Tier: {invoice.get('partner_tier', '').capitalize()}"
+            if invoice.get("tier_discount_percent"):
+                tier_text += f" ({invoice.get('tier_discount_percent')}% discount)"
+            page.insert_text((40, y), tier_text, fontsize=9, fontname="helv", color=medium_gray)
+            y += 14
+
+        y += 16
+
+        # --- Orders Table Header ---
+        header_y = y
+        # Header background
+        page.draw_rect(fitz.Rect(40, header_y - 4, 572, header_y + 14), color=teal, fill=teal)
+        page.insert_text((48, header_y + 10), "Order #", fontsize=8, fontname="helv", color=white)
+        page.insert_text((140, header_y + 10), "Client", fontsize=8, fontname="helv", color=white)
+        page.insert_text((280, header_y + 10), "Languages", fontsize=8, fontname="helv", color=white)
+        page.insert_text((420, header_y + 10), "Date", fontsize=8, fontname="helv", color=white)
+        page.insert_text((500, header_y + 10), "Amount", fontsize=8, fontname="helv", color=white)
+        y = header_y + 22
+
+        # --- Order Rows ---
+        for i, order in enumerate(orders):
+            if y > 660:
+                # New page if running out of space
+                page = doc.new_page(width=612, height=792)
+                y = 40
+
+            # Alternate row background
+            if i % 2 == 0:
+                page.draw_rect(fitz.Rect(40, y - 4, 572, y + 14), color=(0.97, 0.97, 0.97), fill=(0.97, 0.97, 0.97))
+
+            order_num = order.get("order_number", "N/A")
+            page.insert_text((48, y + 10), str(order_num)[:15], fontsize=8, fontname="helv", color=dark_gray)
+
+            client = order.get("client_name", "N/A")
+            page.insert_text((140, y + 10), str(client)[:22], fontsize=8, fontname="helv", color=dark_gray)
+
+            langs = f"{order.get('translate_from', '')} → {order.get('translate_to', '')}"
+            page.insert_text((280, y + 10), str(langs)[:22], fontsize=8, fontname="helv", color=dark_gray)
+
+            order_date = order.get("created_at")
+            order_date_str = order_date.strftime("%m/%d/%Y") if hasattr(order_date, 'strftime') else str(order_date)[:10] if order_date else "-"
+            page.insert_text((420, y + 10), order_date_str, fontsize=8, fontname="helv", color=dark_gray)
+
+            amount = order.get("total_price", 0)
+            page.insert_text((500, y + 10), f"${amount:.2f}", fontsize=8, fontname="helv", color=dark_gray)
+
+            # Show coupon if applicable
+            if order.get("coupon_code"):
+                y += 14
+                coupon_text = f"  Coupon: {order.get('coupon_code')} (-${order.get('coupon_discount_amount', 0):.2f})"
+                page.insert_text((140, y + 10), coupon_text, fontsize=7, fontname="helv", color=(0.13, 0.55, 0.13))
+
+            y += 18
+
+        y += 10
+
+        # --- Totals Section ---
+        # Separator line
+        page.draw_line((350, y), (572, y), color=medium_gray, width=0.5)
+        y += 16
+
+        subtotal = invoice.get("subtotal", invoice.get("total_amount", 0))
+        discount_amount = invoice.get("discount_amount", 0)
+        manual_discount = invoice.get("manual_discount_amount", 0)
+        total = invoice.get("total_amount", 0)
+
+        if discount_amount > 0 or manual_discount > 0:
+            page.insert_text((370, y), "Subtotal:", fontsize=9, fontname="helv", color=medium_gray)
+            page.insert_text((500, y), f"${subtotal:.2f}", fontsize=9, fontname="helv", color=dark_gray)
+            y += 16
+
+        if discount_amount > 0:
+            page.insert_text((370, y), "Coupon Discount:", fontsize=9, fontname="helv", color=(0.13, 0.55, 0.13))
+            page.insert_text((500, y), f"-${discount_amount:.2f}", fontsize=9, fontname="helv", color=(0.13, 0.55, 0.13))
+            y += 16
+
+        if manual_discount > 0:
+            reason = invoice.get("manual_discount_reason", "Discount")
+            label = f"{reason}:" if len(reason) < 20 else "Manual Discount:"
+            page.insert_text((370, y), label, fontsize=9, fontname="helv", color=(0.8, 0.5, 0.0))
+            page.insert_text((500, y), f"-${manual_discount:.2f}", fontsize=9, fontname="helv", color=(0.8, 0.5, 0.0))
+            y += 16
+
+        # Total line
+        page.draw_line((350, y - 4), (572, y - 4), color=teal, width=1.5)
+        y += 4
+        page.insert_text((370, y), "TOTAL DUE:", fontsize=11, fontname="helv", color=dark_gray)
+        page.insert_text((490, y), f"${total:.2f}", fontsize=11, fontname="helv", color=teal)
+        y += 8
+        page.draw_line((350, y), (572, y), color=teal, width=1.5)
+
+        # --- Notes ---
+        if invoice.get("notes"):
+            y += 24
+            page.insert_text((40, y), "Notes:", fontsize=9, fontname="helv", color=teal)
+            y += 14
+            notes_text = invoice.get("notes", "")
+            # Wrap long notes
+            for line in notes_text.split("\n")[:5]:
+                page.insert_text((40, y), str(line)[:80], fontsize=8, fontname="helv", color=medium_gray)
+                y += 12
+
+        # --- Footer ---
+        footer_y = 750
+        page.draw_line((40, footer_y - 10), (572, footer_y - 10), color=(0.9, 0.9, 0.9), width=0.5)
+        page.insert_text((40, footer_y + 4), "Legacy Translations | payments@legacytranslations.com", fontsize=7, fontname="helv", color=light_gray)
+        page.insert_text((430, footer_y + 4), f"Generated: {datetime.utcnow().strftime('%m/%d/%Y %H:%M UTC')}", fontsize=7, fontname="helv", color=light_gray)
+
+        # Write PDF to bytes
+        pdf_bytes = doc.tobytes()
+        doc.close()
+
+        invoice_number = invoice.get("invoice_number", "invoice")
+        filename = f"{invoice_number}.pdf"
+
+        return StreamingResponse(
+            io.BytesIO(pdf_bytes),
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Length": str(len(pdf_bytes))
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating invoice PDF: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to generate invoice PDF")
+
+
 # ==================== INVOICE PAYMENT MANAGEMENT ====================
 
 @api_router.get("/admin/invoice-payments/pending-zelle")
