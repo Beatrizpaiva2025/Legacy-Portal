@@ -25351,7 +25351,10 @@ const FinancesPage = ({ adminKey }) => {
     if (!window.confirm('Are you sure you want to delete this invoice?')) return;
     try {
       await axios.delete(`${API}/admin/partner-invoices/${invoiceId}?admin_key=${adminKey}`);
-      fetchPartnerInvoicesForPartner(selectedPartnerForInvoice.partner_id);
+      if (selectedPartnerForInvoice?.partner_id) {
+        fetchPartnerInvoicesForPartner(selectedPartnerForInvoice.partner_id);
+      }
+      fetchPartnerInvoices();
       fetchPartnerStats();
     } catch (err) {
       showToast('Error deleting invoice: ' + (err.response?.data?.detail || err.message));
@@ -25403,7 +25406,9 @@ const FinancesPage = ({ adminKey }) => {
       await axios.put(`${API}/admin/partner-invoices/${editingInvoice.id}/edit?admin_key=${adminKey}`, payload);
       showToast('Invoice updated successfully!');
       setEditingInvoice(null);
-      fetchPartnerInvoicesForPartner(selectedPartnerForInvoice.partner_id);
+      if (selectedPartnerForInvoice?.partner_id) {
+        fetchPartnerInvoicesForPartner(selectedPartnerForInvoice.partner_id);
+      }
       fetchPartnerInvoices();
     } catch (err) {
       showToast('Error updating invoice: ' + (err.response?.data?.detail || err.message));
@@ -27274,19 +27279,37 @@ const FinancesPage = ({ adminKey }) => {
                             </div>
                           </td>
                           <td className="px-4 py-3 text-center">
-                            {invoice.status !== 'paid' && (
+                            <div className="flex items-center justify-center gap-1">
+                              {invoice.status !== 'paid' && (
+                                <button
+                                  onClick={() => sendInvoiceReminder(invoice.id, invoice.invoice_number)}
+                                  disabled={sendingReminder === invoice.id}
+                                  className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded hover:bg-blue-200 disabled:opacity-50"
+                                  title={`Send reminder${invoice.reminder_sent_count ? ` (${invoice.reminder_sent_count} sent)` : ''}`}
+                                >
+                                  {sendingReminder === invoice.id ? '...' : '📧'}
+                                  {invoice.reminder_sent_count > 0 && (
+                                    <span className="ml-1 text-gray-500">({invoice.reminder_sent_count})</span>
+                                  )}
+                                </button>
+                              )}
+                              {invoice.status !== 'paid' && (
+                                <button
+                                  onClick={() => handleOpenEditInvoice(invoice)}
+                                  className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded hover:bg-yellow-200"
+                                  title="Edit invoice"
+                                >
+                                  ✏️
+                                </button>
+                              )}
                               <button
-                                onClick={() => sendInvoiceReminder(invoice.id, invoice.invoice_number)}
-                                disabled={sendingReminder === invoice.id}
-                                className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded hover:bg-blue-200 disabled:opacity-50"
-                                title={`Send reminder${invoice.reminder_sent_count ? ` (${invoice.reminder_sent_count} sent)` : ''}`}
+                                onClick={() => handleDeleteInvoice(invoice.id)}
+                                className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded hover:bg-red-200"
+                                title="Delete invoice"
                               >
-                                {sendingReminder === invoice.id ? '...' : '📧'}
-                                {invoice.reminder_sent_count > 0 && (
-                                  <span className="ml-1 text-gray-500">({invoice.reminder_sent_count})</span>
-                                )}
+                                🗑️
                               </button>
-                            )}
+                            </div>
                           </td>
                         </tr>
                       );
