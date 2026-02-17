@@ -20956,6 +20956,45 @@ IMPORTANTE: Os termos acima do GLOSSÁRIO e MEMÓRIA DE TRADUÇÃO são OBRIGAT�
 
 """
 
+    # Determine date format based on target language
+    is_english_uk = "uk" in target_lang.lower() or "british" in target_lang.lower() or "reino unido" in target_lang.lower()
+    is_english = "english" in target_lang.lower() or "inglês" in target_lang.lower() or "ingles" in target_lang.lower()
+
+    date_format_section = ""
+    if is_english:
+        if is_english_uk:
+            date_format_section = """
+═══════════════════════════════════════════════════════════════════
+                    FORMATO DE DATAS (OBRIGATÓRIO)
+═══════════════════════════════════════════════════════════════════
+• Idioma alvo é English UK: usar formato DD/MM/YYYY (ex: 25/12/2024 ou 25 December 2024)
+• Verificar se TODAS as datas no documento traduzido estão neste formato
+• Se alguma data estiver em formato diferente, marcar como erro de "Data" com gravidade ALTA
+"""
+        else:
+            date_format_section = """
+═══════════════════════════════════════════════════════════════════
+                    FORMATO DE DATAS (OBRIGATÓRIO)
+═══════════════════════════════════════════════════════════════════
+• Datas em inglês DEVEM estar SEMPRE no formato AMERICANO: MM/DD/YYYY (ex: 12/25/2024 ou December 25, 2024)
+• NUNCA usar formato DD/MM/YYYY em traduções para inglês (exceto English UK)
+• Datas escritas por extenso: "25 de dezembro de 2024" → "December 25, 2024"
+• Verificar se TODAS as datas no documento traduzido estão no formato americano
+• Se alguma data estiver no formato DD/MM/YYYY ou outro formato não-americano, marcar como erro de "Data" com gravidade ALTA
+"""
+
+    # Mandatory translation rules
+    mandatory_translations_section = """
+═══════════════════════════════════════════════════════════════════
+                    TRADUÇÕES OBRIGATÓRIAS
+═══════════════════════════════════════════════════════════════════
+As seguintes frases em português DEVEM ser traduzidas EXATAMENTE como especificado:
+
+• "O conteúdo da certidão é verdadeiro. Dou fé" → "The aforementioned is true, in witness thereof"
+  (Esta regra se aplica com ou sem acentos: "O conteudo da certidao e verdadeiro. Dou fe" também)
+  GRAVIDADE: CRÍTICO se traduzida de forma diferente
+"""
+
     prompt = f"""Você é um revisor de traduções certificado.
 
 IDIOMA FONTE: {source_lang}
@@ -20967,6 +21006,8 @@ CARACTERES ESPECIAIS DO IDIOMA FONTE (devem ser PRESERVADOS em nomes próprios):
 
 {terminology}
 {glossary_section}
+{date_format_section}
+{mandatory_translations_section}
 INSTRUÇÕES DE REVISÃO:
 
 1. Compare CADA elemento dos dois documentos minuciosamente
@@ -20979,14 +21020,16 @@ INSTRUÇÕES DE REVISÃO:
    - Omissões (conteúdo do original ausente na tradução)
    - Adições indevidas (conteúdo na tradução que não está no original)
    - Formatação inconsistente
-   - Datas incorretas
+   - Datas incorretas ou em formato errado (verificar regras de formato acima)
+   - Frases com tradução obrigatória traduzidas incorretamente
 
 3. ATENÇÃO ESPECIAL para:
    - IBANs, números de conta, referências bancárias
-   - Datas (verificar formato e valores)
+   - Datas (verificar formato AMERICANO MM/DD/YYYY para inglês, exceto English UK)
    - Nomes próprios (pessoas, empresas, lugares)
    - Valores monetários
    - Caracteres especiais em nomes ({special_chars})
+   - Frase "O conteúdo da certidão é verdadeiro. Dou fé" (deve ser traduzida como "The aforementioned is true, in witness thereof")
 
 4. Para cada erro forneça:
    - Página/localização
@@ -21377,6 +21420,18 @@ Referência de traduções aprovadas - verifique se foram seguidas:
 """
         except Exception as e:
             logger.warning(f"Error fetching TM for proofreading: {e}")
+
+        # Fetch custom instructions from training database (so training changes apply to proofreading)
+        try:
+            custom_instructions = await fetch_matching_instructions(
+                source_lang=request.source_language,
+                target_lang=request.target_language,
+                document_type=request.document_type
+            )
+            if custom_instructions:
+                glossary_and_tm_terms += custom_instructions
+        except Exception as e:
+            logger.warning(f"Error fetching custom instructions for proofreading: {e}")
 
         system_prompt = get_proofreading_prompt(
             request.source_language,
@@ -25893,6 +25948,47 @@ REGRAS:
 • Para extratos bancários: converta saldos, créditos e débitos
 """
 
+    # Determine date format based on target language
+    is_english_uk = "uk" in target_lang.lower() or "british" in target_lang.lower() or "reino unido" in target_lang.lower()
+    is_english = "english" in target_lang.lower() or "inglês" in target_lang.lower() or "ingles" in target_lang.lower()
+
+    date_format_text = ""
+    if is_english:
+        if is_english_uk:
+            date_format_text = """
+═══════════════════════════════════════════════════════════════════
+                    FORMATO DE DATAS (OBRIGATÓRIO)
+═══════════════════════════════════════════════════════════════════
+• Idioma alvo é English UK: usar formato DD/MM/YYYY (ex: 25/12/2024 ou 25 December 2024)
+• Verificar se TODAS as datas no documento traduzido estão neste formato
+• Se alguma data estiver em formato diferente, marcar como erro de "Data" com gravidade ALTA
+"""
+        else:
+            date_format_text = """
+═══════════════════════════════════════════════════════════════════
+                    FORMATO DE DATAS (OBRIGATÓRIO)
+═══════════════════════════════════════════════════════════════════
+• Datas em inglês DEVEM estar SEMPRE no formato AMERICANO: MM/DD/YYYY (ex: 12/25/2024 ou December 25, 2024)
+• NUNCA usar formato DD/MM/YYYY em traduções para inglês (exceto English UK)
+• Datas escritas por extenso: "25 de dezembro de 2024" → "December 25, 2024"
+• Verificar se TODAS as datas no documento traduzido estão no formato americano
+• Se alguma data estiver no formato DD/MM/YYYY ou outro formato não-americano, marcar como erro de "Data" com gravidade ALTA
+"""
+
+    mandatory_translations_text = """
+═══════════════════════════════════════════════════════════════════
+                    TRADUÇÕES OBRIGATÓRIAS
+═══════════════════════════════════════════════════════════════════
+As seguintes frases em português DEVEM ser traduzidas EXATAMENTE como especificado:
+
+• "O conteúdo da certidão é verdadeiro. Dou fé" → "The aforementioned is true, in witness thereof"
+  (Esta regra se aplica com ou sem acentos: "O conteudo da certidao e verdadeiro. Dou fe" também)
+  GRAVIDADE: CRÍTICO se traduzida de forma diferente
+"""
+
+    # Fetch custom instructions from training database
+    custom_instructions_text = config.get("custom_instructions_text", "")
+
     prompt = f"""Você é um REVISOR CERTIFICADO especializado em traduções {source_lang} ↔ {target_lang}.
 
 TIPO DE DOCUMENTO: {doc_type}
@@ -25900,7 +25996,9 @@ IDIOMA FONTE: {source_lang}
 IDIOMA ALVO: {target_lang}
 {glossario_texto}
 {currency_text}
-
+{date_format_text}
+{mandatory_translations_text}
+{custom_instructions_text}
 ═══════════════════════════════════════════════════════════════════
                     INSTRUÇÕES DE REVISÃO
 ═══════════════════════════════════════════════════════════════════
@@ -25915,14 +26013,16 @@ IDIOMA ALVO: {target_lang}
    • Omissões (conteúdo do original ausente na tradução)
    • Adições indevidas
    • Formatação inconsistente
-   • Datas incorretas
+   • Datas incorretas ou em formato errado (verificar regras de formato acima)
+   • Frases com tradução obrigatória traduzidas incorretamente
 
 3. ATENÇÃO ESPECIAL para:
    • IBANs, números de conta, referências bancárias
-   • Datas (verificar formato e valores)
+   • Datas (verificar formato AMERICANO MM/DD/YYYY para inglês, exceto English UK)
    • Nomes próprios (pessoas, empresas, lugares) - NUNCA traduzir
    • Valores monetários
    • Caracteres especiais em nomes
+   • Frase "O conteúdo da certidão é verdadeiro. Dou fé" (deve ser "The aforementioned is true, in witness thereof")
 
 ═══════════════════════════════════════════════════════════════════
                     TERMINOLOGIA OBRIGATÓRIA
@@ -27198,6 +27298,19 @@ async def run_ai_proofreader_stage(pipeline: dict, previous_translation: str, cl
     config = pipeline["config"]
     target_language = config["target_language"]
     document_type = config["document_type"]
+    source_language = config.get("source_language", "Portuguese")
+
+    # Fetch custom instructions from training database (so training changes apply to proofreading)
+    try:
+        custom_instructions = await fetch_matching_instructions(
+            source_lang=source_language,
+            target_lang=target_language,
+            document_type=document_type
+        )
+        if custom_instructions:
+            config["custom_instructions_text"] = custom_instructions
+    except Exception as e:
+        logger.warning(f"Error fetching custom instructions for AI proofreader: {e}")
 
     # Validate input
     if not previous_translation:
@@ -28209,6 +28322,34 @@ Return the optimized HTML with proper CSS for printing:"""
         # ========== STEP 4: PROOFREADING ==========
         await update_status("proofreading", 75, "in_progress", "Proofreading translation...")
 
+        # Determine date format rules for proofreading
+        target_lang_lower = request.target_language.lower()
+        is_eng_uk = "uk" in target_lang_lower or "british" in target_lang_lower
+        is_eng = "english" in target_lang_lower
+
+        date_rules = ""
+        if is_eng and not is_eng_uk:
+            date_rules = """
+MANDATORY DATE FORMAT:
+- ALL dates in English MUST be in AMERICAN format: MM/DD/YYYY (e.g., 12/25/2024 or December 25, 2024)
+- NEVER use DD/MM/YYYY format in English translations (except English UK)
+- Written dates: "25 de dezembro de 2024" → "December 25, 2024"
+- If any date is NOT in American format, flag as HIGH severity Date error
+"""
+        elif is_eng and is_eng_uk:
+            date_rules = """
+MANDATORY DATE FORMAT:
+- English UK: use DD/MM/YYYY format (e.g., 25/12/2024 or 25 December 2024)
+- If any date is NOT in UK format, flag as HIGH severity Date error
+"""
+
+        mandatory_translation_rules = """
+MANDATORY TRANSLATIONS:
+- The Portuguese phrase "O conteúdo da certidão é verdadeiro. Dou fé" (with or without accents)
+  MUST be translated EXACTLY as: "The aforementioned is true, in witness thereof"
+  If translated differently, flag as CRITICAL severity error
+"""
+
         proofread_prompt = f"""You are a professional proofreader. Compare the original text with the translation and identify any errors.
 
 ORIGINAL ({request.source_language}):
@@ -28219,12 +28360,20 @@ TRANSLATION ({request.target_language}):
 
 {glossary_text}
 
+{date_rules}
+
+{mandatory_translation_rules}
+
+{custom_instructions if custom_instructions else ""}
+
 Check for:
 1. Transcription errors (numbers, dates, names)
 2. Missing or added text
 3. Terminology inconsistencies (especially with glossary terms)
 4. Grammar and spelling errors
 5. Formatting issues
+6. Incorrect date formats (dates MUST follow the format rules above)
+7. Mandatory translation phrases translated incorrectly
 
 Return a JSON object with this EXACT structure:
 {{
