@@ -13048,13 +13048,10 @@ async def download_partner_invoice_pdf(invoice_id: str, token: str, lang: str = 
 
         # Company name
         page.insert_text((LEFT, y), "Legacy Translations Inc", fontsize=10, fontname="helv", color=dark_gray)
-        # Contact info - right column
-        page.insert_text((350, y), "contact@legacytranslations.com", fontsize=8, fontname="helv", color=medium_gray)
         y += 13
-        page.insert_text((LEFT, y), "867 Boylston St - Suite 500 - Unit # 414", fontsize=8, fontname="helv", color=medium_gray)
-        page.insert_text((350, y), "+1 (857) 316-7770", fontsize=8, fontname="helv", color=medium_gray)
+        page.insert_text((LEFT, y), "867 Boylston Street \u00b7 5th Floor \u00b7 #2073 \u00b7 Boston, MA \u00b7 02116", fontsize=8, fontname="helv", color=medium_gray)
         y += 12
-        page.insert_text((LEFT, y), "Boston/MA 02116", fontsize=8, fontname="helv", color=medium_gray)
+        page.insert_text((LEFT, y), "(857) 316-7770 \u00b7 contact@legacytranslations.com", fontsize=8, fontname="helv", color=medium_gray)
 
         y += 24
 
