@@ -25072,6 +25072,7 @@ const FinancesPage = ({ adminKey }) => {
   const [sendingBulkEmail, setSendingBulkEmail] = useState(false);
   const [bulkEmailMode, setBulkEmailMode] = useState('template'); // 'template' or 'custom'
   const [selectedEmailTemplate, setSelectedEmailTemplate] = useState('auto'); // 'auto', 'first_contact', 'followup_1', 'followup_2'
+  const [bulkEmailResults, setBulkEmailResults] = useState(null); // { sent, skipped, failed, details: [...] }
   // Add prospect modal state
   const [showAddProspectModal, setShowAddProspectModal] = useState(false);
   const [addProspectForm, setAddProspectForm] = useState({ company_name: '', contact_name: '', email: '', phone: '' });
@@ -28193,6 +28194,8 @@ const FinancesPage = ({ adminKey }) => {
                   </button>
                   <button
                     onClick={async () => {
+                      const templateLabel = selectedEmailTemplate === 'auto' ? 'Next Step (auto)' : selectedEmailTemplate === 'first_contact' ? '1st Email' : selectedEmailTemplate === 'followup_1' ? '2nd Email' : '3rd Email';
+                      if (!window.confirm(`Send "${templateLabel}" to ${selectedPartnerIds.length} partner(s)?\n\nThis action cannot be undone.`)) return;
                       setSendingBulkEmail(true);
                       try {
                         const payload = { partner_ids: selectedPartnerIds };
@@ -28200,11 +28203,11 @@ const FinancesPage = ({ adminKey }) => {
                           payload.email_type = selectedEmailTemplate;
                         }
                         const res = await axios.post(`${API}/admin/partners/bulk-prospect-step?admin_key=${adminKey}`, payload);
-                        showToast(res.data.message || 'Prospecting emails sent!');
                         setShowBulkEmailModal(false);
                         setSelectedPartnerIds([]);
                         setSelectedEmailTemplate('auto');
                         fetchPartnerStats();
+                        setBulkEmailResults(res.data);
                       } catch (err) {
                         showToast('Error: ' + (err.response?.data?.detail || err.message));
                       } finally {
@@ -28259,6 +28262,79 @@ const FinancesPage = ({ adminKey }) => {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Email Results Modal */}
+      {bulkEmailResults && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col">
+            <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+              <div>
+                <h2 className="font-bold text-gray-800">Email Send Results</h2>
+                <div className="flex gap-3 mt-1">
+                  {bulkEmailResults.sent > 0 && <span className="text-xs font-medium text-green-700 bg-green-100 px-2 py-0.5 rounded-full">Sent: {bulkEmailResults.sent}</span>}
+                  {bulkEmailResults.skipped > 0 && <span className="text-xs font-medium text-yellow-700 bg-yellow-100 px-2 py-0.5 rounded-full">Skipped: {bulkEmailResults.skipped}</span>}
+                  {bulkEmailResults.failed > 0 && <span className="text-xs font-medium text-red-700 bg-red-100 px-2 py-0.5 rounded-full">Failed: {bulkEmailResults.failed}</span>}
+                </div>
+              </div>
+              <button onClick={() => setBulkEmailResults(null)} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            <div className="p-4 overflow-y-auto flex-1">
+              {(bulkEmailResults.details || []).length > 0 ? (
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Company</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Email</th>
+                      <th className="px-3 py-2 text-center text-xs font-medium text-gray-500">Status</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Info</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {bulkEmailResults.details.map((d, i) => (
+                      <tr key={i} className={d.status === 'failed' ? 'bg-red-50' : d.status === 'skipped' ? 'bg-yellow-50' : ''}>
+                        <td className="px-3 py-2 text-xs font-medium text-gray-800">{d.company}</td>
+                        <td className="px-3 py-2 text-xs text-gray-500">{d.email || '—'}</td>
+                        <td className="px-3 py-2 text-center">
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${d.status === 'sent' ? 'bg-green-100 text-green-700' : d.status === 'skipped' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
+                            {d.status === 'sent' ? 'Sent' : d.status === 'skipped' ? 'Skipped' : 'Failed'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-xs text-gray-500">{d.step || d.reason || ''}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <p className="text-sm text-gray-500 text-center py-4">{bulkEmailResults.message}</p>
+              )}
+            </div>
+            <div className="p-4 border-t bg-gray-50 flex justify-between items-center">
+              <div>
+                {bulkEmailResults.failed > 0 && bulkEmailResults.details?.some(d => d.status === 'failed') && (
+                  <button
+                    onClick={() => {
+                      const failedIds = (bulkEmailResults.details || []).filter(d => d.status === 'failed').map(d => d.partner_id).filter(Boolean);
+                      if (failedIds.length === 0) { showToast('Could not identify failed partners'); return; }
+                      setBulkEmailResults(null);
+                      setSelectedPartnerIds(failedIds);
+                      setShowBulkEmailModal(true);
+                    }}
+                    className="px-4 py-2 bg-red-600 text-white rounded-md text-sm hover:bg-red-700"
+                  >
+                    Retry {bulkEmailResults.details.filter(d => d.status === 'failed').length} Failed
+                  </button>
+                )}
+              </div>
+              <button
+                onClick={() => setBulkEmailResults(null)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
