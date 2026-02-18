@@ -660,10 +660,10 @@ const VendorPortal = ({ user, adminKey, onLogout }) => {
                         </span>
                       </div>
                     </div>
-                    {selectedProject.internal_notes && (
-                      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                        <span className="text-xs font-medium text-blue-700 block mb-1">Instructions from PM:</span>
-                        <p className="text-sm text-blue-800 whitespace-pre-wrap">{selectedProject.internal_notes}</p>
+                    {selectedProject.team_notes && (
+                      <div className="mt-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                        <span className="text-xs font-medium text-purple-700 block mb-1">Team Notes:</span>
+                        <p className="text-sm text-purple-800 whitespace-pre-wrap">{selectedProject.team_notes}</p>
                       </div>
                     )}
                   </div>

@@ -2106,7 +2106,8 @@ class TranslationOrder(BaseModel):
     translator_assignment_responded_at: Optional[datetime] = None
     deadline: Optional[datetime] = None  # Client deadline - when to deliver to client
     translator_deadline: Optional[datetime] = None  # Translator deadline - when translator must return
-    internal_notes: Optional[str] = None  # Notes visible only to admin/PM
+    internal_notes: Optional[str] = None  # Notes visible only to admin
+    team_notes: Optional[str] = None  # Notes visible to admin, PM and translator
     revenue_source: str = "website"  # website, whatsapp, social_media, referral, partner, other
     payment_method: Optional[str] = None  # credit_card, debit, paypal, zelle, venmo, pix, apple_pay, bank_transfer, invoice
     zelle_receipt_id: Optional[str] = None
@@ -2152,6 +2153,7 @@ class TranslationOrderUpdate(BaseModel):
     deadline: Optional[str] = None  # Client deadline - Changed to str to accept ISO string
     translator_deadline: Optional[str] = None  # Translator deadline - when translator must return
     internal_notes: Optional[str] = None
+    team_notes: Optional[str] = None  # Notes visible to admin, PM and translator
     revenue_source: Optional[str] = None  # website, whatsapp, social_media, referral, partner, other
     # NEW: Additional editable fields
     client_name: Optional[str] = None
@@ -2266,6 +2268,7 @@ class ManualProjectCreate(BaseModel):
     reference: Optional[str] = None
     notes: Optional[str] = None
     internal_notes: Optional[str] = None
+    team_notes: Optional[str] = None  # Notes visible to admin, PM and translator
     # Pricing (optional - can be set later)
     base_price: Optional[float] = 0.0
     urgency_fee: Optional[float] = 0.0
@@ -10034,6 +10037,7 @@ async def admin_create_manual_order(project_data: ManualProjectCreate, admin_key
             assigned_translator_name=translator_name,
             deadline=deadline,
             internal_notes=project_data.internal_notes,
+            team_notes=project_data.team_notes,
             revenue_source=project_data.revenue_source,
             payment_method=project_data.payment_method,
             document_type=project_data.document_type,
@@ -14038,6 +14042,8 @@ async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate,
             update_dict["translator_deadline"] = update_data.translator_deadline
         if update_data.internal_notes is not None:
             update_dict["internal_notes"] = update_data.internal_notes
+        if update_data.team_notes is not None:
+            update_dict["team_notes"] = update_data.team_notes
 
         # NEW: Handle additional editable fields from project modal
         if update_data.client_name is not None:
