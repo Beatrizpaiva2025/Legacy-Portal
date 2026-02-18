@@ -25734,9 +25734,12 @@ const FinancesPage = ({ adminKey }) => {
     const isRegisteredPartner = (p) => p.is_real_partner && p.payment_plan_approved && (p.payment_plan === 'biweekly' || p.payment_plan === 'monthly');
     const visiblePartners = (partnerStats.partners || []).filter(p => {
       if (partnerFilter === 'registered' && !isRegisteredPartner(p)) return false;
-      if (partnerFilter === 'prospect' && isRegisteredPartner(p)) return false;
+      if (partnerFilter === 'prospect' && (isRegisteredPartner(p) || p.prospect_status === 'archived')) return false;
+      if (partnerFilter === 'new' && (isRegisteredPartner(p) || (p.prospect_status && p.prospect_status !== 'new'))) return false;
+      if (partnerFilter === 'first_email' && p.prospect_status !== 'first_email') return false;
+      if (partnerFilter === 'follow_up_1' && p.prospect_status !== 'follow_up_1') return false;
+      if (partnerFilter === 'follow_up_2' && p.prospect_status !== 'follow_up_2') return false;
       if (partnerFilter === 'archived' && p.prospect_status !== 'archived') return false;
-      if (partnerFilter === 'prospect' && p.prospect_status === 'archived') return false;
       if (partnerSearchQuery.trim()) {
         const q = partnerSearchQuery.toLowerCase();
         return (p.company_name || '').toLowerCase().includes(q) || (p.email || '').toLowerCase().includes(q) || (p.contact_name || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q);

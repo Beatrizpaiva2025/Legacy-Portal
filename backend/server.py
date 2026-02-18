@@ -11902,7 +11902,8 @@ async def bulk_send_prospect_step(request: BulkPartnerIdsRequest, admin_key: str
                 }}
             )
             sent += 1
-        except Exception:
+        except Exception as e:
+            print(f"[bulk-prospect-step] Failed to send email to partner {pid} ({partner.get('email', 'no-email')}): {e}")
             failed += 1
 
     return {"success": True, "message": f"Sent: {sent}, Skipped: {skipped}, Failed: {failed}"}
