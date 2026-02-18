@@ -6195,15 +6195,20 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         // Word document (.docx or .doc)
         if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
           setQuickPackageProgress(`Converting Word document: ${file.name}`);
-          const html = await convertWordToHtml(file);
-          setQuickTranslationHtml(prev => prev + (prev ? '<div style="page-break-before: always;"></div>' : '') + html);
+          const rawHtml = await convertWordToHtml(file);
+          // Clean HTML the same way Normal Flow does: strip <html>/<body>/<style> wrappers
+          // and normalize excessive inline sizes to prevent formatting conflicts
+          const cleanHtml = normalizeTranslationHtml(extractBodyForEdit(rawHtml));
+          setQuickTranslationHtml(prev => prev + (prev ? '<div style="page-break-before: always;"></div>' : '') + cleanHtml);
           setQuickTranslationType('html');
         }
         // HTML file
         else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
           setQuickPackageProgress(`Reading HTML: ${file.name}`);
-          const html = await readHtmlFile(file);
-          setQuickTranslationHtml(prev => prev + (prev ? '<div style="page-break-before: always;"></div>' : '') + html);
+          const rawHtml = await readHtmlFile(file);
+          // Clean HTML the same way Normal Flow does: strip wrappers, normalize sizes
+          const cleanHtml = normalizeTranslationHtml(extractBodyForEdit(rawHtml));
+          setQuickTranslationHtml(prev => prev + (prev ? '<div style="page-break-before: always;"></div>' : '') + cleanHtml);
           setQuickTranslationType('html');
         }
         // Text file
@@ -6483,8 +6488,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
         <div style="clear: both !important; width: 100% !important; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>`;
 
-    // Extract translation styles to include in print document (preserves formatting)
-    const quickTranslationStyles = extractStylesFromHtml(quickTranslationHtml);
+    // Extract translation styles and SCOPE them to .translation-content to prevent
+    // document CSS from breaking letterhead/cover layout (same as Normal Flow)
+    const quickTranslationStyles = scopeTranslationStyles(extractStylesFromHtml(quickTranslationHtml));
 
     // Translation pages - supports HTML content OR images (not both to avoid duplication)
     let translationPagesHTML = '';
@@ -6497,7 +6503,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     // For mildly overflowing content, JS auto-scale still applies (scale >= 0.55)
     // First page doesn't need page-break since cover ends with one
     if (quickTranslationHtml) {
-      const normalizedQuickHtml = normalizeTranslationHtml(quickTranslationHtml);
+      // Apply same HTML cleanup pipeline as Normal Flow:
+      // 1. extractBodyForEdit: strip <html>/<head>/<style>/<body> wrappers
+      // 2. normalizeTranslationHtml: cap excessive font-sizes, margins, paddings
+      const normalizedQuickHtml = normalizeTranslationHtml(extractBodyForEdit(quickTranslationHtml));
       translationPagesHTML = includeLetterhead ? `
     <table class="paged-translation">
         <thead><tr><td style="padding: 0;">
