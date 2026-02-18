@@ -25799,14 +25799,14 @@ const FinancesPage = ({ adminKey }) => {
   // Bulk send next prospect step email
   const bulkSendProspectStep = async () => {
     if (selectedPartnerIds.length === 0) { showToast('No partners selected'); return; }
-    if (!window.confirm(`Send the next outreach email step to ${selectedPartnerIds.length} prospect(s)?`)) return;
+    if (!window.confirm(`Send the next outreach email step to ${selectedPartnerIds.length} prospect(s)?\n\nThis action cannot be undone.`)) return;
     try {
       const res = await axios.post(`${API}/admin/partners/bulk-prospect-step?admin_key=${adminKey}`, {
         partner_ids: selectedPartnerIds
       });
-      showToast(res.data.message || 'Emails sent!');
       setSelectedPartnerIds([]);
       fetchPartnerStats();
+      setBulkEmailResults(res.data);
     } catch (err) {
       showToast('Error: ' + (err.response?.data?.detail || err.message));
     }
