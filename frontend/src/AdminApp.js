@@ -8246,9 +8246,14 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             ⏰ Due: {new Date(file.translator_deadline || file.deadline).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
                           </div>
                         )}
+                        {file.team_notes && (
+                          <div className="text-[10px] text-purple-600 mt-1">
+                            👥 Has team notes
+                          </div>
+                        )}
                         {isAdmin && file.internal_notes && (
                           <div className="text-[10px] text-sky-600 mt-1">
-                            📝 Has instructions
+                            🔒 Has internal notes
                           </div>
                         )}
                         {selectedFileId === file.id && (
@@ -8393,9 +8398,14 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                               ⏰ Due: {new Date(order.translator_deadline || order.deadline).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
                             </div>
                           )}
+                          {order.team_notes && (
+                            <div className="text-[10px] text-purple-600 mt-1">
+                              👥 Has team notes
+                            </div>
+                          )}
                           {isAdmin && order.internal_notes && (
                             <div className="text-[10px] text-sky-600 mt-1">
-                              📝 Has instructions from PM
+                              🔒 Has internal notes
                             </div>
                           )}
                           {!isPendingAcceptance && selectedOrderId === order.id && (
@@ -8416,13 +8426,28 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             </div>
           )}
 
+          {/* Team Notes - Visible to Admin, PM and Translator */}
+          {selectedOrderId && assignedOrders.find(o => o.id === selectedOrderId)?.team_notes && (
+            <div className="bg-purple-50 border border-purple-300 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <div className="text-2xl">👥</div>
+                <div className="flex-1">
+                  <h3 className="text-sm font-bold text-purple-800 mb-2">Team Notes (PM / Translator)</h3>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                    {assignedOrders.find(o => o.id === selectedOrderId)?.team_notes}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Internal Notes - Admin only */}
           {isAdmin && selectedOrderId && assignedOrders.find(o => o.id === selectedOrderId)?.internal_notes && (
             <div className="bg-sky-50 border border-sky-300 rounded-lg p-4">
               <div className="flex items-start gap-3">
-                <div className="text-2xl">📝</div>
+                <div className="text-2xl">🔒</div>
                 <div className="flex-1">
-                  <h3 className="text-sm font-bold text-sky-800 mb-2">Instructions from PM</h3>
+                  <h3 className="text-sm font-bold text-sky-800 mb-2">Internal Notes (Admin only)</h3>
                   <p className="text-sm text-gray-700 whitespace-pre-wrap">
                     {assignedOrders.find(o => o.id === selectedOrderId)?.internal_notes}
                   </p>
@@ -15285,7 +15310,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [uploadingProjectDoc, setUploadingProjectDoc] = useState(false);
   const [fileTranslatorAssignments, setFileTranslatorAssignments] = useState({}); // { docId: translatorId }
   const [editingNotes, setEditingNotes] = useState(false);
-  const [tempNotes, setTempNotes] = useState({ client: '', internal: '' });
+  const [tempNotes, setTempNotes] = useState({ internal: '', team: '' });
   const [editingModalDeadline, setEditingModalDeadline] = useState(false);
   const [tempModalDeadline, setTempModalDeadline] = useState({ date: '', time: '' });
   const [editingProject, setEditingProject] = useState(false);
@@ -15387,6 +15412,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     urgency: 'no',
     notes: '',
     internal_notes: '',
+    team_notes: '',
     assigned_pm_id: '',
     assigned_translator_id: '',
     deadline: '',
@@ -16512,14 +16538,15 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   };
 
   // Update order notes
-  const updateOrderNotes = async (orderId, clientNotes, internalNotes) => {
+  const updateOrderNotes = async (orderId, internalNotes, teamNotes) => {
     try {
-      await axios.put(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`, {
-        notes: clientNotes,
-        internal_notes: internalNotes
-      });
+      const payload = {
+        internal_notes: internalNotes,
+        team_notes: teamNotes
+      };
+      await axios.put(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`, payload);
       // Refresh order in modal
-      setViewingOrder(prev => ({ ...prev, notes: clientNotes, internal_notes: internalNotes }));
+      setViewingOrder(prev => ({ ...prev, internal_notes: internalNotes, team_notes: teamNotes }));
       setEditingNotes(false);
       fetchOrders();
     } catch (err) {
@@ -16597,8 +16624,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       urgency: viewingOrder.urgency || 'no',
       deadline: viewingOrder.deadline ? (() => { const { date, time } = getDateTimePartsInNY(viewingOrder.deadline); return `${date}T${time}`; })() : '',
       document_type: viewingOrder.document_type || '',
-      notes: viewingOrder.notes || '',
       internal_notes: viewingOrder.internal_notes || '',
+      team_notes: viewingOrder.team_notes || '',
       total_price: viewingOrder.total_price || 0,
       payment_status: viewingOrder.payment_status || 'pending',
       translation_status: viewingOrder.translation_status || 'received'
@@ -17098,6 +17125,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       if (projectData.reference === '') projectData.reference = null;
       if (projectData.notes === '') projectData.notes = null;
       if (projectData.internal_notes === '') projectData.internal_notes = null;
+      if (projectData.team_notes === '') projectData.team_notes = null;
       if (projectData.payment_tag === '') projectData.payment_tag = null;
       if (projectData.base_price === '' || projectData.base_price === null) projectData.base_price = 0;
       if (projectData.total_price === '' || projectData.total_price === null) projectData.total_price = 0;
@@ -17157,6 +17185,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         urgency: 'no',
         notes: '',
         internal_notes: '',
+        team_notes: '',
         assigned_pm_id: '',
         assigned_translator_id: '',
         deadline: '',
@@ -18323,16 +18352,6 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   {translatorList.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
               </div>
-              <div className="col-span-2">
-                <label className="block text-[10px] font-medium text-gray-600 mb-1">Client Notes</label>
-                <input
-                  type="text"
-                  value={newProject.notes}
-                  onChange={(e) => setNewProject({...newProject, notes: e.target.value})}
-                  className="w-full px-2 py-1.5 text-xs border rounded"
-                  placeholder="Notes visible to client"
-                />
-              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3 mb-3">
@@ -18347,16 +18366,30 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 </select>
               </div>
               <div>
-                <label className="block text-[10px] font-medium text-gray-600 mb-1">Internal Notes (Admin/PM only)</label>
+                <label className="block text-[10px] font-medium text-gray-600 mb-1">👥 Team Notes (PM / Translator)</label>
+                <textarea
+                  value={newProject.team_notes || ''}
+                  onChange={(e) => setNewProject({...newProject, team_notes: e.target.value})}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                  rows="1"
+                  placeholder="Notes visible to PM and Translator"
+                />
+              </div>
+            </div>
+            {isAdmin && (
+            <div className="mb-3">
+              <div>
+                <label className="block text-[10px] font-medium text-gray-600 mb-1">🔒 Internal Notes (Admin only)</label>
                 <textarea
                   value={newProject.internal_notes}
                   onChange={(e) => setNewProject({...newProject, internal_notes: e.target.value})}
                   className="w-full px-2 py-1.5 text-xs border rounded"
                   rows="1"
-                  placeholder="Internal notes"
+                  placeholder="Notes visible only to admin"
                 />
               </div>
             </div>
+            )}
 
             <div className="flex justify-end gap-2">
               <button type="button" onClick={() => setShowNewProjectForm(false)} className="px-4 py-1.5 text-gray-600 text-xs">
@@ -19009,6 +19042,21 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         </div>
                       </div>
 
+                      {/* Mailing / Shipping Section - Read only in edit mode */}
+                      {viewingOrder.shipping_address && (
+                        <div>
+                          <h4 className="text-sm font-bold text-blue-600 mb-2">Mailing / Shipping</h4>
+                          <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                            <div className="text-xs space-y-1">
+                              <div><span className="font-medium text-gray-600">Delivery:</span> <span className="text-blue-700">USPS Priority Mail ($18.99)</span></div>
+                              <div><span className="font-medium text-gray-600">Address:</span> {viewingOrder.shipping_address.street}</div>
+                              <div><span className="font-medium text-gray-600">City:</span> {viewingOrder.shipping_address.city}, {viewingOrder.shipping_address.state} {viewingOrder.shipping_address.zipCode}</div>
+                              <div><span className="font-medium text-gray-600">Country:</span> {viewingOrder.shipping_address.country || 'USA'}</div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Status Section - Editable */}
                       <div>
                         <h4 className="text-sm font-bold text-blue-600 mb-2">📊 Status</h4>
@@ -19038,24 +19086,24 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         <h4 className="text-sm font-bold text-blue-600 mb-2">📝 Notes</h4>
                         <div className="space-y-3">
                           <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">Client Notes</label>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">👥 Team Note (PM / Translator)</label>
                             <textarea
-                              value={editFormData.notes || ''}
-                              onChange={(e) => setEditFormData(prev => ({ ...prev, notes: e.target.value }))}
+                              value={editFormData.team_notes || ''}
+                              onChange={(e) => setEditFormData(prev => ({ ...prev, team_notes: e.target.value }))}
                               className="w-full px-2 py-1.5 border rounded text-sm"
                               rows="2"
-                              placeholder="Notes visible to client..."
+                              placeholder="Notes visible to PM and Translator..."
                             />
                           </div>
                           {isAdmin && (
                           <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">Internal Notes (Admin only)</label>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">🔒 Internal Notes (Admin only)</label>
                             <textarea
                               value={editFormData.internal_notes || ''}
                               onChange={(e) => setEditFormData(prev => ({ ...prev, internal_notes: e.target.value }))}
                               className="w-full px-2 py-1.5 border rounded text-sm"
                               rows="2"
-                              placeholder="Internal notes..."
+                              placeholder="Notes visible only to admin..."
                             />
                           </div>
                           )}
@@ -19206,34 +19254,91 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         </div>
                       )}
 
+                      {/* Mailing / Shipping Section */}
+                      {viewingOrder.shipping_address && (
+                        <div>
+                          <h4 className="text-sm font-bold text-blue-600 mb-2">Mailing / Shipping</h4>
+                          <table className="w-full text-xs">
+                            <tbody>
+                              <tr className="border-b">
+                                <td className="py-2 font-medium text-gray-600 w-1/3">Delivery</td>
+                                <td className="py-2">
+                                  <span className="px-2 py-0.5 rounded text-[10px] bg-blue-100 text-blue-700">
+                                    USPS Priority Mail
+                                  </span>
+                                </td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="py-2 font-medium text-gray-600">Street</td>
+                                <td className="py-2">{viewingOrder.shipping_address.street || '-'}</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="py-2 font-medium text-gray-600">City</td>
+                                <td className="py-2">{viewingOrder.shipping_address.city || '-'}</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="py-2 font-medium text-gray-600">State</td>
+                                <td className="py-2">{viewingOrder.shipping_address.state || '-'}</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="py-2 font-medium text-gray-600">ZIP Code</td>
+                                <td className="py-2">{viewingOrder.shipping_address.zipCode || '-'}</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="py-2 font-medium text-gray-600">Country</td>
+                                <td className="py-2">{viewingOrder.shipping_address.country || 'USA'}</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+
                       {/* Notes Section */}
                       <div>
-                        <h4 className="text-sm font-bold text-blue-600 mb-2">Notes</h4>
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="text-sm font-bold text-blue-600">Notes</h4>
+                          {!editingNotes && (isAdmin || isPM) && (
+                            <button
+                              onClick={() => {
+                                setTempNotes({
+                                  internal: viewingOrder.internal_notes || '',
+                                  team: viewingOrder.team_notes || ''
+                                });
+                                setEditingNotes(true);
+                              }}
+                              className="px-2 py-0.5 bg-blue-100 text-blue-600 rounded text-[10px] hover:bg-blue-200"
+                            >
+                              ✏️ Edit Notes
+                            </button>
+                          )}
+                        </div>
                         {editingNotes ? (
                       <div className="space-y-3">
                         <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">💬 Client Note</label>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">👥 Team Note (PM / Translator)</label>
                           <textarea
-                            value={tempNotes.client}
-                            onChange={(e) => setTempNotes(prev => ({ ...prev, client: e.target.value }))}
+                            value={tempNotes.team}
+                            onChange={(e) => setTempNotes(prev => ({ ...prev, team: e.target.value }))}
                             className="w-full px-2 py-1.5 border rounded text-xs"
                             rows="2"
-                            placeholder="Notes visible to client..."
+                            placeholder="Notes visible to PM and Translator..."
                           />
                         </div>
+                        {isAdmin && (
                         <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">📝 Internal Note (Admin/PM only)</label>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">🔒 Internal Note (Admin only)</label>
                           <textarea
                             value={tempNotes.internal}
                             onChange={(e) => setTempNotes(prev => ({ ...prev, internal: e.target.value }))}
                             className="w-full px-2 py-1.5 border rounded text-xs"
                             rows="2"
-                            placeholder="Internal notes..."
+                            placeholder="Notes visible only to admin..."
                           />
                         </div>
+                        )}
                         <div className="flex gap-2">
                           <button
-                            onClick={() => updateOrderNotes(viewingOrder.id, tempNotes.client, tempNotes.internal)}
+                            onClick={() => updateOrderNotes(viewingOrder.id, tempNotes.internal, tempNotes.team)}
                             className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
                           >
                             Save Notes
@@ -19248,18 +19353,18 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        {viewingOrder.notes ? (
-                          <div className="p-2 bg-blue-50 rounded border border-blue-200">
-                            <div className="text-[10px] font-medium text-blue-600 mb-1">💬 Client Note:</div>
-                            <p className="text-xs text-gray-700">{viewingOrder.notes}</p>
+                        {viewingOrder.team_notes ? (
+                          <div className="p-2 bg-purple-50 rounded border border-purple-200">
+                            <div className="text-[10px] font-medium text-purple-600 mb-1">👥 Team Note (PM / Translator):</div>
+                            <p className="text-xs text-gray-700">{viewingOrder.team_notes}</p>
                           </div>
                         ) : (
-                          <div className="p-2 bg-gray-50 rounded border text-xs text-gray-400">No client notes</div>
+                          <div className="p-2 bg-gray-50 rounded border text-xs text-gray-400">No team notes</div>
                         )}
                         {isAdmin && (
                           viewingOrder.internal_notes ? (
                             <div className="p-2 bg-yellow-50 rounded border border-yellow-200">
-                              <div className="text-[10px] font-medium text-yellow-600 mb-1">📝 Internal Note:</div>
+                              <div className="text-[10px] font-medium text-yellow-600 mb-1">🔒 Internal Note (Admin only):</div>
                               <p className="text-xs text-gray-700">{viewingOrder.internal_notes}</p>
                             </div>
                           ) : (
@@ -19359,6 +19464,20 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             <td className="py-2 font-medium text-gray-600">Payment Method</td>
                             <td className="py-2 capitalize">{viewingOrder.payment_method || '-'}</td>
                           </tr>
+                          {viewingOrder.shipping_address && (
+                            <tr className="border-b">
+                              <td className="py-2 font-medium text-gray-600">Shipping Fee</td>
+                              <td className="py-2 text-blue-600">$18.99 (USPS Priority Mail)</td>
+                            </tr>
+                          )}
+                          {viewingOrder.shipping_address && (
+                            <tr className="border-b">
+                              <td className="py-2 font-medium text-gray-600">Ship To</td>
+                              <td className="py-2">
+                                {viewingOrder.shipping_address.street}, {viewingOrder.shipping_address.city}, {viewingOrder.shipping_address.state} {viewingOrder.shipping_address.zipCode}, {viewingOrder.shipping_address.country || 'USA'}
+                              </td>
+                            </tr>
+                          )}
                         </tbody>
                       </table>
 
