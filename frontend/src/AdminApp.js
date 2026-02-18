@@ -15310,7 +15310,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [uploadingProjectDoc, setUploadingProjectDoc] = useState(false);
   const [fileTranslatorAssignments, setFileTranslatorAssignments] = useState({}); // { docId: translatorId }
   const [editingNotes, setEditingNotes] = useState(false);
-  const [tempNotes, setTempNotes] = useState({ client: '', internal: '', team: '' });
+  const [tempNotes, setTempNotes] = useState({ internal: '', team: '' });
   const [editingModalDeadline, setEditingModalDeadline] = useState(false);
   const [tempModalDeadline, setTempModalDeadline] = useState({ date: '', time: '' });
   const [editingProject, setEditingProject] = useState(false);
@@ -16538,16 +16538,15 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   };
 
   // Update order notes
-  const updateOrderNotes = async (orderId, clientNotes, internalNotes, teamNotes) => {
+  const updateOrderNotes = async (orderId, internalNotes, teamNotes) => {
     try {
       const payload = {
-        notes: clientNotes,
         internal_notes: internalNotes,
         team_notes: teamNotes
       };
       await axios.put(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`, payload);
       // Refresh order in modal
-      setViewingOrder(prev => ({ ...prev, notes: clientNotes, internal_notes: internalNotes, team_notes: teamNotes }));
+      setViewingOrder(prev => ({ ...prev, internal_notes: internalNotes, team_notes: teamNotes }));
       setEditingNotes(false);
       fetchOrders();
     } catch (err) {
@@ -16625,7 +16624,6 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       urgency: viewingOrder.urgency || 'no',
       deadline: viewingOrder.deadline ? (() => { const { date, time } = getDateTimePartsInNY(viewingOrder.deadline); return `${date}T${time}`; })() : '',
       document_type: viewingOrder.document_type || '',
-      notes: viewingOrder.notes || '',
       internal_notes: viewingOrder.internal_notes || '',
       team_notes: viewingOrder.team_notes || '',
       total_price: viewingOrder.total_price || 0,
@@ -18354,16 +18352,6 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   {translatorList.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
               </div>
-              <div className="col-span-2">
-                <label className="block text-[10px] font-medium text-gray-600 mb-1">Client Notes</label>
-                <input
-                  type="text"
-                  value={newProject.notes}
-                  onChange={(e) => setNewProject({...newProject, notes: e.target.value})}
-                  className="w-full px-2 py-1.5 text-xs border rounded"
-                  placeholder="Notes visible to client"
-                />
-              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3 mb-3">
@@ -19098,16 +19086,6 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         <h4 className="text-sm font-bold text-blue-600 mb-2">📝 Notes</h4>
                         <div className="space-y-3">
                           <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">💬 Client Notes</label>
-                            <textarea
-                              value={editFormData.notes || ''}
-                              onChange={(e) => setEditFormData(prev => ({ ...prev, notes: e.target.value }))}
-                              className="w-full px-2 py-1.5 border rounded text-sm"
-                              rows="2"
-                              placeholder="Notes visible to client..."
-                            />
-                          </div>
-                          <div>
                             <label className="block text-xs font-medium text-gray-600 mb-1">👥 Team Note (PM / Translator)</label>
                             <textarea
                               value={editFormData.team_notes || ''}
@@ -19323,7 +19301,6 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             <button
                               onClick={() => {
                                 setTempNotes({
-                                  client: viewingOrder.notes || '',
                                   internal: viewingOrder.internal_notes || '',
                                   team: viewingOrder.team_notes || ''
                                 });
@@ -19337,16 +19314,6 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         </div>
                         {editingNotes ? (
                       <div className="space-y-3">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">💬 Client Note</label>
-                          <textarea
-                            value={tempNotes.client}
-                            onChange={(e) => setTempNotes(prev => ({ ...prev, client: e.target.value }))}
-                            className="w-full px-2 py-1.5 border rounded text-xs"
-                            rows="2"
-                            placeholder="Notes visible to client..."
-                          />
-                        </div>
                         <div>
                           <label className="block text-xs font-medium text-gray-600 mb-1">👥 Team Note (PM / Translator)</label>
                           <textarea
@@ -19371,7 +19338,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         )}
                         <div className="flex gap-2">
                           <button
-                            onClick={() => updateOrderNotes(viewingOrder.id, tempNotes.client, tempNotes.internal, tempNotes.team)}
+                            onClick={() => updateOrderNotes(viewingOrder.id, tempNotes.internal, tempNotes.team)}
                             className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
                           >
                             Save Notes
@@ -19386,14 +19353,6 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        {viewingOrder.notes ? (
-                          <div className="p-2 bg-blue-50 rounded border border-blue-200">
-                            <div className="text-[10px] font-medium text-blue-600 mb-1">💬 Client Note:</div>
-                            <p className="text-xs text-gray-700">{viewingOrder.notes}</p>
-                          </div>
-                        ) : (
-                          <div className="p-2 bg-gray-50 rounded border text-xs text-gray-400">No client notes</div>
-                        )}
                         {viewingOrder.team_notes ? (
                           <div className="p-2 bg-purple-50 rounded border border-purple-200">
                             <div className="text-[10px] font-medium text-purple-600 mb-1">👥 Team Note (PM / Translator):</div>
