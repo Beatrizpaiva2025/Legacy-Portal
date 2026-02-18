@@ -19009,6 +19009,21 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         </div>
                       </div>
 
+                      {/* Mailing / Shipping Section - Read only in edit mode */}
+                      {viewingOrder.shipping_address && (
+                        <div>
+                          <h4 className="text-sm font-bold text-blue-600 mb-2">Mailing / Shipping</h4>
+                          <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                            <div className="text-xs space-y-1">
+                              <div><span className="font-medium text-gray-600">Delivery:</span> <span className="text-blue-700">USPS Priority Mail ($18.99)</span></div>
+                              <div><span className="font-medium text-gray-600">Address:</span> {viewingOrder.shipping_address.street}</div>
+                              <div><span className="font-medium text-gray-600">City:</span> {viewingOrder.shipping_address.city}, {viewingOrder.shipping_address.state} {viewingOrder.shipping_address.zipCode}</div>
+                              <div><span className="font-medium text-gray-600">Country:</span> {viewingOrder.shipping_address.country || 'USA'}</div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Status Section - Editable */}
                       <div>
                         <h4 className="text-sm font-bold text-blue-600 mb-2">📊 Status</h4>
@@ -19206,6 +19221,45 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         </div>
                       )}
 
+                      {/* Mailing / Shipping Section */}
+                      {viewingOrder.shipping_address && (
+                        <div>
+                          <h4 className="text-sm font-bold text-blue-600 mb-2">Mailing / Shipping</h4>
+                          <table className="w-full text-xs">
+                            <tbody>
+                              <tr className="border-b">
+                                <td className="py-2 font-medium text-gray-600 w-1/3">Delivery</td>
+                                <td className="py-2">
+                                  <span className="px-2 py-0.5 rounded text-[10px] bg-blue-100 text-blue-700">
+                                    USPS Priority Mail
+                                  </span>
+                                </td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="py-2 font-medium text-gray-600">Street</td>
+                                <td className="py-2">{viewingOrder.shipping_address.street || '-'}</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="py-2 font-medium text-gray-600">City</td>
+                                <td className="py-2">{viewingOrder.shipping_address.city || '-'}</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="py-2 font-medium text-gray-600">State</td>
+                                <td className="py-2">{viewingOrder.shipping_address.state || '-'}</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="py-2 font-medium text-gray-600">ZIP Code</td>
+                                <td className="py-2">{viewingOrder.shipping_address.zipCode || '-'}</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="py-2 font-medium text-gray-600">Country</td>
+                                <td className="py-2">{viewingOrder.shipping_address.country || 'USA'}</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+
                       {/* Notes Section */}
                       <div>
                         <h4 className="text-sm font-bold text-blue-600 mb-2">Notes</h4>
@@ -19359,6 +19413,20 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             <td className="py-2 font-medium text-gray-600">Payment Method</td>
                             <td className="py-2 capitalize">{viewingOrder.payment_method || '-'}</td>
                           </tr>
+                          {viewingOrder.shipping_address && (
+                            <tr className="border-b">
+                              <td className="py-2 font-medium text-gray-600">Shipping Fee</td>
+                              <td className="py-2 text-blue-600">$18.99 (USPS Priority Mail)</td>
+                            </tr>
+                          )}
+                          {viewingOrder.shipping_address && (
+                            <tr className="border-b">
+                              <td className="py-2 font-medium text-gray-600">Ship To</td>
+                              <td className="py-2">
+                                {viewingOrder.shipping_address.street}, {viewingOrder.shipping_address.city}, {viewingOrder.shipping_address.state} {viewingOrder.shipping_address.zipCode}, {viewingOrder.shipping_address.country || 'USA'}
+                              </td>
+                            </tr>
+                          )}
                         </tbody>
                       </table>
 
