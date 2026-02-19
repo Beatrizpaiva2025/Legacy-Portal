@@ -2234,6 +2234,7 @@ class PartnerInvoiceCreate(BaseModel):
     manual_discount_reason: Optional[str] = None  # Reason for manual discount
 
 class PartnerInvoiceEdit(BaseModel):
+    partner_company: Optional[str] = None  # Override company name on invoice
     manual_discount_amount: Optional[float] = None  # Manual discount to apply
     manual_discount_reason: Optional[str] = None  # Reason for the discount
     new_due_date: Optional[str] = None  # New due date (ISO format)
@@ -6859,6 +6860,54 @@ async def get_partner_assigned_coupons(partner_id: str, admin_key: str):
         "max_uses": c["max_uses"],
         "valid_until": c.get("valid_until")
     } for c in coupons]
+
+# ==================== PARTNER PROFILE UPDATE ====================
+
+class PartnerProfileUpdate(BaseModel):
+    company_name: Optional[str] = None
+    contact_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    address_street: Optional[str] = None
+    address_city: Optional[str] = None
+    address_state: Optional[str] = None
+    address_zip: Optional[str] = None
+    address_country: Optional[str] = None
+    tax_id: Optional[str] = None
+    estimated_volume: Optional[str] = None
+
+@api_router.put("/partner/profile")
+async def update_partner_profile(update_data: PartnerProfileUpdate, token: str):
+    """Allow partner to update their own profile"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    updates = {}
+    for field, value in update_data.dict(exclude_unset=True).items():
+        if value is not None:
+            updates[field] = value.strip() if isinstance(value, str) else value
+
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    # If email is being changed, check uniqueness
+    if "email" in updates and updates["email"] != partner.get("email"):
+        existing = await db.partners.find_one({"email": updates["email"], "id": {"$ne": partner["id"]}})
+        if existing:
+            raise HTTPException(status_code=409, detail="Email already in use by another partner")
+
+    await db.partners.update_one(
+        {"id": partner["id"]},
+        {"$set": updates}
+    )
+
+    updated_partner = await db.partners.find_one({"id": partner["id"]})
+    safe_partner = {k: v for k, v in updated_partner.items() if k not in ["password_hash", "_id"]}
+
+    logger.info(f"Partner {partner['id']} updated profile: {list(updates.keys())}")
+
+    return {"status": "success", "partner": safe_partner}
 
 # ==================== PARTNER CREDIT QUALIFICATION ====================
 
@@ -12588,6 +12637,10 @@ async def edit_partner_invoice(invoice_id: str, edit_data: PartnerInvoiceEdit, a
             raise HTTPException(status_code=400, detail="Cannot edit a paid invoice")
 
         update_fields = {}
+
+        # Update partner company name on invoice
+        if edit_data.partner_company is not None and edit_data.partner_company.strip():
+            update_fields["partner_company"] = edit_data.partner_company.strip()
 
         # Apply manual discount
         if edit_data.manual_discount_amount is not None and edit_data.manual_discount_amount > 0:

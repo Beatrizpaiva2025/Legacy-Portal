@@ -25056,6 +25056,7 @@ const FinancesPage = ({ adminKey }) => {
   const [editInvoiceDueDate, setEditInvoiceDueDate] = useState('');
   const [editInvoiceFixedDueDay, setEditInvoiceFixedDueDay] = useState('');
   const [editInvoiceNotes, setEditInvoiceNotes] = useState('');
+  const [editInvoiceCompanyName, setEditInvoiceCompanyName] = useState('');
   const [savingInvoiceEdit, setSavingInvoiceEdit] = useState(false);
   const [invoiceFixedDueDay, setInvoiceFixedDueDay] = useState('');
   const [invoiceDueDateMode, setInvoiceDueDateMode] = useState('days');
@@ -25373,6 +25374,7 @@ const FinancesPage = ({ adminKey }) => {
 
   const handleOpenEditInvoice = (invoice) => {
     setEditingInvoice(invoice);
+    setEditInvoiceCompanyName(invoice.partner_company || '');
     setEditInvoiceDiscount('');
     setEditInvoiceDiscountReason('');
     setEditInvoiceDueDate(invoice.due_date ? new Date(invoice.due_date).toISOString().split('T')[0] : '');
@@ -25385,6 +25387,9 @@ const FinancesPage = ({ adminKey }) => {
     setSavingInvoiceEdit(true);
     try {
       const payload = {};
+      if (editInvoiceCompanyName && editInvoiceCompanyName !== (editingInvoice.partner_company || '')) {
+        payload.partner_company = editInvoiceCompanyName;
+      }
       if (editInvoiceDiscount && parseFloat(editInvoiceDiscount) > 0) {
         payload.manual_discount_amount = parseFloat(editInvoiceDiscount);
         payload.manual_discount_reason = editInvoiceDiscountReason;
@@ -27892,6 +27897,18 @@ const FinancesPage = ({ adminKey }) => {
                   </div>
                 </div>
               )}
+
+              {/* Partner Company Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Company Name (on invoice)</label>
+                <input
+                  type="text"
+                  value={editInvoiceCompanyName}
+                  onChange={(e) => setEditInvoiceCompanyName(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  placeholder="Partner company name"
+                />
+              </div>
 
               {/* Manual Discount */}
               <div>
