@@ -121,8 +121,30 @@ const TRANSLATIONS = {
     messages: 'Messages',
     invoices: 'Invoices',
     paymentPlanMenu: 'Payment Plan',
+    editProfile: 'My Profile',
     welcome: 'Welcome',
     logout: 'Logout',
+    // Edit Profile Page
+    editProfileTitle: 'Edit Profile',
+    profileCompanyName: 'Company Name',
+    profileContactName: 'Contact Name',
+    profileEmail: 'Email',
+    profilePhone: 'Phone',
+    profileAddressStreet: 'Street Address',
+    profileAddressCity: 'City',
+    profileAddressState: 'State',
+    profileAddressZip: 'ZIP Code',
+    profileAddressCountry: 'Country',
+    profileTaxId: 'Tax ID (EIN/CNPJ)',
+    profileEstimatedVolume: 'Estimated Monthly Volume',
+    profileSave: 'Save Changes',
+    profileSaving: 'Saving...',
+    profileSaved: 'Profile updated successfully!',
+    profileError: 'Error updating profile',
+    profileVolume1: '1-10 pages',
+    profileVolume2: '11-50 pages',
+    profileVolume3: '51-100 pages',
+    profileVolume4: '100+ pages',
     // Payment Plan Page
     paymentPlanTitle: 'Payment Plan',
     currentPlan: 'Current Plan',
@@ -379,8 +401,30 @@ const TRANSLATIONS = {
     messages: 'Mensajes',
     invoices: 'Facturas',
     paymentPlanMenu: 'Plan de Pago',
+    editProfile: 'Mi Perfil',
     welcome: 'Bienvenido',
     logout: 'Cerrar Sesión',
+    // Edit Profile Page
+    editProfileTitle: 'Editar Perfil',
+    profileCompanyName: 'Nombre de la Empresa',
+    profileContactName: 'Nombre de Contacto',
+    profileEmail: 'Correo Electrónico',
+    profilePhone: 'Teléfono',
+    profileAddressStreet: 'Dirección',
+    profileAddressCity: 'Ciudad',
+    profileAddressState: 'Estado',
+    profileAddressZip: 'Código Postal',
+    profileAddressCountry: 'País',
+    profileTaxId: 'ID Fiscal (EIN/CNPJ)',
+    profileEstimatedVolume: 'Volumen Mensual Estimado',
+    profileSave: 'Guardar Cambios',
+    profileSaving: 'Guardando...',
+    profileSaved: '¡Perfil actualizado exitosamente!',
+    profileError: 'Error al actualizar el perfil',
+    profileVolume1: '1-10 páginas',
+    profileVolume2: '11-50 páginas',
+    profileVolume3: '51-100 páginas',
+    profileVolume4: '100+ páginas',
     // Payment Plan Page
     paymentPlanTitle: 'Plan de Pago',
     currentPlan: 'Plan Actual',
@@ -636,8 +680,30 @@ const TRANSLATIONS = {
     messages: 'Mensagens',
     invoices: 'Faturas',
     paymentPlanMenu: 'Plano de Pagamento',
+    editProfile: 'Meu Perfil',
     welcome: 'Bem-vindo',
     logout: 'Sair',
+    // Edit Profile Page
+    editProfileTitle: 'Editar Perfil',
+    profileCompanyName: 'Nome da Empresa',
+    profileContactName: 'Nome do Contato',
+    profileEmail: 'E-mail',
+    profilePhone: 'Telefone',
+    profileAddressStreet: 'Endereço',
+    profileAddressCity: 'Cidade',
+    profileAddressState: 'Estado',
+    profileAddressZip: 'CEP',
+    profileAddressCountry: 'País',
+    profileTaxId: 'ID Fiscal (EIN/CNPJ)',
+    profileEstimatedVolume: 'Volume Mensal Estimado',
+    profileSave: 'Salvar Alterações',
+    profileSaving: 'Salvando...',
+    profileSaved: 'Perfil atualizado com sucesso!',
+    profileError: 'Erro ao atualizar perfil',
+    profileVolume1: '1-10 páginas',
+    profileVolume2: '11-50 páginas',
+    profileVolume3: '51-100 páginas',
+    profileVolume4: '100+ páginas',
     // Payment Plan Page
     paymentPlanTitle: 'Plano de Pagamento',
     currentPlan: 'Plano Atual',
@@ -1586,7 +1652,8 @@ const Sidebar = ({ activeTab, setActiveTab, partner, onLogout, t }) => {
     { id: 'orders', label: t.myOrders, icon: '📦' },
     { id: 'invoices', label: t.invoices, icon: '🧾' },
     { id: 'messages', label: t.messages, icon: '✉️' },
-    { id: 'payment-plan', label: t.paymentPlanMenu, icon: '💳' }
+    { id: 'payment-plan', label: t.paymentPlanMenu, icon: '💳' },
+    { id: 'profile', label: t.editProfile, icon: '👤' }
   ];
 
   return (
@@ -4031,6 +4098,145 @@ const InvoicesPage = ({ token, t, currency, lang }) => {
   );
 };
 
+// ==================== PROFILE PAGE ====================
+const ProfilePage = ({ partner, token, t, refreshPartner }) => {
+  const [form, setForm] = useState({
+    company_name: partner?.company_name || '',
+    contact_name: partner?.contact_name || '',
+    email: partner?.email || '',
+    phone: partner?.phone || '',
+    address_street: partner?.address_street || '',
+    address_city: partner?.address_city || '',
+    address_state: partner?.address_state || '',
+    address_zip: partner?.address_zip || '',
+    address_country: partner?.address_country || '',
+    tax_id: partner?.tax_id || '',
+    estimated_volume: partner?.estimated_volume || '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState(null);
+
+  useEffect(() => {
+    if (partner) {
+      setForm({
+        company_name: partner.company_name || '',
+        contact_name: partner.contact_name || '',
+        email: partner.email || '',
+        phone: partner.phone || '',
+        address_street: partner.address_street || '',
+        address_city: partner.address_city || '',
+        address_state: partner.address_state || '',
+        address_zip: partner.address_zip || '',
+        address_country: partner.address_country || '',
+        tax_id: partner.tax_id || '',
+        estimated_volume: partner.estimated_volume || '',
+      });
+    }
+  }, [partner]);
+
+  const handleChange = (field, value) => {
+    setForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setMessage(null);
+    try {
+      await axios.put(`${API}/partner/profile?token=${token}`, form);
+      setMessage({ type: 'success', text: t.profileSaved });
+      if (refreshPartner) refreshPartner();
+    } catch (err) {
+      setMessage({ type: 'error', text: t.profileError + ': ' + (err.response?.data?.detail || err.message) });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm";
+  const labelClass = "block text-sm font-medium text-gray-700 mb-1";
+
+  return (
+    <div className="max-w-2xl mx-auto p-6">
+      <h1 className="text-2xl font-bold text-gray-800 mb-6">{t.editProfileTitle}</h1>
+
+      {message && (
+        <div className={`mb-4 p-3 rounded-lg text-sm ${message.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+          {message.text}
+        </div>
+      )}
+
+      <div className="bg-white rounded-lg shadow p-6 space-y-5">
+        {/* Company Name */}
+        <div>
+          <label className={labelClass}>{t.profileCompanyName}</label>
+          <input type="text" className={inputClass} value={form.company_name} onChange={(e) => handleChange('company_name', e.target.value)} />
+        </div>
+
+        {/* Contact Name */}
+        <div>
+          <label className={labelClass}>{t.profileContactName}</label>
+          <input type="text" className={inputClass} value={form.contact_name} onChange={(e) => handleChange('contact_name', e.target.value)} />
+        </div>
+
+        {/* Email & Phone */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className={labelClass}>{t.profileEmail}</label>
+            <input type="email" className={inputClass} value={form.email} onChange={(e) => handleChange('email', e.target.value)} />
+          </div>
+          <div>
+            <label className={labelClass}>{t.profilePhone}</label>
+            <input type="tel" className={inputClass} value={form.phone} onChange={(e) => handleChange('phone', e.target.value)} />
+          </div>
+        </div>
+
+        {/* Address */}
+        <div className="border-t pt-4">
+          <h3 className="text-sm font-semibold text-gray-600 mb-3 uppercase tracking-wide">{t.profileAddressStreet}</h3>
+          <div className="space-y-3">
+            <input type="text" className={inputClass} placeholder={t.profileAddressStreet} value={form.address_street} onChange={(e) => handleChange('address_street', e.target.value)} />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <input type="text" className={inputClass} placeholder={t.profileAddressCity} value={form.address_city} onChange={(e) => handleChange('address_city', e.target.value)} />
+              <input type="text" className={inputClass} placeholder={t.profileAddressState} value={form.address_state} onChange={(e) => handleChange('address_state', e.target.value)} />
+              <input type="text" className={inputClass} placeholder={t.profileAddressZip} value={form.address_zip} onChange={(e) => handleChange('address_zip', e.target.value)} />
+              <input type="text" className={inputClass} placeholder={t.profileAddressCountry} value={form.address_country} onChange={(e) => handleChange('address_country', e.target.value)} />
+            </div>
+          </div>
+        </div>
+
+        {/* Tax ID & Volume */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4">
+          <div>
+            <label className={labelClass}>{t.profileTaxId}</label>
+            <input type="text" className={inputClass} value={form.tax_id} onChange={(e) => handleChange('tax_id', e.target.value)} />
+          </div>
+          <div>
+            <label className={labelClass}>{t.profileEstimatedVolume}</label>
+            <select className={inputClass} value={form.estimated_volume} onChange={(e) => handleChange('estimated_volume', e.target.value)}>
+              <option value="">--</option>
+              <option value="1-10">{t.profileVolume1}</option>
+              <option value="11-50">{t.profileVolume2}</option>
+              <option value="51-100">{t.profileVolume3}</option>
+              <option value="100+">{t.profileVolume4}</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Save Button */}
+        <div className="pt-4 border-t">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="w-full py-3 bg-teal-600 text-white font-semibold rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
+          >
+            {saving ? t.profileSaving : t.profileSave}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ==================== PAYMENT PLAN PAGE ====================
 const PaymentPlanPage = ({ token, t, currency }) => {
   const [qualification, setQualification] = useState(null);
@@ -5567,6 +5773,8 @@ function App() {
         return <MessagesPage token={token} />;
       case 'payment-plan':
         return <PaymentPlanPage token={token} t={t} currency={currency} />;
+      case 'profile':
+        return <ProfilePage partner={partner} token={token} t={t} refreshPartner={refreshPartner} />;
       default:
         return <NewOrderPage partner={partner} token={token} t={t} currency={currency} refreshPartner={refreshPartner} />;
     }
