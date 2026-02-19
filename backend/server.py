@@ -28356,7 +28356,7 @@ Extract the complete text now, preserving the original layout:"""
             request.source_language,
             request.target_language,
             request.document_type
-        ) if 'fetch_matching_instructions' in dir() else ""
+        )
 
         # Build translation prompt
         translation_prompt = f"""You are a professional certified translator performing a translation from {request.source_language} to {request.target_language}.
@@ -28549,7 +28549,8 @@ If there are no errors, return an empty errors array and quality as "APPROVED"."
             summary = proofread_data.get("summary", {})
             quality_score = summary.get("quality", "APPROVED")
             error_count = len(errors)
-        except:
+        except (json.JSONDecodeError, IndexError, KeyError, AttributeError) as e:
+            logger.error(f"Failed to parse proofreading results for status {status_id}: {str(e)}")
             errors = []
             quality_score = "APPROVED"
             error_count = 0

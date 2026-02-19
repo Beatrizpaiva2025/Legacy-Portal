@@ -135,6 +135,8 @@ const TraduxAdminApp = () => {
           }
         } catch (err) {
           console.error('Error polling status:', err);
+          clearInterval(pollInterval);
+          setProcessingStatus('Error checking translation status. Please refresh and try again.');
         }
       }, 3000);
 
