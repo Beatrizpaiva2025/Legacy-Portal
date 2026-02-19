@@ -19920,7 +19920,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                             }
                                           });
                                           showToast(`Translation sent to client!\n\n${selectedDocsForDelivery.length} file(s) delivered.` + (bccEmail ? `\n\nCopy (BCC): ${bccEmail}` : ''));
-                                          setViewingOrder(prev => ({ ...prev, translation_status: 'delivered' }));
+                                          setViewingOrder(prev => ({ ...prev, translation_status: 'delivered', delivered_at: new Date().toISOString() }));
                                           fetchOrders();
                                         } catch (err) {
                                           console.error('Failed to deliver:', err);
@@ -19950,8 +19950,11 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                               <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 flex items-center gap-2">
                                 <span className="text-2xl">✅</span>
                                 <div>
-                                  <div className="text-sm font-medium text-gray-700">Entregue ao Cliente</div>
-                                  <div className="text-[10px] text-gray-500">Tradução enviada com sucesso</div>
+                                  <div className="text-sm font-medium text-gray-700">Delivered to Client</div>
+                                  <div className="text-[10px] text-gray-500">
+                                    Translation sent successfully
+                                    {viewingOrder.delivered_at && ` — ${formatDateTimeLocal(viewingOrder.delivered_at)} (EST)`}
+                                  </div>
                                 </div>
                               </div>
                             )}
