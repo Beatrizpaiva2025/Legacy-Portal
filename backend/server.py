@@ -11842,6 +11842,7 @@ async def bulk_send_prospect_step(request: BulkPartnerIdsRequest, admin_key: str
     sent = 0
     skipped = 0
     failed = 0
+    details = []  # Per-partner results for detailed feedback
     email_service = EmailService()
 
     step_map = {
@@ -11857,6 +11858,12 @@ async def bulk_send_prospect_step(request: BulkPartnerIdsRequest, admin_key: str
         "followup_2": "follow_up_2",
     }
 
+    step_labels = {
+        "first_contact": "1st Email",
+        "followup_1": "Follow-up 1",
+        "followup_2": "Follow-up 2",
+    }
+
     subjects = {
         "first_contact": "Certified Translation Services with Digital Verification",
         "followup_1": "A free translation — try us risk-free",
@@ -11869,6 +11876,7 @@ async def bulk_send_prospect_step(request: BulkPartnerIdsRequest, admin_key: str
         partner = await db.partners.find_one({"id": pid})
         if not partner or not partner.get("email"):
             skipped += 1
+            details.append({"partner_id": pid, "company": partner.get("company_name", "Unknown") if partner else "Not found", "email": partner.get("email", "") if partner else "", "status": "skipped", "reason": "No email address" if partner else "Partner not found"})
             continue
 
         company_name = partner.get("company_name", "Partner")
@@ -11882,6 +11890,7 @@ async def bulk_send_prospect_step(request: BulkPartnerIdsRequest, admin_key: str
             current_status = partner.get("prospect_status", "new")
             if current_status not in step_map:
                 skipped += 1
+                details.append({"partner_id": pid, "company": company_name, "email": partner.get("email", ""), "status": "skipped", "reason": "All email steps already completed"})
                 continue
             email_type, next_status = step_map[current_status]
 
@@ -11906,10 +11915,13 @@ async def bulk_send_prospect_step(request: BulkPartnerIdsRequest, admin_key: str
                 }}
             )
             sent += 1
-        except Exception:
+            details.append({"partner_id": pid, "company": company_name, "email": partner.get("email", ""), "status": "sent", "step": step_labels.get(email_type, email_type)})
+        except Exception as e:
+            print(f"[bulk-prospect-step] Failed to send email to partner {pid} ({partner.get('email', 'no-email')}): {e}")
             failed += 1
+            details.append({"partner_id": pid, "company": company_name, "email": partner.get("email", ""), "status": "failed", "reason": str(e)})
 
-    return {"success": True, "message": f"Sent: {sent}, Skipped: {skipped}, Failed: {failed}"}
+    return {"success": True, "message": f"Sent: {sent}, Skipped: {skipped}, Failed: {failed}", "sent": sent, "skipped": skipped, "failed": failed, "details": details}
 
 
 @api_router.post("/admin/partners/bulk-archive")
