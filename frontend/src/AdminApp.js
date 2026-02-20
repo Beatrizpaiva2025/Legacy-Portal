@@ -16682,6 +16682,40 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     }
   };
 
+  // Dismiss all partner messages (mark all as read)
+  const dismissAllPartnerMessages = async () => {
+    try {
+      const unread = partnerMessages.filter(m => !m.read);
+      await Promise.all(unread.map(m => axios.put(`${API}/admin/partner-messages/${m.id}/read?admin_key=${adminKey}`)));
+      fetchPartnerMessages();
+      setShowPartnerMessages(false);
+    } catch (err) {
+      console.error('Failed to dismiss all partner messages:', err);
+    }
+  };
+
+  // Mark translator inbox message as read (dismiss)
+  const markTranslatorInboxMessageRead = async (messageId) => {
+    try {
+      await axios.put(`${API}/translator/messages/${messageId}/read?admin_key=${adminKey}`);
+      fetchTranslatorInbox();
+    } catch (err) {
+      console.error('Failed to mark translator message as read:', err);
+    }
+  };
+
+  // Dismiss all translator inbox messages (mark all as read)
+  const dismissAllTranslatorInbox = async () => {
+    try {
+      const unread = translatorInbox.filter(m => !m.read);
+      await Promise.all(unread.map(m => axios.put(`${API}/translator/messages/${m.id}/read?admin_key=${adminKey}`)));
+      fetchTranslatorInbox();
+      setShowTranslatorInbox(false);
+    } catch (err) {
+      console.error('Failed to dismiss all translator messages:', err);
+    }
+  };
+
   // Reply to partner message
   const replyToPartnerMessage = async () => {
     if (!replyingToMessage || !replyContent.trim()) return;
@@ -17350,7 +17384,16 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
             <div className="absolute bottom-14 right-0 w-96 bg-white rounded-lg shadow-xl border border-gray-200 max-h-96 overflow-hidden">
               <div className="p-2 border-b bg-gray-50 flex justify-between items-center">
                 <span className="text-xs font-bold text-gray-700">💬 Partner Messages</span>
-                <button onClick={() => setShowPartnerMessages(false)} className="text-gray-400 hover:text-gray-600">×</button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={dismissAllPartnerMessages}
+                    className="text-[10px] px-2 py-0.5 bg-gray-200 text-gray-600 rounded hover:bg-gray-300"
+                    title="Dismiss all messages"
+                  >
+                    Dismiss All
+                  </button>
+                  <button onClick={() => setShowPartnerMessages(false)} className="text-gray-400 hover:text-gray-600">×</button>
+                </div>
               </div>
               <div className="overflow-y-auto max-h-80">
                 {partnerMessages.filter(m => !m.read).map((msg) => (
@@ -17475,7 +17518,16 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
             <div className="absolute top-14 left-0 w-96 bg-white rounded-lg shadow-xl border border-gray-200 max-h-96 overflow-hidden">
               <div className="p-2 border-b bg-blue-50 flex justify-between items-center">
                 <span className="text-xs font-bold text-blue-800">💬 Translator Messages</span>
-                <button onClick={() => setShowTranslatorInbox(false)} className="text-gray-400 hover:text-gray-600">×</button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={dismissAllTranslatorInbox}
+                    className="text-[10px] px-2 py-0.5 bg-gray-200 text-gray-600 rounded hover:bg-gray-300"
+                    title="Dismiss all messages"
+                  >
+                    Dismiss All
+                  </button>
+                  <button onClick={() => setShowTranslatorInbox(false)} className="text-gray-400 hover:text-gray-600">×</button>
+                </div>
               </div>
               <div className="overflow-y-auto max-h-80">
                 {translatorInbox.filter(m => !m.read).map((msg) => (
@@ -17498,15 +17550,24 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] text-gray-400">{formatDateTimeLocal(msg.created_at)}</span>
-                      <button
-                        onClick={() => {
-                          setReplyingToTranslatorMsg(msg);
-                          setTranslatorReplyContent('');
-                        }}
-                        className="px-2 py-0.5 bg-blue-600 text-white rounded text-[10px] hover:bg-blue-700"
-                      >
-                        Reply
-                      </button>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => {
+                            setReplyingToTranslatorMsg(msg);
+                            setTranslatorReplyContent('');
+                          }}
+                          className="px-2 py-0.5 bg-blue-600 text-white rounded text-[10px] hover:bg-blue-700"
+                        >
+                          Reply
+                        </button>
+                        <button
+                          onClick={() => markTranslatorInboxMessageRead(msg.id)}
+                          className="px-2 py-0.5 text-gray-500 border border-gray-300 rounded text-[10px] hover:bg-gray-100"
+                          title="Dismiss message"
+                        >
+                          ✓
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
