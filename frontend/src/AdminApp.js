@@ -2477,6 +2477,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [processingStatus, setProcessingStatus] = useState('');
   const [selectedResultIndex, setSelectedResultIndex] = useState(0);
   const [selectedOriginalPageIndex, setSelectedOriginalPageIndex] = useState(0); // Independent page index for original document in Review/Proofreading
+  const [syncPageNavigation, setSyncPageNavigation] = useState(true); // Sync original and translation page navigation
   const [translationEditMode, setTranslationEditMode] = useState(false); // Edit mode for in-house translators in TRANSLATION tab
 
   // Proofreading state (admin only)
@@ -2793,6 +2794,20 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
   // Proofreading view mode: 'preview' shows highlighted errors, 'edit' allows editing
   const [proofreadingViewMode, setProofreadingViewMode] = useState('preview');
+
+  // Synchronized page navigation helpers
+  const navigateOriginalPage = (newIndex) => {
+    setSelectedOriginalPageIndex(newIndex);
+    if (syncPageNavigation) {
+      setSelectedResultIndex(Math.min(newIndex, Math.max(0, translationResults.length - 1)));
+    }
+  };
+  const navigateTranslationPage = (newIndex) => {
+    setSelectedResultIndex(newIndex);
+    if (syncPageNavigation) {
+      setSelectedOriginalPageIndex(Math.min(newIndex, Math.max(0, originalImages.length - 1)));
+    }
+  };
 
   // Bulk upload state for glossary
   const [bulkTermsText, setBulkTermsText] = useState('');
@@ -4987,15 +5002,30 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       const file = selectedFiles[i];
       const fileName = file.name.toLowerCase();
 
-      // PDF - store directly as data URL
+      // PDF - convert each page to an image so we get per-page navigation
       if (fileName.endsWith('.pdf')) {
-        setProcessingStatus(`Loading PDF: ${file.name}`);
-        const dataUrl = await new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.readAsDataURL(file);
-        });
-        allImages.push({ filename: file.name, data: dataUrl, type: 'application/pdf' });
+        setProcessingStatus(`Converting PDF pages: ${file.name}...`);
+        try {
+          const pdfImages = await convertPdfToImages(file, (currentPage, totalPages) => {
+            setProcessingStatus(`Converting PDF page ${currentPage}/${totalPages}: ${file.name}`);
+          });
+          pdfImages.forEach(img => {
+            allImages.push({
+              filename: img.filename,
+              data: `data:${img.type};base64,${img.data}`,
+              type: img.type
+            });
+          });
+        } catch (err) {
+          console.error('PDF conversion error:', err);
+          // Fallback: store as single data URL
+          const dataUrl = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.readAsDataURL(file);
+          });
+          allImages.push({ filename: file.name, data: dataUrl, type: 'application/pdf' });
+        }
       }
       // Images - read as data URL
       else if (file.type.startsWith('image/')) {
@@ -5048,16 +5078,80 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           setExternalTranslationText(text);
           setProcessingStatus(`✅ Text file loaded`);
         }
-        // PDF - store directly
+        // PDF - extract text per page for editable comparison
         else if (fileName.endsWith('.pdf')) {
-          setProcessingStatus(`Loading PDF: ${file.name}`);
-          const dataUrl = await new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.readAsDataURL(file);
-          });
-          setExternalTranslationImages(prev => [...prev, { filename: file.name, data: dataUrl, type: 'application/pdf' }]);
-          setProcessingStatus(`✅ PDF loaded`);
+          setProcessingStatus(`Extracting text from PDF: ${file.name}...`);
+          try {
+            const pdfData = await new Promise((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(new Uint8Array(reader.result));
+              reader.onerror = reject;
+              reader.readAsArrayBuffer(file);
+            });
+            const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
+            const pageTexts = [];
+            let hasAnyText = false;
+
+            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+              setProcessingStatus(`Extracting text: page ${pageNum}/${pdf.numPages} of ${file.name}`);
+              const page = await pdf.getPage(pageNum);
+              const textContent = await page.getTextContent();
+              const viewport = page.getViewport({ scale: 1 });
+              let pageHtml = '';
+              let lastY = null;
+              let currentLine = '';
+              textContent.items.forEach(item => {
+                const y = Math.round(viewport.height - item.transform[5]);
+                if (lastY !== null && Math.abs(y - lastY) > 5) {
+                  pageHtml += `<p style="margin:2px 0; font-family:'Times New Roman',serif; font-size:12pt;">${currentLine}</p>\n`;
+                  currentLine = '';
+                }
+                currentLine += item.str;
+                lastY = y;
+              });
+              if (currentLine) {
+                pageHtml += `<p style="margin:2px 0; font-family:'Times New Roman',serif; font-size:12pt;">${currentLine}</p>\n`;
+              }
+              if (pageHtml.trim()) {
+                hasAnyText = true;
+              }
+              pageTexts.push(pageHtml);
+            }
+
+            if (hasAnyText) {
+              // Store as structured text per page using page break markers
+              const combinedHtml = pageTexts.map((text, idx) => {
+                if (!text.trim()) return '';
+                return text;
+              }).join('\n--- Page Break ---\n');
+              setExternalTranslationText(combinedHtml);
+              setProcessingStatus(`✅ PDF text extracted (${pdf.numPages} pages)`);
+            } else {
+              // Fallback: convert pages to images if no text found (scanned PDF)
+              setProcessingStatus(`No text found in PDF, converting to images...`);
+              const pdfImages = await convertPdfToImages(file, (currentPage, totalPages) => {
+                setProcessingStatus(`Converting page ${currentPage}/${totalPages} to image...`);
+              });
+              pdfImages.forEach(img => {
+                setExternalTranslationImages(prev => [...prev, {
+                  filename: img.filename,
+                  data: `data:${img.type};base64,${img.data}`,
+                  type: img.type
+                }]);
+              });
+              setProcessingStatus(`✅ PDF converted to ${pdfImages.length} images`);
+            }
+          } catch (pdfErr) {
+            console.error('PDF text extraction error:', pdfErr);
+            // Final fallback: store as single data URL
+            const dataUrl = await new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result);
+              reader.readAsDataURL(file);
+            });
+            setExternalTranslationImages(prev => [...prev, { filename: file.name, data: dataUrl, type: 'application/pdf' }]);
+            setProcessingStatus(`✅ PDF loaded (as image)`);
+          }
         }
         // Images (JPG, PNG, etc.)
         else if (file.type.startsWith('image/')) {
@@ -9716,8 +9810,53 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                   const text = await readTxtFile(file);
                                   html = `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif; font-size: 12pt;">${text}</div>`;
                                 } else if (fileName.endsWith('.pdf')) {
-                                  const images = await convertPdfToImages(file);
-                                  html = images.map((img, idx) => `<div style="text-align:center;"><img src="data:${img.type};base64,${img.data}" style="max-width:100%; height:auto;" alt="${file.name} page ${idx + 1}" /></div>`).join('');
+                                  // Extract text per page from PDF for editable content
+                                  const pdfData = await new Promise((resolve, reject) => {
+                                    const reader = new FileReader();
+                                    reader.onload = () => resolve(new Uint8Array(reader.result));
+                                    reader.onerror = reject;
+                                    reader.readAsArrayBuffer(file);
+                                  });
+                                  const pdfDoc = await pdfjsLib.getDocument({ data: pdfData }).promise;
+                                  const pdfNewResults = [];
+                                  for (let pgNum = 1; pgNum <= pdfDoc.numPages; pgNum++) {
+                                    const pg = await pdfDoc.getPage(pgNum);
+                                    const tc = await pg.getTextContent();
+                                    const vp = pg.getViewport({ scale: 1 });
+                                    let pgHtml = '';
+                                    let pgLastY = null;
+                                    let pgLine = '';
+                                    tc.items.forEach(item => {
+                                      const yPos = Math.round(vp.height - item.transform[5]);
+                                      if (pgLastY !== null && Math.abs(yPos - pgLastY) > 5) {
+                                        pgHtml += `<p style="margin:2px 0; font-family:'Times New Roman',serif; font-size:12pt;">${pgLine}</p>\n`;
+                                        pgLine = '';
+                                      }
+                                      pgLine += item.str;
+                                      pgLastY = yPos;
+                                    });
+                                    if (pgLine) pgHtml += `<p style="margin:2px 0; font-family:'Times New Roman',serif; font-size:12pt;">${pgLine}</p>\n`;
+                                    if (!pgHtml.trim()) {
+                                      const imgScale = 3;
+                                      const imgVp = pg.getViewport({ scale: imgScale });
+                                      const cvs = document.createElement('canvas');
+                                      cvs.width = imgVp.width; cvs.height = imgVp.height;
+                                      await pg.render({ canvasContext: cvs.getContext('2d'), viewport: imgVp }).promise;
+                                      pgHtml = `<div style="text-align:center;"><img src="${cvs.toDataURL('image/png')}" style="max-width:100%; height:auto;" alt="${file.name} page ${pgNum}" /></div>`;
+                                    }
+                                    const existRes = translationResults[selectedResultIndex + pgNum - 1];
+                                    pdfNewResults.push({
+                                      ...(existRes || {}),
+                                      translatedText: `<div style="padding:10px;">${pgHtml}</div>`,
+                                      filename: `${file.name} - Page ${pgNum}`
+                                    });
+                                  }
+                                  const pdfUpdatedResults = [...translationResults];
+                                  pdfUpdatedResults.splice(selectedResultIndex, Math.max(1, pdfNewResults.length), ...pdfNewResults);
+                                  setTranslationResults(pdfUpdatedResults);
+                                  showToast(`PDF loaded: ${pdfDoc.numPages} pages extracted!`);
+                                  e.target.value = '';
+                                  return;
                                 } else if (file.type.startsWith('image/')) {
                                   const dataUrl = await new Promise((resolve) => {
                                     const reader = new FileReader();
@@ -11297,8 +11436,26 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
           {translationResults.length > 0 ? (
             <>
-              {/* Side by side view: Original | Translation - Independent page navigation */}
+              {/* Side by side view: Original | Translation - Synchronized page navigation */}
               <div className="border rounded mb-4">
+                {/* Sync toggle bar */}
+                {(originalImages.length > 1 || translationResults.length > 1) && (
+                  <div className="flex items-center justify-center gap-2 px-3 py-1.5 bg-gray-50 border-b">
+                    <button
+                      onClick={() => setSyncPageNavigation(!syncPageNavigation)}
+                      className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-medium rounded-full transition-all ${
+                        syncPageNavigation
+                          ? 'bg-blue-100 text-blue-700 border border-blue-300'
+                          : 'bg-gray-100 text-gray-500 border border-gray-300'
+                      }`}
+                    >
+                      {syncPageNavigation ? '🔗' : '🔓'} {syncPageNavigation ? 'Pages Synced' : 'Pages Independent'}
+                    </button>
+                    <span className="text-[10px] text-gray-400">
+                      Original: {originalImages.length} pages | Translation: {translationResults.length} pages
+                    </span>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-0 bg-gray-100 border-b">
                   <div className="px-3 py-2 border-r">
                     <div className="flex items-center justify-between">
@@ -11307,7 +11464,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         {originalImages.length > 1 && (
                           <>
                             <button
-                              onClick={() => setSelectedOriginalPageIndex(Math.max(0, selectedOriginalPageIndex - 1))}
+                              onClick={() => navigateOriginalPage(Math.max(0, selectedOriginalPageIndex - 1))}
                               disabled={selectedOriginalPageIndex === 0}
                               className="px-1.5 py-0.5 text-[10px] rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
                             >
@@ -11315,7 +11472,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             </button>
                             <span className="text-[10px] text-gray-500 font-medium">{selectedOriginalPageIndex + 1}/{originalImages.length}</span>
                             <button
-                              onClick={() => setSelectedOriginalPageIndex(Math.min(originalImages.length - 1, selectedOriginalPageIndex + 1))}
+                              onClick={() => navigateOriginalPage(Math.min(originalImages.length - 1, selectedOriginalPageIndex + 1))}
                               disabled={selectedOriginalPageIndex >= originalImages.length - 1}
                               className="px-1.5 py-0.5 text-[10px] rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
                             >
@@ -11330,19 +11487,51 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                               type="file"
                               accept="image/*,.pdf"
                               className="hidden"
-                              onChange={(e) => {
+                              onChange={async (e) => {
                                 if (e.target.files && e.target.files[0]) {
                                   const file = e.target.files[0];
-                                  const reader = new FileReader();
-                                  reader.onload = (event) => {
-                                    const newOriginalImages = [...originalImages];
-                                    newOriginalImages[selectedOriginalPageIndex] = {
-                                      data: event.target.result,
-                                      filename: file.name
+                                  const fileName = file.name.toLowerCase();
+                                  if (fileName.endsWith('.pdf')) {
+                                    // Convert PDF pages to individual images
+                                    try {
+                                      setProcessingStatus(`Converting PDF pages: ${file.name}...`);
+                                      const pdfImages = await convertPdfToImages(file, (cp, tp) => {
+                                        setProcessingStatus(`Converting page ${cp}/${tp}...`);
+                                      });
+                                      const newOriginalImages = [...originalImages];
+                                      pdfImages.forEach((img, idx) => {
+                                        newOriginalImages[selectedOriginalPageIndex + idx] = {
+                                          data: `data:${img.type};base64,${img.data}`,
+                                          filename: img.filename
+                                        };
+                                      });
+                                      setOriginalImages(newOriginalImages);
+                                      setProcessingStatus(`✅ ${pdfImages.length} pages loaded`);
+                                      setTimeout(() => setProcessingStatus(''), 3000);
+                                    } catch (err) {
+                                      console.error('PDF conversion error:', err);
+                                      // Fallback: store as single data URL
+                                      const reader = new FileReader();
+                                      reader.onload = (event) => {
+                                        const newOriginalImages = [...originalImages];
+                                        newOriginalImages[selectedOriginalPageIndex] = { data: event.target.result, filename: file.name };
+                                        setOriginalImages(newOriginalImages);
+                                      };
+                                      reader.readAsDataURL(file);
+                                    }
+                                  } else {
+                                    const reader = new FileReader();
+                                    reader.onload = (event) => {
+                                      const newOriginalImages = [...originalImages];
+                                      newOriginalImages[selectedOriginalPageIndex] = {
+                                        data: event.target.result,
+                                        filename: file.name
+                                      };
+                                      setOriginalImages(newOriginalImages);
                                     };
-                                    setOriginalImages(newOriginalImages);
-                                  };
-                                  reader.readAsDataURL(file);
+                                    reader.readAsDataURL(file);
+                                  }
+                                  e.target.value = '';
                                 }
                               }}
                             />
@@ -11375,7 +11564,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       {translationResults.length > 1 && (
                         <>
                           <button
-                            onClick={() => setSelectedResultIndex(Math.max(0, selectedResultIndex - 1))}
+                            onClick={() => navigateTranslationPage(Math.max(0, selectedResultIndex - 1))}
                             disabled={selectedResultIndex === 0}
                             className="px-1.5 py-0.5 text-[10px] rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
                           >
@@ -11383,7 +11572,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           </button>
                           <span className="text-[10px] text-gray-500 font-medium">{selectedResultIndex + 1}/{translationResults.length}</span>
                           <button
-                            onClick={() => setSelectedResultIndex(Math.min(translationResults.length - 1, selectedResultIndex + 1))}
+                            onClick={() => navigateTranslationPage(Math.min(translationResults.length - 1, selectedResultIndex + 1))}
                             disabled={selectedResultIndex >= translationResults.length - 1}
                             className="px-1.5 py-0.5 text-[10px] rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
                           >
@@ -11444,15 +11633,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                 const file = e.target.files[0];
                                 const fileName = file.name.toLowerCase();
                                 try {
-                                  let html = '';
-                                  if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
-                                    html = await convertWordToHtml(file);
-                                  } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
-                                    html = await readHtmlFile(file);
-                                  } else if (fileName.endsWith('.txt')) {
-                                    const text = await readTxtFile(file);
-                                    html = `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif; font-size: 12pt;">${text}</div>`;
-                                  } else if (fileName.endsWith('.pdf')) {
+                                  if (fileName.endsWith('.pdf')) {
+                                    // PDF: extract text per page and create separate entries
+                                    setProcessingStatus(`Extracting text from PDF: ${file.name}...`);
                                     const pdfData = await new Promise((resolve, reject) => {
                                       const reader = new FileReader();
                                       reader.onload = () => resolve(new Uint8Array(reader.result));
@@ -11460,52 +11643,80 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                       reader.readAsArrayBuffer(file);
                                     });
                                     const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
-                                    let allPagesHtml = '';
+                                    const newResults = [];
                                     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                                      setProcessingStatus(`Extracting page ${pageNum}/${pdf.numPages}...`);
                                       const page = await pdf.getPage(pageNum);
                                       const textContent = await page.getTextContent();
                                       const viewport = page.getViewport({ scale: 1 });
+                                      let pageHtml = '';
                                       let lastY = null;
                                       let currentLine = '';
                                       textContent.items.forEach(item => {
                                         const y = Math.round(viewport.height - item.transform[5]);
                                         if (lastY !== null && Math.abs(y - lastY) > 5) {
-                                          allPagesHtml += `<p style="margin:2px 0; font-family:'Times New Roman',serif; font-size:12pt;">${currentLine}</p>\n`;
+                                          pageHtml += `<p style="margin:2px 0; font-family:'Times New Roman',serif; font-size:12pt;">${currentLine}</p>\n`;
                                           currentLine = '';
                                         }
                                         currentLine += item.str;
                                         lastY = y;
                                       });
                                       if (currentLine) {
-                                        allPagesHtml += `<p style="margin:2px 0; font-family:'Times New Roman',serif; font-size:12pt;">${currentLine}</p>\n`;
+                                        pageHtml += `<p style="margin:2px 0; font-family:'Times New Roman',serif; font-size:12pt;">${currentLine}</p>\n`;
                                       }
-                                      if (pageNum < pdf.numPages) {
-                                        allPagesHtml += '<hr style="margin:15px 0; border-top:1px dashed #ccc;" />\n';
+                                      if (!pageHtml.trim()) {
+                                        // Fallback to image if no text found on this page
+                                        const scale = 3;
+                                        const imgViewport = page.getViewport({ scale });
+                                        const canvas = document.createElement('canvas');
+                                        const ctx = canvas.getContext('2d');
+                                        canvas.width = imgViewport.width;
+                                        canvas.height = imgViewport.height;
+                                        await page.render({ canvasContext: ctx, viewport: imgViewport }).promise;
+                                        const dataUrl = canvas.toDataURL('image/png');
+                                        pageHtml = `<div style="text-align:center;"><img src="${dataUrl}" style="max-width:100%; height:auto;" alt="${file.name} page ${pageNum}" /></div>`;
                                       }
+                                      const wrappedHtml = `<div style="padding:10px;">${pageHtml}</div>`;
+                                      const existingResult = translationResults[selectedResultIndex + pageNum - 1];
+                                      newResults.push({
+                                        ...(existingResult || {}),
+                                        translatedText: wrappedHtml,
+                                        filename: `${file.name} - Page ${pageNum}`
+                                      });
                                     }
-                                    if (!allPagesHtml.trim()) {
-                                      // Fallback to image if no text found
-                                      const images = await convertPdfToImages(file);
-                                      allPagesHtml = images.map((img, idx) => `<div style="text-align:center;"><img src="data:${img.type};base64,${img.data}" style="max-width:100%; height:auto;" alt="${file.name} page ${idx + 1}" /></div>`).join('');
-                                    }
-                                    html = `<div style="padding:10px;">${allPagesHtml}</div>`;
-                                  } else if (file.type.startsWith('image/')) {
-                                    const dataUrl = await new Promise((resolve) => {
-                                      const reader = new FileReader();
-                                      reader.onload = () => resolve(reader.result);
-                                      reader.readAsDataURL(file);
-                                    });
-                                    html = `<div style="text-align:center;"><img src="${dataUrl}" style="max-width:100%; height:auto;" alt="${file.name}" /></div>`;
-                                  }
-                                  if (html) {
+                                    // Replace from current index with new per-page results
                                     const updatedResults = [...translationResults];
-                                    updatedResults[selectedResultIndex] = {
-                                      ...updatedResults[selectedResultIndex],
-                                      translatedText: html,
-                                      filename: file.name
-                                    };
+                                    updatedResults.splice(selectedResultIndex, Math.max(1, newResults.length), ...newResults);
                                     setTranslationResults(updatedResults);
-                                    showToast('Translation page replaced!');
+                                    showToast(`PDF loaded: ${pdf.numPages} pages extracted!`);
+                                    setProcessingStatus('');
+                                  } else {
+                                    let html = '';
+                                    if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
+                                      html = await convertWordToHtml(file);
+                                    } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
+                                      html = await readHtmlFile(file);
+                                    } else if (fileName.endsWith('.txt')) {
+                                      const text = await readTxtFile(file);
+                                      html = `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif; font-size: 12pt;">${text}</div>`;
+                                    } else if (file.type.startsWith('image/')) {
+                                      const dataUrl = await new Promise((resolve) => {
+                                        const reader = new FileReader();
+                                        reader.onload = () => resolve(reader.result);
+                                        reader.readAsDataURL(file);
+                                      });
+                                      html = `<div style="text-align:center;"><img src="${dataUrl}" style="max-width:100%; height:auto;" alt="${file.name}" /></div>`;
+                                    }
+                                    if (html) {
+                                      const updatedResults = [...translationResults];
+                                      updatedResults[selectedResultIndex] = {
+                                        ...updatedResults[selectedResultIndex],
+                                        translatedText: html,
+                                        filename: file.name
+                                      };
+                                      setTranslationResults(updatedResults);
+                                      showToast('Translation page replaced!');
+                                    }
                                   }
                                 } catch (err) {
                                   console.error('Upload error:', err);
@@ -11781,8 +11992,26 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
           {translationResults.length > 0 ? (
             <>
-              {/* Original and Translation Side by Side - Independent page navigation */}
+              {/* Original and Translation Side by Side - Synchronized page navigation */}
               <div className="border rounded mb-4">
+                {/* Sync toggle bar */}
+                {(originalImages.length > 1 || translationResults.length > 1) && (
+                  <div className="flex items-center justify-center gap-2 px-3 py-1.5 bg-gray-50 border-b">
+                    <button
+                      onClick={() => setSyncPageNavigation(!syncPageNavigation)}
+                      className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-medium rounded-full transition-all ${
+                        syncPageNavigation
+                          ? 'bg-blue-100 text-blue-700 border border-blue-300'
+                          : 'bg-gray-100 text-gray-500 border border-gray-300'
+                      }`}
+                    >
+                      {syncPageNavigation ? '🔗' : '🔓'} {syncPageNavigation ? 'Pages Synced' : 'Pages Independent'}
+                    </button>
+                    <span className="text-[10px] text-gray-400">
+                      Original: {originalImages.length} pages | Translation: {translationResults.length} pages
+                    </span>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-0 bg-gray-100 border-b">
                   <div className="px-3 py-2 border-r">
                     <div className="flex items-center justify-between">
@@ -11791,7 +12020,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         {originalImages.length > 1 && (
                           <>
                             <button
-                              onClick={() => setSelectedOriginalPageIndex(Math.max(0, selectedOriginalPageIndex - 1))}
+                              onClick={() => navigateOriginalPage(Math.max(0, selectedOriginalPageIndex - 1))}
                               disabled={selectedOriginalPageIndex === 0}
                               className="px-1.5 py-0.5 text-[10px] rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
                             >
@@ -11799,7 +12028,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             </button>
                             <span className="text-[10px] text-gray-500 font-medium">{selectedOriginalPageIndex + 1}/{originalImages.length}</span>
                             <button
-                              onClick={() => setSelectedOriginalPageIndex(Math.min(originalImages.length - 1, selectedOriginalPageIndex + 1))}
+                              onClick={() => navigateOriginalPage(Math.min(originalImages.length - 1, selectedOriginalPageIndex + 1))}
                               disabled={selectedOriginalPageIndex >= originalImages.length - 1}
                               className="px-1.5 py-0.5 text-[10px] rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
                             >
@@ -11813,19 +12042,49 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             type="file"
                             accept="image/*,.pdf"
                             className="hidden"
-                            onChange={(e) => {
+                            onChange={async (e) => {
                               if (e.target.files && e.target.files[0]) {
                                 const file = e.target.files[0];
-                                const reader = new FileReader();
-                                reader.onload = (event) => {
-                                  const newOriginalImages = [...originalImages];
-                                  newOriginalImages[selectedOriginalPageIndex] = {
-                                    data: event.target.result,
-                                    filename: file.name
+                                const fileName = file.name.toLowerCase();
+                                if (fileName.endsWith('.pdf')) {
+                                  try {
+                                    setProcessingStatus(`Converting PDF pages: ${file.name}...`);
+                                    const pdfImages = await convertPdfToImages(file, (cp, tp) => {
+                                      setProcessingStatus(`Converting page ${cp}/${tp}...`);
+                                    });
+                                    const newOriginalImages = [...originalImages];
+                                    pdfImages.forEach((img, idx) => {
+                                      newOriginalImages[selectedOriginalPageIndex + idx] = {
+                                        data: `data:${img.type};base64,${img.data}`,
+                                        filename: img.filename
+                                      };
+                                    });
+                                    setOriginalImages(newOriginalImages);
+                                    setProcessingStatus(`✅ ${pdfImages.length} pages loaded`);
+                                    setTimeout(() => setProcessingStatus(''), 3000);
+                                  } catch (err) {
+                                    console.error('PDF conversion error:', err);
+                                    const reader = new FileReader();
+                                    reader.onload = (event) => {
+                                      const newOriginalImages = [...originalImages];
+                                      newOriginalImages[selectedOriginalPageIndex] = { data: event.target.result, filename: file.name };
+                                      setOriginalImages(newOriginalImages);
+                                    };
+                                    reader.readAsDataURL(file);
+                                  }
+                                } else {
+                                  const reader = new FileReader();
+                                  reader.onload = (event) => {
+                                    const newOriginalImages = [...originalImages];
+                                    newOriginalImages[selectedOriginalPageIndex] = {
+                                      data: event.target.result,
+                                      filename: file.name
+                                    };
+                                    setOriginalImages(newOriginalImages);
                                   };
-                                  setOriginalImages(newOriginalImages);
-                                };
-                                reader.readAsDataURL(file);
+                                  reader.readAsDataURL(file);
+                                }
+                                e.target.value = '';
                               }
                             }}
                           />
@@ -11857,7 +12116,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       {translationResults.length > 1 && (
                         <>
                           <button
-                            onClick={() => setSelectedResultIndex(Math.max(0, selectedResultIndex - 1))}
+                            onClick={() => navigateTranslationPage(Math.max(0, selectedResultIndex - 1))}
                             disabled={selectedResultIndex === 0}
                             className="px-1.5 py-0.5 text-[10px] rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
                           >
@@ -11865,7 +12124,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           </button>
                           <span className="text-[10px] text-gray-500 font-medium">{selectedResultIndex + 1}/{translationResults.length}</span>
                           <button
-                            onClick={() => setSelectedResultIndex(Math.min(translationResults.length - 1, selectedResultIndex + 1))}
+                            onClick={() => navigateTranslationPage(Math.min(translationResults.length - 1, selectedResultIndex + 1))}
                             disabled={selectedResultIndex >= translationResults.length - 1}
                             className="px-1.5 py-0.5 text-[10px] rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
                           >
@@ -11905,8 +12164,53 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                   const text = await readTxtFile(file);
                                   html = `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif; font-size: 12pt;">${text}</div>`;
                                 } else if (fileName.endsWith('.pdf')) {
-                                  const images = await convertPdfToImages(file);
-                                  html = images.map((img, idx) => `<div style="text-align:center;"><img src="data:${img.type};base64,${img.data}" style="max-width:100%; height:auto;" alt="${file.name} page ${idx + 1}" /></div>`).join('');
+                                  // Extract text per page from PDF for editable content
+                                  const pdfData = await new Promise((resolve, reject) => {
+                                    const reader = new FileReader();
+                                    reader.onload = () => resolve(new Uint8Array(reader.result));
+                                    reader.onerror = reject;
+                                    reader.readAsArrayBuffer(file);
+                                  });
+                                  const pdfDoc = await pdfjsLib.getDocument({ data: pdfData }).promise;
+                                  const pdfNewResults = [];
+                                  for (let pgNum = 1; pgNum <= pdfDoc.numPages; pgNum++) {
+                                    const pg = await pdfDoc.getPage(pgNum);
+                                    const tc = await pg.getTextContent();
+                                    const vp = pg.getViewport({ scale: 1 });
+                                    let pgHtml = '';
+                                    let pgLastY = null;
+                                    let pgLine = '';
+                                    tc.items.forEach(item => {
+                                      const yPos = Math.round(vp.height - item.transform[5]);
+                                      if (pgLastY !== null && Math.abs(yPos - pgLastY) > 5) {
+                                        pgHtml += `<p style="margin:2px 0; font-family:'Times New Roman',serif; font-size:12pt;">${pgLine}</p>\n`;
+                                        pgLine = '';
+                                      }
+                                      pgLine += item.str;
+                                      pgLastY = yPos;
+                                    });
+                                    if (pgLine) pgHtml += `<p style="margin:2px 0; font-family:'Times New Roman',serif; font-size:12pt;">${pgLine}</p>\n`;
+                                    if (!pgHtml.trim()) {
+                                      const imgScale = 3;
+                                      const imgVp = pg.getViewport({ scale: imgScale });
+                                      const cvs = document.createElement('canvas');
+                                      cvs.width = imgVp.width; cvs.height = imgVp.height;
+                                      await pg.render({ canvasContext: cvs.getContext('2d'), viewport: imgVp }).promise;
+                                      pgHtml = `<div style="text-align:center;"><img src="${cvs.toDataURL('image/png')}" style="max-width:100%; height:auto;" alt="${file.name} page ${pgNum}" /></div>`;
+                                    }
+                                    const existRes = translationResults[selectedResultIndex + pgNum - 1];
+                                    pdfNewResults.push({
+                                      ...(existRes || {}),
+                                      translatedText: `<div style="padding:10px;">${pgHtml}</div>`,
+                                      filename: `${file.name} - Page ${pgNum}`
+                                    });
+                                  }
+                                  const pdfUpdatedResults = [...translationResults];
+                                  pdfUpdatedResults.splice(selectedResultIndex, Math.max(1, pdfNewResults.length), ...pdfNewResults);
+                                  setTranslationResults(pdfUpdatedResults);
+                                  showToast(`PDF loaded: ${pdfDoc.numPages} pages extracted!`);
+                                  e.target.value = '';
+                                  return;
                                 } else if (file.type.startsWith('image/')) {
                                   const dataUrl = await new Promise((resolve) => {
                                     const reader = new FileReader();
