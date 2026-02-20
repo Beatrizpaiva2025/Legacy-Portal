@@ -24675,6 +24675,8 @@ const ExpensesPage = ({ adminKey }) => {
   const [expenseReceiptPreview, setExpenseReceiptPreview] = useState(null);
   const [translators, setTranslators] = useState([]);
   const [vendorError, setVendorError] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
   const [expenseForm, setExpenseForm] = useState({
     category: 'fixed',
     subcategory: '',
@@ -24880,6 +24882,43 @@ const ExpensesPage = ({ adminKey }) => {
     return formatDateLocal(dateStr);
   };
 
+  // --- Search / Filter ---
+  const filteredExpenses = expenses.filter(exp => {
+    const q = searchQuery.toLowerCase();
+    const matchesSearch = !q ||
+      (exp.description || '').toLowerCase().includes(q) ||
+      (exp.vendor || '').toLowerCase().includes(q) ||
+      (exp.notes || '').toLowerCase().includes(q) ||
+      (EXPENSE_CATEGORIES[exp.category]?.label || '').toLowerCase().includes(q);
+    const matchesCategory = !filterCategory || exp.category === filterCategory;
+    return matchesSearch && matchesCategory;
+  });
+
+  // --- Chart Data: expenses by month & category ---
+  const buildChartData = () => {
+    const monthMap = {};
+    expenses.forEach(exp => {
+      const d = new Date(exp.date);
+      if (isNaN(d.getTime())) return;
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (!monthMap[key]) monthMap[key] = {};
+      if (!monthMap[key][exp.category]) monthMap[key][exp.category] = 0;
+      monthMap[key][exp.category] += (exp.amount || 0);
+    });
+    const sortedMonths = Object.keys(monthMap).sort();
+    const last12 = sortedMonths.slice(-12);
+    return last12.map(m => ({ month: m, categories: monthMap[m] }));
+  };
+
+  const chartData = buildChartData();
+  const maxMonthTotal = Math.max(...chartData.map(d => Object.values(d.categories).reduce((s, v) => s + v, 0)), 1);
+  const categoryKeys = Object.keys(EXPENSE_CATEGORIES);
+  const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const formatMonthLabel = (m) => {
+    const [y, mo] = m.split('-');
+    return `${MONTH_NAMES[parseInt(mo, 10) - 1]} ${y.slice(2)}`;
+  };
+
   if (loading) return <div className="p-6 text-center">Loading expenses data...</div>;
 
   return (
@@ -24887,18 +24926,112 @@ const ExpensesPage = ({ adminKey }) => {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-xl font-bold text-gray-800">💸 Expenses</h1>
+        <button
+          onClick={() => setShowExpenseModal(true)}
+          className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+        >
+          + New Expense
+        </button>
+      </div>
+
+      {/* Expenses Chart by Category / Month */}
+      {chartData.length > 0 && (
+        <div className="bg-white rounded-lg shadow mb-6">
+          <div className="p-4 border-b">
+            <h3 className="font-bold text-gray-800">Expenses by Category per Month</h3>
+          </div>
+          <div className="p-4">
+            {/* Legend */}
+            <div className="flex flex-wrap gap-3 mb-4">
+              {categoryKeys.map(key => (
+                <div key={key} className="flex items-center gap-1.5 text-xs text-gray-700">
+                  <span className="inline-block w-3 h-3 rounded" style={{ backgroundColor: EXPENSE_CATEGORIES[key].color }} />
+                  {EXPENSE_CATEGORIES[key].label}
+                </div>
+              ))}
+            </div>
+            {/* Stacked Bar Chart */}
+            <div className="overflow-x-auto">
+              <div className="flex items-end gap-2" style={{ minHeight: 220, minWidth: chartData.length * 70 }}>
+                {chartData.map((item) => {
+                  const total = Object.values(item.categories).reduce((s, v) => s + v, 0);
+                  return (
+                    <div key={item.month} className="flex flex-col items-center flex-1" style={{ minWidth: 54 }}>
+                      {/* Bars */}
+                      <div className="relative w-full flex flex-col-reverse items-center" style={{ height: 180 }}>
+                        {categoryKeys.map(cat => {
+                          const val = item.categories[cat] || 0;
+                          if (val === 0) return null;
+                          const pct = (val / maxMonthTotal) * 100;
+                          return (
+                            <div
+                              key={cat}
+                              title={`${EXPENSE_CATEGORIES[cat].label}: ${formatCurrency(val)}`}
+                              className="w-10 rounded-sm cursor-default transition-opacity hover:opacity-80"
+                              style={{
+                                height: `${Math.max(pct, 1.5)}%`,
+                                backgroundColor: EXPENSE_CATEGORIES[cat].color,
+                              }}
+                            />
+                          );
+                        })}
+                      </div>
+                      {/* Total */}
+                      <span className="text-[10px] text-gray-500 mt-1 font-medium">{formatCurrency(total).replace('.00', '')}</span>
+                      {/* Month label */}
+                      <span className="text-[10px] text-gray-600 mt-0.5">{formatMonthLabel(item.month)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Search & Filter Bar */}
+      <div className="bg-white rounded-lg shadow mb-6">
+        <div className="p-4 flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search expenses by description, vendor, notes..."
+              className="w-full pl-9 pr-3 py-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-sm"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+          <select
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+            className="px-3 py-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+          >
+            <option value="">All Categories</option>
+            {Object.entries(EXPENSE_CATEGORIES).map(([key, { label }]) => (
+              <option key={key} value={key}>{label}</option>
+            ))}
+          </select>
+          {(searchQuery || filterCategory) && (
+            <span className="text-xs text-gray-500 self-center">
+              {filteredExpenses.length} of {expenses.length} expenses
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Expenses List */}
       <div className="bg-white rounded-lg shadow">
         <div className="p-4 border-b flex justify-between items-center">
           <h3 className="font-bold text-gray-800">Expenses List</h3>
-          <button
-            onClick={() => setShowExpenseModal(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
-          >
-            + New Expense
-          </button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
@@ -24914,10 +25047,12 @@ const ExpensesPage = ({ adminKey }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {expenses.length === 0 ? (
-                <tr><td colSpan="7" className="px-4 py-8 text-center text-gray-500">No expenses registered</td></tr>
+              {filteredExpenses.length === 0 ? (
+                <tr><td colSpan="7" className="px-4 py-8 text-center text-gray-500">
+                  {expenses.length === 0 ? 'No expenses registered' : 'No expenses match your search'}
+                </td></tr>
               ) : (
-                expenses.map((expense) => (
+                filteredExpenses.map((expense) => (
                   <tr key={expense.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3">{formatDate(expense.date)}</td>
                     <td className="px-4 py-3">
