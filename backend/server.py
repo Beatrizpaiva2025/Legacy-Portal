@@ -21630,12 +21630,55 @@ Referência de traduções aprovadas - verifique se foram seguidas:
         def compress_proofread_image(raw_b64: str) -> tuple:
             media_type = "image/png"
             try:
+                # Strip data URL prefix if present (e.g. "data:image/png;base64,...")
+                if raw_b64.startswith('data:'):
+                    header, raw_b64 = raw_b64.split(',', 1)
+                    if 'image/jpeg' in header:
+                        media_type = "image/jpeg"
+                    elif 'image/webp' in header:
+                        media_type = "image/webp"
                 image_bytes = base64.b64decode(raw_b64)
                 compressed_bytes, final_media_type = compress_image_for_claude_api(image_bytes, media_type)
+                # Final safety check: if still over 5MB, the API will reject it
+                max_size = 5 * 1024 * 1024
+                if len(compressed_bytes) > max_size:
+                    logger.warning(f"Compressed image still {len(compressed_bytes)} bytes (>{max_size}), forcing aggressive resize")
+                    img = Image.open(io.BytesIO(compressed_bytes))
+                    if img.mode in ('RGBA', 'P', 'LA'):
+                        img = img.convert('RGB')
+                    # Aggressively resize until under limit
+                    for scale in [0.5, 0.35, 0.25, 0.15, 0.1]:
+                        new_size = (max(1, int(img.width * scale)), max(1, int(img.height * scale)))
+                        resized = img.resize(new_size, Image.LANCZOS)
+                        buf = io.BytesIO()
+                        resized.save(buf, format='JPEG', quality=30, optimize=True)
+                        if buf.tell() <= max_size:
+                            compressed_bytes = buf.getvalue()
+                            final_media_type = "image/jpeg"
+                            logger.info(f"Aggressive resize to {new_size} brought image to {len(compressed_bytes)} bytes")
+                            break
                 return base64.b64encode(compressed_bytes).decode('utf-8'), final_media_type
             except Exception as e:
-                logger.warning(f"Could not compress image, using original: {str(e)}")
-                return raw_b64, media_type
+                logger.warning(f"Could not compress image for proofreading: {str(e)}")
+                # Try to at least decode and re-encode at low quality as fallback
+                try:
+                    clean_b64 = raw_b64.split(',', 1)[-1] if raw_b64.startswith('data:') else raw_b64
+                    img_bytes = base64.b64decode(clean_b64)
+                    img = Image.open(io.BytesIO(img_bytes))
+                    if img.mode in ('RGBA', 'P', 'LA'):
+                        img = img.convert('RGB')
+                    # Resize to max 2000px and low quality
+                    max_dim = 2000
+                    if img.width > max_dim or img.height > max_dim:
+                        ratio = min(max_dim / img.width, max_dim / img.height)
+                        img = img.resize((int(img.width * ratio), int(img.height * ratio)), Image.LANCZOS)
+                    buf = io.BytesIO()
+                    img.save(buf, format='JPEG', quality=50, optimize=True)
+                    logger.info(f"Fallback compression succeeded: {buf.tell()} bytes")
+                    return base64.b64encode(buf.getvalue()).decode('utf-8'), "image/jpeg"
+                except Exception as e2:
+                    logger.error(f"Fallback compression also failed: {str(e2)}")
+                    return raw_b64, media_type
 
         # Build the message content based on whether we have images or just text
         if all_images:
@@ -26441,15 +26484,15 @@ def compress_image_for_claude_api(img_bytes: bytes, media_type: str = "image/jpe
                 return compressed_bytes, "image/jpeg"
 
         # If still too large, resize the image progressively
-        scale_factors = [0.75, 0.5, 0.35, 0.25]
+        scale_factors = [0.75, 0.5, 0.35, 0.25, 0.15, 0.1]
         original_size = img.size
 
         for scale in scale_factors:
-            new_size = (int(original_size[0] * scale), int(original_size[1] * scale))
+            new_size = (max(1, int(original_size[0] * scale)), max(1, int(original_size[1] * scale)))
             resized_img = img.resize(new_size, Image.LANCZOS)
 
             # Try quality settings again with resized image
-            for quality in [70, 50, 35]:
+            for quality in [70, 50, 35, 20]:
                 jpeg_buffer = io.BytesIO()
                 resized_img.save(jpeg_buffer, format='JPEG', quality=quality, optimize=True)
                 compressed_bytes = jpeg_buffer.getvalue()
