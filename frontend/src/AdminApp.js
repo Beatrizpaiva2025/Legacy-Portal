@@ -5817,16 +5817,38 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
             await page.render({ canvasContext: context, viewport }).promise;
 
-            // Convert canvas to base64 PNG
-            const dataUrl = canvas.toDataURL('image/png');
-            const base64 = dataUrl.split(',')[1];
+            // Convert canvas to JPEG (much smaller than PNG, stays under Claude API 5MB limit)
+            let dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            let base64 = dataUrl.split(',')[1];
+
+            // Safety check: if still over ~4.5MB, reduce quality/scale
+            const estimatedBytes = base64.length * 0.75;
+            const maxBytes = 4.5 * 1024 * 1024;
+            if (estimatedBytes > maxBytes) {
+              console.warn(`Page ${pageNum} JPEG is ~${Math.round(estimatedBytes / 1024)}KB, re-rendering at lower quality`);
+              // Try lower quality first
+              dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+              base64 = dataUrl.split(',')[1];
+              // If still too large, re-render at lower scale
+              if (base64.length * 0.75 > maxBytes) {
+                const lowerScale = Math.min(2, scale * 0.6);
+                const lowerViewport = page.getViewport({ scale: lowerScale });
+                canvas.width = lowerViewport.width;
+                canvas.height = lowerViewport.height;
+                context.clearRect(0, 0, canvas.width, canvas.height);
+                await page.render({ canvasContext: context, viewport: lowerViewport }).promise;
+                dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                base64 = dataUrl.split(',')[1];
+                console.log(`Page ${pageNum} re-rendered at scale ${lowerScale}: ~${Math.round(base64.length * 0.75 / 1024)}KB`);
+              }
+            }
 
             // Validate that we got actual image data (not empty/blank)
             if (base64 && base64.length > 100) {
               images.push({
-                filename: `${file.name}_page_${pageNum}.png`,
+                filename: `${file.name}_page_${pageNum}.jpg`,
                 data: base64,
-                type: 'image/png'
+                type: 'image/jpeg'
               });
             } else {
               console.warn(`PDF page ${pageNum} rendered as empty, skipping`);
@@ -9890,12 +9912,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                     });
                                     if (pgLine) pgHtml += `<p style="margin:2px 0; font-family:'Times New Roman',serif; font-size:12pt;">${pgLine}</p>\n`;
                                     if (!pgHtml.trim()) {
-                                      const imgScale = 3;
+                                      const imgScale = 2;
                                       const imgVp = pg.getViewport({ scale: imgScale });
                                       const cvs = document.createElement('canvas');
                                       cvs.width = imgVp.width; cvs.height = imgVp.height;
                                       await pg.render({ canvasContext: cvs.getContext('2d'), viewport: imgVp }).promise;
-                                      pgHtml = `<div style="text-align:center;"><img src="${cvs.toDataURL('image/png')}" style="max-width:100%; height:auto;" alt="${file.name} page ${pgNum}" /></div>`;
+                                      pgHtml = `<div style="text-align:center;"><img src="${cvs.toDataURL('image/jpeg', 0.85)}" style="max-width:100%; height:auto;" alt="${file.name} page ${pgNum}" /></div>`;
                                     }
                                     const existRes = translationResults[selectedResultIndex + pgNum - 1];
                                     pdfNewResults.push({
@@ -11437,14 +11459,14 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           }
                           if (!pageHtml.trim()) {
                             // Fallback to image if no text found
-                            const scale = 3;
+                            const scale = 2;
                             const imgViewport = page.getViewport({ scale });
                             const canvas = document.createElement('canvas');
                             const ctx = canvas.getContext('2d');
                             canvas.width = imgViewport.width;
                             canvas.height = imgViewport.height;
                             await page.render({ canvasContext: ctx, viewport: imgViewport }).promise;
-                            const dataUrl = canvas.toDataURL('image/png');
+                            const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
                             pageHtml = `<div style="text-align:center;"><img src="${dataUrl}" style="max-width:100%; height:auto;" alt="${file.name} page ${pageNum}" /></div>`;
                           }
                           const wrappedHtml = `<div style="padding:10px;">${pageHtml}</div>`;
@@ -11719,14 +11741,14 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                       }
                                       if (!pageHtml.trim()) {
                                         // Fallback to image if no text found on this page
-                                        const scale = 3;
+                                        const scale = 2;
                                         const imgViewport = page.getViewport({ scale });
                                         const canvas = document.createElement('canvas');
                                         const ctx = canvas.getContext('2d');
                                         canvas.width = imgViewport.width;
                                         canvas.height = imgViewport.height;
                                         await page.render({ canvasContext: ctx, viewport: imgViewport }).promise;
-                                        const dataUrl = canvas.toDataURL('image/png');
+                                        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
                                         pageHtml = `<div style="text-align:center;"><img src="${dataUrl}" style="max-width:100%; height:auto;" alt="${file.name} page ${pageNum}" /></div>`;
                                       }
                                       const wrappedHtml = `<div style="padding:10px;">${pageHtml}</div>`;
@@ -12244,12 +12266,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                     });
                                     if (pgLine) pgHtml += `<p style="margin:2px 0; font-family:'Times New Roman',serif; font-size:12pt;">${pgLine}</p>\n`;
                                     if (!pgHtml.trim()) {
-                                      const imgScale = 3;
+                                      const imgScale = 2;
                                       const imgVp = pg.getViewport({ scale: imgScale });
                                       const cvs = document.createElement('canvas');
                                       cvs.width = imgVp.width; cvs.height = imgVp.height;
                                       await pg.render({ canvasContext: cvs.getContext('2d'), viewport: imgVp }).promise;
-                                      pgHtml = `<div style="text-align:center;"><img src="${cvs.toDataURL('image/png')}" style="max-width:100%; height:auto;" alt="${file.name} page ${pgNum}" /></div>`;
+                                      pgHtml = `<div style="text-align:center;"><img src="${cvs.toDataURL('image/jpeg', 0.85)}" style="max-width:100%; height:auto;" alt="${file.name} page ${pgNum}" /></div>`;
                                     }
                                     const existRes = translationResults[selectedResultIndex + pgNum - 1];
                                     pdfNewResults.push({
