@@ -2477,7 +2477,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [processingStatus, setProcessingStatus] = useState('');
   const [selectedResultIndex, setSelectedResultIndex] = useState(0);
   const [selectedOriginalPageIndex, setSelectedOriginalPageIndex] = useState(0); // Independent page index for original document in Review/Proofreading
-  const [syncPageNavigation, setSyncPageNavigation] = useState(true); // Sync original and translation page navigation
   const [translationEditMode, setTranslationEditMode] = useState(false); // Edit mode for in-house translators in TRANSLATION tab
 
   // Proofreading state (admin only)
@@ -2794,20 +2793,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
   // Proofreading view mode: 'preview' shows highlighted errors, 'edit' allows editing
   const [proofreadingViewMode, setProofreadingViewMode] = useState('preview');
-
-  // Synchronized page navigation helpers
-  const navigateOriginalPage = (newIndex) => {
-    setSelectedOriginalPageIndex(newIndex);
-    if (syncPageNavigation) {
-      setSelectedResultIndex(Math.min(newIndex, Math.max(0, translationResults.length - 1)));
-    }
-  };
-  const navigateTranslationPage = (newIndex) => {
-    setSelectedResultIndex(newIndex);
-    if (syncPageNavigation) {
-      setSelectedOriginalPageIndex(Math.min(newIndex, Math.max(0, originalImages.length - 1)));
-    }
-  };
 
   // Bulk upload state for glossary
   const [bulkTermsText, setBulkTermsText] = useState('');
@@ -5002,30 +4987,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       const file = selectedFiles[i];
       const fileName = file.name.toLowerCase();
 
-      // PDF - convert each page to an image so we get per-page navigation
+      // PDF - store directly as data URL
       if (fileName.endsWith('.pdf')) {
-        setProcessingStatus(`Converting PDF pages: ${file.name}...`);
-        try {
-          const pdfImages = await convertPdfToImages(file, (currentPage, totalPages) => {
-            setProcessingStatus(`Converting PDF page ${currentPage}/${totalPages}: ${file.name}`);
-          });
-          pdfImages.forEach(img => {
-            allImages.push({
-              filename: img.filename,
-              data: `data:${img.type};base64,${img.data}`,
-              type: img.type
-            });
-          });
-        } catch (err) {
-          console.error('PDF conversion error:', err);
-          // Fallback: store as single data URL
-          const dataUrl = await new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.readAsDataURL(file);
-          });
-          allImages.push({ filename: file.name, data: dataUrl, type: 'application/pdf' });
-        }
+        setProcessingStatus(`Loading PDF: ${file.name}`);
+        const dataUrl = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.readAsDataURL(file);
+        });
+        allImages.push({ filename: file.name, data: dataUrl, type: 'application/pdf' });
       }
       // Images - read as data URL
       else if (file.type.startsWith('image/')) {
@@ -5078,80 +5048,16 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           setExternalTranslationText(text);
           setProcessingStatus(`✅ Text file loaded`);
         }
-        // PDF - extract text per page for editable comparison
+        // PDF - store directly
         else if (fileName.endsWith('.pdf')) {
-          setProcessingStatus(`Extracting text from PDF: ${file.name}...`);
-          try {
-            const pdfData = await new Promise((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onload = () => resolve(new Uint8Array(reader.result));
-              reader.onerror = reject;
-              reader.readAsArrayBuffer(file);
-            });
-            const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
-            const pageTexts = [];
-            let hasAnyText = false;
-
-            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-              setProcessingStatus(`Extracting text: page ${pageNum}/${pdf.numPages} of ${file.name}`);
-              const page = await pdf.getPage(pageNum);
-              const textContent = await page.getTextContent();
-              const viewport = page.getViewport({ scale: 1 });
-              let pageHtml = '';
-              let lastY = null;
-              let currentLine = '';
-              textContent.items.forEach(item => {
-                const y = Math.round(viewport.height - item.transform[5]);
-                if (lastY !== null && Math.abs(y - lastY) > 5) {
-                  pageHtml += `<p style="margin:2px 0; font-family:'Times New Roman',serif; font-size:12pt;">${currentLine}</p>\n`;
-                  currentLine = '';
-                }
-                currentLine += item.str;
-                lastY = y;
-              });
-              if (currentLine) {
-                pageHtml += `<p style="margin:2px 0; font-family:'Times New Roman',serif; font-size:12pt;">${currentLine}</p>\n`;
-              }
-              if (pageHtml.trim()) {
-                hasAnyText = true;
-              }
-              pageTexts.push(pageHtml);
-            }
-
-            if (hasAnyText) {
-              // Store as structured text per page using page break markers
-              const combinedHtml = pageTexts.map((text, idx) => {
-                if (!text.trim()) return '';
-                return text;
-              }).join('\n--- Page Break ---\n');
-              setExternalTranslationText(combinedHtml);
-              setProcessingStatus(`✅ PDF text extracted (${pdf.numPages} pages)`);
-            } else {
-              // Fallback: convert pages to images if no text found (scanned PDF)
-              setProcessingStatus(`No text found in PDF, converting to images...`);
-              const pdfImages = await convertPdfToImages(file, (currentPage, totalPages) => {
-                setProcessingStatus(`Converting page ${currentPage}/${totalPages} to image...`);
-              });
-              pdfImages.forEach(img => {
-                setExternalTranslationImages(prev => [...prev, {
-                  filename: img.filename,
-                  data: `data:${img.type};base64,${img.data}`,
-                  type: img.type
-                }]);
-              });
-              setProcessingStatus(`✅ PDF converted to ${pdfImages.length} images`);
-            }
-          } catch (pdfErr) {
-            console.error('PDF text extraction error:', pdfErr);
-            // Final fallback: store as single data URL
-            const dataUrl = await new Promise((resolve) => {
-              const reader = new FileReader();
-              reader.onload = () => resolve(reader.result);
-              reader.readAsDataURL(file);
-            });
-            setExternalTranslationImages(prev => [...prev, { filename: file.name, data: dataUrl, type: 'application/pdf' }]);
-            setProcessingStatus(`✅ PDF loaded (as image)`);
-          }
+          setProcessingStatus(`Loading PDF: ${file.name}`);
+          const dataUrl = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.readAsDataURL(file);
+          });
+          setExternalTranslationImages(prev => [...prev, { filename: file.name, data: dataUrl, type: 'application/pdf' }]);
+          setProcessingStatus(`✅ PDF loaded`);
         }
         // Images (JPG, PNG, etc.)
         else if (file.type.startsWith('image/')) {
@@ -5293,70 +5199,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       .filter(t => t)
       .join('\n\n');
 
-    // Helper: compress a base64 image to stay under Claude API's 5MB limit using canvas
-    const compressImageForApi = (base64Data, maxSizeBytes = 4.5 * 1024 * 1024) => {
-      return new Promise((resolve) => {
-        // Check raw size first - base64 is ~33% overhead, so decoded size ≈ base64.length * 0.75
-        const estimatedBytes = base64Data.length * 0.75;
-        if (estimatedBytes <= maxSizeBytes) {
-          resolve(base64Data);
-          return;
-        }
-        const imgEl = new window.Image();
-        imgEl.onload = () => {
-          const tryCompress = (scale, quality) => {
-            const canvas = document.createElement('canvas');
-            canvas.width = Math.round(imgEl.width * scale);
-            canvas.height = Math.round(imgEl.height * scale);
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(imgEl, 0, 0, canvas.width, canvas.height);
-            const dataUrl = canvas.toDataURL('image/jpeg', quality);
-            return dataUrl.split(',')[1];
-          };
-          // Try progressively more aggressive compression
-          const attempts = [
-            { scale: 1.0, quality: 0.7 },
-            { scale: 1.0, quality: 0.5 },
-            { scale: 0.75, quality: 0.6 },
-            { scale: 0.75, quality: 0.4 },
-            { scale: 0.5, quality: 0.5 },
-            { scale: 0.5, quality: 0.3 },
-            { scale: 0.35, quality: 0.4 },
-            { scale: 0.25, quality: 0.4 },
-          ];
-          for (const { scale, quality } of attempts) {
-            const compressed = tryCompress(scale, quality);
-            if (compressed.length * 0.75 <= maxSizeBytes) {
-              console.log(`Image compressed: scale=${scale}, quality=${quality}, ~${Math.round(compressed.length * 0.75 / 1024)}KB`);
-              resolve(compressed);
-              return;
-            }
-          }
-          // Last resort: very small
-          const last = tryCompress(0.2, 0.3);
-          console.warn(`Image compressed with last resort: ~${Math.round(last.length * 0.75 / 1024)}KB`);
-          resolve(last);
-        };
-        imgEl.onerror = () => {
-          console.warn('Could not load image for compression, using original');
-          resolve(base64Data);
-        };
-        imgEl.src = `data:image/png;base64,${base64Data}`;
-      });
-    };
-
-    // Collect ALL original images and compress them to stay under 5MB
+    // Collect ALL original images
     const allOriginalImages = [];
-    for (const img of originalImages) {
+    originalImages.forEach(img => {
       if (img?.data) {
         let imgBase64 = img.data;
         if (imgBase64.startsWith('data:')) {
           imgBase64 = imgBase64.split(',')[1];
         }
-        const compressed = await compressImageForApi(imgBase64);
-        allOriginalImages.push(compressed);
+        allOriginalImages.push(imgBase64);
       }
-    }
+    });
 
     // If no text and no images, show error
     if (!originalText && allOriginalImages.length === 0) {
@@ -5817,38 +5670,16 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
             await page.render({ canvasContext: context, viewport }).promise;
 
-            // Convert canvas to JPEG (much smaller than PNG, stays under Claude API 5MB limit)
-            let dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-            let base64 = dataUrl.split(',')[1];
-
-            // Safety check: if still over ~4.5MB, reduce quality/scale
-            const estimatedBytes = base64.length * 0.75;
-            const maxBytes = 4.5 * 1024 * 1024;
-            if (estimatedBytes > maxBytes) {
-              console.warn(`Page ${pageNum} JPEG is ~${Math.round(estimatedBytes / 1024)}KB, re-rendering at lower quality`);
-              // Try lower quality first
-              dataUrl = canvas.toDataURL('image/jpeg', 0.6);
-              base64 = dataUrl.split(',')[1];
-              // If still too large, re-render at lower scale
-              if (base64.length * 0.75 > maxBytes) {
-                const lowerScale = Math.min(2, scale * 0.6);
-                const lowerViewport = page.getViewport({ scale: lowerScale });
-                canvas.width = lowerViewport.width;
-                canvas.height = lowerViewport.height;
-                context.clearRect(0, 0, canvas.width, canvas.height);
-                await page.render({ canvasContext: context, viewport: lowerViewport }).promise;
-                dataUrl = canvas.toDataURL('image/jpeg', 0.6);
-                base64 = dataUrl.split(',')[1];
-                console.log(`Page ${pageNum} re-rendered at scale ${lowerScale}: ~${Math.round(base64.length * 0.75 / 1024)}KB`);
-              }
-            }
+            // Convert canvas to base64 PNG
+            const dataUrl = canvas.toDataURL('image/png');
+            const base64 = dataUrl.split(',')[1];
 
             // Validate that we got actual image data (not empty/blank)
             if (base64 && base64.length > 100) {
               images.push({
-                filename: `${file.name}_page_${pageNum}.jpg`,
+                filename: `${file.name}_page_${pageNum}.png`,
                 data: base64,
-                type: 'image/jpeg'
+                type: 'image/png'
               });
             } else {
               console.warn(`PDF page ${pageNum} rendered as empty, skipping`);
@@ -9885,53 +9716,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                   const text = await readTxtFile(file);
                                   html = `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif; font-size: 12pt;">${text}</div>`;
                                 } else if (fileName.endsWith('.pdf')) {
-                                  // Extract text per page from PDF for editable content
-                                  const pdfData = await new Promise((resolve, reject) => {
-                                    const reader = new FileReader();
-                                    reader.onload = () => resolve(new Uint8Array(reader.result));
-                                    reader.onerror = reject;
-                                    reader.readAsArrayBuffer(file);
-                                  });
-                                  const pdfDoc = await pdfjsLib.getDocument({ data: pdfData }).promise;
-                                  const pdfNewResults = [];
-                                  for (let pgNum = 1; pgNum <= pdfDoc.numPages; pgNum++) {
-                                    const pg = await pdfDoc.getPage(pgNum);
-                                    const tc = await pg.getTextContent();
-                                    const vp = pg.getViewport({ scale: 1 });
-                                    let pgHtml = '';
-                                    let pgLastY = null;
-                                    let pgLine = '';
-                                    tc.items.forEach(item => {
-                                      const yPos = Math.round(vp.height - item.transform[5]);
-                                      if (pgLastY !== null && Math.abs(yPos - pgLastY) > 5) {
-                                        pgHtml += `<p style="margin:2px 0; font-family:'Times New Roman',serif; font-size:12pt;">${pgLine}</p>\n`;
-                                        pgLine = '';
-                                      }
-                                      pgLine += item.str;
-                                      pgLastY = yPos;
-                                    });
-                                    if (pgLine) pgHtml += `<p style="margin:2px 0; font-family:'Times New Roman',serif; font-size:12pt;">${pgLine}</p>\n`;
-                                    if (!pgHtml.trim()) {
-                                      const imgScale = 2;
-                                      const imgVp = pg.getViewport({ scale: imgScale });
-                                      const cvs = document.createElement('canvas');
-                                      cvs.width = imgVp.width; cvs.height = imgVp.height;
-                                      await pg.render({ canvasContext: cvs.getContext('2d'), viewport: imgVp }).promise;
-                                      pgHtml = `<div style="text-align:center;"><img src="${cvs.toDataURL('image/jpeg', 0.85)}" style="max-width:100%; height:auto;" alt="${file.name} page ${pgNum}" /></div>`;
-                                    }
-                                    const existRes = translationResults[selectedResultIndex + pgNum - 1];
-                                    pdfNewResults.push({
-                                      ...(existRes || {}),
-                                      translatedText: `<div style="padding:10px;">${pgHtml}</div>`,
-                                      filename: `${file.name} - Page ${pgNum}`
-                                    });
-                                  }
-                                  const pdfUpdatedResults = [...translationResults];
-                                  pdfUpdatedResults.splice(selectedResultIndex, Math.max(1, pdfNewResults.length), ...pdfNewResults);
-                                  setTranslationResults(pdfUpdatedResults);
-                                  showToast(`PDF loaded: ${pdfDoc.numPages} pages extracted!`);
-                                  e.target.value = '';
-                                  return;
+                                  const images = await convertPdfToImages(file);
+                                  html = images.map((img, idx) => `<div style="text-align:center;"><img src="data:${img.type};base64,${img.data}" style="max-width:100%; height:auto;" alt="${file.name} page ${idx + 1}" /></div>`).join('');
                                 } else if (file.type.startsWith('image/')) {
                                   const dataUrl = await new Promise((resolve) => {
                                     const reader = new FileReader();
@@ -11459,14 +11245,14 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           }
                           if (!pageHtml.trim()) {
                             // Fallback to image if no text found
-                            const scale = 2;
+                            const scale = 3;
                             const imgViewport = page.getViewport({ scale });
                             const canvas = document.createElement('canvas');
                             const ctx = canvas.getContext('2d');
                             canvas.width = imgViewport.width;
                             canvas.height = imgViewport.height;
                             await page.render({ canvasContext: ctx, viewport: imgViewport }).promise;
-                            const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                            const dataUrl = canvas.toDataURL('image/png');
                             pageHtml = `<div style="text-align:center;"><img src="${dataUrl}" style="max-width:100%; height:auto;" alt="${file.name} page ${pageNum}" /></div>`;
                           }
                           const wrappedHtml = `<div style="padding:10px;">${pageHtml}</div>`;
@@ -11511,26 +11297,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
           {translationResults.length > 0 ? (
             <>
-              {/* Side by side view: Original | Translation - Synchronized page navigation */}
+              {/* Side by side view: Original | Translation - Independent page navigation */}
               <div className="border rounded mb-4">
-                {/* Sync toggle bar */}
-                {(originalImages.length > 1 || translationResults.length > 1) && (
-                  <div className="flex items-center justify-center gap-2 px-3 py-1.5 bg-gray-50 border-b">
-                    <button
-                      onClick={() => setSyncPageNavigation(!syncPageNavigation)}
-                      className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-medium rounded-full transition-all ${
-                        syncPageNavigation
-                          ? 'bg-blue-100 text-blue-700 border border-blue-300'
-                          : 'bg-gray-100 text-gray-500 border border-gray-300'
-                      }`}
-                    >
-                      {syncPageNavigation ? '🔗' : '🔓'} {syncPageNavigation ? 'Pages Synced' : 'Pages Independent'}
-                    </button>
-                    <span className="text-[10px] text-gray-400">
-                      Original: {originalImages.length} pages | Translation: {translationResults.length} pages
-                    </span>
-                  </div>
-                )}
                 <div className="grid grid-cols-2 gap-0 bg-gray-100 border-b">
                   <div className="px-3 py-2 border-r">
                     <div className="flex items-center justify-between">
@@ -11539,7 +11307,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         {originalImages.length > 1 && (
                           <>
                             <button
-                              onClick={() => navigateOriginalPage(Math.max(0, selectedOriginalPageIndex - 1))}
+                              onClick={() => setSelectedOriginalPageIndex(Math.max(0, selectedOriginalPageIndex - 1))}
                               disabled={selectedOriginalPageIndex === 0}
                               className="px-1.5 py-0.5 text-[10px] rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
                             >
@@ -11547,7 +11315,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             </button>
                             <span className="text-[10px] text-gray-500 font-medium">{selectedOriginalPageIndex + 1}/{originalImages.length}</span>
                             <button
-                              onClick={() => navigateOriginalPage(Math.min(originalImages.length - 1, selectedOriginalPageIndex + 1))}
+                              onClick={() => setSelectedOriginalPageIndex(Math.min(originalImages.length - 1, selectedOriginalPageIndex + 1))}
                               disabled={selectedOriginalPageIndex >= originalImages.length - 1}
                               className="px-1.5 py-0.5 text-[10px] rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
                             >
@@ -11562,51 +11330,19 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                               type="file"
                               accept="image/*,.pdf"
                               className="hidden"
-                              onChange={async (e) => {
+                              onChange={(e) => {
                                 if (e.target.files && e.target.files[0]) {
                                   const file = e.target.files[0];
-                                  const fileName = file.name.toLowerCase();
-                                  if (fileName.endsWith('.pdf')) {
-                                    // Convert PDF pages to individual images
-                                    try {
-                                      setProcessingStatus(`Converting PDF pages: ${file.name}...`);
-                                      const pdfImages = await convertPdfToImages(file, (cp, tp) => {
-                                        setProcessingStatus(`Converting page ${cp}/${tp}...`);
-                                      });
-                                      const newOriginalImages = [...originalImages];
-                                      pdfImages.forEach((img, idx) => {
-                                        newOriginalImages[selectedOriginalPageIndex + idx] = {
-                                          data: `data:${img.type};base64,${img.data}`,
-                                          filename: img.filename
-                                        };
-                                      });
-                                      setOriginalImages(newOriginalImages);
-                                      setProcessingStatus(`✅ ${pdfImages.length} pages loaded`);
-                                      setTimeout(() => setProcessingStatus(''), 3000);
-                                    } catch (err) {
-                                      console.error('PDF conversion error:', err);
-                                      // Fallback: store as single data URL
-                                      const reader = new FileReader();
-                                      reader.onload = (event) => {
-                                        const newOriginalImages = [...originalImages];
-                                        newOriginalImages[selectedOriginalPageIndex] = { data: event.target.result, filename: file.name };
-                                        setOriginalImages(newOriginalImages);
-                                      };
-                                      reader.readAsDataURL(file);
-                                    }
-                                  } else {
-                                    const reader = new FileReader();
-                                    reader.onload = (event) => {
-                                      const newOriginalImages = [...originalImages];
-                                      newOriginalImages[selectedOriginalPageIndex] = {
-                                        data: event.target.result,
-                                        filename: file.name
-                                      };
-                                      setOriginalImages(newOriginalImages);
+                                  const reader = new FileReader();
+                                  reader.onload = (event) => {
+                                    const newOriginalImages = [...originalImages];
+                                    newOriginalImages[selectedOriginalPageIndex] = {
+                                      data: event.target.result,
+                                      filename: file.name
                                     };
-                                    reader.readAsDataURL(file);
-                                  }
-                                  e.target.value = '';
+                                    setOriginalImages(newOriginalImages);
+                                  };
+                                  reader.readAsDataURL(file);
                                 }
                               }}
                             />
@@ -11639,7 +11375,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       {translationResults.length > 1 && (
                         <>
                           <button
-                            onClick={() => navigateTranslationPage(Math.max(0, selectedResultIndex - 1))}
+                            onClick={() => setSelectedResultIndex(Math.max(0, selectedResultIndex - 1))}
                             disabled={selectedResultIndex === 0}
                             className="px-1.5 py-0.5 text-[10px] rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
                           >
@@ -11647,7 +11383,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           </button>
                           <span className="text-[10px] text-gray-500 font-medium">{selectedResultIndex + 1}/{translationResults.length}</span>
                           <button
-                            onClick={() => navigateTranslationPage(Math.min(translationResults.length - 1, selectedResultIndex + 1))}
+                            onClick={() => setSelectedResultIndex(Math.min(translationResults.length - 1, selectedResultIndex + 1))}
                             disabled={selectedResultIndex >= translationResults.length - 1}
                             className="px-1.5 py-0.5 text-[10px] rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
                           >
@@ -11708,9 +11444,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                 const file = e.target.files[0];
                                 const fileName = file.name.toLowerCase();
                                 try {
-                                  if (fileName.endsWith('.pdf')) {
-                                    // PDF: extract text per page and create separate entries
-                                    setProcessingStatus(`Extracting text from PDF: ${file.name}...`);
+                                  let html = '';
+                                  if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
+                                    html = await convertWordToHtml(file);
+                                  } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
+                                    html = await readHtmlFile(file);
+                                  } else if (fileName.endsWith('.txt')) {
+                                    const text = await readTxtFile(file);
+                                    html = `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif; font-size: 12pt;">${text}</div>`;
+                                  } else if (fileName.endsWith('.pdf')) {
                                     const pdfData = await new Promise((resolve, reject) => {
                                       const reader = new FileReader();
                                       reader.onload = () => resolve(new Uint8Array(reader.result));
@@ -11718,80 +11460,52 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                       reader.readAsArrayBuffer(file);
                                     });
                                     const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
-                                    const newResults = [];
+                                    let allPagesHtml = '';
                                     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-                                      setProcessingStatus(`Extracting page ${pageNum}/${pdf.numPages}...`);
                                       const page = await pdf.getPage(pageNum);
                                       const textContent = await page.getTextContent();
                                       const viewport = page.getViewport({ scale: 1 });
-                                      let pageHtml = '';
                                       let lastY = null;
                                       let currentLine = '';
                                       textContent.items.forEach(item => {
                                         const y = Math.round(viewport.height - item.transform[5]);
                                         if (lastY !== null && Math.abs(y - lastY) > 5) {
-                                          pageHtml += `<p style="margin:2px 0; font-family:'Times New Roman',serif; font-size:12pt;">${currentLine}</p>\n`;
+                                          allPagesHtml += `<p style="margin:2px 0; font-family:'Times New Roman',serif; font-size:12pt;">${currentLine}</p>\n`;
                                           currentLine = '';
                                         }
                                         currentLine += item.str;
                                         lastY = y;
                                       });
                                       if (currentLine) {
-                                        pageHtml += `<p style="margin:2px 0; font-family:'Times New Roman',serif; font-size:12pt;">${currentLine}</p>\n`;
+                                        allPagesHtml += `<p style="margin:2px 0; font-family:'Times New Roman',serif; font-size:12pt;">${currentLine}</p>\n`;
                                       }
-                                      if (!pageHtml.trim()) {
-                                        // Fallback to image if no text found on this page
-                                        const scale = 2;
-                                        const imgViewport = page.getViewport({ scale });
-                                        const canvas = document.createElement('canvas');
-                                        const ctx = canvas.getContext('2d');
-                                        canvas.width = imgViewport.width;
-                                        canvas.height = imgViewport.height;
-                                        await page.render({ canvasContext: ctx, viewport: imgViewport }).promise;
-                                        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-                                        pageHtml = `<div style="text-align:center;"><img src="${dataUrl}" style="max-width:100%; height:auto;" alt="${file.name} page ${pageNum}" /></div>`;
+                                      if (pageNum < pdf.numPages) {
+                                        allPagesHtml += '<hr style="margin:15px 0; border-top:1px dashed #ccc;" />\n';
                                       }
-                                      const wrappedHtml = `<div style="padding:10px;">${pageHtml}</div>`;
-                                      const existingResult = translationResults[selectedResultIndex + pageNum - 1];
-                                      newResults.push({
-                                        ...(existingResult || {}),
-                                        translatedText: wrappedHtml,
-                                        filename: `${file.name} - Page ${pageNum}`
-                                      });
                                     }
-                                    // Replace from current index with new per-page results
+                                    if (!allPagesHtml.trim()) {
+                                      // Fallback to image if no text found
+                                      const images = await convertPdfToImages(file);
+                                      allPagesHtml = images.map((img, idx) => `<div style="text-align:center;"><img src="data:${img.type};base64,${img.data}" style="max-width:100%; height:auto;" alt="${file.name} page ${idx + 1}" /></div>`).join('');
+                                    }
+                                    html = `<div style="padding:10px;">${allPagesHtml}</div>`;
+                                  } else if (file.type.startsWith('image/')) {
+                                    const dataUrl = await new Promise((resolve) => {
+                                      const reader = new FileReader();
+                                      reader.onload = () => resolve(reader.result);
+                                      reader.readAsDataURL(file);
+                                    });
+                                    html = `<div style="text-align:center;"><img src="${dataUrl}" style="max-width:100%; height:auto;" alt="${file.name}" /></div>`;
+                                  }
+                                  if (html) {
                                     const updatedResults = [...translationResults];
-                                    updatedResults.splice(selectedResultIndex, Math.max(1, newResults.length), ...newResults);
+                                    updatedResults[selectedResultIndex] = {
+                                      ...updatedResults[selectedResultIndex],
+                                      translatedText: html,
+                                      filename: file.name
+                                    };
                                     setTranslationResults(updatedResults);
-                                    showToast(`PDF loaded: ${pdf.numPages} pages extracted!`);
-                                    setProcessingStatus('');
-                                  } else {
-                                    let html = '';
-                                    if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
-                                      html = await convertWordToHtml(file);
-                                    } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
-                                      html = await readHtmlFile(file);
-                                    } else if (fileName.endsWith('.txt')) {
-                                      const text = await readTxtFile(file);
-                                      html = `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif; font-size: 12pt;">${text}</div>`;
-                                    } else if (file.type.startsWith('image/')) {
-                                      const dataUrl = await new Promise((resolve) => {
-                                        const reader = new FileReader();
-                                        reader.onload = () => resolve(reader.result);
-                                        reader.readAsDataURL(file);
-                                      });
-                                      html = `<div style="text-align:center;"><img src="${dataUrl}" style="max-width:100%; height:auto;" alt="${file.name}" /></div>`;
-                                    }
-                                    if (html) {
-                                      const updatedResults = [...translationResults];
-                                      updatedResults[selectedResultIndex] = {
-                                        ...updatedResults[selectedResultIndex],
-                                        translatedText: html,
-                                        filename: file.name
-                                      };
-                                      setTranslationResults(updatedResults);
-                                      showToast('Translation page replaced!');
-                                    }
+                                    showToast('Translation page replaced!');
                                   }
                                 } catch (err) {
                                   console.error('Upload error:', err);
@@ -12067,26 +11781,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
           {translationResults.length > 0 ? (
             <>
-              {/* Original and Translation Side by Side - Synchronized page navigation */}
+              {/* Original and Translation Side by Side - Independent page navigation */}
               <div className="border rounded mb-4">
-                {/* Sync toggle bar */}
-                {(originalImages.length > 1 || translationResults.length > 1) && (
-                  <div className="flex items-center justify-center gap-2 px-3 py-1.5 bg-gray-50 border-b">
-                    <button
-                      onClick={() => setSyncPageNavigation(!syncPageNavigation)}
-                      className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-medium rounded-full transition-all ${
-                        syncPageNavigation
-                          ? 'bg-blue-100 text-blue-700 border border-blue-300'
-                          : 'bg-gray-100 text-gray-500 border border-gray-300'
-                      }`}
-                    >
-                      {syncPageNavigation ? '🔗' : '🔓'} {syncPageNavigation ? 'Pages Synced' : 'Pages Independent'}
-                    </button>
-                    <span className="text-[10px] text-gray-400">
-                      Original: {originalImages.length} pages | Translation: {translationResults.length} pages
-                    </span>
-                  </div>
-                )}
                 <div className="grid grid-cols-2 gap-0 bg-gray-100 border-b">
                   <div className="px-3 py-2 border-r">
                     <div className="flex items-center justify-between">
@@ -12095,7 +11791,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         {originalImages.length > 1 && (
                           <>
                             <button
-                              onClick={() => navigateOriginalPage(Math.max(0, selectedOriginalPageIndex - 1))}
+                              onClick={() => setSelectedOriginalPageIndex(Math.max(0, selectedOriginalPageIndex - 1))}
                               disabled={selectedOriginalPageIndex === 0}
                               className="px-1.5 py-0.5 text-[10px] rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
                             >
@@ -12103,7 +11799,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             </button>
                             <span className="text-[10px] text-gray-500 font-medium">{selectedOriginalPageIndex + 1}/{originalImages.length}</span>
                             <button
-                              onClick={() => navigateOriginalPage(Math.min(originalImages.length - 1, selectedOriginalPageIndex + 1))}
+                              onClick={() => setSelectedOriginalPageIndex(Math.min(originalImages.length - 1, selectedOriginalPageIndex + 1))}
                               disabled={selectedOriginalPageIndex >= originalImages.length - 1}
                               className="px-1.5 py-0.5 text-[10px] rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
                             >
@@ -12117,49 +11813,19 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             type="file"
                             accept="image/*,.pdf"
                             className="hidden"
-                            onChange={async (e) => {
+                            onChange={(e) => {
                               if (e.target.files && e.target.files[0]) {
                                 const file = e.target.files[0];
-                                const fileName = file.name.toLowerCase();
-                                if (fileName.endsWith('.pdf')) {
-                                  try {
-                                    setProcessingStatus(`Converting PDF pages: ${file.name}...`);
-                                    const pdfImages = await convertPdfToImages(file, (cp, tp) => {
-                                      setProcessingStatus(`Converting page ${cp}/${tp}...`);
-                                    });
-                                    const newOriginalImages = [...originalImages];
-                                    pdfImages.forEach((img, idx) => {
-                                      newOriginalImages[selectedOriginalPageIndex + idx] = {
-                                        data: `data:${img.type};base64,${img.data}`,
-                                        filename: img.filename
-                                      };
-                                    });
-                                    setOriginalImages(newOriginalImages);
-                                    setProcessingStatus(`✅ ${pdfImages.length} pages loaded`);
-                                    setTimeout(() => setProcessingStatus(''), 3000);
-                                  } catch (err) {
-                                    console.error('PDF conversion error:', err);
-                                    const reader = new FileReader();
-                                    reader.onload = (event) => {
-                                      const newOriginalImages = [...originalImages];
-                                      newOriginalImages[selectedOriginalPageIndex] = { data: event.target.result, filename: file.name };
-                                      setOriginalImages(newOriginalImages);
-                                    };
-                                    reader.readAsDataURL(file);
-                                  }
-                                } else {
-                                  const reader = new FileReader();
-                                  reader.onload = (event) => {
-                                    const newOriginalImages = [...originalImages];
-                                    newOriginalImages[selectedOriginalPageIndex] = {
-                                      data: event.target.result,
-                                      filename: file.name
-                                    };
-                                    setOriginalImages(newOriginalImages);
+                                const reader = new FileReader();
+                                reader.onload = (event) => {
+                                  const newOriginalImages = [...originalImages];
+                                  newOriginalImages[selectedOriginalPageIndex] = {
+                                    data: event.target.result,
+                                    filename: file.name
                                   };
-                                  reader.readAsDataURL(file);
-                                }
-                                e.target.value = '';
+                                  setOriginalImages(newOriginalImages);
+                                };
+                                reader.readAsDataURL(file);
                               }
                             }}
                           />
@@ -12191,7 +11857,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       {translationResults.length > 1 && (
                         <>
                           <button
-                            onClick={() => navigateTranslationPage(Math.max(0, selectedResultIndex - 1))}
+                            onClick={() => setSelectedResultIndex(Math.max(0, selectedResultIndex - 1))}
                             disabled={selectedResultIndex === 0}
                             className="px-1.5 py-0.5 text-[10px] rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
                           >
@@ -12199,7 +11865,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           </button>
                           <span className="text-[10px] text-gray-500 font-medium">{selectedResultIndex + 1}/{translationResults.length}</span>
                           <button
-                            onClick={() => navigateTranslationPage(Math.min(translationResults.length - 1, selectedResultIndex + 1))}
+                            onClick={() => setSelectedResultIndex(Math.min(translationResults.length - 1, selectedResultIndex + 1))}
                             disabled={selectedResultIndex >= translationResults.length - 1}
                             className="px-1.5 py-0.5 text-[10px] rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
                           >
@@ -12239,53 +11905,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                   const text = await readTxtFile(file);
                                   html = `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif; font-size: 12pt;">${text}</div>`;
                                 } else if (fileName.endsWith('.pdf')) {
-                                  // Extract text per page from PDF for editable content
-                                  const pdfData = await new Promise((resolve, reject) => {
-                                    const reader = new FileReader();
-                                    reader.onload = () => resolve(new Uint8Array(reader.result));
-                                    reader.onerror = reject;
-                                    reader.readAsArrayBuffer(file);
-                                  });
-                                  const pdfDoc = await pdfjsLib.getDocument({ data: pdfData }).promise;
-                                  const pdfNewResults = [];
-                                  for (let pgNum = 1; pgNum <= pdfDoc.numPages; pgNum++) {
-                                    const pg = await pdfDoc.getPage(pgNum);
-                                    const tc = await pg.getTextContent();
-                                    const vp = pg.getViewport({ scale: 1 });
-                                    let pgHtml = '';
-                                    let pgLastY = null;
-                                    let pgLine = '';
-                                    tc.items.forEach(item => {
-                                      const yPos = Math.round(vp.height - item.transform[5]);
-                                      if (pgLastY !== null && Math.abs(yPos - pgLastY) > 5) {
-                                        pgHtml += `<p style="margin:2px 0; font-family:'Times New Roman',serif; font-size:12pt;">${pgLine}</p>\n`;
-                                        pgLine = '';
-                                      }
-                                      pgLine += item.str;
-                                      pgLastY = yPos;
-                                    });
-                                    if (pgLine) pgHtml += `<p style="margin:2px 0; font-family:'Times New Roman',serif; font-size:12pt;">${pgLine}</p>\n`;
-                                    if (!pgHtml.trim()) {
-                                      const imgScale = 2;
-                                      const imgVp = pg.getViewport({ scale: imgScale });
-                                      const cvs = document.createElement('canvas');
-                                      cvs.width = imgVp.width; cvs.height = imgVp.height;
-                                      await pg.render({ canvasContext: cvs.getContext('2d'), viewport: imgVp }).promise;
-                                      pgHtml = `<div style="text-align:center;"><img src="${cvs.toDataURL('image/jpeg', 0.85)}" style="max-width:100%; height:auto;" alt="${file.name} page ${pgNum}" /></div>`;
-                                    }
-                                    const existRes = translationResults[selectedResultIndex + pgNum - 1];
-                                    pdfNewResults.push({
-                                      ...(existRes || {}),
-                                      translatedText: `<div style="padding:10px;">${pgHtml}</div>`,
-                                      filename: `${file.name} - Page ${pgNum}`
-                                    });
-                                  }
-                                  const pdfUpdatedResults = [...translationResults];
-                                  pdfUpdatedResults.splice(selectedResultIndex, Math.max(1, pdfNewResults.length), ...pdfNewResults);
-                                  setTranslationResults(pdfUpdatedResults);
-                                  showToast(`PDF loaded: ${pdfDoc.numPages} pages extracted!`);
-                                  e.target.value = '';
-                                  return;
+                                  const images = await convertPdfToImages(file);
+                                  html = images.map((img, idx) => `<div style="text-align:center;"><img src="data:${img.type};base64,${img.data}" style="max-width:100%; height:auto;" alt="${file.name} page ${idx + 1}" /></div>`).join('');
                                 } else if (file.type.startsWith('image/')) {
                                   const dataUrl = await new Promise((resolve) => {
                                     const reader = new FileReader();
