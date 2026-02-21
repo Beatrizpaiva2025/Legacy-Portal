@@ -5293,17 +5293,70 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       .filter(t => t)
       .join('\n\n');
 
-    // Collect ALL original images
+    // Helper: compress a base64 image to stay under Claude API's 5MB limit using canvas
+    const compressImageForApi = (base64Data, maxSizeBytes = 4.5 * 1024 * 1024) => {
+      return new Promise((resolve) => {
+        // Check raw size first - base64 is ~33% overhead, so decoded size ≈ base64.length * 0.75
+        const estimatedBytes = base64Data.length * 0.75;
+        if (estimatedBytes <= maxSizeBytes) {
+          resolve(base64Data);
+          return;
+        }
+        const imgEl = new window.Image();
+        imgEl.onload = () => {
+          const tryCompress = (scale, quality) => {
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.round(imgEl.width * scale);
+            canvas.height = Math.round(imgEl.height * scale);
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(imgEl, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL('image/jpeg', quality);
+            return dataUrl.split(',')[1];
+          };
+          // Try progressively more aggressive compression
+          const attempts = [
+            { scale: 1.0, quality: 0.7 },
+            { scale: 1.0, quality: 0.5 },
+            { scale: 0.75, quality: 0.6 },
+            { scale: 0.75, quality: 0.4 },
+            { scale: 0.5, quality: 0.5 },
+            { scale: 0.5, quality: 0.3 },
+            { scale: 0.35, quality: 0.4 },
+            { scale: 0.25, quality: 0.4 },
+          ];
+          for (const { scale, quality } of attempts) {
+            const compressed = tryCompress(scale, quality);
+            if (compressed.length * 0.75 <= maxSizeBytes) {
+              console.log(`Image compressed: scale=${scale}, quality=${quality}, ~${Math.round(compressed.length * 0.75 / 1024)}KB`);
+              resolve(compressed);
+              return;
+            }
+          }
+          // Last resort: very small
+          const last = tryCompress(0.2, 0.3);
+          console.warn(`Image compressed with last resort: ~${Math.round(last.length * 0.75 / 1024)}KB`);
+          resolve(last);
+        };
+        imgEl.onerror = () => {
+          console.warn('Could not load image for compression, using original');
+          resolve(base64Data);
+        };
+        imgEl.src = `data:image/png;base64,${base64Data}`;
+      });
+    };
+
+    // Collect ALL original images and compress them to stay under 5MB
     const allOriginalImages = [];
-    originalImages.forEach(img => {
+    for (const img of originalImages) {
       if (img?.data) {
         let imgBase64 = img.data;
         if (imgBase64.startsWith('data:')) {
           imgBase64 = imgBase64.split(',')[1];
         }
-        allOriginalImages.push(imgBase64);
+        const compressed = await compressImageForApi(imgBase64);
+        allOriginalImages.push(compressed);
       }
-    });
+    }
 
     // If no text and no images, show error
     if (!originalText && allOriginalImages.length === 0) {
