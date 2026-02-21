@@ -21630,55 +21630,12 @@ Referência de traduções aprovadas - verifique se foram seguidas:
         def compress_proofread_image(raw_b64: str) -> tuple:
             media_type = "image/png"
             try:
-                # Strip data URL prefix if present (e.g. "data:image/png;base64,...")
-                if raw_b64.startswith('data:'):
-                    header, raw_b64 = raw_b64.split(',', 1)
-                    if 'image/jpeg' in header:
-                        media_type = "image/jpeg"
-                    elif 'image/webp' in header:
-                        media_type = "image/webp"
                 image_bytes = base64.b64decode(raw_b64)
                 compressed_bytes, final_media_type = compress_image_for_claude_api(image_bytes, media_type)
-                # Final safety check: if still over 5MB, the API will reject it
-                max_size = 5 * 1024 * 1024
-                if len(compressed_bytes) > max_size:
-                    logger.warning(f"Compressed image still {len(compressed_bytes)} bytes (>{max_size}), forcing aggressive resize")
-                    img = Image.open(io.BytesIO(compressed_bytes))
-                    if img.mode in ('RGBA', 'P', 'LA'):
-                        img = img.convert('RGB')
-                    # Aggressively resize until under limit
-                    for scale in [0.5, 0.35, 0.25, 0.15, 0.1]:
-                        new_size = (max(1, int(img.width * scale)), max(1, int(img.height * scale)))
-                        resized = img.resize(new_size, Image.LANCZOS)
-                        buf = io.BytesIO()
-                        resized.save(buf, format='JPEG', quality=30, optimize=True)
-                        if buf.tell() <= max_size:
-                            compressed_bytes = buf.getvalue()
-                            final_media_type = "image/jpeg"
-                            logger.info(f"Aggressive resize to {new_size} brought image to {len(compressed_bytes)} bytes")
-                            break
                 return base64.b64encode(compressed_bytes).decode('utf-8'), final_media_type
             except Exception as e:
-                logger.warning(f"Could not compress image for proofreading: {str(e)}")
-                # Try to at least decode and re-encode at low quality as fallback
-                try:
-                    clean_b64 = raw_b64.split(',', 1)[-1] if raw_b64.startswith('data:') else raw_b64
-                    img_bytes = base64.b64decode(clean_b64)
-                    img = Image.open(io.BytesIO(img_bytes))
-                    if img.mode in ('RGBA', 'P', 'LA'):
-                        img = img.convert('RGB')
-                    # Resize to max 2000px and low quality
-                    max_dim = 2000
-                    if img.width > max_dim or img.height > max_dim:
-                        ratio = min(max_dim / img.width, max_dim / img.height)
-                        img = img.resize((int(img.width * ratio), int(img.height * ratio)), Image.LANCZOS)
-                    buf = io.BytesIO()
-                    img.save(buf, format='JPEG', quality=50, optimize=True)
-                    logger.info(f"Fallback compression succeeded: {buf.tell()} bytes")
-                    return base64.b64encode(buf.getvalue()).decode('utf-8'), "image/jpeg"
-                except Exception as e2:
-                    logger.error(f"Fallback compression also failed: {str(e2)}")
-                    return raw_b64, media_type
+                logger.warning(f"Could not compress image, using original: {str(e)}")
+                return raw_b64, media_type
 
         # Build the message content based on whether we have images or just text
         if all_images:
@@ -21699,31 +21656,6 @@ Referência de traduções aprovadas - verifique se foram seguidas:
             # Add all images
             for idx, img_b64 in enumerate(all_images):
                 compressed_data, media_type = compress_proofread_image(img_b64)
-
-                # SAFETY NET: verify decoded size is under 5MB before adding
-                try:
-                    decoded_size = len(base64.b64decode(compressed_data))
-                    max_api_size = 5 * 1024 * 1024
-                    if decoded_size > max_api_size:
-                        logger.warning(f"Proofread image {idx} still {decoded_size} bytes after compression, force-compressing via PIL")
-                        raw_bytes = base64.b64decode(compressed_data)
-                        img_pil = Image.open(io.BytesIO(raw_bytes))
-                        if img_pil.mode in ('RGBA', 'P', 'LA'):
-                            img_pil = img_pil.convert('RGB')
-                        # Aggressively shrink until under limit
-                        for s, q in [(0.7, 60), (0.5, 50), (0.4, 40), (0.3, 35), (0.2, 30), (0.15, 25), (0.1, 20)]:
-                            w, h = max(1, int(img_pil.width * s)), max(1, int(img_pil.height * s))
-                            resized = img_pil.resize((w, h), Image.LANCZOS)
-                            buf = io.BytesIO()
-                            resized.save(buf, format='JPEG', quality=q, optimize=True)
-                            if buf.tell() <= max_api_size:
-                                compressed_data = base64.b64encode(buf.getvalue()).decode('utf-8')
-                                media_type = "image/jpeg"
-                                logger.info(f"Safety net compressed image {idx} to {buf.tell()} bytes ({w}x{h}, q={q})")
-                                break
-                except Exception as safety_err:
-                    logger.error(f"Safety net compression failed for image {idx}: {safety_err}")
-
                 if total_pages > 1:
                     user_content.append({
                         "type": "text",
@@ -21761,34 +21693,6 @@ Analise minuciosamente TODAS as páginas e retorne o JSON com todos os erros enc
 
 Analise minuciosamente e retorne o JSON com todos os erros encontrados."""
             messages = [{"role": "user", "content": user_message}]
-
-        # FINAL PRE-FLIGHT CHECK: ensure no image in messages exceeds 5MB
-        max_api_size = 5 * 1024 * 1024
-        for msg in messages:
-            if isinstance(msg.get("content"), list):
-                for block in msg["content"]:
-                    if block.get("type") == "image" and block.get("source", {}).get("type") == "base64":
-                        img_data = block["source"]["data"]
-                        try:
-                            decoded_len = len(base64.b64decode(img_data))
-                            if decoded_len > max_api_size:
-                                logger.warning(f"Pre-flight: image {decoded_len} bytes > {max_api_size}, force-compressing")
-                                raw = base64.b64decode(img_data)
-                                pil_img = Image.open(io.BytesIO(raw))
-                                if pil_img.mode in ('RGBA', 'P', 'LA'):
-                                    pil_img = pil_img.convert('RGB')
-                                for s, q in [(0.5, 50), (0.35, 40), (0.25, 30), (0.15, 25), (0.1, 20)]:
-                                    w, h = max(1, int(pil_img.width * s)), max(1, int(pil_img.height * s))
-                                    r_img = pil_img.resize((w, h), Image.LANCZOS)
-                                    buf = io.BytesIO()
-                                    r_img.save(buf, format='JPEG', quality=q, optimize=True)
-                                    if buf.tell() <= max_api_size:
-                                        block["source"]["data"] = base64.b64encode(buf.getvalue()).decode('utf-8')
-                                        block["source"]["media_type"] = "image/jpeg"
-                                        logger.info(f"Pre-flight compressed to {buf.tell()} bytes ({w}x{h}, q={q})")
-                                        break
-                        except Exception as pf_err:
-                            logger.error(f"Pre-flight image check failed: {pf_err}")
 
         async with httpx.AsyncClient(timeout=180.0) as client:
             response = await client.post(
@@ -26537,15 +26441,15 @@ def compress_image_for_claude_api(img_bytes: bytes, media_type: str = "image/jpe
                 return compressed_bytes, "image/jpeg"
 
         # If still too large, resize the image progressively
-        scale_factors = [0.75, 0.5, 0.35, 0.25, 0.15, 0.1]
+        scale_factors = [0.75, 0.5, 0.35, 0.25]
         original_size = img.size
 
         for scale in scale_factors:
-            new_size = (max(1, int(original_size[0] * scale)), max(1, int(original_size[1] * scale)))
+            new_size = (int(original_size[0] * scale), int(original_size[1] * scale))
             resized_img = img.resize(new_size, Image.LANCZOS)
 
             # Try quality settings again with resized image
-            for quality in [70, 50, 35, 20]:
+            for quality in [70, 50, 35]:
                 jpeg_buffer = io.BytesIO()
                 resized_img.save(jpeg_buffer, format='JPEG', quality=quality, optimize=True)
                 compressed_bytes = jpeg_buffer.getvalue()
