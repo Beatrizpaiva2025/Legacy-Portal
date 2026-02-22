@@ -5652,7 +5652,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             if (onProgress) onProgress(pageNum, pdf.numPages);
 
             const page = await pdf.getPage(pageNum);
-            let scale = 3; // Higher scale = better quality (3x for sharp PDF rendering)
+            let scale = 2; // 2x scale for good quality while keeping file size manageable
             let viewport = page.getViewport({ scale });
 
             // Ensure no dimension exceeds 7900px (Claude API limit is 8000px)
@@ -5670,16 +5670,33 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
             await page.render({ canvasContext: context, viewport }).promise;
 
-            // Convert canvas to base64 PNG
-            const dataUrl = canvas.toDataURL('image/png');
-            const base64 = dataUrl.split(',')[1];
+            // Convert canvas to JPEG (much smaller than PNG, keeps under Claude API 5MB limit)
+            let dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            let base64 = dataUrl.split(',')[1];
+
+            // Safety: if still over ~4.5MB, reduce quality then scale
+            const maxBytes = 4.5 * 1024 * 1024;
+            if (base64.length * 0.75 > maxBytes) {
+              dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+              base64 = dataUrl.split(',')[1];
+              if (base64.length * 0.75 > maxBytes) {
+                const lowerScale = Math.min(1.5, scale * 0.6);
+                const lowerViewport = page.getViewport({ scale: lowerScale });
+                canvas.width = lowerViewport.width;
+                canvas.height = lowerViewport.height;
+                context.clearRect(0, 0, canvas.width, canvas.height);
+                await page.render({ canvasContext: context, viewport: lowerViewport }).promise;
+                dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                base64 = dataUrl.split(',')[1];
+              }
+            }
 
             // Validate that we got actual image data (not empty/blank)
             if (base64 && base64.length > 100) {
               images.push({
-                filename: `${file.name}_page_${pageNum}.png`,
+                filename: `${file.name}_page_${pageNum}.jpg`,
                 data: base64,
-                type: 'image/png'
+                type: 'image/jpeg'
               });
             } else {
               console.warn(`PDF page ${pageNum} rendered as empty, skipping`);
@@ -11215,48 +11232,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         const html = `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif; font-size: 12pt;">${text}</div>`;
                         setTranslationResults(prev => [...prev, { translatedText: html, originalText: '', filename: file.name }]);
                       } else if (fileName.endsWith('.pdf')) {
-                        setProcessingStatus(`Extracting text from PDF: ${file.name}...`);
-                        const pdfData = await new Promise((resolve, reject) => {
-                          const reader = new FileReader();
-                          reader.onload = () => resolve(new Uint8Array(reader.result));
-                          reader.onerror = reject;
-                          reader.readAsArrayBuffer(file);
+                        setProcessingStatus(`Converting PDF pages: ${file.name}...`);
+                        const images = await convertPdfToImages(file, (page, total) => {
+                          setProcessingStatus(`Rendering page ${page}/${total}...`);
                         });
-                        const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
-                        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-                          setProcessingStatus(`Extracting text: page ${pageNum}/${pdf.numPages}`);
-                          const page = await pdf.getPage(pageNum);
-                          const textContent = await page.getTextContent();
-                          const viewport = page.getViewport({ scale: 1 });
-                          let pageHtml = '';
-                          let lastY = null;
-                          let currentLine = '';
-                          textContent.items.forEach(item => {
-                            const y = Math.round(viewport.height - item.transform[5]);
-                            if (lastY !== null && Math.abs(y - lastY) > 5) {
-                              pageHtml += `<p style="margin:2px 0; font-family:'Times New Roman',serif; font-size:12pt;">${currentLine}</p>\n`;
-                              currentLine = '';
-                            }
-                            currentLine += item.str;
-                            lastY = y;
-                          });
-                          if (currentLine) {
-                            pageHtml += `<p style="margin:2px 0; font-family:'Times New Roman',serif; font-size:12pt;">${currentLine}</p>\n`;
-                          }
-                          if (!pageHtml.trim()) {
-                            // Fallback to image if no text found
-                            const scale = 3;
-                            const imgViewport = page.getViewport({ scale });
-                            const canvas = document.createElement('canvas');
-                            const ctx = canvas.getContext('2d');
-                            canvas.width = imgViewport.width;
-                            canvas.height = imgViewport.height;
-                            await page.render({ canvasContext: ctx, viewport: imgViewport }).promise;
-                            const dataUrl = canvas.toDataURL('image/png');
-                            pageHtml = `<div style="text-align:center;"><img src="${dataUrl}" style="max-width:100%; height:auto;" alt="${file.name} page ${pageNum}" /></div>`;
-                          }
-                          const wrappedHtml = `<div style="padding:10px;">${pageHtml}</div>`;
-                          setTranslationResults(prev => [...prev, { translatedText: wrappedHtml, originalText: '', filename: `${file.name} - Page ${pageNum}` }]);
+                        // Each page becomes a separate translation result with image
+                        for (let idx = 0; idx < images.length; idx++) {
+                          const img = images[idx];
+                          const pageHtml = `<div style="text-align:center;"><img src="data:${img.type};base64,${img.data}" style="max-width:100%; height:auto;" alt="${file.name} page ${idx + 1}" /></div>`;
+                          setTranslationResults(prev => [...prev, { translatedText: pageHtml, originalText: '', filename: `${file.name} - Page ${idx + 1}` }]);
                         }
                       } else if (file.type.startsWith('image/')) {
                         const dataUrl = await new Promise((resolve) => {
@@ -11453,42 +11437,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                     const text = await readTxtFile(file);
                                     html = `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif; font-size: 12pt;">${text}</div>`;
                                   } else if (fileName.endsWith('.pdf')) {
-                                    const pdfData = await new Promise((resolve, reject) => {
-                                      const reader = new FileReader();
-                                      reader.onload = () => resolve(new Uint8Array(reader.result));
-                                      reader.onerror = reject;
-                                      reader.readAsArrayBuffer(file);
-                                    });
-                                    const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
-                                    let allPagesHtml = '';
-                                    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-                                      const page = await pdf.getPage(pageNum);
-                                      const textContent = await page.getTextContent();
-                                      const viewport = page.getViewport({ scale: 1 });
-                                      let lastY = null;
-                                      let currentLine = '';
-                                      textContent.items.forEach(item => {
-                                        const y = Math.round(viewport.height - item.transform[5]);
-                                        if (lastY !== null && Math.abs(y - lastY) > 5) {
-                                          allPagesHtml += `<p style="margin:2px 0; font-family:'Times New Roman',serif; font-size:12pt;">${currentLine}</p>\n`;
-                                          currentLine = '';
-                                        }
-                                        currentLine += item.str;
-                                        lastY = y;
-                                      });
-                                      if (currentLine) {
-                                        allPagesHtml += `<p style="margin:2px 0; font-family:'Times New Roman',serif; font-size:12pt;">${currentLine}</p>\n`;
-                                      }
-                                      if (pageNum < pdf.numPages) {
-                                        allPagesHtml += '<hr style="margin:15px 0; border-top:1px dashed #ccc;" />\n';
-                                      }
-                                    }
-                                    if (!allPagesHtml.trim()) {
-                                      // Fallback to image if no text found
-                                      const images = await convertPdfToImages(file);
-                                      allPagesHtml = images.map((img, idx) => `<div style="text-align:center;"><img src="data:${img.type};base64,${img.data}" style="max-width:100%; height:auto;" alt="${file.name} page ${idx + 1}" /></div>`).join('');
-                                    }
-                                    html = `<div style="padding:10px;">${allPagesHtml}</div>`;
+                                    // Render PDF pages as images to preserve visual formatting
+                                    const images = await convertPdfToImages(file);
+                                    html = images.map((img, idx) => `<div style="text-align:center;"><img src="data:${img.type};base64,${img.data}" style="max-width:100%; height:auto;" alt="${file.name} page ${idx + 1}" /></div>`).join('');
                                   } else if (file.type.startsWith('image/')) {
                                     const dataUrl = await new Promise((resolve) => {
                                       const reader = new FileReader();
