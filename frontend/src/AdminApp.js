@@ -465,7 +465,7 @@ const stripParentheticalComment = (text) => {
 const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
     @page {
         size: ${pageSizeCSS};
-        margin: 0.5in 0.5in;
+        margin: 0.4in 0.4in;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -474,7 +474,7 @@ const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
         line-height: 1.6;
         color: #333;
         background: white;
-        padding: 0.2in 0.25in;
+        padding: 0;
     }
     img { max-width: 100%; height: auto; }
     table { border-collapse: collapse; width: 100%; }
@@ -549,7 +549,7 @@ const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
 
 // Helper function to generate letterhead HTML with INLINE STYLES (guaranteed to work)
 const getLetterheadHTML = (logoLeft, logoRight) => `
-<table style="width: 100%; border: none; border-collapse: collapse; margin-bottom: 8px;">
+<table style="width: 100%; border: none; border-collapse: collapse; margin-bottom: 4px;">
     <tr>
         <td style="width: 120px; vertical-align: middle; border: none; padding: 0;">
             ${logoLeft
@@ -568,7 +568,7 @@ const getLetterheadHTML = (logoLeft, logoRight) => `
         </td>
     </tr>
 </table>
-<div style="width: 100%; height: 2px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 8px;"></div>`;
+<div style="width: 100%; height: 2px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 4px;"></div>`;
 
 // ==================== CONSTANTS ====================
 const STATUS_COLORS = {
@@ -6644,7 +6644,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
       // Generate PDF with hash tracking using html2pdf (deterministic blob)
       const { blob: pdfBlob, hash: pdfHash } = await generatePdfWithHash(fullHTML, filename, {
-        margin: [5, 5, 5, 5],
+        margin: [10, 10, 10, 10],
         image: { type: 'jpeg', quality: 0.95 },
         html2canvas: { scale: 2, useCORS: true, allowTaint: true },
         jsPDF: { unit: 'mm', format: pageFormat === 'a4' ? 'a4' : 'letter', orientation: 'portrait' }
@@ -7274,7 +7274,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         const filename = `${orderNumber || 'P0000'}_${documentType.replace(/\s+/g, '_')}_${translationType === 'sworn' ? 'Sworn' : 'Certified'}_Translation.pdf`;
 
         const { blob: pdfBlob, hash: pdfHash } = await generatePdfWithHash(htmlContent, filename, {
-          margin: [5, 5, 5, 5],
+          margin: [10, 10, 10, 10],
           image: { type: 'jpeg', quality: 0.95 },
           html2canvas: { scale: 2, useCORS: true, allowTaint: true },
           jsPDF: { unit: 'mm', format: pageFormat === 'a4' ? 'a4' : 'letter', orientation: 'portrait' }
@@ -15745,12 +15745,12 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   <meta charset="UTF-8">
   <title>Certified Translation - ${orderData.order_number || 'Document'}</title>
   <style>
-    @page { size: Letter; margin: 0.5in 0.5in; }
-    @page cover { size: Letter; margin: 0.5in; }
+    @page { size: Letter; margin: 0.4in 0.4in; }
+    @page cover { size: Letter; margin: 0.4in; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Times New Roman', Georgia, serif; font-size: 13px; line-height: 1.5; color: #333; padding: 0.2in 0.25in; }
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; }
-    .header-line { height: 3px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 12px; }
+    body { font-family: 'Times New Roman', Georgia, serif; font-size: 13px; line-height: 1.5; color: #333; padding: 0; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; padding-bottom: 4px; }
+    .header-line { height: 3px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 4px; }
     .logo-left { width: 130px; height: 55px; display: flex; align-items: center; }
     .logo-placeholder { width: 130px; height: 55px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #999; background: #fafafa; }
     .header-center { text-align: center; flex: 1; padding: 0 15px; }
@@ -15804,7 +15804,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
       try {
         const { blob: pdfBlob, hash: pdfHash } = await generatePdfWithHash(fullHTML, filename, {
-          margin: [5, 5, 5, 5],
+          margin: [10, 10, 10, 10],
           image: { type: 'jpeg', quality: 0.95 },
           html2canvas: { scale: 2, useCORS: true, allowTaint: true },
           jsPDF: { unit: 'mm', format: 'letter', orientation: 'portrait' }
@@ -29987,12 +29987,12 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   <meta charset="UTF-8">
   <title>Certified Translation - ${orderData.order_number || 'Document'}</title>
   <style>
-    @page { size: Letter; margin: 0.5in 0.5in; }
-    @page cover { size: Letter; margin: 0.5in; }
+    @page { size: Letter; margin: 0.4in 0.4in; }
+    @page cover { size: Letter; margin: 0.4in; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Times New Roman', Georgia, serif; font-size: 13px; line-height: 1.5; color: #333; padding: 0.2in 0.25in; }
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; }
-    .header-line { height: 3px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 12px; }
+    body { font-family: 'Times New Roman', Georgia, serif; font-size: 13px; line-height: 1.5; color: #333; padding: 0; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; padding-bottom: 4px; }
+    .header-line { height: 3px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 4px; }
     .logo-left { width: 130px; height: 55px; display: flex; align-items: center; }
     .logo-placeholder { width: 130px; height: 55px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #999; background: #fafafa; }
     .header-center { text-align: center; flex: 1; padding: 0 15px; }
@@ -30046,7 +30046,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
       try {
         const { blob: pdfBlob, hash: pdfHash } = await generatePdfWithHash(fullHTML, filename, {
-          margin: [5, 5, 5, 5],
+          margin: [10, 10, 10, 10],
           image: { type: 'jpeg', quality: 0.95 },
           html2canvas: { scale: 2, useCORS: true, allowTaint: true },
           jsPDF: { unit: 'mm', format: 'letter', orientation: 'portrait' }
@@ -31156,8 +31156,8 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     <meta charset="UTF-8">
     <title>${certTitle} - ${order?.order_number || 'Document'}</title>
     <style>
-        @page { size: ${pageSizeCSS}; margin: 0.5in 0.6in 0.6in 0.6in; }
-        @page cover { size: ${pageSizeCSS}; margin: 0.75in; }
+        @page { size: ${pageSizeCSS}; margin: 0.4in 0.4in; }
+        @page cover { size: ${pageSizeCSS}; margin: 0.4in; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Times New Roman', Georgia, serif;
@@ -31169,14 +31169,14 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 8px;
-            padding-bottom: 8px;
+            margin-bottom: 4px;
+            padding-bottom: 4px;
             border: none;
         }
         .header-line {
             height: 3px;
             background: linear-gradient(to right, #3B82F6, #60A5FA);
-            margin-bottom: 12px;
+            margin-bottom: 4px;
             border: none;
         }
         .logo-left { width: 130px; height: 55px; display: flex; align-items: center; }
@@ -31289,7 +31289,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
     try {
       const { blob: pdfBlob, hash: pdfHash } = await generatePdfWithHash(fullHTML, filename, {
-        margin: [5, 5, 5, 5],
+        margin: [10, 10, 10, 10],
         image: { type: 'jpeg', quality: 0.95 },
         html2canvas: { scale: 2, useCORS: true, allowTaint: true },
         jsPDF: { unit: 'mm', format: pmPageFormat === 'a4' ? 'a4' : 'letter', orientation: 'portrait' }
