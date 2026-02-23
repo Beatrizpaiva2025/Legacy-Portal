@@ -558,12 +558,12 @@ const getLetterheadHTML = (logoLeft, logoRight) => `
         </td>
         <td style="text-align: center; vertical-align: middle; border: none; padding: 0 15px;">
             <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
-            <div style="font-size: 9px; color: #333; line-height: 1.3;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
-            <div style="font-size: 9px; color: #333;">(857) 316-7770 · contact@legacytranslations.com</div>
+            <div style="font-size: 10px; color: #333; line-height: 1.3;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+            <div style="font-size: 10px; color: #333;">(857) 316-7770 · contact@legacytranslations.com</div>
         </td>
-        <td style="width: 80px; text-align: right; vertical-align: middle; border: none; padding: 0;">
+        <td style="width: 120px; text-align: right; vertical-align: middle; border: none; padding: 0;">
             ${logoRight
-              ? `<img src="${logoRight}" alt="ATA" style="max-width: 75px; max-height: 50px; object-fit: contain;" />`
+              ? `<img src="${logoRight}" alt="ATA" style="max-width: 110px; max-height: 50px; object-fit: contain;" />`
               : `<div style="font-size: 9px; color: #666; font-style: italic; text-align: right;">ata<br/><span style="font-size: 8px;">Member # 275993</span></div>`}
         </td>
     </tr>
@@ -1736,8 +1736,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             </div>
             <div style="text-align: center; flex: 1; padding: 0 16px;">
               <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
-              <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
-              <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
+              <div style="font-size: 10px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+              <div style="font-size: 10px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
             <div style="width: 80px; text-align: right;">
               {{LOGO_RIGHT}}
@@ -6417,15 +6417,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
                   : `<div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>`}
             </div>
-            <div style="float: right !important; width: 80px !important; text-align: right !important;">
+            <div style="float: right !important; width: 128px !important; text-align: right !important;">
                 ${logoRight
-                  ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px; max-width: 75px;" />`
+                  ? `<img src="${logoRight}" alt="ATA" style="max-height: 48px; max-width: 120px;" />`
                   : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>`}
             </div>
-            <div style="margin-left: 138px !important; margin-right: 90px !important; text-align: center !important;">
+            <div style="margin-left: 138px !important; margin-right: 138px !important; text-align: center !important;">
                 <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
-                <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
-                <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
+                <div style="font-size: 10px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                <div style="font-size: 10px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
 
@@ -6492,15 +6492,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
                   : `<div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>`}
             </div>
-            <div style="float: right !important; width: 80px !important; text-align: right !important;">
+            <div style="float: right !important; width: 128px !important; text-align: right !important;">
                 ${logoRight
-                  ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px; max-width: 75px;" />`
+                  ? `<img src="${logoRight}" alt="ATA" style="max-height: 48px; max-width: 120px;" />`
                   : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span></div>`}
             </div>
-            <div style="margin-left: 138px !important; margin-right: 90px !important; text-align: center !important;">
+            <div style="margin-left: 138px !important; margin-right: 138px !important; text-align: center !important;">
                 <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
-                <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
-                <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
+                <div style="font-size: 10px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                <div style="font-size: 10px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
         <div style="clear: both !important; width: 100% !important; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>`;
@@ -6849,7 +6849,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       <div style="padding: 20px;">
         ${CERTIFICATE_TEMPLATES[selectedCertificateTemplate].formHTML
           .replace(/\{\{LOGO_LEFT\}\}/g, logoLeft ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px;" />` : '<div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>')
-          .replace(/\{\{LOGO_RIGHT\}\}/g, logoRight ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px;" />` : '<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>')
+          .replace(/\{\{LOGO_RIGHT\}\}/g, logoRight ? `<img src="${logoRight}" alt="ATA" style="max-height: 48px;" />` : '<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>')
           .replace(/\{\{LOGO_STAMP\}\}/g, logoStamp ? `<img src="${logoStamp}" alt="Stamp" style="width: 100px; height: 100px; object-fit: contain;" />` : '')
           .replace(/\{\{SIGNATURE\}\}/g, signatureImage ? `<img src="${signatureImage}" alt="Signature" style="max-height: 32px; max-width: 150px;" />` : '')
           .replace(/\{\{TODAY_DATE\}\}/g, new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York' }))}
@@ -6863,11 +6863,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           </div>
           <div style="text-align: center; flex: 1; padding: 0 16px;">
             <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
-            <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
-            <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
+            <div style="font-size: 10px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+            <div style="font-size: 10px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
           </div>
           <div style="width: 80px; text-align: left;">
-            ${logoRight ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px;" />` : '<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>'}
+            ${logoRight ? `<img src="${logoRight}" alt="ATA" style="max-height: 48px;" />` : '<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>'}
           </div>
         </div>
         <div style="width: 100%; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>
@@ -6981,15 +6981,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
                   : `<div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>`}
             </div>
-            <div style="float: right !important; width: 80px !important; text-align: right !important;">
+            <div style="float: right !important; width: 128px !important; text-align: right !important;">
                 ${logoRight
-                  ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px; max-width: 75px;" />`
+                  ? `<img src="${logoRight}" alt="ATA" style="max-height: 48px; max-width: 120px;" />`
                   : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>`}
             </div>
-            <div style="margin-left: 138px !important; margin-right: 90px !important; text-align: center !important;">
+            <div style="margin-left: 138px !important; margin-right: 138px !important; text-align: center !important;">
                 <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
-                <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
-                <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
+                <div style="font-size: 10px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                <div style="font-size: 10px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
 
@@ -7057,15 +7057,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
                   : `<div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>`}
             </div>
-            <div style="float: right !important; width: 80px !important; text-align: right !important;">
+            <div style="float: right !important; width: 128px !important; text-align: right !important;">
                 ${logoRight
-                  ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px; max-width: 75px;" />`
+                  ? `<img src="${logoRight}" alt="ATA" style="max-height: 48px; max-width: 120px;" />`
                   : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span></div>`}
             </div>
-            <div style="margin-left: 138px !important; margin-right: 90px !important; text-align: center !important;">
+            <div style="margin-left: 138px !important; margin-right: 138px !important; text-align: center !important;">
                 <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
-                <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
-                <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
+                <div style="font-size: 10px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                <div style="font-size: 10px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
         <div style="clear: both !important; width: 100% !important; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>`;
@@ -8866,7 +8866,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 style={{maxHeight: '800px'}}
                 dangerouslySetInnerHTML={{ __html: CERTIFICATE_TEMPLATES[selectedCertificateTemplate].formHTML
                   .replace(/\{\{LOGO_LEFT\}\}/g, logoLeft ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px;" />` : '<div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>')
-                  .replace(/\{\{LOGO_RIGHT\}\}/g, logoRight ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px;" />` : '<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>')
+                  .replace(/\{\{LOGO_RIGHT\}\}/g, logoRight ? `<img src="${logoRight}" alt="ATA" style="max-height: 48px;" />` : '<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>')
                   .replace(/\{\{LOGO_STAMP\}\}/g, logoStamp ? `<img src="${logoStamp}" alt="Stamp" style="width: 100px; height: 100px; object-fit: contain;" />` : '')
                   .replace(/\{\{SIGNATURE\}\}/g, signatureImage ? `<img src="${signatureImage}" alt="Signature" style="max-height: 32px; max-width: 150px;" />` : '')
                   .replace(/\{\{TODAY_DATE\}\}/g, new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York' }))
@@ -8883,11 +8883,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   </div>
                   <div className="text-center flex-1 px-4">
                     <div className="font-bold text-blue-600 text-sm">Legacy Translations</div>
-                    <div className="text-[9px] text-gray-600">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
-                    <div className="text-[9px] text-gray-600">(857) 316-7770 · contact@legacytranslations.com</div>
+                    <div className="text-[10px] text-gray-600">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                    <div className="text-[10px] text-gray-600">(857) 316-7770 · contact@legacytranslations.com</div>
                   </div>
-                  <div className="w-20 text-right">
-                    {logoRight ? <img src={logoRight} alt="ATA" className="max-h-10 ml-auto" /> : <div className="text-[9px] text-gray-600 italic">ata<br/><span className="text-[8px]">Member # 275993</span></div>}
+                  <div className="w-32 text-right">
+                    {logoRight ? <img src={logoRight} alt="ATA" className="max-h-12 ml-auto" /> : <div className="text-[9px] text-gray-600 italic">ata<br/><span className="text-[8px]">Member # 275993</span></div>}
                   </div>
                 </div>
                 {/* Light blue line below header */}
@@ -15755,9 +15755,9 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     .logo-placeholder { width: 130px; height: 55px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #999; background: #fafafa; }
     .header-center { text-align: center; flex: 1; padding: 0 15px; }
     .company-name { font-size: 15px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
-    .company-address { font-size: 9px; line-height: 1.3; color: #333; }
-    .logo-right { width: 85px; height: 55px; display: flex; align-items: center; justify-content: flex-end; }
-    .logo-placeholder-right { width: 85px; height: 55px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #1a365d; background: #fafafa; text-align: center; font-style: italic; }
+    .company-address { font-size: 10px; line-height: 1.3; color: #333; }
+    .logo-right { width: 120px; height: 55px; display: flex; align-items: center; justify-content: flex-end; }
+    .logo-placeholder-right { width: 120px; height: 55px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #1a365d; background: #fafafa; text-align: center; font-style: italic; }
     .order-number { text-align: right; margin-bottom: 20px; font-size: 12px; margin-top: 5px; }
     .main-title { text-align: center; font-size: 28px; font-weight: normal; margin-bottom: 20px; color: #1a365d; line-height: 1.2; }
     .subtitle { text-align: center; font-size: 13px; margin-bottom: 25px; line-height: 1.5; }
@@ -29939,15 +29939,15 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   ? `<img src="${pkgLogoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
                   : `<div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>`}
             </div>
-            <div style="float: right !important; width: 80px !important; text-align: right !important;">
+            <div style="float: right !important; width: 128px !important; text-align: right !important;">
                 ${pkgLogoRight
-                  ? `<img src="${pkgLogoRight}" alt="ATA" style="max-height: 40px; max-width: 75px;" />`
+                  ? `<img src="${pkgLogoRight}" alt="ATA" style="max-height: 48px; max-width: 120px;" />`
                   : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span></div>`}
             </div>
-            <div style="margin-left: 138px !important; margin-right: 90px !important; text-align: center !important;">
+            <div style="margin-left: 138px !important; margin-right: 138px !important; text-align: center !important;">
                 <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
-                <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
-                <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
+                <div style="font-size: 10px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                <div style="font-size: 10px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
         <div style="clear: both !important; width: 100% !important; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>`;
@@ -29963,15 +29963,15 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   ? `<img src="${pkgLogoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
                   : `<div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>`}
             </div>
-            <div style="float: right !important; width: 80px !important; text-align: right !important;">
+            <div style="float: right !important; width: 128px !important; text-align: right !important;">
                 ${pkgLogoRight
-                  ? `<img src="${pkgLogoRight}" alt="ATA" style="max-height: 40px; max-width: 75px;" />`
+                  ? `<img src="${pkgLogoRight}" alt="ATA" style="max-height: 48px; max-width: 120px;" />`
                   : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>`}
             </div>
-            <div style="margin-left: 138px !important; margin-right: 90px !important; text-align: center !important;">
+            <div style="margin-left: 138px !important; margin-right: 138px !important; text-align: center !important;">
                 <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
-                <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
-                <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
+                <div style="font-size: 10px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                <div style="font-size: 10px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
 
@@ -31085,15 +31085,15 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
                   : `<div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>`}
             </div>
-            <div style="float: right !important; width: 80px !important; text-align: right !important;">
+            <div style="float: right !important; width: 128px !important; text-align: right !important;">
                 ${logoRight
-                  ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px; max-width: 75px;" />`
+                  ? `<img src="${logoRight}" alt="ATA" style="max-height: 48px; max-width: 120px;" />`
                   : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>`}
             </div>
-            <div style="margin-left: 138px !important; margin-right: 90px !important; text-align: center !important;">
+            <div style="margin-left: 138px !important; margin-right: 138px !important; text-align: center !important;">
                 <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
-                <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
-                <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
+                <div style="font-size: 10px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                <div style="font-size: 10px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
         <div style="clear: both !important; width: 100% !important; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>
@@ -31139,15 +31139,15 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
                   : `<div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>`}
             </div>
-            <div style="float: right !important; width: 80px !important; text-align: right !important;">
+            <div style="float: right !important; width: 128px !important; text-align: right !important;">
                 ${logoRight
-                  ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px; max-width: 75px;" />`
+                  ? `<img src="${logoRight}" alt="ATA" style="max-height: 48px; max-width: 120px;" />`
                   : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span></div>`}
             </div>
-            <div style="margin-left: 138px !important; margin-right: 90px !important; text-align: center !important;">
+            <div style="margin-left: 138px !important; margin-right: 138px !important; text-align: center !important;">
                 <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
-                <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
-                <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
+                <div style="font-size: 10px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                <div style="font-size: 10px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
         <div style="clear: both !important; width: 100% !important; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>`;
@@ -31755,11 +31755,11 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         }
         .header-center { text-align: center; flex: 1; padding: 0 15px; }
         .company-name { font-size: 15px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
-        .company-address { font-size: 9px; line-height: 1.3; color: #333; }
-        .logo-right { width: 85px; height: 55px; display: flex; align-items: center; justify-content: flex-end; }
+        .company-address { font-size: 10px; line-height: 1.3; color: #333; }
+        .logo-right { width: 120px; height: 55px; display: flex; align-items: center; justify-content: flex-end; }
         .logo-right img { max-width: 100%; max-height: 100%; }
         .logo-placeholder-right {
-            width: 85px; height: 55px; border: 1px dashed #ccc;
+            width: 120px; height: 55px; border: 1px dashed #ccc;
             display: flex; align-items: center; justify-content: center;
             font-size: 9px; color: #1a365d; background: #fafafa; text-align: center; font-style: italic;
         }
