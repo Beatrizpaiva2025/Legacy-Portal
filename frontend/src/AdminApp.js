@@ -265,7 +265,7 @@ const calculateSHA256 = async (arrayBuffer) => {
 // Uses a visible iframe approach for more reliable rendering
 const generatePdfWithHash = async (htmlContent, filename, options = {}) => {
   const defaultOptions = {
-    margin: [10, 10, 10, 10],
+    margin: [5, 5, 5, 5],
     filename: filename || 'document.pdf',
     image: { type: 'jpeg', quality: 0.98 },
     html2canvas: {
@@ -465,7 +465,7 @@ const stripParentheticalComment = (text) => {
 const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
     @page {
         size: ${pageSizeCSS};
-        margin: 0.4in 0.4in;
+        margin: 0.5in 0.5in;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -474,7 +474,7 @@ const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
         line-height: 1.6;
         color: #333;
         background: white;
-        padding: 0;
+        padding: 0.2in 0.25in;
     }
     img { max-width: 100%; height: auto; }
     table { border-collapse: collapse; width: 100%; }
@@ -549,7 +549,7 @@ const getUnifiedPdfStyles = (pageSizeCSS = 'Letter') => `
 
 // Helper function to generate letterhead HTML with INLINE STYLES (guaranteed to work)
 const getLetterheadHTML = (logoLeft, logoRight) => `
-<table style="width: 100%; border: none; border-collapse: collapse; margin-bottom: 4px;">
+<table style="width: 100%; border: none; border-collapse: collapse; margin-bottom: 8px;">
     <tr>
         <td style="width: 120px; vertical-align: middle; border: none; padding: 0;">
             ${logoLeft
@@ -558,17 +558,17 @@ const getLetterheadHTML = (logoLeft, logoRight) => `
         </td>
         <td style="text-align: center; vertical-align: middle; border: none; padding: 0 15px;">
             <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
-            <div style="font-size: 9px; color: #333; line-height: 1.3;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
-            <div style="font-size: 9px; color: #333;">(857) 316-7770 · contact@legacytranslations.com</div>
+            <div style="font-size: 10px; color: #333; line-height: 1.3;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+            <div style="font-size: 10px; color: #333;">(857) 316-7770 · contact@legacytranslations.com</div>
         </td>
-        <td style="width: 80px; text-align: right; vertical-align: middle; border: none; padding: 0;">
+        <td style="width: 120px; text-align: right; vertical-align: middle; border: none; padding: 0;">
             ${logoRight
-              ? `<img src="${logoRight}" alt="ATA" style="max-width: 75px; max-height: 50px; object-fit: contain;" />`
+              ? `<img src="${logoRight}" alt="ATA" style="max-width: 110px; max-height: 50px; object-fit: contain;" />`
               : `<div style="font-size: 9px; color: #666; font-style: italic; text-align: right;">ata<br/><span style="font-size: 8px;">Member # 275993</span></div>`}
         </td>
     </tr>
 </table>
-<div style="width: 100%; height: 2px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 4px;"></div>`;
+<div style="width: 100%; height: 2px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 8px;"></div>`;
 
 // ==================== CONSTANTS ====================
 const STATUS_COLORS = {
@@ -1736,8 +1736,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             </div>
             <div style="text-align: center; flex: 1; padding: 0 16px;">
               <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
-              <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
-              <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
+              <div style="font-size: 10px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+              <div style="font-size: 10px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
             <div style="width: 80px; text-align: right;">
               {{LOGO_RIGHT}}
@@ -6417,15 +6417,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
                   : `<div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>`}
             </div>
-            <div style="float: right !important; width: 80px !important; text-align: right !important;">
+            <div style="float: right !important; width: 128px !important; text-align: right !important;">
                 ${logoRight
-                  ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px; max-width: 75px;" />`
+                  ? `<img src="${logoRight}" alt="ATA" style="max-height: 48px; max-width: 120px;" />`
                   : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>`}
             </div>
-            <div style="margin-left: 138px !important; margin-right: 90px !important; text-align: center !important;">
+            <div style="margin-left: 138px !important; margin-right: 138px !important; text-align: center !important;">
                 <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
-                <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
-                <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
+                <div style="font-size: 10px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                <div style="font-size: 10px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
 
@@ -6492,15 +6492,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
                   : `<div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>`}
             </div>
-            <div style="float: right !important; width: 80px !important; text-align: right !important;">
+            <div style="float: right !important; width: 128px !important; text-align: right !important;">
                 ${logoRight
-                  ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px; max-width: 75px;" />`
+                  ? `<img src="${logoRight}" alt="ATA" style="max-height: 48px; max-width: 120px;" />`
                   : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span></div>`}
             </div>
-            <div style="margin-left: 138px !important; margin-right: 90px !important; text-align: center !important;">
+            <div style="margin-left: 138px !important; margin-right: 138px !important; text-align: center !important;">
                 <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
-                <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
-                <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
+                <div style="font-size: 10px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                <div style="font-size: 10px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
         <div style="clear: both !important; width: 100% !important; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>`;
@@ -6644,7 +6644,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
       // Generate PDF with hash tracking using html2pdf (deterministic blob)
       const { blob: pdfBlob, hash: pdfHash } = await generatePdfWithHash(fullHTML, filename, {
-        margin: [10, 10, 10, 10],
+        margin: [5, 5, 5, 5],
         image: { type: 'jpeg', quality: 0.95 },
         html2canvas: { scale: 2, useCORS: true, allowTaint: true },
         jsPDF: { unit: 'mm', format: pageFormat === 'a4' ? 'a4' : 'letter', orientation: 'portrait' }
@@ -6849,7 +6849,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       <div style="padding: 20px;">
         ${CERTIFICATE_TEMPLATES[selectedCertificateTemplate].formHTML
           .replace(/\{\{LOGO_LEFT\}\}/g, logoLeft ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px;" />` : '<div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>')
-          .replace(/\{\{LOGO_RIGHT\}\}/g, logoRight ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px;" />` : '<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>')
+          .replace(/\{\{LOGO_RIGHT\}\}/g, logoRight ? `<img src="${logoRight}" alt="ATA" style="max-height: 48px;" />` : '<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>')
           .replace(/\{\{LOGO_STAMP\}\}/g, logoStamp ? `<img src="${logoStamp}" alt="Stamp" style="width: 100px; height: 100px; object-fit: contain;" />` : '')
           .replace(/\{\{SIGNATURE\}\}/g, signatureImage ? `<img src="${signatureImage}" alt="Signature" style="max-height: 32px; max-width: 150px;" />` : '')
           .replace(/\{\{TODAY_DATE\}\}/g, new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York' }))}
@@ -6863,11 +6863,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           </div>
           <div style="text-align: center; flex: 1; padding: 0 16px;">
             <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
-            <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
-            <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
+            <div style="font-size: 10px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+            <div style="font-size: 10px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
           </div>
           <div style="width: 80px; text-align: left;">
-            ${logoRight ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px;" />` : '<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>'}
+            ${logoRight ? `<img src="${logoRight}" alt="ATA" style="max-height: 48px;" />` : '<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>'}
           </div>
         </div>
         <div style="width: 100%; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>
@@ -6981,15 +6981,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
                   : `<div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>`}
             </div>
-            <div style="float: right !important; width: 80px !important; text-align: right !important;">
+            <div style="float: right !important; width: 128px !important; text-align: right !important;">
                 ${logoRight
-                  ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px; max-width: 75px;" />`
+                  ? `<img src="${logoRight}" alt="ATA" style="max-height: 48px; max-width: 120px;" />`
                   : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>`}
             </div>
-            <div style="margin-left: 138px !important; margin-right: 90px !important; text-align: center !important;">
+            <div style="margin-left: 138px !important; margin-right: 138px !important; text-align: center !important;">
                 <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
-                <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
-                <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
+                <div style="font-size: 10px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                <div style="font-size: 10px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
 
@@ -7057,15 +7057,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
                   : `<div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>`}
             </div>
-            <div style="float: right !important; width: 80px !important; text-align: right !important;">
+            <div style="float: right !important; width: 128px !important; text-align: right !important;">
                 ${logoRight
-                  ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px; max-width: 75px;" />`
+                  ? `<img src="${logoRight}" alt="ATA" style="max-height: 48px; max-width: 120px;" />`
                   : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span></div>`}
             </div>
-            <div style="margin-left: 138px !important; margin-right: 90px !important; text-align: center !important;">
+            <div style="margin-left: 138px !important; margin-right: 138px !important; text-align: center !important;">
                 <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
-                <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
-                <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
+                <div style="font-size: 10px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                <div style="font-size: 10px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
         </div>
         <div style="clear: both !important; width: 100% !important; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>`;
@@ -7274,7 +7274,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         const filename = `${orderNumber || 'P0000'}_${documentType.replace(/\s+/g, '_')}_${translationType === 'sworn' ? 'Sworn' : 'Certified'}_Translation.pdf`;
 
         const { blob: pdfBlob, hash: pdfHash } = await generatePdfWithHash(htmlContent, filename, {
-          margin: [10, 10, 10, 10],
+          margin: [5, 5, 5, 5],
           image: { type: 'jpeg', quality: 0.95 },
           html2canvas: { scale: 2, useCORS: true, allowTaint: true },
           jsPDF: { unit: 'mm', format: pageFormat === 'a4' ? 'a4' : 'letter', orientation: 'portrait' }
@@ -8866,7 +8866,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 style={{maxHeight: '800px'}}
                 dangerouslySetInnerHTML={{ __html: CERTIFICATE_TEMPLATES[selectedCertificateTemplate].formHTML
                   .replace(/\{\{LOGO_LEFT\}\}/g, logoLeft ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px;" />` : '<div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>')
-                  .replace(/\{\{LOGO_RIGHT\}\}/g, logoRight ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px;" />` : '<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>')
+                  .replace(/\{\{LOGO_RIGHT\}\}/g, logoRight ? `<img src="${logoRight}" alt="ATA" style="max-height: 48px;" />` : '<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>')
                   .replace(/\{\{LOGO_STAMP\}\}/g, logoStamp ? `<img src="${logoStamp}" alt="Stamp" style="width: 100px; height: 100px; object-fit: contain;" />` : '')
                   .replace(/\{\{SIGNATURE\}\}/g, signatureImage ? `<img src="${signatureImage}" alt="Signature" style="max-height: 32px; max-width: 150px;" />` : '')
                   .replace(/\{\{TODAY_DATE\}\}/g, new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York' }))
@@ -8883,11 +8883,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   </div>
                   <div className="text-center flex-1 px-4">
                     <div className="font-bold text-blue-600 text-sm">Legacy Translations</div>
-                    <div className="text-[9px] text-gray-600">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
-                    <div className="text-[9px] text-gray-600">(857) 316-7770 · contact@legacytranslations.com</div>
+                    <div className="text-[10px] text-gray-600">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                    <div className="text-[10px] text-gray-600">(857) 316-7770 · contact@legacytranslations.com</div>
                   </div>
-                  <div className="w-20 text-right">
-                    {logoRight ? <img src={logoRight} alt="ATA" className="max-h-10 ml-auto" /> : <div className="text-[9px] text-gray-600 italic">ata<br/><span className="text-[8px]">Member # 275993</span></div>}
+                  <div className="w-32 text-right">
+                    {logoRight ? <img src={logoRight} alt="ATA" className="max-h-12 ml-auto" /> : <div className="text-[9px] text-gray-600 italic">ata<br/><span className="text-[8px]">Member # 275993</span></div>}
                   </div>
                 </div>
                 {/* Light blue line below header */}
@@ -15745,19 +15745,19 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   <meta charset="UTF-8">
   <title>Certified Translation - ${orderData.order_number || 'Document'}</title>
   <style>
-    @page { size: Letter; margin: 0.4in 0.4in; }
-    @page cover { size: Letter; margin: 0.4in; }
+    @page { size: Letter; margin: 0.5in 0.5in; }
+    @page cover { size: Letter; margin: 0.5in; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Times New Roman', Georgia, serif; font-size: 13px; line-height: 1.5; color: #333; padding: 0; }
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; padding-bottom: 4px; }
-    .header-line { height: 3px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 4px; }
+    body { font-family: 'Times New Roman', Georgia, serif; font-size: 13px; line-height: 1.5; color: #333; padding: 0.2in 0.25in; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; }
+    .header-line { height: 3px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 12px; }
     .logo-left { width: 130px; height: 55px; display: flex; align-items: center; }
     .logo-placeholder { width: 130px; height: 55px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #999; background: #fafafa; }
     .header-center { text-align: center; flex: 1; padding: 0 15px; }
     .company-name { font-size: 15px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
-    .company-address { font-size: 9px; line-height: 1.3; color: #333; }
-    .logo-right { width: 85px; height: 55px; display: flex; align-items: center; justify-content: flex-end; }
-    .logo-placeholder-right { width: 85px; height: 55px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #1a365d; background: #fafafa; text-align: center; font-style: italic; }
+    .company-address { font-size: 10px; line-height: 1.3; color: #333; }
+    .logo-right { width: 120px; height: 55px; display: flex; align-items: center; justify-content: flex-end; }
+    .logo-placeholder-right { width: 120px; height: 55px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #1a365d; background: #fafafa; text-align: center; font-style: italic; }
     .order-number { text-align: right; margin-bottom: 20px; font-size: 12px; margin-top: 5px; }
     .main-title { text-align: center; font-size: 28px; font-weight: normal; margin-bottom: 20px; color: #1a365d; line-height: 1.2; }
     .subtitle { text-align: center; font-size: 13px; margin-bottom: 25px; line-height: 1.5; }
@@ -15804,7 +15804,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
       try {
         const { blob: pdfBlob, hash: pdfHash } = await generatePdfWithHash(fullHTML, filename, {
-          margin: [10, 10, 10, 10],
+          margin: [5, 5, 5, 5],
           image: { type: 'jpeg', quality: 0.95 },
           html2canvas: { scale: 2, useCORS: true, allowTaint: true },
           jsPDF: { unit: 'mm', format: 'letter', orientation: 'portrait' }
@@ -29282,6 +29282,22 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   const [pmTranslationHtml, setPmTranslationHtml] = useState('');    // HTML content for translation
   const [pmPackageGenerating, setPmPackageGenerating] = useState(false);
 
+  // PM Quick Package state
+  const [pmQuickTranslationFiles, setPmQuickTranslationFiles] = useState([]);
+  const [pmQuickTranslationHtml, setPmQuickTranslationHtml] = useState('');
+  const [pmQuickTranslationType, setPmQuickTranslationType] = useState('images');
+  const [pmQuickOriginalFiles, setPmQuickOriginalFiles] = useState([]);
+  const [pmQuickPackageLoading, setPmQuickPackageLoading] = useState(false);
+  const [pmQuickPackageProgress, setPmQuickPackageProgress] = useState('');
+  const [pmQuickDocumentType, setPmQuickDocumentType] = useState('');
+  const [pmQuickSourceLanguage, setPmQuickSourceLanguage] = useState('Portuguese (Brazil)');
+  const [pmQuickTargetLanguage, setPmQuickTargetLanguage] = useState('English');
+  const [pmQuickOrderNumber, setPmQuickOrderNumber] = useState('');
+  const [pmQuickIncludeCover, setPmQuickIncludeCover] = useState(true);
+  const [pmQuickIncludeLetterhead, setPmQuickIncludeLetterhead] = useState(true);
+  const [pmQuickIncludeOriginal, setPmQuickIncludeOriginal] = useState(true);
+  const [pmQuickIncludeVerification, setPmQuickIncludeVerification] = useState(true);
+
   // Proofreading state
   const [proofreadingResult, setProofreadingResult] = useState(null);
   const [isProofreading, setIsProofreading] = useState(false);
@@ -29855,6 +29871,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   };
 
   // Download complete translation package (PDF/Print) for PM Dashboard
+  // Uses same format as Quick Package in translator workspace
   const downloadOrderPackagePM = async (order) => {
     setDownloadingPackagePM(order.id);
     try {
@@ -29901,143 +29918,235 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         console.warn('Failed to fetch documents:', docsErr);
       }
 
-      // Build package HTML
+      // Build package HTML - same format as Quick Package
       const translatorName = orderData.translation_translator_name || orderData.assigned_translator_name || orderData.assigned_translator || 'Beatriz Paiva';
       const documentType = DOCUMENT_TYPES.find(d => d.value === orderData.document_type)?.label || orderData.document_type || 'Document';
       const sourceLanguage = orderData.translate_from || orderData.source_language || 'Portuguese';
       const targetLanguage = orderData.translate_to || orderData.target_language || 'English';
       const translationDateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/New_York' });
+      const pkgLogoLeft = localStorage.getItem('logo_left') || '';
+      const pkgLogoRight = localStorage.getItem('logo_right') || '';
+      const pkgLogoStamp = localStorage.getItem('logo_stamp') || '';
+      const pkgSignatureImage = localStorage.getItem('signature_image') || '';
+      const pkgPageFormat = localStorage.getItem('page_format') || 'letter';
+      const pageSizeCSS = pkgPageFormat === 'a4' ? 'A4' : 'Letter';
 
-      // Letterhead HTML
+      // Inline letterhead HTML (same as Quick Package - float-based with !important)
       const letterheadHTML = `
-        <div class="header">
-          <div class="logo-left">
-            <div class="logo-placeholder"><span style="text-align:center;">LEGACY<br/>TRANSLATIONS</span></div>
-          </div>
-          <div class="header-center">
-            <div class="company-name">Legacy Translations</div>
-            <div class="company-address">
-              867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116<br>
-              (857) 316-7770 · contact@legacytranslations.com
+        <div style="width: 100% !important; margin-bottom: 8px; overflow: hidden !important; position: relative !important;">
+            <div style="float: left !important; width: 128px !important;">
+                ${pkgLogoLeft
+                  ? `<img src="${pkgLogoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
+                  : `<div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>`}
             </div>
-          </div>
-          <div class="logo-right">
-            <div class="logo-placeholder-right"><span>ata<br/>Member #275993</span></div>
-          </div>
+            <div style="float: right !important; width: 128px !important; text-align: right !important;">
+                ${pkgLogoRight
+                  ? `<img src="${pkgLogoRight}" alt="ATA" style="max-height: 48px; max-width: 120px;" />`
+                  : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span></div>`}
+            </div>
+            <div style="margin-left: 138px !important; margin-right: 138px !important; text-align: center !important;">
+                <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
+                <div style="font-size: 10px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                <div style="font-size: 10px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
+            </div>
         </div>
-        <div class="header-line"></div>`;
+        <div style="clear: both !important; width: 100% !important; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>`;
 
-      // Cover Letter
+      // Cover Letter HTML (inline styles, same as Quick Package)
       const coverLetterHTML = `
-      <div class="cover-page">
-        ${letterheadHTML}
-        ${orderData.order_number ? `<div class="order-number">Order # <strong>${orderData.order_number}</strong></div>` : ''}
-        <h1 class="main-title">Certification of Translation Accuracy</h1>
-        <div class="subtitle">
-          Translation of a <strong>${documentType}</strong> from <strong>${sourceLanguage}</strong> to<br>
-          <strong>${targetLanguage}</strong>
-        </div>
-        <p class="body-text">I, the undersigned, hereby certify that the attached document is, to the best of my knowledge and belief, a true and accurate translation of the original document from ${sourceLanguage} to ${targetLanguage}.</p>
-        <p class="body-text">I am competent to translate from ${sourceLanguage} to ${targetLanguage}, and this translation is complete and accurate.</p>
-        <p class="body-text">This certification is valid for official use, including immigration, legal, and academic purposes.</p>
-        <div class="footer-section">
-          <div class="signature-block">
-            <div style="font-family: 'Times New Roman', serif; font-size: 18px; font-style: italic; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>
-            <div class="signature-name">Beatriz Paiva</div>
-            <div class="signature-title">Authorized Representative</div>
-            <div style="font-size: 12px;">Legacy Translations Inc.</div>
-            <div class="signature-date">Dated: ${translationDateStr}</div>
-          </div>
-          <div class="stamp-container">
-            <div class="stamp">
-              <div class="stamp-text-top">CERTIFIED TRANSLATOR</div>
-              <div class="stamp-center">
-                <div class="stamp-company">LEGACY TRANSLATIONS</div>
-                <div class="stamp-ata">ATA # 275993</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>`;
+    <div style="font-family: Georgia, 'Times New Roman', serif; font-size: 12px; line-height: 1.6; max-width: 100%; padding: 0; page-break-after: always;">
 
-      // Translation pages HTML
+        <!-- HEADER -->
+        <div style="width: 100% !important; margin-bottom: 8px; overflow: hidden !important;">
+            <div style="float: left !important; width: 128px !important;">
+                ${pkgLogoLeft
+                  ? `<img src="${pkgLogoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
+                  : `<div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>`}
+            </div>
+            <div style="float: right !important; width: 128px !important; text-align: right !important;">
+                ${pkgLogoRight
+                  ? `<img src="${pkgLogoRight}" alt="ATA" style="max-height: 48px; max-width: 120px;" />`
+                  : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>`}
+            </div>
+            <div style="margin-left: 138px !important; margin-right: 138px !important; text-align: center !important;">
+                <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
+                <div style="font-size: 10px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                <div style="font-size: 10px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
+            </div>
+        </div>
+
+        <!-- Blue line -->
+        <div style="clear: both !important; width: 100% !important; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>
+
+        <!-- Order Number -->
+        ${orderData.order_number && !orderData.order_number.toLowerCase().includes('order0') && orderData.order_number !== 'P0000'
+          ? `<div style="text-align: right; margin-bottom: 24px; font-size: 14px;">Order # <strong>${orderData.order_number}</strong></div>`
+          : '<div style="margin-bottom: 24px;"></div>'}
+
+        <!-- Main Title -->
+        <h1 style="text-align: center; font-size: 28px; font-weight: normal; margin-bottom: 30px; color: #1a365d; letter-spacing: 0.5px;">Certification of Translation Accuracy</h1>
+
+        <!-- Translation of... -->
+        <p style="text-align: center; margin-bottom: 30px; font-size: 14px; line-height: 1.6;">
+            Translation of a <strong>${documentType}</strong> from <strong>${sourceLanguage}</strong> to<br/>
+            <strong>${targetLanguage}</strong>
+        </p>
+
+        <!-- Body Paragraphs (default template) -->
+        ${CERTIFICATE_TEMPLATES['default'].bodyParagraphs.map(p => {
+          const processed = p.replace(/\{\{sourceLanguage\}\}/g, sourceLanguage).replace(/\{\{targetLanguage\}\}/g, targetLanguage);
+          return `<p style="text-align: justify; margin-bottom: 18px; line-height: 1.6; font-size: 13px;">${processed}</p>`;
+        }).join('\n        ')}
+
+        <!-- Signature Section -->
+        <div style="margin-top: 60px; overflow: hidden !important;">
+            <div style="float: left !important; width: 60% !important;">
+                ${pkgSignatureImage
+                  ? `<img src="${pkgSignatureImage}" alt="Signature" style="max-height: 40px; max-width: 180px; margin-bottom: 4px;" />`
+                  : `<div style="font-family: 'Brush Script MT', cursive; font-size: 24px; color: #1a365d; margin-bottom: 4px;">Beatriz Paiva</div>`}
+                <div style="font-weight: bold; font-size: 13px;">Beatriz Paiva</div>
+                <div style="font-weight: bold; font-size: 13px;">Authorized Representative</div>
+                <div style="font-size: 13px;">Legacy Translations Inc.</div>
+                <div style="font-size: 13px; margin-top: 8px;">Dated: ${translationDateStr}</div>
+            </div>
+            <div style="float: right !important; width: 35% !important; text-align: right !important;">
+                ${pkgLogoStamp
+                  ? `<img src="${pkgLogoStamp}" alt="Stamp" style="width: 146px; height: 146px; object-fit: contain;" />`
+                  : `<div style="width: 146px; height: 146px; border: 5px double #2563eb; border-radius: 50%; margin-left: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px;">
+                      <div style="font-size: 10px; font-weight: bold; color: #2563eb;">CERTIFIED TRANSLATOR</div>
+                      <div style="font-size: 13px; font-weight: bold; color: #2563eb; margin-top: 4px;">LEGACY TRANSLATIONS</div>
+                      <div style="font-size: 10px; color: #2563eb;">ATA # 275993</div>
+                    </div>`}
+            </div>
+        </div>
+    </div>`;
+
+      // Translation pages HTML - use paged-translation table for repeating letterhead
       let translationPagesHTML = '';
+      const translationStyles = scopeTranslationStyles(extractStylesFromHtml(orderData.translation_html || ''));
+
       if (orderData.translation_html) {
+        const normalizedHtml = normalizeTranslationHtml(extractBodyForEdit(orderData.translation_html));
         translationPagesHTML = `
-        <div class="translation-text-page">
-          ${letterheadHTML}
-          <div class="translation-content translation-text">${orderData.translation_html}</div>
-        </div>`;
+    <table class="paged-translation">
+        <thead><tr><td style="padding: 0;">
+            ${letterheadHTML}
+        </td></tr></thead>
+        <tbody><tr><td>
+            <div class="translation-content" style="padding: 0; line-height: 1.4; font-size: 10.5pt;">
+                ${normalizedHtml}
+            </div>
+        </td></tr></tbody>
+    </table>`;
       }
 
       // Original documents pages
-      const originalPagesHTML = originalDocuments.length > 0 ? originalDocuments.map((file, idx) => `
-      <div class="original-documents-page">
+      const validOriginals = originalDocuments.filter(file => file.data && file.data.length > 100);
+      const originalPagesHTML = validOriginals.length > 0 ? validOriginals.map((file, idx) => `
+    <div style="page-break-before: always; padding-top: 5px;">
         ${letterheadHTML}
-        ${idx === 0 ? '<div class="page-title">Original Document</div>' : ''}
-        <div class="original-image-container">
-          <img src="data:${file.type};base64,${file.data}" alt="Original page ${idx + 1}" class="original-image" />
+        ${idx === 0 ? '<div style="font-size: 13px; font-weight: bold; text-align: center; margin: 4px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px;">Original Document</div>' : ''}
+        <div style="text-align: center;">
+            <img src="data:${file.type};base64,${file.data}" alt="Original page ${idx + 1}" style="max-width: 100%; max-height: 7in; object-fit: contain; display: block; margin: 0 auto;" />
         </div>
-      </div>`).join('') : '';
+    </div>`).join('') : '';
 
-      // Complete HTML document
+      // Certification verification page - create in backend
+      let certificationPageHTML = '';
+      try {
+        const certResponse = await axios.post(`${API}/certifications/create?admin_key=${adminKey}`, {
+          order_id: order.id || '',
+          order_number: orderData.order_number || '',
+          document_type: documentType,
+          source_language: sourceLanguage,
+          target_language: targetLanguage,
+          page_count: validOriginals.length || 1,
+          document_content: (orderData.translation_html || 'Certified Translation').substring(0, 50000),
+          certifier_name: translatorName,
+          certifier_title: 'Authorized Representative',
+          certifier_credentials: 'ATA Member # 275993',
+          company_name: 'Legacy Translations Inc.',
+          company_address: '867 Boylston Street, 5th Floor, #2073, Boston, MA 02116',
+          company_phone: '(857) 316-7770',
+          company_email: 'contact@legacytranslations.com',
+          client_name: orderData.client_name || ''
+        }, { timeout: 15000 });
+
+        if (certResponse.data.success) {
+          const certData = certResponse.data;
+          certificationPageHTML = `
+    <div style="page-break-before: always; padding-top: 10px;">
+        ${letterheadHTML}
+
+        <div style="max-width: 520px; margin: 25px auto; padding: 28px; border: 2px solid #2563eb; border-radius: 12px; background: #f8fafc; font-family: Georgia, 'Times New Roman', serif;">
+            <!-- Header -->
+            <div style="text-align: center; margin-bottom: 25px;">
+                <div style="font-size: 40px; margin-bottom: 10px;">🔐</div>
+                <h2 style="font-size: 20px; font-weight: bold; color: #1e40af; margin-bottom: 5px;">Document Verification</h2>
+                <p style="font-size: 12px; color: #64748b;">This certified translation can be verified online</p>
+            </div>
+
+            <!-- Content: Info + QR side by side -->
+            <div style="overflow: hidden; margin-bottom: 20px;">
+                <div style="float: left; width: 55%;">
+                    <div style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; overflow: hidden;">
+                        <span style="float: left; font-size: 11px; color: #64748b;">Certification ID:</span>
+                        <span style="float: right; font-size: 11px; font-weight: 600; color: #2563eb; font-family: monospace;">${certData.certification_id}</span>
+                    </div>
+                    <div style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; overflow: hidden;">
+                        <span style="float: left; font-size: 11px; color: #64748b;">Document Type:</span>
+                        <span style="float: right; font-size: 11px; font-weight: 600; color: #1e293b;">${documentType}</span>
+                    </div>
+                    <div style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; overflow: hidden;">
+                        <span style="float: left; font-size: 11px; color: #64748b;">Translation:</span>
+                        <span style="float: right; font-size: 11px; font-weight: 600; color: #1e293b;">${sourceLanguage} → ${targetLanguage}</span>
+                    </div>
+                    <div style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; overflow: hidden;">
+                        <span style="float: left; font-size: 11px; color: #64748b;">Certified Date:</span>
+                        <span style="float: right; font-size: 11px; font-weight: 600; color: #1e293b;">${translationDateStr}</span>
+                    </div>
+                    <div style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; overflow: hidden;">
+                        <span style="float: left; font-size: 11px; color: #64748b;">Document Hash:</span>
+                        <span style="float: right; font-size: 10px; font-weight: 600; color: #1e293b; font-family: monospace;">${certData.document_hash?.substring(0, 16)}...</span>
+                    </div>
+                </div>
+                <div style="float: right; width: 40%; text-align: center; padding-left: 15px;">
+                    ${certData.qr_code_data
+                      ? `<img src="data:image/png;base64,${certData.qr_code_data}" alt="QR Code" style="width: 120px; height: 120px; border: 1px solid #e2e8f0; border-radius: 8px;" />`
+                      : '<div style="width: 120px; height: 120px; border: 1px solid #e2e8f0; border-radius: 8px; margin: 0 auto; color: #999; text-align: center; line-height: 120px;">QR Code</div>'}
+                    <p style="font-size: 10px; color: #64748b; margin-top: 5px;">Scan to verify</p>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div style="clear: both; text-align: center; padding-top: 20px; border-top: 1px solid #e2e8f0; margin-top: 10px;">
+                <p style="font-size: 11px; color: #1e40af; margin-bottom: 10px;">Verify at: <strong>${certData.verification_url}</strong></p>
+                <p style="font-size: 9px; color: #64748b; line-height: 1.4;">This document has been digitally certified by Legacy Translations Inc. Any alterations to this document will invalidate this certification.</p>
+            </div>
+        </div>
+    </div>
+    `;
+        }
+      } catch (certErr) {
+        console.warn('Failed to create certification for PM package:', certErr);
+      }
+
+      // Complete HTML using UNIFIED styles (same as Quick Package)
       const fullHTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Certified Translation - ${orderData.order_number || 'Document'}</title>
-  <style>
-    @page { size: Letter; margin: 0.4in 0.4in; }
-    @page cover { size: Letter; margin: 0.4in; }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Times New Roman', Georgia, serif; font-size: 13px; line-height: 1.5; color: #333; padding: 0; }
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; padding-bottom: 4px; }
-    .header-line { height: 3px; background: linear-gradient(to right, #3B82F6, #60A5FA); margin-bottom: 4px; }
-    .logo-left { width: 130px; height: 55px; display: flex; align-items: center; }
-    .logo-placeholder { width: 130px; height: 55px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #999; background: #fafafa; }
-    .header-center { text-align: center; flex: 1; padding: 0 15px; }
-    .company-name { font-size: 15px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
-    .company-address { font-size: 9px; line-height: 1.3; color: #333; }
-    .logo-right { width: 85px; height: 55px; display: flex; align-items: center; justify-content: flex-end; }
-    .logo-placeholder-right { width: 85px; height: 55px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #1a365d; background: #fafafa; text-align: center; font-style: italic; }
-    .order-number { text-align: right; margin-bottom: 20px; font-size: 12px; margin-top: 5px; }
-    .main-title { text-align: center; font-size: 28px; font-weight: normal; margin-bottom: 20px; color: #1a365d; line-height: 1.2; }
-    .subtitle { text-align: center; font-size: 13px; margin-bottom: 25px; line-height: 1.5; }
-    .body-text { text-align: justify; margin-bottom: 18px; line-height: 1.6; font-size: 13px; }
-    .footer-section { display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; padding-top: 20px; }
-    .signature-block { line-height: 1.3; }
-    .signature-name { font-weight: bold; font-size: 13px; }
-    .signature-title { font-weight: bold; font-size: 12px; }
-    .signature-date { font-size: 12px; }
-    .stamp-container { width: 130px; height: 130px; }
-    .stamp { width: 130px; height: 130px; border: 3px solid #2563eb; border-radius: 50%; position: relative; display: flex; align-items: center; justify-content: center; background: white; }
-    .stamp::before { content: ''; position: absolute; top: 7px; left: 7px; right: 7px; bottom: 7px; border: 1px solid #2563eb; border-radius: 50%; }
-    .stamp-text-top { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); font-size: 8px; font-weight: bold; color: #2563eb; letter-spacing: 1.5px; }
-    .stamp-center { text-align: center; padding: 0 12px; }
-    .stamp-company { font-size: 10px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
-    .stamp-ata { font-size: 8px; color: #2563eb; }
-    .cover-page { page: cover; page-break-after: always; min-height: 100%; display: flex; flex-direction: column; }
-    .translation-text-page { page-break-before: always; }
-    .translation-content.translation-text { text-align: left; font-family: 'Times New Roman', Georgia, serif; font-size: 11pt; line-height: 1.5; color: #333; }
-    .translation-content.translation-text p { margin-bottom: 10px; text-align: justify; word-wrap: break-word; overflow-wrap: break-word; }
-    .translation-content.translation-text table { width: 100%; max-width: 100%; border-collapse: collapse; margin: 10px 0; table-layout: fixed; page-break-inside: auto; }
-    .translation-content.translation-text td, .translation-content.translation-text th { border: 1px solid #333; padding: 4px 6px; font-size: 9pt; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; overflow: hidden; line-height: 1.3; }
-    .translation-content.translation-text tr { page-break-inside: avoid; }
-    .page-title { font-size: 13px; font-weight: bold; text-align: center; margin: 10px 0 8px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
-    .original-documents-page { page-break-after: always; page-break-inside: avoid; padding-top: 15px; }
-    .original-documents-page:last-of-type { page-break-after: auto; }
-    .original-image-container { text-align: center; margin-bottom: 5px; }
-    .original-image { max-width: 100%; max-height: 630px; border: 1px solid #ddd; object-fit: contain; display: block; margin: 0 auto; }
-    @media print {
-      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      /* running-header styles removed - using inline letterheads instead */
-    }
-  </style>
+    <meta charset="UTF-8">
+    <title>Certified Translation - ${orderData.order_number || 'Document'}</title>
+    <style>
+        ${getUnifiedPdfStyles(pageSizeCSS)}
+    </style>
+    ${translationStyles}
 </head>
 <body>
-  ${coverLetterHTML}
-  ${translationPagesHTML}
-  ${originalPagesHTML}
+    ${coverLetterHTML}
+    ${translationPagesHTML}
+    ${originalPagesHTML}
+    ${certificationPageHTML}
 </body>
 </html>`;
 
@@ -30046,10 +30155,10 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
       try {
         const { blob: pdfBlob, hash: pdfHash } = await generatePdfWithHash(fullHTML, filename, {
-          margin: [10, 10, 10, 10],
+          margin: [5, 5, 5, 5],
           image: { type: 'jpeg', quality: 0.95 },
           html2canvas: { scale: 2, useCORS: true, allowTaint: true },
-          jsPDF: { unit: 'mm', format: 'letter', orientation: 'portrait' }
+          jsPDF: { unit: 'mm', format: pkgPageFormat === 'a4' ? 'a4' : 'letter', orientation: 'portrait' }
         });
 
         // Download the PDF
@@ -30797,6 +30906,464 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     }
   };
 
+  // PM Quick Package - Upload Translation handler
+  const handlePmQuickTranslationUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+
+    setPmQuickPackageLoading(true);
+    setPmQuickPackageProgress(`Processing ${files.length} translation file(s)...`);
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const fileName = file.name.toLowerCase();
+      setPmQuickPackageProgress(`Processing translation ${i + 1}/${files.length}: ${file.name}`);
+
+      try {
+        if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
+          setPmQuickPackageProgress(`Converting Word document: ${file.name}`);
+          const rawHtml = await convertWordToHtml(file);
+          const cleanHtml = normalizeTranslationHtml(extractBodyForEdit(rawHtml));
+          setPmQuickTranslationHtml(prev => prev + (prev ? '<div style="page-break-before: always;"></div>' : '') + cleanHtml);
+          setPmQuickTranslationType('html');
+        } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
+          setPmQuickPackageProgress(`Reading HTML: ${file.name}`);
+          const rawHtml = await readHtmlFile(file);
+          const cleanHtml = normalizeTranslationHtml(extractBodyForEdit(rawHtml));
+          setPmQuickTranslationHtml(prev => prev + (prev ? '<div style="page-break-before: always;"></div>' : '') + cleanHtml);
+          setPmQuickTranslationType('html');
+        } else if (fileName.endsWith('.txt')) {
+          setPmQuickPackageProgress(`Reading text file: ${file.name}`);
+          const text = await readTxtFile(file);
+          const html = `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.6;">${text}</div>`;
+          setPmQuickTranslationHtml(prev => prev + (prev ? '<div style="page-break-before: always;"></div>' : '') + html);
+          setPmQuickTranslationType('html');
+        } else if (fileName.endsWith('.pdf')) {
+          setPmQuickPackageProgress(`Converting PDF to images: ${file.name}`);
+          try {
+            const images = await convertPdfToImages(file, (page, total) => {
+              setPmQuickPackageProgress(`Converting PDF page ${page}/${total}: ${file.name}`);
+            });
+            images.forEach((img, pageIdx) => {
+              setPmQuickTranslationFiles(prev => [...prev, {
+                filename: `${file.name.replace('.pdf', '')}_page_${pageIdx + 1}.png`,
+                data: img.data.includes(',') ? img.data.split(',')[1] : img.data,
+                type: 'image/png'
+              }]);
+            });
+            if (!pmQuickTranslationHtml) setPmQuickTranslationType('images');
+          } catch (pdfErr) {
+            console.error('PDF conversion failed:', pdfErr);
+            setPmQuickPackageProgress(`⚠️ PDF conversion failed for ${file.name}`);
+          }
+        } else if (file.type.startsWith('image/')) {
+          const base64 = await fileToBase64(file);
+          if (base64 && base64.length > 100) {
+            setPmQuickTranslationFiles(prev => [...prev, {
+              filename: file.name,
+              data: base64,
+              type: file.type
+            }]);
+            if (!pmQuickTranslationHtml) setPmQuickTranslationType('images');
+          } else {
+            setPmQuickPackageProgress(`⚠️ Failed to process ${file.name}`);
+          }
+        }
+      } catch (err) {
+        console.error(`Error processing ${file.name}:`, err);
+        setPmQuickPackageProgress(`⚠️ Error processing ${file.name}`);
+      }
+    }
+
+    setPmQuickPackageLoading(false);
+    setPmQuickPackageProgress(`✅ Translation file(s) ready`);
+    setTimeout(() => setPmQuickPackageProgress(''), 3000);
+  };
+
+  // PM Quick Package - Upload Original handler
+  const handlePmQuickOriginalUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+
+    setPmQuickPackageLoading(true);
+    setPmQuickPackageProgress(`Processing ${files.length} original file(s)...`);
+    const processedFiles = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const fileName = file.name.toLowerCase();
+      setPmQuickPackageProgress(`Processing original ${i + 1}/${files.length}: ${file.name}`);
+
+      try {
+        if (fileName.endsWith('.pdf')) {
+          setPmQuickPackageProgress(`Converting PDF to images: ${file.name}`);
+          try {
+            const images = await convertPdfToImages(file, (page, total) => {
+              setPmQuickPackageProgress(`Converting PDF page ${page}/${total}: ${file.name}`);
+            });
+            images.forEach((img, pageIdx) => {
+              processedFiles.push({
+                filename: `${file.name.replace('.pdf', '')}_page_${pageIdx + 1}.png`,
+                data: img.data.includes(',') ? img.data.split(',')[1] : img.data,
+                type: 'image/png'
+              });
+            });
+          } catch (pdfErr) {
+            console.error('PDF conversion failed:', pdfErr);
+            setPmQuickPackageProgress(`⚠️ PDF conversion failed for ${file.name}`);
+          }
+        } else if (file.type.startsWith('image/')) {
+          const base64 = await fileToBase64(file);
+          if (base64 && base64.length > 100) {
+            processedFiles.push({ filename: file.name, data: base64, type: file.type });
+          }
+        }
+      } catch (err) {
+        console.error(`Error processing ${file.name}:`, err);
+      }
+    }
+
+    setPmQuickOriginalFiles(prev => [...prev, ...processedFiles]);
+    setPmQuickPackageLoading(false);
+    setPmQuickPackageProgress(`✅ ${processedFiles.length} original page(s) ready`);
+    setTimeout(() => setPmQuickPackageProgress(''), 3000);
+  };
+
+  // PM Quick Package Download - generates complete certified translation package
+  const handlePmQuickPackageDownload = async () => {
+    setPmQuickPackageLoading(true);
+    setPmQuickPackageProgress('Generating package...');
+
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Create certification with QR code if enabled
+    let certData = null;
+    if (pmQuickIncludeVerification) {
+      setPmQuickPackageProgress('Creating certification...');
+      try {
+        const translationContent = pmQuickTranslationHtml || 'Quick Package Translation';
+        const response = await axios.post(`${API}/certifications/create?admin_key=${adminKey}`, {
+          order_number: pmQuickOrderNumber,
+          document_type: pmQuickDocumentType,
+          source_language: pmQuickSourceLanguage,
+          target_language: pmQuickTargetLanguage,
+          page_count: pmQuickTranslationFiles.length || 1,
+          document_content: translationContent,
+          certifier_name: 'Beatriz Paiva',
+          certifier_title: 'Authorized Representative',
+          certifier_credentials: 'ATA Member # 275993',
+          company_name: 'Legacy Translations Inc.',
+          company_address: '867 Boylston Street, 5th Floor, #2073, Boston, MA 02116',
+          company_phone: '(857) 316-7770',
+          company_email: 'contact@legacytranslations.com',
+          client_name: ''
+        });
+        certData = response.data;
+      } catch (err) {
+        console.error('Failed to create certification:', err);
+        setPmQuickPackageProgress('⚠️ Verification page not available - continuing without QR code...');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+      setPmQuickPackageProgress('Generating package...');
+    }
+
+    const pmPageFormat = localStorage.getItem('page_format') || 'letter';
+    const pageSizeCSS = pmPageFormat === 'a4' ? 'A4' : 'Letter';
+    const certTitle = 'Certification of Translation Accuracy';
+    const logoLeft = localStorage.getItem('logo_left') || '';
+    const logoRight = localStorage.getItem('logo_right') || '';
+    const logoStamp = localStorage.getItem('logo_stamp') || '';
+    const signatureImage = localStorage.getItem('signature_image') || '';
+    const translationDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/New_York' });
+
+    // Cover Letter HTML
+    const coverLetterHTML = `
+    <div style="font-family: Georgia, 'Times New Roman', serif; font-size: 12px; line-height: 1.6; max-width: 100%; padding: 0; page-break-after: always;">
+        <div style="width: 100% !important; margin-bottom: 8px; overflow: hidden !important;">
+            <div style="float: left !important; width: 128px !important;">
+                ${logoLeft
+                  ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
+                  : `<div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>`}
+            </div>
+            <div style="float: right !important; width: 128px !important; text-align: right !important;">
+                ${logoRight
+                  ? `<img src="${logoRight}" alt="ATA" style="max-height: 48px; max-width: 120px;" />`
+                  : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>`}
+            </div>
+            <div style="margin-left: 138px !important; margin-right: 138px !important; text-align: center !important;">
+                <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
+                <div style="font-size: 10px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                <div style="font-size: 10px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
+            </div>
+        </div>
+        <div style="clear: both !important; width: 100% !important; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>
+        ${pmQuickOrderNumber && !pmQuickOrderNumber.toLowerCase().includes('order0') && pmQuickOrderNumber !== 'P0000'
+          ? `<div style="text-align: right; margin-bottom: 24px; font-size: 14px;">Order # <strong>${pmQuickOrderNumber}</strong></div>`
+          : '<div style="margin-bottom: 24px;"></div>'}
+        <h1 style="text-align: center; font-size: 28px; font-weight: normal; margin-bottom: 30px; color: #1a365d; letter-spacing: 0.5px;">${certTitle}</h1>
+        <p style="text-align: center; margin-bottom: 30px; font-size: 14px; line-height: 1.6;">
+            Translation of a <strong>${pmQuickDocumentType}</strong> from <strong>${pmQuickSourceLanguage}</strong> to<br/>
+            <strong>${pmQuickTargetLanguage}</strong>
+        </p>
+        ${CERTIFICATE_TEMPLATES['default'].bodyParagraphs.map(p => {
+          const processed = p.replace(/\{\{sourceLanguage\}\}/g, pmQuickSourceLanguage).replace(/\{\{targetLanguage\}\}/g, pmQuickTargetLanguage);
+          return `<p style="text-align: justify; margin-bottom: 18px; line-height: 1.6; font-size: 13px;">${processed}</p>`;
+        }).join('\n        ')}
+        <div style="margin-top: 60px; overflow: hidden !important;">
+            <div style="float: left !important; width: 60% !important;">
+                ${signatureImage
+                  ? `<img src="${signatureImage}" alt="Signature" style="max-height: 40px; max-width: 180px; margin-bottom: 4px;" />`
+                  : `<div style="font-family: 'Brush Script MT', cursive; font-size: 24px; color: #1a365d; margin-bottom: 4px;">Beatriz Paiva</div>`}
+                <div style="font-weight: bold; font-size: 13px;">Beatriz Paiva</div>
+                <div style="font-weight: bold; font-size: 13px;">Authorized Representative</div>
+                <div style="font-size: 13px;">Legacy Translations Inc.</div>
+                <div style="font-size: 13px; margin-top: 8px;">Dated: ${translationDate}</div>
+            </div>
+            <div style="float: right !important; width: 35% !important; text-align: right !important;">
+                ${logoStamp
+                  ? `<img src="${logoStamp}" alt="Stamp" style="width: 146px; height: 146px; object-fit: contain;" />`
+                  : `<div style="width: 146px; height: 146px; border: 5px double #2563eb; border-radius: 50%; margin-left: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px;">
+                      <div style="font-size: 10px; font-weight: bold; color: #2563eb;">CERTIFIED TRANSLATOR</div>
+                      <div style="font-size: 13px; font-weight: bold; color: #2563eb; margin-top: 4px;">LEGACY TRANSLATIONS</div>
+                      <div style="font-size: 10px; color: #2563eb;">ATA # 275993</div>
+                    </div>`}
+            </div>
+        </div>
+    </div>`;
+
+    // Letterhead HTML
+    const letterheadHTML = `
+        <div style="width: 100% !important; margin-bottom: 8px; overflow: hidden !important; position: relative !important;">
+            <div style="float: left !important; width: 128px !important;">
+                ${logoLeft
+                  ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px; max-width: 120px;" />`
+                  : `<div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>`}
+            </div>
+            <div style="float: right !important; width: 128px !important; text-align: right !important;">
+                ${logoRight
+                  ? `<img src="${logoRight}" alt="ATA" style="max-height: 48px; max-width: 120px;" />`
+                  : `<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span></div>`}
+            </div>
+            <div style="margin-left: 138px !important; margin-right: 138px !important; text-align: center !important;">
+                <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
+                <div style="font-size: 10px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                <div style="font-size: 10px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
+            </div>
+        </div>
+        <div style="clear: both !important; width: 100% !important; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>`;
+
+    // Extract and scope translation styles
+    const quickTranslationStyles = scopeTranslationStyles(extractStylesFromHtml(pmQuickTranslationHtml));
+
+    // Translation pages
+    let translationPagesHTML = '';
+    const validTranslationFiles = pmQuickTranslationFiles.filter(file => file.data && file.data.length > 100);
+
+    if (pmQuickTranslationHtml) {
+      const normalizedQuickHtml = normalizeTranslationHtml(extractBodyForEdit(pmQuickTranslationHtml));
+      translationPagesHTML = pmQuickIncludeLetterhead ? `
+    <table class="paged-translation">
+        <thead><tr><td style="padding: 0;">
+            ${letterheadHTML}
+        </td></tr></thead>
+        <tbody><tr><td>
+            <div class="translation-content" style="padding: 0; line-height: 1.4; font-size: 10.5pt;">
+                ${normalizedQuickHtml}
+            </div>
+        </td></tr></tbody>
+    </table>` : `
+    <div style="padding-top: 5px;">
+        <div class="translation-content" style="padding: 0; line-height: 1.4; font-size: 10.5pt;">
+            ${normalizedQuickHtml}
+        </div>
+    </div>`;
+    } else if (validTranslationFiles.length > 0) {
+      translationPagesHTML = validTranslationFiles.map((file, idx) => `
+    <div style="${idx > 0 ? 'page-break-before: always;' : ''} padding-top: 5px;">
+        ${pmQuickIncludeLetterhead ? letterheadHTML : ''}
+        <div>
+            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Translation page ${idx + 1}" style="max-width: 100%; max-height: 7in; object-fit: contain; display: block; margin: 0 auto;" />
+        </div>
+    </div>`).join('');
+    }
+
+    // Original document pages
+    const validOriginalFiles = pmQuickOriginalFiles.filter(file => file.data && file.data.length > 100);
+    const originalPagesHTML = (pmQuickIncludeOriginal && validOriginalFiles.length > 0) ? validOriginalFiles.map((file, idx) => `
+    <div style="page-break-before: always; padding-top: 5px;">
+        ${pmQuickIncludeLetterhead ? letterheadHTML : ''}
+        ${idx === 0 ? '<div style="font-size: 13px; font-weight: bold; text-align: center; margin: 4px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px;">Original Document</div>' : ''}
+        <div style="text-align: center;">
+            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Original page ${idx + 1}" style="max-width: 100%; max-height: 7in; object-fit: contain; display: block; margin: 0 auto;" />
+        </div>
+    </div>`).join('') : '';
+
+    // Certification verification page
+    const certificationPageHTML = (pmQuickIncludeVerification && certData) ? `
+    <div style="page-break-before: always; padding-top: 10px;">
+        ${pmQuickIncludeLetterhead ? letterheadHTML : ''}
+        <div style="max-width: 520px; margin: 25px auto; padding: 28px; border: 2px solid #2563eb; border-radius: 12px; background: #f8fafc; font-family: Georgia, 'Times New Roman', serif;">
+            <div style="text-align: center; margin-bottom: 25px;">
+                <div style="font-size: 40px; margin-bottom: 10px;">🔐</div>
+                <h2 style="font-size: 20px; font-weight: bold; color: #1e40af; margin-bottom: 5px;">Document Verification</h2>
+                <p style="font-size: 12px; color: #64748b;">This certified translation can be verified online</p>
+            </div>
+            <div style="overflow: hidden; margin-bottom: 20px;">
+                <div style="float: left; width: 55%;">
+                    <div style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; overflow: hidden;">
+                        <span style="float: left; font-size: 11px; color: #64748b;">Certification ID:</span>
+                        <span style="float: right; font-size: 11px; font-weight: 600; color: #2563eb; font-family: monospace;">${certData.certification_id}</span>
+                    </div>
+                    <div style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; overflow: hidden;">
+                        <span style="float: left; font-size: 11px; color: #64748b;">Document Type:</span>
+                        <span style="float: right; font-size: 11px; font-weight: 600; color: #1e293b;">${pmQuickDocumentType}</span>
+                    </div>
+                    <div style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; overflow: hidden;">
+                        <span style="float: left; font-size: 11px; color: #64748b;">Translation:</span>
+                        <span style="float: right; font-size: 11px; font-weight: 600; color: #1e293b;">${pmQuickSourceLanguage} → ${pmQuickTargetLanguage}</span>
+                    </div>
+                    <div style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; overflow: hidden;">
+                        <span style="float: left; font-size: 11px; color: #64748b;">Certified Date:</span>
+                        <span style="float: right; font-size: 11px; font-weight: 600; color: #1e293b;">${new Date(certData.certified_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/New_York' })}</span>
+                    </div>
+                    <div style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; overflow: hidden;">
+                        <span style="float: left; font-size: 11px; color: #64748b;">Document Hash:</span>
+                        <span style="float: right; font-size: 10px; font-weight: 600; color: #1e293b; font-family: monospace;">${certData.document_hash?.substring(0, 16)}...</span>
+                    </div>
+                </div>
+                <div style="float: right; width: 40%; text-align: center; padding-left: 15px;">
+                    ${certData.qr_code_data
+                      ? `<img src="data:image/png;base64,${certData.qr_code_data}" alt="QR Code" style="width: 120px; height: 120px; border: 1px solid #e2e8f0; border-radius: 8px;" />`
+                      : '<div style="width: 120px; height: 120px; border: 1px solid #e2e8f0; border-radius: 8px; margin: 0 auto; color: #999; text-align: center; line-height: 120px;">QR Code</div>'}
+                    <p style="font-size: 10px; color: #64748b; margin-top: 5px;">Scan to verify</p>
+                </div>
+            </div>
+            <div style="clear: both; text-align: center; padding-top: 20px; border-top: 1px solid #e2e8f0; margin-top: 10px;">
+                <p style="font-size: 11px; color: #1e40af; margin-bottom: 10px;">Verify at: <strong>${certData.verification_url}</strong></p>
+                <p style="font-size: 9px; color: #64748b; line-height: 1.4;">This document has been digitally certified by Legacy Translations Inc. Any alterations to this document will invalidate this certification.</p>
+            </div>
+        </div>
+    </div>
+    ` : '';
+
+    // Complete HTML
+    const fullHTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>${certTitle} - ${pmQuickOrderNumber || 'Document'}</title>
+    <style>
+        ${getUnifiedPdfStyles(pageSizeCSS)}
+    </style>
+    ${quickTranslationStyles}
+</head>
+<body>
+    ${pmQuickIncludeCover ? coverLetterHTML : ''}
+    ${translationPagesHTML}
+    ${originalPagesHTML}
+    ${certificationPageHTML}
+</body>
+</html>`;
+
+    // Generate PDF
+    setPmQuickPackageProgress('Generating PDF...');
+
+    try {
+      const filename = `${pmQuickOrderNumber || 'LT'}_Certified_Translation.pdf`;
+
+      const { blob: pdfBlob, hash: pdfHash } = await generatePdfWithHash(fullHTML, filename, {
+        margin: [5, 5, 5, 5],
+        image: { type: 'jpeg', quality: 0.95 },
+        html2canvas: { scale: 2, useCORS: true, allowTaint: true },
+        jsPDF: { unit: 'mm', format: pmPageFormat === 'a4' ? 'a4' : 'letter', orientation: 'portrait' }
+      });
+
+      // Update PDF hash in backend for verification
+      if (certData?.certification_id) {
+        setPmQuickPackageProgress('Registering digital signature...');
+        const hashResult = await updatePdfHashInBackend(certData.certification_id, pdfHash, adminKey);
+        if (hashResult.success) {
+          setPmQuickPackageProgress('✅ Digital signature registered!');
+        }
+      }
+
+      // Download the PDF
+      const downloadUrl = URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(downloadUrl);
+
+      // Open preview window
+      setPmQuickPackageProgress('Opening preview...');
+
+      const screenWidth = window.screen.width;
+      const screenHeight = window.screen.height;
+      const windowWidth = Math.min(1200, screenWidth - 100);
+      const windowHeight = Math.min(900, screenHeight - 100);
+      const left = (screenWidth - windowWidth) / 2;
+      const top = (screenHeight - windowHeight) / 2;
+
+      const printWindow = window.open('', 'PDFPreview', `width=${windowWidth},height=${windowHeight},left=${left},top=${top},scrollbars=yes,resizable=yes`);
+
+      if (printWindow && !printWindow.closed) {
+        printWindow.document.open();
+        printWindow.document.write(fullHTML);
+        printWindow.document.close();
+
+        await new Promise(resolve => {
+          if (printWindow.document.readyState === 'complete') resolve();
+          else { printWindow.onload = resolve; setTimeout(resolve, 2000); }
+        });
+
+        const images = printWindow.document.querySelectorAll('img');
+        if (images.length > 0) {
+          await Promise.all(Array.from(images).map(img => {
+            return new Promise((resolve) => {
+              if (img.complete && img.naturalHeight !== 0) resolve();
+              else { img.onload = resolve; img.onerror = resolve; setTimeout(resolve, 5000); }
+            });
+          }));
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 500));
+        printWindow.focus();
+
+        const instructionDiv = printWindow.document.createElement('div');
+        instructionDiv.id = 'print-instructions';
+        instructionDiv.innerHTML = `
+          <div style="position: fixed; top: 0; left: 0; right: 0; background: #1e40af; color: white; padding: 12px 20px; z-index: 99999; font-family: sans-serif; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <strong>📄 Document Preview</strong> - Your PDF has been downloaded. This is a preview for reference.
+            </div>
+            <div>
+              <button onclick="window.print()" style="background: white; color: #1e40af; border: none; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-right: 10px;">
+                🖨️ Print
+              </button>
+              <button onclick="document.getElementById('print-instructions').remove()" style="background: transparent; color: white; border: 1px solid white; padding: 8px 16px; border-radius: 6px; cursor: pointer;">
+                ✕ Close Bar
+              </button>
+            </div>
+          </div>
+          <style>@media print { #print-instructions { display: none !important; } }</style>
+        `;
+        printWindow.document.body.insertBefore(instructionDiv, printWindow.document.body.firstChild);
+      }
+
+      setPmQuickPackageProgress('');
+      setPmQuickPackageLoading(false);
+
+    } catch (err) {
+      console.error('Error generating package:', err);
+      showToast('Error generating PDF package. Please try again.');
+      setPmQuickPackageLoading(false);
+      setPmQuickPackageProgress('');
+    }
+  };
+
   // Generate PM Package (same format as Quick Package)
   const handlePmPackageDownload = async () => {
     // Check for any translation source available in PM Dashboard
@@ -31156,8 +31723,8 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     <meta charset="UTF-8">
     <title>${certTitle} - ${order?.order_number || 'Document'}</title>
     <style>
-        @page { size: ${pageSizeCSS}; margin: 0.4in 0.4in; }
-        @page cover { size: ${pageSizeCSS}; margin: 0.4in; }
+        @page { size: ${pageSizeCSS}; margin: 0.5in 0.6in 0.6in 0.6in; }
+        @page cover { size: ${pageSizeCSS}; margin: 0.75in; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Times New Roman', Georgia, serif;
@@ -31169,14 +31736,14 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 4px;
-            padding-bottom: 4px;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
             border: none;
         }
         .header-line {
             height: 3px;
             background: linear-gradient(to right, #3B82F6, #60A5FA);
-            margin-bottom: 4px;
+            margin-bottom: 12px;
             border: none;
         }
         .logo-left { width: 130px; height: 55px; display: flex; align-items: center; }
@@ -31188,11 +31755,11 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         }
         .header-center { text-align: center; flex: 1; padding: 0 15px; }
         .company-name { font-size: 15px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
-        .company-address { font-size: 9px; line-height: 1.3; color: #333; }
-        .logo-right { width: 85px; height: 55px; display: flex; align-items: center; justify-content: flex-end; }
+        .company-address { font-size: 10px; line-height: 1.3; color: #333; }
+        .logo-right { width: 120px; height: 55px; display: flex; align-items: center; justify-content: flex-end; }
         .logo-right img { max-width: 100%; max-height: 100%; }
         .logo-placeholder-right {
-            width: 85px; height: 55px; border: 1px dashed #ccc;
+            width: 120px; height: 55px; border: 1px dashed #ccc;
             display: flex; align-items: center; justify-content: center;
             font-size: 9px; color: #1a365d; background: #fafafa; text-align: center; font-style: italic;
         }
@@ -31289,7 +31856,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
     try {
       const { blob: pdfBlob, hash: pdfHash } = await generatePdfWithHash(fullHTML, filename, {
-        margin: [10, 10, 10, 10],
+        margin: [5, 5, 5, 5],
         image: { type: 'jpeg', quality: 0.95 },
         html2canvas: { scale: 2, useCORS: true, allowTaint: true },
         jsPDF: { unit: 'mm', format: pmPageFormat === 'a4' ? 'a4' : 'letter', orientation: 'portrait' }
@@ -31861,7 +32428,8 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     { id: 'team', label: 'My Team', icon: '👥' },
     { id: 'calendar', label: 'Calendar', icon: '📅' },
     { id: 'reports', label: 'Reports', icon: '📈' },
-    { id: 'messages', label: 'Messages', icon: '💬' }
+    { id: 'messages', label: 'Messages', icon: '💬' },
+    { id: 'quick-package', label: 'Quick Package', icon: '📦' }
   ];
 
   if (loading) {
@@ -34014,6 +34582,336 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                       <p className="text-xs">Select a translator to start a conversation</p>
                     </div>
                   </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* QUICK PACKAGE SECTION */}
+      {activeSection === 'quick-package' && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-bold text-gray-800 mb-1">📦 Quick Package</h3>
+            <p className="text-xs text-gray-500 mb-4">Build a complete certified translation package with ready translation files</p>
+
+            <div className="grid grid-cols-2 gap-6">
+              {/* Left Column - Certificate Info & Upload */}
+              <div className="space-y-4">
+                {/* Certificate Information */}
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded">
+                  <h4 className="text-sm font-bold text-blue-700 mb-3">📜 Certificate Information</h4>
+
+                  <div className="mb-3">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Order #</label>
+                    <input
+                      type="text"
+                      value={pmQuickOrderNumber}
+                      onChange={(e) => setPmQuickOrderNumber(e.target.value)}
+                      placeholder="P0000 or ORD-20260111-241CFA"
+                      className="w-full px-3 py-2 text-sm border rounded"
+                    />
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Translation of <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={pmQuickDocumentType}
+                      onChange={(e) => setPmQuickDocumentType(e.target.value)}
+                      placeholder="Birth Certificate, Marriage Certificate, Diploma..."
+                      className={`w-full px-3 py-2 text-sm border rounded ${
+                        !pmQuickDocumentType.trim() ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                      }`}
+                    />
+                    {!pmQuickDocumentType.trim() && (
+                      <p className="text-[10px] text-red-500 mt-1">⚠️ Document type is required</p>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">From</label>
+                      <select
+                        value={pmQuickSourceLanguage}
+                        onChange={(e) => setPmQuickSourceLanguage(e.target.value)}
+                        className="w-full px-3 py-2 text-sm border rounded"
+                      >
+                        {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">To</label>
+                      <select
+                        value={pmQuickTargetLanguage}
+                        onChange={(e) => setPmQuickTargetLanguage(e.target.value)}
+                        className="w-full px-3 py-2 text-sm border rounded"
+                      >
+                        {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Upload Translation */}
+                <div className="p-4 bg-green-50 border border-green-200 rounded">
+                  <h4 className="text-sm font-bold text-green-700 mb-2">📄 Upload Ready Translation</h4>
+                  <p className="text-[10px] text-green-600 mb-3">Upload your translation document (recommended: Word .docx)</p>
+
+                  <div className={`border-2 border-dashed border-green-300 rounded-lg p-4 text-center transition-colors mb-2 ${pmQuickPackageLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-green-500'}`}>
+                    <input
+                      type="file"
+                      multiple
+                      accept=".docx,.doc,.html,.htm,.txt,.pdf,image/*"
+                      onChange={handlePmQuickTranslationUpload}
+                      className="hidden"
+                      id="pm-quick-translation-upload"
+                      disabled={pmQuickPackageLoading}
+                    />
+                    <label htmlFor="pm-quick-translation-upload" className={pmQuickPackageLoading ? 'cursor-not-allowed' : 'cursor-pointer'}>
+                      <UploadIcon className="w-6 h-6 mx-auto mb-1 text-green-600" />
+                      <span className="px-3 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700">
+                        Upload Translation
+                      </span>
+                      <p className="text-[10px] text-gray-500 mt-1">Word (.docx), HTML, TXT, PDF, Images</p>
+                    </label>
+                  </div>
+
+                  {/* Paste HTML/Text */}
+                  <div className="mt-3">
+                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Or paste text/HTML directly:</label>
+                    <textarea
+                      placeholder="Paste your translation text or HTML here..."
+                      className="w-full h-24 px-3 py-2 text-xs border border-green-200 rounded resize-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                      onChange={(e) => {
+                        const text = e.target.value;
+                        if (text.trim()) {
+                          const isHtml = text.includes('<') && text.includes('>');
+                          const html = isHtml ? text : `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.6;">${text}</div>`;
+                          setPmQuickTranslationHtml(html);
+                          setPmQuickTranslationType('html');
+                        }
+                      }}
+                      disabled={pmQuickPackageLoading}
+                    />
+                  </div>
+
+                  {/* HTML content indicator */}
+                  {pmQuickTranslationHtml && (
+                    <div className="mb-2 p-2 bg-white rounded border border-green-200">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-green-700">
+                          ✓ Document content loaded (Word/HTML/TXT)
+                        </span>
+                        <button
+                          onClick={() => { setPmQuickTranslationHtml(''); setPmQuickTranslationType('images'); }}
+                          className="text-gray-400 hover:text-red-500 p-1"
+                          disabled={pmQuickPackageLoading}
+                          title="Clear document"
+                        >
+                          <TrashIcon className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Image files */}
+                  {pmQuickTranslationFiles.length > 0 && (
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-medium text-green-700">{pmQuickTranslationFiles.length} image page(s):</p>
+                        <button
+                          onClick={() => setPmQuickTranslationFiles([])}
+                          className="text-[10px] text-gray-400 hover:text-red-500"
+                          disabled={pmQuickPackageLoading}
+                        >
+                          Clear all
+                        </button>
+                      </div>
+                      <div className="max-h-32 overflow-y-auto">
+                        {pmQuickTranslationFiles.map((file, idx) => (
+                          <div key={idx} className="flex items-center justify-between bg-white px-2 py-1 rounded text-xs mb-1">
+                            <span className="truncate flex-1">{idx + 1}. {file.filename}</span>
+                            <button
+                              onClick={() => setPmQuickTranslationFiles(prev => prev.filter((_, i) => i !== idx))}
+                              className="text-gray-400 hover:text-red-500 ml-2 p-1"
+                              disabled={pmQuickPackageLoading}
+                            >
+                              <TrashIcon className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Upload Originals */}
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded">
+                  <h4 className="text-sm font-bold text-blue-700 mb-2">📑 Upload Original Documents</h4>
+                  <p className="text-[10px] text-blue-600 mb-3">Upload original document (PDF auto-converted to images)</p>
+
+                  <div className={`border-2 border-dashed border-blue-300 rounded-lg p-4 text-center transition-colors mb-2 ${pmQuickPackageLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-blue-500'}`}>
+                    <input
+                      type="file"
+                      multiple
+                      accept=".pdf,image/*"
+                      onChange={handlePmQuickOriginalUpload}
+                      className="hidden"
+                      id="pm-quick-original-upload"
+                      disabled={pmQuickPackageLoading}
+                    />
+                    <label htmlFor="pm-quick-original-upload" className={pmQuickPackageLoading ? 'cursor-not-allowed' : 'cursor-pointer'}>
+                      <UploadIcon className="w-6 h-6 mx-auto mb-1 text-blue-600" />
+                      <span className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700">
+                        Upload Originals
+                      </span>
+                      <p className="text-[10px] text-gray-500 mt-1">PDF or images (PDF auto-converted)</p>
+                    </label>
+                  </div>
+
+                  {pmQuickOriginalFiles.length > 0 && (
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-medium text-blue-700">{pmQuickOriginalFiles.length} page(s) uploaded:</p>
+                        <button
+                          onClick={() => setPmQuickOriginalFiles([])}
+                          className="text-[10px] text-gray-400 hover:text-red-500"
+                          disabled={pmQuickPackageLoading}
+                        >
+                          Clear all
+                        </button>
+                      </div>
+                      <div className="max-h-32 overflow-y-auto">
+                        {pmQuickOriginalFiles.map((file, idx) => (
+                          <div key={idx} className="flex items-center justify-between bg-white px-2 py-1 rounded text-xs mb-1">
+                            <span className="truncate flex-1">{idx + 1}. {file.filename}</span>
+                            <button
+                              onClick={() => setPmQuickOriginalFiles(prev => prev.filter((_, i) => i !== idx))}
+                              className="text-gray-400 hover:text-red-500 ml-2 p-1"
+                              disabled={pmQuickPackageLoading}
+                            >
+                              <TrashIcon className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Right Column - Options & Download */}
+              <div className="space-y-4">
+                {/* Options */}
+                <div className="p-4 bg-gray-50 border border-gray-200 rounded">
+                  <h4 className="text-sm font-bold text-gray-700 mb-2">⚙️ Options</h4>
+                  <div className="space-y-2">
+                    <label className="flex items-center text-xs cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={pmQuickIncludeCover}
+                        onChange={(e) => setPmQuickIncludeCover(e.target.checked)}
+                        className="mr-3 w-4 h-4"
+                      />
+                      <span>Include Certificate of Accuracy</span>
+                    </label>
+                    <label className="flex items-center text-xs cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={pmQuickIncludeLetterhead}
+                        onChange={(e) => setPmQuickIncludeLetterhead(e.target.checked)}
+                        className="mr-3 w-4 h-4"
+                      />
+                      <span>Include Letterhead on pages</span>
+                    </label>
+                    <label className="flex items-center text-xs cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={pmQuickIncludeOriginal}
+                        onChange={(e) => setPmQuickIncludeOriginal(e.target.checked)}
+                        className="mr-3 w-4 h-4"
+                      />
+                      <span>Include Original Documents</span>
+                    </label>
+                    <label className="flex items-center text-xs cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={pmQuickIncludeVerification}
+                        onChange={(e) => setPmQuickIncludeVerification(e.target.checked)}
+                        className="mr-3 w-4 h-4"
+                      />
+                      <span>🔐 Include Verification Page (QR Code)</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Document Order Preview */}
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded">
+                  <h4 className="text-sm font-bold text-blue-700 mb-2">📋 Final Document Order</h4>
+                  <div className="flex items-center gap-2 text-xs flex-wrap">
+                    {pmQuickIncludeCover && (
+                      <>
+                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">📜 Certificate</span>
+                        <span className="text-gray-400">→</span>
+                      </>
+                    )}
+                    <span className="px-2 py-1 bg-green-100 text-green-700 rounded">
+                      📄 Translation {pmQuickTranslationHtml ? '(Document)' : `(${pmQuickTranslationFiles.length} pages)`}
+                    </span>
+                    {pmQuickIncludeOriginal && pmQuickOriginalFiles.length > 0 && (
+                      <>
+                        <span className="text-gray-400">→</span>
+                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">📑 Original ({pmQuickOriginalFiles.length} pages)</span>
+                      </>
+                    )}
+                    {pmQuickIncludeVerification && (
+                      <>
+                        <span className="text-gray-400">→</span>
+                        <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded">🔐 Verification</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Progress Indicator */}
+                {pmQuickPackageProgress && (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      {pmQuickPackageLoading && (
+                        <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                      )}
+                      <span className="text-sm text-blue-700 font-medium">{pmQuickPackageProgress}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Download Button */}
+                <button
+                  onClick={handlePmQuickPackageDownload}
+                  disabled={(pmQuickTranslationFiles.length === 0 && !pmQuickTranslationHtml) || pmQuickPackageLoading || !pmQuickDocumentType.trim()}
+                  className="w-full py-3 bg-gradient-to-r from-green-600 to-blue-600 text-white text-sm font-bold rounded-lg hover:from-green-700 hover:to-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {pmQuickPackageLoading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Generating...
+                    </>
+                  ) : (
+                    '📦 Generate Complete Package (Print/PDF)'
+                  )}
+                </button>
+                <p className="text-[10px] text-gray-500 mt-1 text-center">
+                  Downloads PDF and opens preview window
+                </p>
+
+                {(!pmQuickDocumentType.trim() || (pmQuickTranslationFiles.length === 0 && !pmQuickTranslationHtml)) && (
+                  <p className="text-[10px] text-amber-600 text-center">
+                    ⚠️ Fill document type and upload translation first
+                  </p>
                 )}
               </div>
             </div>

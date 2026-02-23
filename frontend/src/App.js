@@ -1703,8 +1703,8 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency, refreshPart
     client_name: '',
     client_email: '',
     service_type: 'certified',
-    translate_from: 'portuguese',
-    translate_to: 'english',
+    translate_from: 'Portuguese (Brazil)',
+    translate_to: 'English (USA)',
     urgency: 'no',
     reference: '',
     notes: ''
@@ -1892,7 +1892,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency, refreshPart
   // Force Portuguese (Brasil) as target language for Sworn Translation
   useEffect(() => {
     if (formData.service_type === 'sworn') {
-      setFormData(prev => ({...prev, translate_to: 'pt-br'}));
+      setFormData(prev => ({...prev, translate_to: 'Portuguese (Brazil)'}));
     }
   }, [formData.service_type]);
 
@@ -2420,7 +2420,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency, refreshPart
                   onChange={(e) => setFormData({...formData, translate_from: e.target.value})}
                 >
                   {FROM_LANGUAGES.map((lang) => (
-                    <option key={lang.code} value={lang.code}>
+                    <option key={lang.code} value={lang.name}>
                       {lang.name}
                     </option>
                   ))}
@@ -2432,10 +2432,10 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency, refreshPart
                   <div>
                     <select
                       className="w-full px-4 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-700"
-                      value="pt-br"
+                      value="Portuguese (Brazil)"
                       disabled
                     >
-                      <option value="pt-br">🇧🇷 Portuguese (Brasil)</option>
+                      <option value="Portuguese (Brazil)">🇧🇷 Portuguese (Brazil)</option>
                     </select>
                     <p className="text-xs text-gray-500 mt-1">{t.swornLanguageNote}</p>
                   </div>
@@ -2446,7 +2446,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency, refreshPart
                     onChange={(e) => setFormData({...formData, translate_to: e.target.value})}
                   >
                     {TO_LANGUAGES.map((lang) => (
-                      <option key={lang.code} value={lang.code}>
+                      <option key={lang.code} value={lang.name}>
                         {lang.name}
                       </option>
                     ))}
