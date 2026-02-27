@@ -12,7 +12,7 @@ const TRANSLATIONS = {
     partnerLogin: 'Partner Login',
     // Hero
     yearsExperience: '15+ Years of Experience',
-    heroTitle1: 'Certified Excellence',
+    heroTitle1: 'Certified Translation',
     heroTitle2: 'Powered by Technology',
     heroDescription: 'Enterprise-grade translation services powered by certified professionals and cutting-edge technology. Trusted by law firms and immigration agencies.',
     requestPartnership: 'Request Partnership',
@@ -88,7 +88,7 @@ const TRANSLATIONS = {
     partnerLogin: 'Acceso Socios',
     // Hero
     yearsExperience: '15+ Años de Experiencia',
-    heroTitle1: 'Excelencia Certificada',
+    heroTitle1: 'Traducción Certificada',
     heroTitle2: 'Impulsada por Tecnología',
     heroDescription: 'Servicios de traducción de nivel empresarial impulsados por profesionales certificados y tecnología de vanguardia. Confianza de bufetes de abogados y agencias de inmigración.',
     requestPartnership: 'Solicitar Asociación',
@@ -164,7 +164,7 @@ const TRANSLATIONS = {
     partnerLogin: 'Login Parceiro',
     // Hero
     yearsExperience: '15+ Anos de Experiência',
-    heroTitle1: 'Excelência Certificada',
+    heroTitle1: 'Tradução Certificada',
     heroTitle2: 'Impulsionada por Tecnologia',
     heroDescription: 'Serviços de tradução de nível empresarial impulsionados por profissionais certificados e tecnologia de ponta. Confiança de escritórios de advocacia e agências de imigração.',
     requestPartnership: 'Solicitar Parceria',
@@ -382,7 +382,7 @@ Message: ${formData.message}
           <img
             src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png"
             alt="Legacy Translations"
-            className="h-10 md:h-12"
+            className="h-14 md:h-16"
           />
           <nav className="flex items-center space-x-4 md:space-x-6">
             {/* Language Flags */}
@@ -800,7 +800,7 @@ Message: ${formData.message}
               <img
                 src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png"
                 alt="Legacy Translations"
-                className="h-10 mb-4 brightness-0 invert"
+                className="h-14 mb-4 brightness-0 invert"
               />
               <p className="text-blue-200">
                 {t.professionalServices}
