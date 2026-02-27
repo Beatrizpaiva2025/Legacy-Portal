@@ -1176,31 +1176,31 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
   if (!isLogin) {
     return (
       <div className="min-h-screen bg-gray-200 flex items-center justify-center p-6">
-        <div className="w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col lg:flex-row">
+        <div className="w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col lg:flex-row">
           {/* Left Side - Branding (White background) */}
-          <div className="lg:w-2/5 bg-white p-6 flex flex-col justify-center items-center">
+          <div className="lg:w-2/5 bg-white p-8 flex flex-col justify-center items-center">
             <img
               src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png"
               alt="Legacy Translations"
-              className="w-48 object-contain mb-6"
+              className="w-56 object-contain mb-6"
             />
-            <h1 className="text-xl font-bold mb-1 text-gray-800">{t.createAccount}</h1>
-            <p className="text-gray-500 text-xs mb-4">{t.corporateOnly}</p>
+            <h1 className="text-2xl font-bold mb-1 text-gray-800">{t.createAccount}</h1>
+            <p className="text-gray-500 text-sm mb-4">{t.corporateOnly}</p>
 
             {/* Welcome Gift Highlight */}
             <div className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-lg p-3 mb-4 text-center">
-              <span className="font-semibold text-sm">{t.welcomeGift}</span>
+              <span className="font-semibold text-base">{t.welcomeGift}</span>
             </div>
 
             {/* Referral Indicator */}
             {formData.referral_code && (
-              <div className="bg-purple-100 text-purple-700 rounded-lg p-3 mb-4 text-center text-sm">
+              <div className="bg-purple-100 text-purple-700 rounded-lg p-3 mb-4 text-center text-base">
                 <span>🤝 Você foi indicado! Código: </span>
                 <span className="font-mono font-bold">{formData.referral_code.toUpperCase()}</span>
               </div>
             )}
 
-            <div className="space-y-2 text-xs text-gray-700">
+            <div className="space-y-2 text-sm text-gray-700">
               <div className="flex items-center gap-2">
                 <span className="text-green-600">✓</span>
                 <span>{t.benefit1}</span>
@@ -1231,33 +1231,33 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
           </div>
 
           {/* Right Side - Form (Light gray background) */}
-          <div className="lg:w-3/5 p-5 lg:p-6 bg-gray-100">
+          <div className="lg:w-3/5 p-6 lg:p-8 bg-gray-100">
             {error && (
-              <div className="mb-3 p-2 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs">
+              <div className="mb-3 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
                 {error}
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-3">
+            <form onSubmit={handleSubmit} className="space-y-4">
               {/* Row 1: Company & Contact */}
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">{t.companyName} *</label>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">{t.companyName} *</label>
                   <input
                     type="text"
                     required
-                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 text-base border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
                     value={formData.company_name}
                     onChange={(e) => setFormData({...formData, company_name: e.target.value})}
                     placeholder="Your Company Inc."
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">{t.contactName} *</label>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">{t.contactName} *</label>
                   <input
                     type="text"
                     required
-                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 text-base border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
                     value={formData.contact_name}
                     onChange={(e) => setFormData({...formData, contact_name: e.target.value})}
                     placeholder="John Smith"
@@ -1266,23 +1266,23 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
               </div>
 
               {/* Row 2: Email & Phone */}
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">{t.companyEmail} *</label>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">{t.companyEmail} *</label>
                   <input
                     type="email"
                     required
-                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 text-base border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
                     value={formData.email}
                     onChange={(e) => setFormData({...formData, email: e.target.value})}
                     placeholder="you@company.com"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">{t.phoneOptional}</label>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">{t.phoneOptional}</label>
                   <input
                     type="tel"
-                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 text-base border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
                     value={formData.phone}
                     onChange={(e) => setFormData({...formData, phone: e.target.value})}
                     placeholder="+1 (555) 123-4567"
@@ -1292,10 +1292,10 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
 
               {/* Estimated Monthly Volume */}
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">{t.estimatedVolume} *</label>
+                <label className="block text-sm font-medium text-gray-600 mb-1">{t.estimatedVolume} *</label>
                 <select
                   required
-                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 text-base border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
                   value={formData.estimated_volume}
                   onChange={(e) => setFormData({...formData, estimated_volume: e.target.value})}
                 >
@@ -1309,42 +1309,42 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
 
               {/* Payment Plan */}
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">{t.paymentPlan}</label>
-                <div className="grid grid-cols-3 gap-2">
+                <label className="block text-sm font-medium text-gray-600 mb-1">{t.paymentPlan}</label>
+                <div className="grid grid-cols-3 gap-3">
                   {/* Pay Per Order - Always available */}
-                  <label className={`flex flex-col p-2 rounded border-2 cursor-pointer transition-all text-center border-blue-500 bg-blue-50`}>
+                  <label className={`flex flex-col p-3 rounded border-2 cursor-pointer transition-all text-center border-blue-500 bg-blue-50`}>
                     <input type="radio" name="payment_plan" value="pay_per_order" checked={true} readOnly className="sr-only" />
-                    <span className="font-medium text-xs text-gray-800">{t.payPerOrder}</span>
-                    <span className="text-[10px] text-gray-500">{t.payPerOrderDesc}</span>
+                    <span className="font-medium text-sm text-gray-800">{t.payPerOrder}</span>
+                    <span className="text-xs text-gray-500">{t.payPerOrderDesc}</span>
                   </label>
                   {/* Biweekly Invoice - Disabled for new signups */}
-                  <div className="flex flex-col p-2 rounded border-2 border-gray-200 text-center opacity-50 cursor-not-allowed relative" title={t.invoiceQualificationNote}>
+                  <div className="flex flex-col p-3 rounded border-2 border-gray-200 text-center opacity-50 cursor-not-allowed relative" title={t.invoiceQualificationNote}>
                     <div className="absolute -top-1 -right-1 bg-amber-100 rounded-full p-0.5">
                       <svg className="w-3 h-3 text-amber-600" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/></svg>
                     </div>
-                    <span className="font-medium text-xs text-gray-500">{t.biweeklyInvoice}</span>
-                    <span className="text-[10px] text-gray-400">{t.invoiceComingSoon}</span>
+                    <span className="font-medium text-sm text-gray-500">{t.biweeklyInvoice}</span>
+                    <span className="text-xs text-gray-400">{t.invoiceComingSoon}</span>
                   </div>
                   {/* Monthly Invoice - Disabled for new signups */}
-                  <div className="flex flex-col p-2 rounded border-2 border-gray-200 text-center opacity-50 cursor-not-allowed relative" title={t.invoiceQualificationNote}>
+                  <div className="flex flex-col p-3 rounded border-2 border-gray-200 text-center opacity-50 cursor-not-allowed relative" title={t.invoiceQualificationNote}>
                     <div className="absolute -top-1 -right-1 bg-amber-100 rounded-full p-0.5">
                       <svg className="w-3 h-3 text-amber-600" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/></svg>
                     </div>
-                    <span className="font-medium text-xs text-gray-500">{t.monthlyInvoice}</span>
-                    <span className="text-[10px] text-gray-400">{t.invoiceComingSoon}</span>
+                    <span className="font-medium text-sm text-gray-500">{t.monthlyInvoice}</span>
+                    <span className="text-xs text-gray-400">{t.invoiceComingSoon}</span>
                   </div>
                 </div>
                 {/* Qualification note */}
-                <p className="text-[10px] text-gray-500 mt-1 italic">{t.invoiceQualificationNote}</p>
+                <p className="text-xs text-gray-500 mt-1 italic">{t.invoiceQualificationNote}</p>
               </div>
 
               {/* Password */}
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">{t.password} *</label>
+                <label className="block text-sm font-medium text-gray-600 mb-1">{t.password} *</label>
                 <input
                   type="password"
                   required
-                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 text-base border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
                   value={formData.password}
                   onChange={(e) => setFormData({...formData, password: e.target.value})}
                   placeholder="Create a secure password"
@@ -1352,7 +1352,7 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
               </div>
 
               {/* Terms - Compact */}
-              <div className="bg-gray-50 rounded p-2 text-[10px] text-gray-600 grid grid-cols-2 gap-x-4 gap-y-1">
+              <div className="bg-gray-50 rounded p-3 text-xs text-gray-600 grid grid-cols-2 gap-x-4 gap-y-1">
                 <span>✓ {t.term1}</span>
                 <span>• {t.term2}</span>
                 <span>• {t.term3}</span>
@@ -1367,20 +1367,20 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
                   onChange={(e) => setFormData({...formData, agreed_to_terms: e.target.checked})}
                   className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
-                <span className="text-xs text-gray-700">{t.iAgreeToTerms}</span>
+                <span className="text-sm text-gray-700">{t.iAgreeToTerms}</span>
               </label>
 
               {/* Submit Button */}
               <button
                 type="submit"
                 disabled={loading || !formData.agreed_to_terms}
-                className={`w-full py-2.5 text-white rounded font-semibold text-sm transition-all ${!formData.agreed_to_terms ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-900 hover:bg-blue-800'}`}
+                className={`w-full py-3 text-white rounded font-semibold text-base transition-all ${!formData.agreed_to_terms ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-900 hover:bg-blue-800'}`}
               >
                 {loading ? t.pleaseWait : t.createAccount}
               </button>
 
               {/* Login Link */}
-              <p className="text-center text-xs text-gray-600">
+              <p className="text-center text-sm text-gray-600">
                 {t.haveAccount}{' '}
                 <button type="button" onClick={() => setIsLogin(true)} className="text-blue-600 hover:underline font-medium">
                   Login
