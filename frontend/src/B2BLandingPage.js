@@ -404,13 +404,13 @@ Message: ${formData.message}
                 </button>
               ))}
             </div>
-            <a href="https://legacytranslations.com" className="text-gray-600 hover:text-blue-900 text-sm font-medium hidden md:block">
+            <a href="https://legacytranslations.com" className="text-gray-600 hover:text-blue-900 text-base font-medium hidden md:block">
               {t.home}
             </a>
-            <a href="https://legacytranslations.com/services" className="text-gray-600 hover:text-blue-900 text-sm font-medium hidden md:block">
+            <a href="https://legacytranslations.com/services" className="text-gray-600 hover:text-blue-900 text-base font-medium hidden md:block">
               {t.services}
             </a>
-            <a href="#/partner/login" className="bg-blue-900 text-white px-4 md:px-5 py-2 rounded-full text-sm font-medium hover:bg-blue-800 transition-colors">
+            <a href="#/partner/login" className="bg-blue-900 text-white px-5 md:px-6 py-2.5 rounded-full text-base font-medium hover:bg-blue-800 transition-colors">
               {t.partnerLogin}
             </a>
           </nav>
@@ -422,15 +422,15 @@ Message: ${formData.message}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div>
-              <div className="inline-flex items-center px-4 py-2 bg-blue-50 text-blue-900 rounded-full text-sm font-medium mb-6">
+              <div className="inline-flex items-center px-4 py-2 bg-blue-50 text-blue-900 rounded-full text-base font-medium mb-6">
                 <span className="w-2 h-2 bg-blue-600 rounded-full mr-2"></span>
                 {t.yearsExperience}
               </div>
-              <h1 className="text-4xl md:text-5xl font-bold text-slate-900 leading-tight mb-6">
+              <h1 className="text-5xl md:text-6xl font-bold text-slate-900 leading-tight mb-6">
                 {t.heroTitle1}
                 <span className="block text-blue-900 italic">{t.heroTitle2}</span>
               </h1>
-              <p className="text-lg text-slate-600 mb-8 leading-relaxed">
+              <p className="text-xl text-slate-600 mb-8 leading-relaxed">
                 {t.heroDescription}
               </p>
               <div className="flex flex-wrap gap-4 mb-8">
@@ -441,7 +441,7 @@ Message: ${formData.message}
                   {t.viewBenefits}
                 </button>
               </div>
-              <div className="flex items-center gap-6 text-sm text-slate-500">
+              <div className="flex items-center gap-6 text-base text-slate-500">
                 <div className="flex items-center">
                   <svg className="w-5 h-5 text-green-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -485,8 +485,8 @@ Message: ${formData.message}
                 </svg>
               </div>
               <div>
-                <div className="text-xl md:text-2xl font-bold">{t.freeTranslationTitle}</div>
-                <div className="text-green-100 text-sm md:text-base">{t.freeTranslationSubtitle}</div>
+                <div className="text-2xl md:text-3xl font-bold">{t.freeTranslationTitle}</div>
+                <div className="text-green-100 text-base md:text-lg">{t.freeTranslationSubtitle}</div>
               </div>
             </div>
             <button
@@ -504,16 +504,16 @@ Message: ${formData.message}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-3 gap-8 text-center">
             <div className="p-6">
-              <div className="text-4xl md:text-5xl font-bold text-white">15+</div>
-              <div className="text-slate-400 mt-2 text-sm uppercase tracking-wide">{t.yearsExperienceStats}</div>
+              <div className="text-5xl md:text-6xl font-bold text-white">15+</div>
+              <div className="text-slate-400 mt-2 text-base uppercase tracking-wide">{t.yearsExperienceStats}</div>
             </div>
             <div className="p-6">
-              <div className="text-4xl md:text-5xl font-bold text-white">50+</div>
-              <div className="text-slate-400 mt-2 text-sm uppercase tracking-wide">{t.languages}</div>
+              <div className="text-5xl md:text-6xl font-bold text-white">50+</div>
+              <div className="text-slate-400 mt-2 text-base uppercase tracking-wide">{t.languages}</div>
             </div>
             <div className="p-6">
-              <div className="text-4xl md:text-5xl font-bold text-white">100%</div>
-              <div className="text-slate-400 mt-2 text-sm uppercase tracking-wide">{t.uscisAcceptedStats}</div>
+              <div className="text-5xl md:text-6xl font-bold text-white">100%</div>
+              <div className="text-slate-400 mt-2 text-base uppercase tracking-wide">{t.uscisAcceptedStats}</div>
             </div>
           </div>
         </div>
@@ -523,10 +523,10 @@ Message: ${formData.message}
       <section id="benefits" className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-blue-900 mb-4">
+            <h2 className="text-4xl md:text-5xl font-bold text-blue-900 mb-4">
               {t.partnershipBenefits}
             </h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            <p className="text-2xl text-gray-600 max-w-2xl mx-auto">
               {t.benefitsDescription}
             </p>
           </div>
@@ -538,8 +538,8 @@ Message: ${formData.message}
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-blue-900 mb-3">{t.monthlyInvoicing}</h3>
-              <p className="text-gray-600">{t.monthlyInvoicingDesc}</p>
+              <h3 className="text-2xl font-bold text-blue-900 mb-3">{t.monthlyInvoicing}</h3>
+              <p className="text-gray-600 text-lg">{t.monthlyInvoicingDesc}</p>
             </div>
 
             <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow">
@@ -548,8 +548,8 @@ Message: ${formData.message}
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-blue-900 mb-3">{t.volumeDiscounts}</h3>
-              <p className="text-gray-600">{t.volumeDiscountsDesc}</p>
+              <h3 className="text-2xl font-bold text-blue-900 mb-3">{t.volumeDiscounts}</h3>
+              <p className="text-gray-600 text-lg">{t.volumeDiscountsDesc}</p>
             </div>
 
             <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow">
@@ -558,8 +558,8 @@ Message: ${formData.message}
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-blue-900 mb-3">{t.priorityProcessing}</h3>
-              <p className="text-gray-600">{t.priorityProcessingDesc}</p>
+              <h3 className="text-2xl font-bold text-blue-900 mb-3">{t.priorityProcessing}</h3>
+              <p className="text-gray-600 text-lg">{t.priorityProcessingDesc}</p>
             </div>
 
             <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow">
@@ -568,8 +568,8 @@ Message: ${formData.message}
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-blue-900 mb-3">{t.dedicatedSupport}</h3>
-              <p className="text-gray-600">{t.dedicatedSupportDesc}</p>
+              <h3 className="text-2xl font-bold text-blue-900 mb-3">{t.dedicatedSupport}</h3>
+              <p className="text-gray-600 text-lg">{t.dedicatedSupportDesc}</p>
             </div>
 
             <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow">
@@ -578,8 +578,8 @@ Message: ${formData.message}
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-blue-900 mb-3">{t.onlineDashboard}</h3>
-              <p className="text-gray-600">{t.onlineDashboardDesc}</p>
+              <h3 className="text-2xl font-bold text-blue-900 mb-3">{t.onlineDashboard}</h3>
+              <p className="text-gray-600 text-lg">{t.onlineDashboardDesc}</p>
             </div>
 
             <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow">
@@ -588,8 +588,8 @@ Message: ${formData.message}
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-blue-900 mb-3">{t.certifiedQuality}</h3>
-              <p className="text-gray-600">{t.certifiedQualityDesc}</p>
+              <h3 className="text-2xl font-bold text-blue-900 mb-3">{t.certifiedQuality}</h3>
+              <p className="text-gray-600 text-lg">{t.certifiedQualityDesc}</p>
             </div>
           </div>
         </div>
@@ -599,10 +599,10 @@ Message: ${formData.message}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-blue-900 mb-4">
+            <h2 className="text-4xl md:text-5xl font-bold text-blue-900 mb-4">
               {t.howItWorks}
             </h2>
-            <p className="text-xl text-gray-600">
+            <p className="text-2xl text-gray-600">
               {t.gettingStartedSimple}
             </p>
           </div>
@@ -610,18 +610,18 @@ Message: ${formData.message}
           <div className="grid md:grid-cols-3 gap-8">
             <div className="text-center">
               <div className="w-16 h-16 bg-blue-900 text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-6">1</div>
-              <h3 className="text-xl font-bold text-blue-900 mb-3">{t.step1Title}</h3>
-              <p className="text-gray-600">{t.step1Desc}</p>
+              <h3 className="text-2xl font-bold text-blue-900 mb-3">{t.step1Title}</h3>
+              <p className="text-gray-600 text-lg">{t.step1Desc}</p>
             </div>
             <div className="text-center">
               <div className="w-16 h-16 bg-blue-900 text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-6">2</div>
-              <h3 className="text-xl font-bold text-blue-900 mb-3">{t.step2Title}</h3>
-              <p className="text-gray-600">{t.step2Desc}</p>
+              <h3 className="text-2xl font-bold text-blue-900 mb-3">{t.step2Title}</h3>
+              <p className="text-gray-600 text-lg">{t.step2Desc}</p>
             </div>
             <div className="text-center">
               <div className="w-16 h-16 bg-blue-900 text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-6">3</div>
-              <h3 className="text-xl font-bold text-blue-900 mb-3">{t.step3Title}</h3>
-              <p className="text-gray-600">{t.step3Desc}</p>
+              <h3 className="text-2xl font-bold text-blue-900 mb-3">{t.step3Title}</h3>
+              <p className="text-gray-600 text-lg">{t.step3Desc}</p>
             </div>
           </div>
         </div>
@@ -632,10 +632,10 @@ Message: ${formData.message}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="text-white">
-              <h2 className="text-3xl md:text-4xl font-bold mb-6">
+              <h2 className="text-4xl md:text-5xl font-bold mb-6">
                 {t.readyToGetStarted}
               </h2>
-              <p className="text-xl text-blue-100 mb-8">
+              <p className="text-2xl text-blue-100 mb-8">
                 {t.ctaDescription}
               </p>
               <div className="space-y-4">
@@ -643,27 +643,27 @@ Message: ${formData.message}
                   <svg className="w-6 h-6 text-blue-300 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
-                  <span className="text-blue-100">{t.instantActivation}</span>
+                  <span className="text-blue-100 text-lg">{t.instantActivation}</span>
                 </div>
                 <div className="flex items-center">
                   <svg className="w-6 h-6 text-blue-300 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
-                  <span className="text-blue-100">{t.payPerOrder}</span>
+                  <span className="text-blue-100 text-lg">{t.payPerOrder}</span>
                 </div>
                 <div className="flex items-center">
                   <svg className="w-6 h-6 text-blue-300 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
-                  <span className="text-blue-100">{t.invoicePlansAvailable}</span>
+                  <span className="text-blue-100 text-lg">{t.invoicePlansAvailable}</span>
                 </div>
                 <div className="flex items-start bg-gradient-to-r from-blue-800/50 to-purple-800/50 rounded-lg p-3 border border-blue-400/30">
                   <svg className="w-6 h-6 text-yellow-300 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                   </svg>
                   <div>
-                    <span className="text-yellow-200 font-bold block">{t.digitalVerificationTitle}</span>
-                    <span className="text-blue-200 text-sm">{t.digitalVerificationDesc}</span>
+                    <span className="text-yellow-200 font-bold block text-lg">{t.digitalVerificationTitle}</span>
+                    <span className="text-blue-200 text-base">{t.digitalVerificationDesc}</span>
                   </div>
                 </div>
                 <div className="flex items-start">
@@ -671,8 +671,8 @@ Message: ${formData.message}
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
                   </svg>
                   <div>
-                    <span className="text-yellow-200 font-semibold block">{t.firstTranslationFree}</span>
-                    <span className="text-blue-200 text-xs">{t.firstTranslationFreeDesc}</span>
+                    <span className="text-yellow-200 font-semibold block text-lg">{t.firstTranslationFree}</span>
+                    <span className="text-blue-200 text-sm">{t.firstTranslationFreeDesc}</span>
                   </div>
                 </div>
               </div>
@@ -686,25 +686,25 @@ Message: ${formData.message}
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
                   </svg>
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">{t.createFreeAccount}</h3>
-                <p className="text-gray-600 mb-6">
+                <h3 className="text-3xl font-bold text-gray-900 mb-2">{t.createFreeAccount}</h3>
+                <p className="text-lg text-gray-600 mb-6">
                   {t.signUpReceiveCoupon} <span className="font-bold text-teal-600">{t.oneFreePageBold}</span>
                 </p>
 
                 <div className="space-y-4 mb-8">
-                  <div className="flex items-center justify-center text-sm text-gray-600">
+                  <div className="flex items-center justify-center text-base text-gray-600">
                     <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                     {t.noCreditCard}
                   </div>
-                  <div className="flex items-center justify-center text-sm text-gray-600">
+                  <div className="flex items-center justify-center text-base text-gray-600">
                     <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                     {t.setupTime}
                   </div>
-                  <div className="flex items-center justify-center text-sm text-gray-600">
+                  <div className="flex items-center justify-center text-base text-gray-600">
                     <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
@@ -719,7 +719,7 @@ Message: ${formData.message}
                   {t.createAccountGetFree}
                 </a>
 
-                <p className="text-sm text-gray-500 mt-4">
+                <p className="text-base text-gray-500 mt-4">
                   {t.alreadyHaveAccount} <a href="/#/partner/login" className="text-blue-600 hover:underline font-medium">{t.signInHere}</a>
                 </p>
               </div>
@@ -782,7 +782,7 @@ Message: ${formData.message}
       {/* Already a Partner */}
       <section className="py-12 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p className="text-gray-600 mb-4">{t.alreadyPartner}</p>
+          <p className="text-gray-600 text-lg mb-4">{t.alreadyPartner}</p>
           <a
             href="#/partner/login"
             className="inline-block px-8 py-3 border-2 border-blue-900 text-blue-900 rounded-full hover:bg-blue-900 hover:text-white font-semibold transition-colors"
@@ -802,13 +802,13 @@ Message: ${formData.message}
                 alt="Legacy Translations"
                 className="h-14 mb-4 brightness-0 invert"
               />
-              <p className="text-blue-200">
+              <p className="text-blue-200 text-lg">
                 {t.professionalServices}
               </p>
             </div>
             <div>
-              <h4 className="font-bold mb-4">{t.contact}</h4>
-              <p className="text-blue-200">contact@legacytranslations.com</p>
+              <h4 className="font-bold text-lg mb-4">{t.contact}</h4>
+              <p className="text-blue-200 text-lg">contact@legacytranslations.com</p>
               <a href="https://wa.me/18573167770" className="flex items-center gap-2 text-blue-200 hover:text-green-400 transition-colors">
                 <svg className="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
@@ -817,11 +817,11 @@ Message: ${formData.message}
               </a>
             </div>
             <div>
-              <h4 className="font-bold mb-4">{t.quickLinks}</h4>
+              <h4 className="font-bold text-lg mb-4">{t.quickLinks}</h4>
               <div className="space-y-2">
-                <a href="https://legacytranslations.com" className="block text-blue-200 hover:text-white">{t.home}</a>
-                <a href="https://legacytranslations.com/services" className="block text-blue-200 hover:text-white">{t.services}</a>
-                <a href="#/partner/login" className="block text-blue-200 hover:text-white">{t.partnerPortal}</a>
+                <a href="https://legacytranslations.com" className="block text-blue-200 hover:text-white text-lg">{t.home}</a>
+                <a href="https://legacytranslations.com/services" className="block text-blue-200 hover:text-white text-lg">{t.services}</a>
+                <a href="#/partner/login" className="block text-blue-200 hover:text-white text-lg">{t.partnerPortal}</a>
               </div>
             </div>
           </div>
