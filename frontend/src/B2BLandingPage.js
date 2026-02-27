@@ -410,6 +410,9 @@ Message: ${formData.message}
             <a href="https://legacytranslations.com/services" className="text-gray-600 hover:text-blue-900 text-sm font-medium hidden md:block">
               {t.services}
             </a>
+            <a href="#/partner/login" className="bg-blue-900 text-white px-4 md:px-5 py-2 rounded-full text-sm font-medium hover:bg-blue-800 transition-colors">
+              {t.partnerLogin}
+            </a>
           </nav>
         </div>
       </header>
@@ -776,6 +779,19 @@ Message: ${formData.message}
         </div>
       </section>
 
+      {/* Already a Partner */}
+      <section className="py-12 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <p className="text-gray-600 mb-4">{t.alreadyPartner}</p>
+          <a
+            href="#/partner/login"
+            className="inline-block px-8 py-3 border-2 border-blue-900 text-blue-900 rounded-full hover:bg-blue-900 hover:text-white font-semibold transition-colors"
+          >
+            {t.accessPartnerPortal}
+          </a>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="py-12 bg-blue-900 text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -805,6 +821,7 @@ Message: ${formData.message}
               <div className="space-y-2">
                 <a href="https://legacytranslations.com" className="block text-blue-200 hover:text-white">{t.home}</a>
                 <a href="https://legacytranslations.com/services" className="block text-blue-200 hover:text-white">{t.services}</a>
+                <a href="#/partner/login" className="block text-blue-200 hover:text-white">{t.partnerPortal}</a>
               </div>
             </div>
           </div>
