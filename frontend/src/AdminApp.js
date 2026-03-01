@@ -18923,6 +18923,14 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 <p className="text-xs opacity-80">{viewingOrder.client_name}</p>
               </div>
               <div className="flex items-center gap-2">
+                {isAdmin && !editingProject && (
+                  <button
+                    onClick={() => { duplicateProject(viewingOrder); setViewingOrder(null); setProjectModalTab('details'); }}
+                    className="px-3 py-1 bg-white bg-opacity-20 rounded text-xs hover:bg-opacity-30 font-medium"
+                  >
+                    📋 Duplicate
+                  </button>
+                )}
                 {(isAdmin || isPM) && !editingProject && (
                   <button
                     onClick={startEditingProject}
@@ -20189,7 +20197,18 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
             </div>
 
             {/* Footer */}
-            <div className="p-3 border-t bg-gray-50 flex justify-end gap-2 rounded-b-lg">
+            <div className="p-3 border-t bg-gray-50 flex justify-between rounded-b-lg">
+              <div>
+                {isAdmin && (
+                  <button
+                    onClick={() => { duplicateProject(viewingOrder); setViewingOrder(null); setProjectModalTab('details'); }}
+                    className="px-4 py-1.5 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700 flex items-center gap-1.5"
+                  >
+                    <DuplicateIcon className="w-3.5 h-3.5" />
+                    Duplicate Project
+                  </button>
+                )}
+              </div>
               <button
                 onClick={() => { setViewingOrder(null); setProjectModalTab('details'); setEditingNotes(false); setEditingModalDeadline(false); }}
                 className="px-4 py-1.5 bg-gray-600 text-white rounded text-xs hover:bg-gray-700"
