@@ -18484,7 +18484,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       )}
 
       <div className="bg-white rounded-lg shadow-sm overflow-x-auto border border-gray-100">
-        <table className="w-full text-sm">
+        <table className="w-full text-[13px]">
           <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
             <tr>
               <th className="px-3 py-3 text-left font-semibold text-blue-700">Code</th>
@@ -18930,18 +18930,18 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       {/* Enhanced Project Details Modal */}
       {viewingOrder && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl mx-4 max-h-[90vh] flex flex-col">
             {/* Header */}
             <div className="p-4 border-b flex justify-between items-center bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">
               <div>
-                <h3 className="font-bold text-lg">PROJECT {viewingOrder.order_number}</h3>
-                <p className="text-xs opacity-80">{viewingOrder.client_name}</p>
+                <h3 className="font-bold text-xl">PROJECT {viewingOrder.order_number}</h3>
+                <p className="text-sm opacity-80">{viewingOrder.client_name}</p>
               </div>
               <div className="flex items-center gap-2">
                 {isAdmin && !editingProject && (
                   <button
                     onClick={() => { duplicateProject(viewingOrder); setViewingOrder(null); setProjectModalTab('details'); }}
-                    className="px-3 py-1 bg-white bg-opacity-20 rounded text-xs hover:bg-opacity-30 font-medium"
+                    className="px-3 py-1.5 bg-white bg-opacity-20 rounded text-sm hover:bg-opacity-30 font-medium"
                   >
                     📋 Duplicate
                   </button>
@@ -18949,7 +18949,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 {(isAdmin || isPM) && !editingProject && (
                   <button
                     onClick={startEditingProject}
-                    className="px-3 py-1 bg-white bg-opacity-20 rounded text-xs hover:bg-opacity-30 font-medium"
+                    className="px-3 py-1.5 bg-white bg-opacity-20 rounded text-sm hover:bg-opacity-30 font-medium"
                   >
                     ✏️ Edit
                   </button>
@@ -18959,19 +18959,19 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                     <button
                       onClick={saveEditedProject}
                       disabled={savingProject}
-                      className="px-3 py-1 bg-green-500 rounded text-xs hover:bg-green-600 font-medium disabled:opacity-50"
+                      className="px-3 py-1.5 bg-green-500 rounded text-sm hover:bg-green-600 font-medium disabled:opacity-50"
                     >
                       {savingProject ? '...' : '💾 Save'}
                     </button>
                     <button
                       onClick={() => setEditingProject(false)}
-                      className="px-3 py-1 bg-white bg-opacity-20 rounded text-xs hover:bg-opacity-30"
+                      className="px-3 py-1.5 bg-white bg-opacity-20 rounded text-sm hover:bg-opacity-30"
                     >
                       Cancel
                     </button>
                   </>
                 )}
-                <button onClick={() => { setViewingOrder(null); setProjectModalTab('details'); setEditingNotes(false); setEditingProject(false); setEditingModalDeadline(false); }} className="text-white hover:text-gray-200 text-xl">×</button>
+                <button onClick={() => { setViewingOrder(null); setProjectModalTab('details'); setEditingNotes(false); setEditingProject(false); setEditingModalDeadline(false); }} className="text-white hover:text-gray-200 text-2xl">×</button>
               </div>
             </div>
 
@@ -18981,7 +18981,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 <button
                   key={tab}
                   onClick={() => setProjectModalTab(tab)}
-                  className={`px-4 py-2 text-sm font-medium transition-colors ${
+                  className={`px-5 py-2.5 text-base font-medium transition-colors ${
                     projectModalTab === tab
                       ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
                       : 'text-gray-500 hover:text-gray-700'
@@ -19002,7 +19002,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                     <>
                       {/* Client Section - Editable */}
                       <div>
-                        <h4 className="text-sm font-bold text-blue-600 mb-2">👤 Client</h4>
+                        <h4 className="text-base font-bold text-blue-600 mb-2">👤 Client</h4>
                         <div className="grid grid-cols-2 gap-3">
                           <div>
                             <label className="block text-xs font-medium text-gray-600 mb-1">Name</label>
@@ -19027,7 +19027,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
                       {/* Requirements Section - Editable */}
                       <div>
-                        <h4 className="text-sm font-bold text-blue-600 mb-2">📋 Requirements</h4>
+                        <h4 className="text-base font-bold text-blue-600 mb-2">📋 Requirements</h4>
                         <div className="grid grid-cols-2 gap-3">
                           <div>
                             <label className="block text-xs font-medium text-gray-600 mb-1">From Language</label>
@@ -19112,7 +19112,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
                       {/* Financial Section - Editable */}
                       <div>
-                        <h4 className="text-sm font-bold text-blue-600 mb-2">💰 Financial</h4>
+                        <h4 className="text-base font-bold text-blue-600 mb-2">💰 Financial</h4>
                         <div className="grid grid-cols-2 gap-3">
                           <div>
                             <label className="block text-xs font-medium text-gray-600 mb-1">Total Price ($)</label>
@@ -19144,7 +19144,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       {/* Mailing / Shipping Section - Read only in edit mode */}
                       {viewingOrder.shipping_address && (
                         <div>
-                          <h4 className="text-sm font-bold text-blue-600 mb-2">Mailing / Shipping</h4>
+                          <h4 className="text-base font-bold text-blue-600 mb-2">Mailing / Shipping</h4>
                           <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
                             <div className="text-xs space-y-1">
                               <div><span className="font-medium text-gray-600">Delivery:</span> <span className="text-blue-700">USPS Priority Mail ($18.99)</span></div>
@@ -19158,7 +19158,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
                       {/* Status Section - Editable */}
                       <div>
-                        <h4 className="text-sm font-bold text-blue-600 mb-2">📊 Status</h4>
+                        <h4 className="text-base font-bold text-blue-600 mb-2">📊 Status</h4>
                         <div>
                           <label className="block text-xs font-medium text-gray-600 mb-1">Translation Status</label>
                           <select
@@ -19182,7 +19182,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
                       {/* Notes Section - Editable */}
                       <div>
-                        <h4 className="text-sm font-bold text-blue-600 mb-2">📝 Notes</h4>
+                        <h4 className="text-base font-bold text-blue-600 mb-2">📝 Notes</h4>
                         <div className="space-y-3">
                           <div>
                             <label className="block text-xs font-medium text-gray-600 mb-1">👥 Team Note (PM / Translator)</label>
@@ -19214,8 +19214,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                     <>
                       {/* Client Section */}
                       <div>
-                        <h4 className="text-sm font-bold text-blue-600 mb-2">Client</h4>
-                        <table className="w-full text-xs">
+                        <h4 className="text-base font-bold text-blue-600 mb-2">Client</h4>
+                        <table className="w-full text-sm">
                           <tbody>
                             <tr className="border-b">
                               <td className="py-2 font-medium text-gray-600 w-1/3">Client</td>
@@ -19231,8 +19231,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
                       {/* Requirements Section */}
                       <div>
-                        <h4 className="text-sm font-bold text-blue-600 mb-2">Requirements</h4>
-                        <table className="w-full text-xs">
+                        <h4 className="text-base font-bold text-blue-600 mb-2">Requirements</h4>
+                        <table className="w-full text-sm">
                           <tbody>
                             <tr className="border-b">
                               <td className="py-2 font-medium text-gray-600 w-1/3">Language Pair</td>
@@ -19249,7 +19249,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             <tr className="border-b">
                               <td className="py-2 font-medium text-gray-600">Urgency</td>
                               <td className="py-2">
-                                <span className={`px-2 py-0.5 rounded text-[10px] ${viewingOrder.urgency === 'urgent' ? 'bg-red-100 text-red-700' : viewingOrder.urgency === 'priority' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}>
+                                <span className={`px-2 py-0.5 rounded text-xs ${viewingOrder.urgency === 'urgent' ? 'bg-red-100 text-red-700' : viewingOrder.urgency === 'priority' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}>
                                   {viewingOrder.urgency === 'no' ? 'Normal' : viewingOrder.urgency || 'Normal'}
                                 </span>
                               </td>
@@ -19325,8 +19325,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       {/* Financial Section - Admin only (PMs cannot see prices) */}
                       {isAdmin && (
                         <div>
-                          <h4 className="text-sm font-bold text-blue-600 mb-2">💰 Financial</h4>
-                          <table className="w-full text-xs">
+                          <h4 className="text-base font-bold text-blue-600 mb-2">💰 Financial</h4>
+                          <table className="w-full text-sm">
                             <tbody>
                               <tr className="border-b">
                                 <td className="py-2 font-medium text-gray-600 w-1/3">Total Price</td>
@@ -19356,8 +19356,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       {/* Mailing / Shipping Section */}
                       {viewingOrder.shipping_address && (
                         <div>
-                          <h4 className="text-sm font-bold text-blue-600 mb-2">Mailing / Shipping</h4>
-                          <table className="w-full text-xs">
+                          <h4 className="text-base font-bold text-blue-600 mb-2">Mailing / Shipping</h4>
+                          <table className="w-full text-sm">
                             <tbody>
                               <tr className="border-b">
                                 <td className="py-2 font-medium text-gray-600 w-1/3">Delivery</td>
@@ -19395,7 +19395,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       {/* Notes Section */}
                       <div>
                         <div className="flex items-center justify-between mb-2">
-                          <h4 className="text-sm font-bold text-blue-600">Notes</h4>
+                          <h4 className="text-base font-bold text-blue-600">Notes</h4>
                           {!editingNotes && (isAdmin || isPM) && (
                             <button
                               onClick={() => {
@@ -19454,20 +19454,20 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       <div className="space-y-2">
                         {viewingOrder.team_notes ? (
                           <div className="p-2 bg-purple-50 rounded border border-purple-200">
-                            <div className="text-[10px] font-medium text-purple-600 mb-1">👥 Team Note (PM / Translator):</div>
-                            <p className="text-xs text-gray-700">{viewingOrder.team_notes}</p>
+                            <div className="text-xs font-medium text-purple-600 mb-1">👥 Team Note (PM / Translator):</div>
+                            <p className="text-sm text-gray-700">{viewingOrder.team_notes}</p>
                           </div>
                         ) : (
-                          <div className="p-2 bg-gray-50 rounded border text-xs text-gray-400">No team notes</div>
+                          <div className="p-2 bg-gray-50 rounded border text-sm text-gray-400">No team notes</div>
                         )}
                         {isAdmin && (
                           viewingOrder.internal_notes ? (
                             <div className="p-2 bg-yellow-50 rounded border border-yellow-200">
-                              <div className="text-[10px] font-medium text-yellow-600 mb-1">🔒 Internal Note (Admin only):</div>
-                              <p className="text-xs text-gray-700">{viewingOrder.internal_notes}</p>
+                              <div className="text-xs font-medium text-yellow-600 mb-1">🔒 Internal Note (Admin only):</div>
+                              <p className="text-sm text-gray-700">{viewingOrder.internal_notes}</p>
                             </div>
                           ) : (
-                            <div className="p-2 bg-gray-50 rounded border text-xs text-gray-400">No internal notes</div>
+                            <div className="p-2 bg-gray-50 rounded border text-sm text-gray-400">No internal notes</div>
                           )
                         )}
                       </div>
@@ -19476,8 +19476,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
                   {/* Assignment Section */}
                   <div>
-                    <h4 className="text-sm font-bold text-blue-600 mb-2">Assignment</h4>
-                    <table className="w-full text-xs">
+                    <h4 className="text-base font-bold text-blue-600 mb-2">Assignment</h4>
+                    <table className="w-full text-sm">
                       <tbody>
                         <tr className="border-b">
                           <td className="py-2 font-medium text-gray-600 w-1/3">Project Manager</td>
@@ -19544,8 +19544,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   {/* Financial Section - Admin only */}
                   {isAdmin && (
                     <div>
-                      <h4 className="text-sm font-bold text-blue-600 mb-2">Financial</h4>
-                      <table className="w-full text-xs">
+                      <h4 className="text-base font-bold text-blue-600 mb-2">Financial</h4>
+                      <table className="w-full text-sm">
                         <tbody>
                           <tr className="border-b">
                             <td className="py-2 font-medium text-gray-600 w-1/3">Total Price</td>
@@ -20212,18 +20212,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
             </div>
 
             {/* Footer */}
-            <div className="p-3 border-t bg-gray-50 flex justify-between rounded-b-lg">
-              <div>
-                {isAdmin && (
-                  <button
-                    onClick={() => { duplicateProject(viewingOrder); setViewingOrder(null); setProjectModalTab('details'); }}
-                    className="px-4 py-1.5 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700 flex items-center gap-1.5"
-                  >
-                    <DuplicateIcon className="w-3.5 h-3.5" />
-                    Duplicate Project
-                  </button>
-                )}
-              </div>
+            <div className="p-3 border-t bg-gray-50 flex justify-end rounded-b-lg">
               <button
                 onClick={() => { setViewingOrder(null); setProjectModalTab('details'); setEditingNotes(false); setEditingModalDeadline(false); }}
                 className="px-4 py-1.5 bg-gray-600 text-white rounded text-xs hover:bg-gray-700"
