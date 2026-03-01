@@ -5365,6 +5365,14 @@ async def confirm_zelle_payment(order_id: str, background_tasks: BackgroundTasks
         except Exception as e:
             logger.error(f"Failed to send Zelle confirmation email: {str(e)}")
 
+        # Mark abandoned quote as recovered (conversion tracking)
+        try:
+            customer_email = order.get("customer_email") or order.get("client_email")
+            order_number = order.get("order_number", order.get("reference"))
+            await _mark_abandoned_quote_recovered(customer_email, order_number)
+        except Exception as e:
+            logger.error(f"Error marking abandoned quote as recovered: {str(e)}")
+
         return {
             "status": "success",
             "message": "Zelle payment confirmed and translation started",
@@ -5698,6 +5706,12 @@ async def handle_successful_payment(session_id: str, payment_transaction: dict, 
             logger.info(f"Sent order confirmation to company for session: {session_id}")
         except Exception as e:
             logger.error(f"Failed to send company confirmation email: {str(e)}")
+
+        # Mark abandoned quote as recovered (conversion tracking)
+        try:
+            await _mark_abandoned_quote_recovered(customer_email, order_number)
+        except Exception as e:
+            logger.error(f"Error marking abandoned quote as recovered: {str(e)}")
 
         logger.info(f"Successfully processed payment for session: {session_id}, order: {order_number}")
 
@@ -23891,6 +23905,47 @@ async def send_abandoned_quote_reminder(quote_id: str, admin_key: str, include_d
 
 # ==================== AUTOMATED FOLLOW-UP SYSTEM ====================
 
+async def _mark_abandoned_quote_recovered(customer_email: str, order_number: str = None):
+    """Mark abandoned quotes as recovered when a customer pays or creates an order.
+    Also marks the corresponding translation_order as recovered_order."""
+    if not customer_email:
+        return
+    # Find abandoned quote for this email
+    abandoned = await db.abandoned_quotes.find_one({
+        "email": {"$regex": f"^{re.escape(customer_email)}$", "$options": "i"},
+        "status": {"$in": ["abandoned", "pending"]}
+    })
+    if abandoned:
+        await db.abandoned_quotes.update_one(
+            {"id": abandoned["id"]},
+            {"$set": {
+                "status": "recovered",
+                "recovered_at": datetime.utcnow(),
+                "recovered_order_number": order_number
+            }}
+        )
+        logger.info(f"Abandoned quote {abandoned['id']} marked as recovered for {customer_email}")
+
+    # Also check if there's a Quote order for this email and mark as recovered
+    quote_order = await db.translation_orders.find_one({
+        "client_email": {"$regex": f"^{re.escape(customer_email)}$", "$options": "i"},
+        "translation_status": "Quote",
+        "payment_status": "pending"
+    })
+    if quote_order:
+        await db.translation_orders.update_one(
+            {"id": quote_order["id"]},
+            {"$set": {
+                "recovered_order": True,
+                "translation_status": "In Progress",
+                "payment_status": "paid",
+                "recovered_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            }}
+        )
+        logger.info(f"Quote order {quote_order.get('order_number')} marked as recovered for {customer_email}")
+
+
 async def _execute_followup_processing():
     """
     Core follow-up processing logic. Called by both the auto-scheduler and manual trigger.
@@ -24386,9 +24441,41 @@ async def get_followup_status(admin_key: str):
             if last_auto_run and isinstance(last_auto_run, datetime):
                 last_auto_run = last_auto_run.isoformat()
 
+        # Build list of converted sales with client names
+        converted_sales = []
+        for r in recovered_abandoned:
+            recovered_at = r.get("recovered_at", r.get("last_reminder_at"))
+            if isinstance(recovered_at, datetime):
+                recovered_at = recovered_at.isoformat()
+            converted_sales.append({
+                "name": r.get("name", "Unknown"),
+                "email": r.get("email", ""),
+                "total_price": r.get("total_price", 0),
+                "reminders_sent": r.get("reminder_sent", 0),
+                "recovered_at": recovered_at,
+                "recovered_order_number": r.get("recovered_order_number"),
+                "type": "abandoned"
+            })
+        for r in recovered_orders:
+            recovered_at = r.get("recovered_at", r.get("updated_at"))
+            if isinstance(recovered_at, datetime):
+                recovered_at = recovered_at.isoformat()
+            converted_sales.append({
+                "name": r.get("client_name", "Unknown"),
+                "email": r.get("client_email", ""),
+                "total_price": r.get("total_price", r.get("base_price", 0)),
+                "reminders_sent": r.get("followup_count", 0),
+                "recovered_at": recovered_at,
+                "order_number": r.get("order_number"),
+                "type": "quote_order"
+            })
+        # Sort by most recent first
+        converted_sales.sort(key=lambda x: x.get("recovered_at") or "", reverse=True)
+
         result = {
             "abandoned_quotes": [],
             "quote_orders": [],
+            "converted_sales": converted_sales,
             "summary": {
                 "total_pending": 0,
                 "needs_first_reminder": 0,
