@@ -9496,7 +9496,8 @@ async def admin_get_all_orders(
         query["$or"] = [
             {"order_number": {"$regex": search, "$options": "i"}},
             {"client_name": {"$regex": search, "$options": "i"}},
-            {"client_email": {"$regex": search, "$options": "i"}}
+            {"client_email": {"$regex": search, "$options": "i"}},
+            {"document_type": {"$regex": search, "$options": "i"}}
         ]
 
     # Combine translator filter with other filters using $and to avoid $or conflicts

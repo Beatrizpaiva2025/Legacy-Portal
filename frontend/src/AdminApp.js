@@ -15466,6 +15466,15 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     }
   }, [statusFilter]);
 
+  // Debounced server-side search: fetch from backend when search changes
+  useEffect(() => {
+    if (!initialLoadDone) return;
+    const timer = setTimeout(() => {
+      fetchOrders(1, search);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   const fetchUsers = async () => {
     try {
       const [pmRes, transRes] = await Promise.all([
@@ -15516,22 +15525,28 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     }
   };
 
-  const fetchOrders = async (page = currentPage) => {
+  const fetchOrders = async (page = currentPage, searchQuery = null) => {
     setLoading(true);
     try {
-      // Build query toms for pagination
-      const toms = new URLSearchParams({
+      const activeSearch = searchQuery !== null ? searchQuery : search;
+      // Build query params for pagination
+      const params = new URLSearchParams({
         admin_key: adminKey,
-        page: page.toString(),
-        limit: pageSize.toString()
+        page: activeSearch ? '1' : page.toString(),
+        limit: activeSearch ? '500' : pageSize.toString()
       });
 
       // Add filters if active
       if (statusFilter && statusFilter !== 'all') {
-        toms.append('status', statusFilter);
+        params.append('status', statusFilter);
       }
 
-      const response = await axios.get(`${API}/admin/orders?${toms.toString()}`);
+      // Send search to backend for server-side filtering across ALL projects
+      if (activeSearch) {
+        params.append('search', activeSearch);
+      }
+
+      const response = await axios.get(`${API}/admin/orders?${params.toString()}`);
       let allOrders = response.data.orders || [];
 
       // Update pagination state
