@@ -4,6 +4,7 @@ import mammoth from 'mammoth';
 import * as pdfjsLib from 'pdfjs-dist';
 import html2pdf from 'html2pdf.js';
 import { THEMES, getTheme } from './themes';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 // Configure PDF.js worker (pdfjs-dist 5.x uses .mjs files)
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -24107,16 +24108,20 @@ const UsersPage = ({ adminKey, user }) => {
 };
 
 // ==================== PRODUCTION & PAYMENTS PAGE ====================
+const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
+
 const ProductionPage = ({ adminKey }) => {
   const [stats, setStats] = useState([]);
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeView, setActiveView] = useState('stats'); // stats, payments, response_times
+  const [activeView, setActiveView] = useState('stats'); // stats, payments
   const [selectedTranslator, setSelectedTranslator] = useState(null);
   const [translatorOrders, setTranslatorOrders] = useState([]);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [partnerResponseTimes, setPartnerResponseTimes] = useState([]);
-  const [selectedPartnerMessages, setSelectedPartnerMessages] = useState(null);
+  const [translatorMetrics, setTranslatorMetrics] = useState([]);
+  const [chartData, setChartData] = useState([]);
+  const [translatorNames, setTranslatorNames] = useState([]);
+  const [metricsPeriod, setMetricsPeriod] = useState('month');
   const [paymentForm, setPaymentForm] = useState({
     translator_id: '',
     period_start: '',
@@ -24156,23 +24161,29 @@ const ProductionPage = ({ adminKey }) => {
     }
   };
 
-  const fetchPartnerResponseTimes = async () => {
+  const fetchTranslatorMetrics = async (period) => {
     try {
-      const response = await axios.get(`${API}/admin/partner-response-times?admin_key=${adminKey}`);
-      setPartnerResponseTimes(response.data.partner_stats || []);
+      const response = await axios.get(`${API}/admin/production/translator-metrics?admin_key=${adminKey}&period=${period}`);
+      setTranslatorMetrics(response.data.metrics || []);
+      setChartData(response.data.chart_data || []);
+      setTranslatorNames(response.data.translator_names || []);
     } catch (err) {
-      console.error('Error fetching partner response times:', err);
+      console.error('Error fetching translator metrics:', err);
     }
   };
 
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([fetchStats(), fetchPayments(), fetchPartnerResponseTimes()]);
+      await Promise.all([fetchStats(), fetchPayments(), fetchTranslatorMetrics(metricsPeriod)]);
       setLoading(false);
     };
     loadData();
   }, [adminKey]);
+
+  useEffect(() => {
+    fetchTranslatorMetrics(metricsPeriod);
+  }, [metricsPeriod]);
 
   const handleSelectTranslator = async (translator) => {
     setSelectedTranslator(translator);
@@ -24258,111 +24269,169 @@ const ProductionPage = ({ adminKey }) => {
           >
             Payment History
           </button>
-          <button
-            onClick={() => setActiveView('response_times')}
-            className={`px-4 py-2 rounded text-sm ${activeView === 'response_times' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
-          >
-            Partner Response Times
-          </button>
         </div>
       </div>
 
       {activeView === 'stats' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Translator Stats Cards */}
-          <div className="bg-white rounded-lg shadow">
-            <div className="p-4 border-b">
-              <h2 className="text-sm font-bold text-gray-800">Translators</h2>
-            </div>
-            <div className="p-4 space-y-3">
-              {stats.length === 0 ? (
-                <div className="text-center text-gray-500 py-4">No translators found</div>
-              ) : (
-                stats.map((translator) => (
-                  <div
-                    key={translator.translator_id}
-                    onClick={() => handleSelectTranslator(translator)}
-                    className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                      selectedTranslator?.translator_id === translator.translator_id
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-teal-300'
+        <div className="space-y-6">
+          {/* Period Filter */}
+          <div className="bg-white rounded-lg shadow p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-bold text-gray-800">Translations Count</h2>
+                <p className="text-xs text-gray-500 mt-1">Completed translations since January 2025</p>
+              </div>
+              <div className="flex space-x-2">
+                {[
+                  { key: 'day', label: 'Today' },
+                  { key: 'week', label: 'This Week' },
+                  { key: 'month', label: 'This Month' }
+                ].map(({ key, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => setMetricsPeriod(key)}
+                    className={`px-4 py-2 rounded text-xs font-medium transition-colors ${
+                      metricsPeriod === key
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                   >
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <div className="font-medium text-gray-800">{translator.translator_name}</div>
-                        <div className="text-xs text-gray-500">{translator.translator_email}</div>
-                      </div>
-                      {translator.pending_payment_pages > 0 && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); openPaymentModal(translator); }}
-                          className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
-                        >
-                          Register Payment
-                        </button>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-4 gap-2 text-center text-xs">
-                      <div className="bg-gray-100 rounded p-2">
-                        <div className="text-gray-500">Total</div>
-                        <div className="font-bold text-gray-800">{translator.total_pages}</div>
-                      </div>
-                      <div className="bg-green-100 rounded p-2">
-                        <div className="text-green-600">Completed</div>
-                        <div className="font-bold text-green-700">{translator.completed_pages}</div>
-                      </div>
-                      <div className="bg-blue-100 rounded p-2">
-                        <div className="text-blue-600">Paid</div>
-                        <div className="font-bold text-blue-700">{translator.paid_pages}</div>
-                      </div>
-                      <div className="bg-yellow-100 rounded p-2">
-                        <div className="text-yellow-600">To Pay</div>
-                        <div className="font-bold text-yellow-700">{translator.pending_payment_pages}</div>
-                      </div>
-                    </div>
-                    <div className="mt-2 text-xs text-gray-500">
-                      {translator.completed_orders} of {translator.orders_count} projects completed
-                    </div>
-                  </div>
-                ))
-              )}
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
-          {/* Selected Translator Orders */}
-          <div className="bg-white rounded-lg shadow">
-            <div className="p-4 border-b">
-              <h2 className="text-sm font-bold text-gray-800">
-                {selectedTranslator ? `${selectedTranslator.translator_name}'s Projects` : 'Select a translator'}
-              </h2>
-            </div>
-            <div className="p-4">
-              {!selectedTranslator ? (
-                <div className="text-center text-gray-500 py-8">
-                  Click on a translator to view their projects
-                </div>
-              ) : translatorOrders.length === 0 ? (
-                <div className="text-center text-gray-500 py-4">No completed projects</div>
-              ) : (
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {translatorOrders.map((order) => (
-                    <div key={order.id} className="p-3 border rounded-lg text-xs">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="font-medium text-gray-800">{order.order_number || order.reference}</div>
-                          <div className="text-gray-500">{order.client_name}</div>
+          {/* Translator Metrics Cards */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-white rounded-lg shadow">
+              <div className="p-4 border-b">
+                <h2 className="text-sm font-bold text-gray-800">Translators</h2>
+              </div>
+              <div className="p-4 space-y-3 max-h-[600px] overflow-y-auto">
+                {translatorMetrics.length === 0 ? (
+                  <div className="text-center text-gray-500 py-4">No translators found</div>
+                ) : (
+                  translatorMetrics.map((translator) => {
+                    const matchingStat = stats.find(s => s.translator_id === translator.translator_id);
+                    return (
+                      <div
+                        key={translator.translator_id}
+                        onClick={() => {
+                          if (matchingStat) handleSelectTranslator(matchingStat);
+                        }}
+                        className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                          selectedTranslator?.translator_id === translator.translator_id
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-200 hover:border-teal-300'
+                        }`}
+                      >
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <div className="font-medium text-gray-800">{translator.translator_name}</div>
+                            <div className="text-xs text-gray-500">{translator.translator_email}</div>
+                          </div>
+                          {matchingStat && matchingStat.pending_payment_pages > 0 && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); openPaymentModal(matchingStat); }}
+                              className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
+                            >
+                              Register Payment
+                            </button>
+                          )}
                         </div>
-                        <div className="text-right">
-                          <div className="font-bold text-blue-600">{order.page_count || 0} pages</div>
-                          <div className="text-gray-500">{formatDate(order.created_at)}</div>
+                        <div className="grid grid-cols-4 gap-2 text-center text-xs">
+                          <div className="bg-blue-50 rounded p-2">
+                            <div className="text-gray-500">Total (since Jan)</div>
+                            <div className="font-bold text-blue-700">{translator.total_translations}</div>
+                          </div>
+                          <div className="bg-green-50 rounded p-2">
+                            <div className="text-gray-500">Total Pages</div>
+                            <div className="font-bold text-green-700">{translator.total_pages}</div>
+                          </div>
+                          <div className="bg-purple-50 rounded p-2">
+                            <div className="text-purple-600">
+                              {metricsPeriod === 'day' ? 'Today' : metricsPeriod === 'week' ? 'This Week' : 'This Month'}
+                            </div>
+                            <div className="font-bold text-purple-700">{translator.period_translations}</div>
+                          </div>
+                          <div className="bg-yellow-50 rounded p-2">
+                            <div className="text-yellow-600">Period Pages</div>
+                            <div className="font-bold text-yellow-700">{translator.period_pages}</div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* Selected Translator Orders */}
+            <div className="bg-white rounded-lg shadow">
+              <div className="p-4 border-b">
+                <h2 className="text-sm font-bold text-gray-800">
+                  {selectedTranslator ? `${selectedTranslator.translator_name}'s Projects` : 'Select a translator'}
+                </h2>
+              </div>
+              <div className="p-4">
+                {!selectedTranslator ? (
+                  <div className="text-center text-gray-500 py-8">
+                    Click on a translator to view their projects
+                  </div>
+                ) : translatorOrders.length === 0 ? (
+                  <div className="text-center text-gray-500 py-4">No completed projects</div>
+                ) : (
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {translatorOrders.map((order) => (
+                      <div key={order.id} className="p-3 border rounded-lg text-xs">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="font-medium text-gray-800">{order.order_number || order.reference}</div>
+                            <div className="text-gray-500">{order.client_name}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-bold text-blue-600">{order.page_count || 0} pages</div>
+                            <div className="text-gray-500">{formatDate(order.created_at)}</div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
+
+          {/* Monthly Chart */}
+          {chartData.length > 0 && (
+            <div className="bg-white rounded-lg shadow">
+              <div className="p-4 border-b">
+                <h2 className="text-sm font-bold text-gray-800">Monthly Translations per Translator</h2>
+                <p className="text-xs text-gray-500 mt-1">Completed translations by month since January 2025</p>
+              </div>
+              <div className="p-4">
+                <ResponsiveContainer width="100%" height={350}>
+                  <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                    <Tooltip />
+                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                    {translatorNames.map((name, index) => (
+                      <Bar
+                        key={name}
+                        dataKey={name}
+                        fill={CHART_COLORS[index % CHART_COLORS.length]}
+                        radius={[2, 2, 0, 0]}
+                      />
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -24435,110 +24504,6 @@ const ProductionPage = ({ adminKey }) => {
                 )}
               </tbody>
             </table>
-          </div>
-        </div>
-      )}
-
-      {/* Partner Response Times View */}
-      {activeView === 'response_times' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Partner Stats Cards */}
-          <div className="bg-white rounded-lg shadow">
-            <div className="p-4 border-b">
-              <h2 className="text-sm font-bold text-gray-800">Partner Message Response Times</h2>
-              <p className="text-xs text-gray-500 mt-1">Track how quickly we respond to partner messages</p>
-            </div>
-            <div className="p-4 space-y-3 max-h-[600px] overflow-y-auto">
-              {partnerResponseTimes.length === 0 ? (
-                <div className="text-center text-gray-500 py-4">No partner messages found</div>
-              ) : (
-                partnerResponseTimes.map((partner) => (
-                  <div
-                    key={partner.partner_id}
-                    onClick={() => setSelectedPartnerMessages(partner)}
-                    className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                      selectedPartnerMessages?.partner_id === partner.partner_id
-                        ? 'border-purple-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-purple-300'
-                    }`}
-                  >
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <div className="font-medium text-gray-800">{partner.partner_name}</div>
-                        <div className="text-xs text-gray-500">{partner.partner_email}</div>
-                      </div>
-                      {partner.pending_messages > 0 && (
-                        <span className="px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-bold">
-                          {partner.pending_messages} Pending
-                        </span>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                      <div className="bg-blue-50 rounded p-2">
-                        <div className="font-bold text-blue-700">{partner.total_messages}</div>
-                        <div className="text-gray-500">Total</div>
-                      </div>
-                      <div className="bg-green-50 rounded p-2">
-                        <div className="font-bold text-green-700">{partner.replied_messages}</div>
-                        <div className="text-gray-500">Replied</div>
-                      </div>
-                      <div className={`rounded p-2 ${partner.avg_response_time_hours !== null ? (partner.avg_response_time_hours <= 24 ? 'bg-green-50' : partner.avg_response_time_hours <= 48 ? 'bg-yellow-50' : 'bg-red-50') : 'bg-gray-50'}`}>
-                        <div className={`font-bold ${partner.avg_response_time_hours !== null ? (partner.avg_response_time_hours <= 24 ? 'text-green-700' : partner.avg_response_time_hours <= 48 ? 'text-yellow-700' : 'text-red-700') : 'text-gray-500'}`}>
-                          {partner.avg_response_time_hours !== null ? `${partner.avg_response_time_hours}h` : '-'}
-                        </div>
-                        <div className="text-gray-500">Avg Time</div>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Message Details Panel */}
-          <div className="bg-white rounded-lg shadow">
-            <div className="p-4 border-b">
-              <h2 className="text-sm font-bold text-gray-800">
-                {selectedPartnerMessages ? `Messages from ${selectedPartnerMessages.partner_name}` : 'Select a Partner'}
-              </h2>
-            </div>
-            <div className="p-4">
-              {selectedPartnerMessages ? (
-                <div className="space-y-3 max-h-[550px] overflow-y-auto">
-                  {selectedPartnerMessages.messages.map((msg) => (
-                    <div key={msg.id} className={`p-3 border rounded-lg ${msg.replied ? 'border-green-200 bg-green-50' : 'border-yellow-200 bg-yellow-50'}`}>
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="flex items-center gap-2">
-                          {msg.order_number && (
-                            <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded">
-                              {msg.order_number}
-                            </span>
-                          )}
-                          <span className={`text-xs px-2 py-0.5 rounded ${msg.replied ? 'bg-green-200 text-green-800' : 'bg-yellow-200 text-yellow-800'}`}>
-                            {msg.replied ? 'Replied' : 'Pending'}
-                          </span>
-                        </div>
-                        {msg.response_time_hours !== null && (
-                          <span className={`text-xs font-bold ${msg.response_time_hours <= 24 ? 'text-green-600' : msg.response_time_hours <= 48 ? 'text-yellow-600' : 'text-red-600'}`}>
-                            {msg.response_time_hours}h response
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-sm text-gray-700">{msg.content}</div>
-                      <div className="text-[10px] text-gray-400 mt-2">
-                        Sent: {msg.created_at ? new Date(msg.created_at).toLocaleString('en-US', { timeZone: 'America/New_York' }) : '-'}
-                        {msg.replied_at && ` • Replied: ${new Date(msg.replied_at).toLocaleString('en-US', { timeZone: 'America/New_York' })}`}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center text-gray-500 py-8">
-                  <div className="text-4xl mb-2">📊</div>
-                  <p>Click on a partner to view their message history</p>
-                </div>
-              )}
-            </div>
           </div>
         </div>
       )}

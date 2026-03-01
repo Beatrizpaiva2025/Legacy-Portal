@@ -10795,6 +10795,105 @@ async def get_production_stats(admin_key: str, translator_id: Optional[str] = No
 
     return {"stats": stats}
 
+@api_router.get("/admin/production/translator-metrics")
+async def get_translator_metrics(admin_key: str, period: Optional[str] = "month"):
+    """Get translator translation counts since January 2025 with monthly breakdown for charts.
+    period: 'day', 'week', or 'month' for filtering the summary view.
+    """
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    # Get all active translators
+    translators = await db.admin_users.find({"role": "translator", "is_active": True}).to_list(100)
+
+    # Since beginning of January 2025
+    jan_start = datetime(2025, 1, 1)
+    now = datetime.utcnow()
+
+    # Calculate period boundaries for the filter
+    if period == "day":
+        period_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif period == "week":
+        days_since_monday = now.weekday()
+        period_start = (now - timedelta(days=days_since_monday)).replace(hour=0, minute=0, second=0, microsecond=0)
+    else:  # month
+        period_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    translator_metrics = []
+    # Collect all monthly data for the chart (all translators combined)
+    all_monthly_data = {}
+
+    for translator in translators:
+        tid = translator["id"]
+
+        # Get all completed orders since Jan 2025
+        query = {
+            "assigned_translator_id": tid,
+            "translation_status": "completed",
+            "created_at": {"$gte": jan_start}
+        }
+        orders = await db.orders.find(query).sort("created_at", -1).to_list(5000)
+
+        # Total since January
+        total_translations = len(orders)
+        total_pages = sum(o.get("page_count", 0) or 0 for o in orders)
+
+        # Count for selected period
+        period_orders = [o for o in orders if o.get("created_at") and o["created_at"] >= period_start]
+        period_translations = len(period_orders)
+        period_pages = sum(o.get("page_count", 0) or 0 for o in period_orders)
+
+        # Monthly breakdown for chart
+        monthly_breakdown = {}
+        for order in orders:
+            created = order.get("created_at")
+            if created:
+                month_key = created.strftime("%Y-%m")
+                month_label = created.strftime("%b %Y")
+                if month_key not in monthly_breakdown:
+                    monthly_breakdown[month_key] = {"month": month_key, "label": month_label, "translations": 0, "pages": 0}
+                monthly_breakdown[month_key]["translations"] += 1
+                monthly_breakdown[month_key]["pages"] += order.get("page_count", 0) or 0
+
+                # Also collect for the combined chart
+                if month_key not in all_monthly_data:
+                    all_monthly_data[month_key] = {"month": month_key, "label": month_label}
+                translator_key = translator.get("name", "Unknown")
+                if translator_key not in all_monthly_data[month_key]:
+                    all_monthly_data[month_key][translator_key] = 0
+                all_monthly_data[month_key][translator_key] += 1
+
+        sorted_monthly = sorted(monthly_breakdown.values(), key=lambda x: x["month"])
+
+        translator_metrics.append({
+            "translator_id": tid,
+            "translator_name": translator.get("name", "Unknown"),
+            "translator_email": translator.get("email", ""),
+            "total_translations": total_translations,
+            "total_pages": total_pages,
+            "period_translations": period_translations,
+            "period_pages": period_pages,
+            "monthly_breakdown": sorted_monthly
+        })
+
+    # Sort by total translations descending
+    translator_metrics.sort(key=lambda x: -x["total_translations"])
+
+    # Build chart data sorted by month
+    chart_data = sorted(all_monthly_data.values(), key=lambda x: x["month"])
+
+    # Get unique translator names for chart series
+    translator_names = [t.get("name", "Unknown") for t in translators]
+
+    return {
+        "metrics": translator_metrics,
+        "chart_data": chart_data,
+        "translator_names": translator_names,
+        "period": period,
+        "period_start": period_start.isoformat(),
+        "since": jan_start.isoformat()
+    }
+
 @api_router.get("/admin/production/translator/{translator_id}/orders")
 async def get_translator_orders(translator_id: str, admin_key: str, status: Optional[str] = None, start_date: Optional[str] = None, end_date: Optional[str] = None):
     """Get orders for a specific translator"""
