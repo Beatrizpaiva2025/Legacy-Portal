@@ -782,6 +782,12 @@ const DownloadIcon = ({ className = "w-3 h-3" }) => (
   </svg>
 );
 
+const DuplicateIcon = ({ className = "w-3 h-3" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+  </svg>
+);
+
 // ==================== ADMIN LOGIN ====================
 const AdminLogin = ({ onLogin }) => {
   const [email, setEmail] = useState('');
@@ -17078,6 +17084,44 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     }
   };
 
+  // Duplicate project - pre-fill form with existing project data
+  const duplicateProject = (order) => {
+    setNewProject({
+      client_name: order.client_name || '',
+      client_email: order.client_email || '',
+      client_phone: order.client_phone || '',
+      translate_from: order.translate_from || 'Portuguese',
+      translate_to: order.translate_to || 'English',
+      service_type: order.service_type || 'certified',
+      document_type: order.document_type || '',
+      page_count: order.page_count || 1,
+      word_count: order.word_count || 0,
+      urgency: order.urgency || 'no',
+      notes: order.notes || '',
+      internal_notes: '',
+      team_notes: order.team_notes || '',
+      assigned_pm_id: order.assigned_pm_id || '',
+      assigned_translator_id: order.assigned_translator_id || '',
+      deadline: '',
+      deadline_time: '17:00',
+      base_price: order.base_price || order.total_price || '',
+      total_price: order.total_price || '',
+      revenue_source: order.revenue_source || 'website',
+      payment_method: order.payment_method || '',
+      payment_received: false,
+      payment_tag: '',
+      create_invoice: false,
+      invoice_terms: '30_days',
+      invoice_custom_date: '',
+      document_category: order.document_category || ''
+    });
+    setShowNewProjectForm(true);
+    setOpenActionsDropdown(null);
+    // Scroll to top to see the form
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    showToast('Project duplicated - review and create');
+  };
+
   // Create new project manually
   const createProject = async (e) => {
     e.preventDefault();
@@ -18772,6 +18816,17 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             >
                               <CheckIcon className="w-4 h-4 text-green-500" />
                               Mark as Final
+                            </button>
+                          )}
+
+                          {/* Duplicate Project - Admin only */}
+                          {isAdmin && (
+                            <button
+                              onClick={() => duplicateProject(order)}
+                              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-indigo-50 flex items-center gap-2"
+                            >
+                              <DuplicateIcon className="w-4 h-4 text-indigo-500" />
+                              Duplicate
                             </button>
                           )}
 
