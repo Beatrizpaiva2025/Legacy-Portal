@@ -21285,6 +21285,17 @@ const FollowupsPage = ({ adminKey }) => {
 
   const getClientsForStage = (stage) => {
     if (!followupData) return [];
+    if (stage === 'converted') {
+      return (followupData.converted_sales || []).map(sale => ({
+        name: sale.name,
+        email: sale.email,
+        total_price: sale.total_price,
+        reminder_count: sale.reminders_sent,
+        recovered_at: sale.recovered_at,
+        order_number: sale.recovered_order_number || sale.order_number,
+        followup_stage: 'converted'
+      }));
+    }
     const allClients = [
       ...(followupData.abandoned_quotes || []),
       ...(followupData.quote_orders || [])
@@ -21297,6 +21308,7 @@ const FollowupsPage = ({ adminKey }) => {
     first: { title: '1st Reminder', color: 'yellow' },
     second: { title: '2nd Reminder (10%)', color: 'blue' },
     third: { title: '3rd Reminder (15%)', color: 'red' },
+    converted: { title: 'Converted Sales', color: 'green' },
     lost: { title: 'Marked Lost', color: 'gray' }
   };
 
@@ -21432,11 +21444,13 @@ const FollowupsPage = ({ adminKey }) => {
               <div className="text-xs text-red-500 mt-1">Click to view</div>
             </div>
             <div
-              className="bg-green-50 rounded-lg shadow p-4 text-center border border-green-200"
+              onClick={() => openStageModal('converted')}
+              className="bg-green-50 rounded-lg shadow p-4 text-center border border-green-200 cursor-pointer hover:shadow-lg transition-shadow hover:border-green-400"
             >
               <div className="text-3xl font-bold text-green-600">{convertedViaFollowup}</div>
               <div className="text-xs text-green-700">Converted via Follow-up</div>
               <div className="text-xs text-green-500 mt-1">${followupRevenue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+              <div className="text-xs text-green-400 mt-1">Click to view</div>
             </div>
             <div
               onClick={() => openStageModal('lost')}
@@ -21591,6 +21605,7 @@ const FollowupsPage = ({ adminKey }) => {
                 selectedStage === 'first' ? 'bg-yellow-50' :
                 selectedStage === 'second' ? 'bg-blue-50' :
                 selectedStage === 'third' ? 'bg-red-50' :
+                selectedStage === 'converted' ? 'bg-green-50' :
                 'bg-gray-50'
               }`}>
                 <h2 className="text-xl font-bold text-gray-800">
@@ -21613,9 +21628,9 @@ const FollowupsPage = ({ adminKey }) => {
                         <th className="px-4 py-2 text-left">Cliente</th>
                         <th className="px-4 py-2 text-left">Email</th>
                         <th className="px-4 py-2 text-right">Valor</th>
-                        <th className="px-4 py-2 text-center">Dias</th>
+                        <th className="px-4 py-2 text-center">{selectedStage === 'converted' ? 'Convertido em' : 'Dias'}</th>
                         <th className="px-4 py-2 text-center">Reminders</th>
-                        <th className="px-4 py-2 text-center">Acoes</th>
+                        {selectedStage !== 'converted' && <th className="px-4 py-2 text-center">Acoes</th>}
                       </tr>
                     </thead>
                     <tbody>
@@ -21629,17 +21644,23 @@ const FollowupsPage = ({ adminKey }) => {
                           </td>
                           <td className="px-4 py-2 text-gray-600">{client.client_email || client.email}</td>
                           <td className="px-4 py-2 text-right">${(client.total_price || 0).toFixed(2)}</td>
-                          <td className="px-4 py-2 text-center">{client.days_since_creation}</td>
-                          <td className="px-4 py-2 text-center">{client.followup_count || client.reminder_count || 0}</td>
                           <td className="px-4 py-2 text-center">
-                            <button
-                              onClick={() => excludeFromFollowup(client.id, client.type)}
-                              className="px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 text-xs font-medium"
-                              title="Remove from automatic follow-up"
-                            >
-                              Remove
-                            </button>
+                            {selectedStage === 'converted'
+                              ? (client.recovered_at ? new Date(client.recovered_at).toLocaleDateString() : '-')
+                              : client.days_since_creation}
                           </td>
+                          <td className="px-4 py-2 text-center">{client.followup_count || client.reminder_count || 0}</td>
+                          {selectedStage !== 'converted' && (
+                            <td className="px-4 py-2 text-center">
+                              <button
+                                onClick={() => excludeFromFollowup(client.id, client.type)}
+                                className="px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 text-xs font-medium"
+                                title="Remove from automatic follow-up"
+                              >
+                                Remove
+                              </button>
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
