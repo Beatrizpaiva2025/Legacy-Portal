@@ -23851,26 +23851,22 @@ async def send_abandoned_quote_reminder(quote_id: str, admin_key: str, include_d
             )
 
         # Send reminder email
-        try:
-            reminder_number = quote.get("reminder_sent", 0) + 1
-            await email_service.send_abandoned_quote_reminder(
-                quote["email"],
-                quote["name"],
-                {
-                    "service_type": quote["service_type"],
-                    "translate_from": quote["translate_from"],
-                    "translate_to": quote["translate_to"],
-                    "word_count": quote["word_count"],
-                    "total_price": quote["total_price"],
-                    "files_info": quote.get("files_info", [])
-                },
-                discount_code=discount_code,
-                discount_percent=discount_percent if include_discount else 0,
-                reminder_number=reminder_number
-            )
-        except Exception as e:
-            logger.error(f"Failed to send reminder email: {str(e)}")
-            # Continue even if email fails
+        reminder_number = quote.get("reminder_sent", 0) + 1
+        await send_followup_email(
+            quote["email"],
+            quote["name"],
+            {
+                "service_type": quote["service_type"],
+                "translate_from": quote["translate_from"],
+                "translate_to": quote["translate_to"],
+                "word_count": quote["word_count"],
+                "total_price": quote["total_price"],
+                "files_info": quote.get("files_info", [])
+            },
+            reminder_number,
+            discount_percent if include_discount else 0,
+            discount_code
+        )
 
         # Update quote reminder count
         await db.abandoned_quotes.update_one(
@@ -23928,7 +23924,9 @@ async def _execute_followup_processing():
         try:
             created_at = quote.get("created_at", now)
             if isinstance(created_at, str):
-                created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00')).replace(tzinfo=None)
+            elif hasattr(created_at, 'tzinfo') and created_at.tzinfo is not None:
+                created_at = created_at.replace(tzinfo=None)
 
             days_since = (now - created_at).days
             reminder_count = quote.get("reminder_sent", 0)
@@ -23966,7 +23964,9 @@ async def _execute_followup_processing():
                 # Check if we sent a reminder recently (within 24 hours)
                 if last_reminder:
                     if isinstance(last_reminder, str):
-                        last_reminder = datetime.fromisoformat(last_reminder.replace('Z', '+00:00'))
+                        last_reminder = datetime.fromisoformat(last_reminder.replace('Z', '+00:00')).replace(tzinfo=None)
+                    elif hasattr(last_reminder, 'tzinfo') and last_reminder.tzinfo is not None:
+                        last_reminder = last_reminder.replace(tzinfo=None)
                     hours_since_last = (now - last_reminder).total_seconds() / 3600
                     if hours_since_last < 24:
                         continue
@@ -24016,7 +24016,9 @@ async def _execute_followup_processing():
         try:
             created_at = order.get("created_at", now)
             if isinstance(created_at, str):
-                created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00')).replace(tzinfo=None)
+            elif hasattr(created_at, 'tzinfo') and created_at.tzinfo is not None:
+                created_at = created_at.replace(tzinfo=None)
 
             days_since = (now - created_at).days
             reminder_count = order.get("followup_count", 0)
@@ -24049,7 +24051,9 @@ async def _execute_followup_processing():
             if should_remind:
                 if last_reminder:
                     if isinstance(last_reminder, str):
-                        last_reminder = datetime.fromisoformat(last_reminder.replace('Z', '+00:00'))
+                        last_reminder = datetime.fromisoformat(last_reminder.replace('Z', '+00:00')).replace(tzinfo=None)
+                    elif hasattr(last_reminder, 'tzinfo') and last_reminder.tzinfo is not None:
+                        last_reminder = last_reminder.replace(tzinfo=None)
                     hours_since_last = (now - last_reminder).total_seconds() / 3600
                     if hours_since_last < 24:
                         continue
@@ -24071,9 +24075,14 @@ async def _execute_followup_processing():
                         "is_active": True
                     })
 
-                # Send reminder email for quote order
+                # Send reminder email for quote order (skip if no email)
+                client_email = order.get("client_email")
+                if not client_email:
+                    results["errors"].append(f"Order {order.get('order_number', 'unknown')}: no client_email")
+                    continue
+
                 await send_quote_order_followup_email(
-                    order.get("client_email"),
+                    client_email,
                     order.get("client_name", "Customer"),
                     order,
                     reminder_count + 1,
