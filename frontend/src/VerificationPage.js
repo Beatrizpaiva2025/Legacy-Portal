@@ -266,7 +266,7 @@ const VerificationPage = () => {
                     { label: 'Document Type', value: v.document_type || 'Certified Translation' },
                     { label: 'Certification Date', value: formatDate(v.certified_at) },
                     { label: 'Language Pair', value: `${v.source_language || ''}  \u2192  ${v.target_language || ''}` },
-                    { label: 'Page Count', value: `${v.page_count || 1} ${(v.page_count || 1) === 1 ? 'page' : 'pages'}` },
+                    { label: 'Translation Pages', value: `${v.page_count || 1} ${(v.page_count || 1) === 1 ? 'page' : 'pages'}` },
                     { label: 'Certified By', value: v.certifier_name || 'Legacy Translations', sub: v.certifier_credentials },
                     ...(v.order_number ? [{ label: 'Order Reference', value: v.order_number }] : [{ label: 'Company', value: 'Legacy Translations Inc.' }]),
                   ].map((item, i) => (
