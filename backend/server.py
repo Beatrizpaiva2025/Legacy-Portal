@@ -22230,7 +22230,7 @@ async def convert_pdf_to_images(request: PDFToImageRequest, admin_key: str):
 # ==================== TRANSLATION TEMPLATES ====================
 
 @api_router.get("/admin/translation-templates")
-async def get_translation_templates(admin_key: str, document_type: Optional[str] = None):
+async def get_translation_templates(admin_key: str, document_type: Optional[str] = None, source_language: Optional[str] = None):
     """Get all translation templates. Accessible by admin, pm, and in-house translators."""
     user_info = await validate_admin_or_user_token(admin_key)
     if not user_info:
@@ -22244,6 +22244,8 @@ async def get_translation_templates(admin_key: str, document_type: Optional[str]
     query = {"is_active": True}
     if document_type:
         query["document_type"] = document_type
+    if source_language:
+        query["source_language"] = source_language
 
     templates = await db.translation_templates.find(query).sort("updated_at", -1).to_list(200)
     for t in templates:

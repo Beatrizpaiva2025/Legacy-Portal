@@ -1645,6 +1645,7 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
   const [fieldValues, setFieldValues] = useState({});
   const [filledResult, setFilledResult] = useState('');
   const [filterDocType, setFilterDocType] = useState('');
+  const [filterSourceLang, setFilterSourceLang] = useState('');
 
   // Create template form
   const [createForm, setCreateForm] = useState({
@@ -1666,9 +1667,9 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
   const fetchTemplates = async () => {
     try {
       setLoading(true);
-      const url = filterDocType
-        ? `${API}/admin/translation-templates?admin_key=${adminKey}&document_type=${filterDocType}`
-        : `${API}/admin/translation-templates?admin_key=${adminKey}`;
+      let url = `${API}/admin/translation-templates?admin_key=${adminKey}`;
+      if (filterDocType) url += `&document_type=${encodeURIComponent(filterDocType)}`;
+      if (filterSourceLang) url += `&source_language=${encodeURIComponent(filterSourceLang)}`;
       const response = await axios.get(url);
       setTemplates(response.data.templates || []);
     } catch (err) {
@@ -1680,7 +1681,7 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
 
   useEffect(() => {
     fetchTemplates();
-  }, [adminKey, filterDocType]);
+  }, [adminKey, filterDocType, filterSourceLang]);
 
   const handleTextSelect = () => {
     if (!selectionMode) return;
@@ -1831,8 +1832,18 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
             className="px-3 py-1.5 border rounded text-xs"
           >
             <option value="">All Types</option>
-            {DOCUMENT_TYPES.map(dt => (
+            {DOCUMENT_TYPES.filter(dt => dt.value).map(dt => (
               <option key={dt.value} value={dt.value}>{dt.label}</option>
+            ))}
+          </select>
+          <select
+            value={filterSourceLang}
+            onChange={(e) => setFilterSourceLang(e.target.value)}
+            className="px-3 py-1.5 border rounded text-xs"
+          >
+            <option value="">All Languages</option>
+            {LANGUAGES.map(lang => (
+              <option key={lang} value={lang}>{lang}</option>
             ))}
           </select>
           <button
@@ -1938,22 +1949,28 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1">Source Language</label>
-                  <input
-                    type="text"
+                  <label className="block text-xs text-gray-600 mb-1">Source Language (Original)</label>
+                  <select
                     value={createForm.source_language}
                     onChange={(e) => setCreateForm({...createForm, source_language: e.target.value})}
                     className="w-full px-3 py-2 border rounded text-sm"
-                  />
+                  >
+                    {LANGUAGES.map(lang => (
+                      <option key={lang} value={lang}>{lang}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Target Language</label>
-                  <input
-                    type="text"
+                  <select
                     value={createForm.target_language}
                     onChange={(e) => setCreateForm({...createForm, target_language: e.target.value})}
                     className="w-full px-3 py-2 border rounded text-sm"
-                  />
+                  >
+                    {LANGUAGES.map(lang => (
+                      <option key={lang} value={lang}>{lang}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
