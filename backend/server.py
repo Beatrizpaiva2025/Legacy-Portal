@@ -1164,7 +1164,7 @@ def generate_tradux_certification_cover(
                 <span class="info-value">{source_language} → {target_language}</span>
             </div>
             <div class="info-row">
-                <span class="info-label">Page Count:</span>
+                <span class="info-label">Original Document:</span>
                 <span class="info-value">{page_count} page(s)</span>
             </div>
             <div class="info-row">
@@ -1251,7 +1251,7 @@ CERTIFICATE OF TRANSLATION ACCURACY
 Order Number: #{order.get("order_number", "")}
 Document Type: {order.get("document_type", "Document")}
 Languages: {order.get("translate_from", "Portuguese")} → {order.get("translate_to", "English")}
-Page Count: {order.get("page_count", 1)} page(s)
+Original Document: {order.get("page_count", 1)} page(s)
 Client: {order.get("client_name", "")}
 Certification Date: {datetime.now(ZoneInfo("America/New_York")).strftime("%B %d, %Y")}
 
@@ -15414,13 +15414,16 @@ async def generate_combined_delivery_pdf(
     include_verification: bool = True,
     certification_data: dict = None,
     translator_name: str = "Beatriz Paiva"
-) -> bytes:
+) -> tuple:
     """
     Generate a combined PDF document with:
     1. Certificate of Accuracy
     2. Translation pages
     3. Original document pages
     4. Verification page with QR code
+
+    Returns a tuple of (pdf_bytes, translation_page_count) where translation_page_count
+    is the number of translation pages included in the PDF.
     """
     import fitz  # PyMuPDF
     from io import BytesIO
@@ -15567,6 +15570,8 @@ async def generate_combined_delivery_pdf(
             page.draw_rect(fitz.Rect(MARGIN_LEFT, FOOTER_LINE_Y, page_width - MARGIN_RIGHT, FOOTER_LINE_Y + 3), color=blue_color, fill=blue_color)
 
     # ==================== TRANSLATION PAGES ====================
+    translation_page_count = 0
+    pages_before_translation = len(doc)
     if include_translation:
         # Check for existing translated file (PDF or HTML)
         translated_file = order.get("translated_file")
@@ -15706,6 +15711,10 @@ async def generate_combined_delivery_pdf(
                 page.insert_text((80, 80), "TRANSLATED DOCUMENT", fontsize=12, fontname="helvB", color=blue_color)
                 page.insert_text((80, 140), "Translation content could not be rendered.", fontsize=10, fontname="helv", color=gray_color)
                 page.insert_text((80, 160), f"Error: {str(html_err)[:60]}", fontsize=9, fontname="helv", color=(0.5, 0.0, 0.0))
+
+    # Calculate translation page count
+    translation_page_count = len(doc) - pages_before_translation
+    logger.info(f"Translation pages added: {translation_page_count} (total pages so far: {len(doc)})")
 
     # ==================== ORIGINAL DOCUMENT PAGES ====================
     if include_original:
@@ -15894,7 +15903,7 @@ async def generate_combined_delivery_pdf(
     )
     doc.close()
 
-    return pdf_bytes
+    return pdf_bytes, translation_page_count
 
 @api_router.post("/admin/orders/{order_id}/deliver")
 async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrderRequest = None):
@@ -16531,7 +16540,7 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                 logger.info(f"  order_with_original translation_html: {bool(order_with_original.get('translation_html'))} ({len(str(order_with_original.get('translation_html', '') or ''))} chars)")
 
                 # Generate the combined PDF
-                combined_pdf_bytes = await generate_combined_delivery_pdf(
+                combined_pdf_bytes, translation_page_count = await generate_combined_delivery_pdf(
                     order=order_with_original,
                     include_certificate=include_certificate,
                     include_translation=include_translation,
@@ -16544,13 +16553,21 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                 # Compute PDF hash for integrity verification
                 pdf_hash = hashlib.sha256(combined_pdf_bytes).hexdigest()
 
-                # Update certification with PDF hash if we have certification data
+                # Update certification with PDF hash and correct page count
+                # page_count should reflect translation pages (what is being certified)
+                # Use translation_page_count from the PDF generation, fall back to original page_count
+                certified_page_count = translation_page_count if translation_page_count > 0 else order.get("page_count", 1)
                 if certification_data and certification_data.get("certification_id"):
                     await db.certifications.update_one(
                         {"certification_id": certification_data["certification_id"]},
-                        {"$set": {"pdf_hash": pdf_hash}}
+                        {"$set": {
+                            "pdf_hash": pdf_hash,
+                            "page_count": certified_page_count,
+                            "translation_page_count": translation_page_count,
+                            "original_page_count": order.get("page_count", 1)
+                        }}
                     )
-                    logger.info(f"Stored PDF hash for certification: {certification_data['certification_id']}")
+                    logger.info(f"Stored PDF hash and page counts for certification: {certification_data['certification_id']} (translation: {translation_page_count}, original: {order.get('page_count', 1)})")
 
                 # Add combined PDF as the single attachment
                 all_attachments = [{

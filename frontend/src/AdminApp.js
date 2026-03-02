@@ -31690,7 +31690,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     </div>
                     <div class="verification-row">
                         <span class="verification-label">Page Count:</span>
-                        <span class="verification-value">${origDocs.length || 1} page(s)</span>
+                        <span class="verification-value">${order?.page_count || origDocs.length || 1} page(s)</span>
                     </div>
                     <div class="verification-row">
                         <span class="verification-label">Certified By:</span>
