@@ -2826,6 +2826,50 @@ class PaymentUpdate(BaseModel):
     payment_reference: Optional[str] = None
     notes: Optional[str] = None
 
+# ==================== TRANSLATION TEMPLATE MODELS ====================
+class TemplateField(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    field_name: str  # e.g. "full_name", "birth_date"
+    label: str  # e.g. "Full Name", "Birth Date"
+    start_index: int  # position in the text
+    end_index: int
+    original_text: str  # the original text that was selected
+    field_type: str = "text"  # text, date, name
+
+class TranslationTemplate(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str  # e.g. "Birth Certificate - SP"
+    document_type: str  # e.g. "birth_certificate", "marriage_certificate", "diploma"
+    source_language: str = "Portuguese"
+    target_language: str = "English"
+    template_content: str  # the full translated text with placeholders like {full_name}
+    original_content: str = ""  # the original translated text before placeholders
+    fields: List[dict] = []  # list of TemplateField dicts
+    created_by_id: str = ""
+    created_by_name: str = ""
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    is_active: bool = True
+    usage_count: int = 0
+
+class TemplateCreate(BaseModel):
+    name: str
+    document_type: str
+    source_language: str = "Portuguese"
+    target_language: str = "English"
+    template_content: str
+    original_content: str = ""
+    fields: List[dict] = []
+
+class TemplateUpdate(BaseModel):
+    name: Optional[str] = None
+    document_type: Optional[str] = None
+    source_language: Optional[str] = None
+    target_language: Optional[str] = None
+    template_content: Optional[str] = None
+    fields: Optional[List[dict]] = None
+    is_active: Optional[bool] = None
+
 # ==================== EXPENSE MODELS ====================
 class Expense(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -22181,6 +22225,187 @@ async def convert_pdf_to_images(request: PDFToImageRequest, admin_key: str):
     except Exception as e:
         logger.error(f"PDF to image conversion error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to convert PDF: {str(e)}")
+
+
+# ==================== TRANSLATION TEMPLATES ====================
+
+@api_router.get("/admin/translation-templates")
+async def get_translation_templates(admin_key: str, document_type: Optional[str] = None):
+    """Get all translation templates. Accessible by admin, pm, and in-house translators."""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    user_role = user_info.get("role", "")
+    is_in_house = user_role == "translator" and user_info.get("translator_type") == "in_house"
+    if user_role not in ["admin", "pm"] and not is_in_house:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+
+    query = {"is_active": True}
+    if document_type:
+        query["document_type"] = document_type
+
+    templates = await db.translation_templates.find(query).sort("updated_at", -1).to_list(200)
+    for t in templates:
+        if '_id' in t:
+            del t['_id']
+
+    return {"templates": templates}
+
+@api_router.get("/admin/translation-templates/{template_id}")
+async def get_translation_template(template_id: str, admin_key: str):
+    """Get a single translation template by ID."""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    user_role = user_info.get("role", "")
+    is_in_house = user_role == "translator" and user_info.get("translator_type") == "in_house"
+    if user_role not in ["admin", "pm"] and not is_in_house:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+
+    template = await db.translation_templates.find_one({"id": template_id})
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+    if '_id' in template:
+        del template['_id']
+
+    return {"template": template}
+
+@api_router.post("/admin/translation-templates")
+async def create_translation_template(template_data: TemplateCreate, admin_key: str):
+    """Create a new translation template. Accessible by admin, pm, and in-house translators."""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    user_role = user_info.get("role", "")
+    is_in_house = user_role == "translator" and user_info.get("translator_type") == "in_house"
+    if user_role not in ["admin", "pm"] and not is_in_house:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+
+    # Get creator name
+    creator_name = "Admin"
+    user_id = user_info.get("user_id", "")
+    if user_id:
+        creator_user = await db.admin_users.find_one({"id": user_id})
+        if creator_user:
+            creator_name = creator_user.get("name", "Unknown")
+
+    template = TranslationTemplate(
+        name=template_data.name,
+        document_type=template_data.document_type,
+        source_language=template_data.source_language,
+        target_language=template_data.target_language,
+        template_content=template_data.template_content,
+        original_content=template_data.original_content,
+        fields=template_data.fields,
+        created_by_id=user_id,
+        created_by_name=creator_name
+    )
+
+    await db.translation_templates.insert_one(template.dict())
+
+    return {"status": "success", "template": template.dict()}
+
+@api_router.put("/admin/translation-templates/{template_id}")
+async def update_translation_template(template_id: str, update_data: TemplateUpdate, admin_key: str):
+    """Update a translation template."""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    user_role = user_info.get("role", "")
+    is_in_house = user_role == "translator" and user_info.get("translator_type") == "in_house"
+    if user_role not in ["admin", "pm"] and not is_in_house:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+
+    update_dict = {}
+    if update_data.name is not None:
+        update_dict["name"] = update_data.name
+    if update_data.document_type is not None:
+        update_dict["document_type"] = update_data.document_type
+    if update_data.source_language is not None:
+        update_dict["source_language"] = update_data.source_language
+    if update_data.target_language is not None:
+        update_dict["target_language"] = update_data.target_language
+    if update_data.template_content is not None:
+        update_dict["template_content"] = update_data.template_content
+    if update_data.fields is not None:
+        update_dict["fields"] = update_data.fields
+    if update_data.is_active is not None:
+        update_dict["is_active"] = update_data.is_active
+
+    if not update_dict:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    update_dict["updated_at"] = datetime.utcnow()
+
+    result = await db.translation_templates.update_one(
+        {"id": template_id},
+        {"$set": update_dict}
+    )
+
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    template = await db.translation_templates.find_one({"id": template_id})
+    if '_id' in template:
+        del template['_id']
+
+    return {"status": "success", "template": template}
+
+@api_router.delete("/admin/translation-templates/{template_id}")
+async def delete_translation_template(template_id: str, admin_key: str):
+    """Delete (deactivate) a translation template."""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    user_role = user_info.get("role", "")
+    if user_role not in ["admin", "pm"]:
+        raise HTTPException(status_code=403, detail="Only admin or PM can delete templates")
+
+    result = await db.translation_templates.update_one(
+        {"id": template_id},
+        {"$set": {"is_active": False, "updated_at": datetime.utcnow()}}
+    )
+
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    return {"status": "success"}
+
+@api_router.post("/admin/translation-templates/{template_id}/use")
+async def use_translation_template(template_id: str, admin_key: str, data: dict = Body(...)):
+    """Use a template - fills in the fields and returns the completed text. Also increments usage count."""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    user_role = user_info.get("role", "")
+    is_in_house = user_role == "translator" and user_info.get("translator_type") == "in_house"
+    if user_role not in ["admin", "pm"] and not is_in_house:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+
+    template = await db.translation_templates.find_one({"id": template_id})
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    # Fill in the fields
+    filled_content = template.get("template_content", "")
+    field_values = data.get("field_values", {})
+    for field_name, value in field_values.items():
+        placeholder = "{" + field_name + "}"
+        filled_content = filled_content.replace(placeholder, value)
+
+    # Increment usage count
+    await db.translation_templates.update_one(
+        {"id": template_id},
+        {"$inc": {"usage_count": 1}}
+    )
+
+    return {"status": "success", "filled_content": filled_content}
 
 
 # ==================== TRANSLATION MEMORY ====================
