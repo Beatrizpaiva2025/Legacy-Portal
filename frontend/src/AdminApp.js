@@ -1639,6 +1639,549 @@ const reconstructFullHtml = (originalHtml, newBodyContent) => {
   return newBodyContent;
 };
 
+// ==================== TEMPLATES TAB COMPONENT ====================
+const TEMPLATE_DOC_TYPES = DOCUMENT_TYPES.filter(dt => dt.value !== '');
+
+const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
+  const [templates, setTemplates] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showUseModal, setShowUseModal] = useState(false);
+  const [fieldValues, setFieldValues] = useState({});
+  const [filledResult, setFilledResult] = useState('');
+  const [filterDocType, setFilterDocType] = useState('');
+  const [filterSourceLang, setFilterSourceLang] = useState('');
+
+  // Create template form
+  const [createForm, setCreateForm] = useState({
+    name: '',
+    document_type: 'birth_certificate',
+    source_language: 'Portuguese',
+    target_language: 'English',
+    original_content: '',
+    template_content: '',
+    fields: []
+  });
+
+  // Field selection mode
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [newFieldName, setNewFieldName] = useState('');
+  const [newFieldLabel, setNewFieldLabel] = useState('');
+  const [textSelection, setTextSelection] = useState(null);
+
+  const fetchTemplates = async () => {
+    try {
+      setLoading(true);
+      let url = `${API}/admin/translation-templates?admin_key=${adminKey}`;
+      if (filterDocType) url += `&document_type=${encodeURIComponent(filterDocType)}`;
+      if (filterSourceLang) url += `&source_language=${encodeURIComponent(filterSourceLang)}`;
+      const response = await axios.get(url);
+      setTemplates(response.data.templates || []);
+    } catch (err) {
+      console.error('Error fetching templates:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTemplates();
+  }, [adminKey, filterDocType, filterSourceLang]);
+
+  const handleTextSelect = () => {
+    if (!selectionMode) return;
+    const selection = window.getSelection();
+    const text = selection?.toString()?.trim();
+    if (text && text.length > 0) {
+      const content = createForm.template_content;
+      const startIndex = content.indexOf(text);
+      if (startIndex !== -1) {
+        setTextSelection({
+          text,
+          startIndex,
+          endIndex: startIndex + text.length
+        });
+      }
+    }
+  };
+
+  const addFieldFromSelection = () => {
+    if (!textSelection || !newFieldName) return;
+
+    const fieldName = newFieldName.replace(/\s+/g, '_').toLowerCase();
+    const newField = {
+      id: Date.now().toString(),
+      field_name: fieldName,
+      label: newFieldLabel || newFieldName,
+      start_index: textSelection.startIndex,
+      end_index: textSelection.endIndex,
+      original_text: textSelection.text,
+      field_type: 'text'
+    };
+
+    // Replace the selected text with a placeholder in template_content
+    const placeholder = `{${fieldName}}`;
+    const updatedContent = createForm.template_content.replace(textSelection.text, placeholder);
+
+    setCreateForm(prev => ({
+      ...prev,
+      template_content: updatedContent,
+      fields: [...prev.fields, newField]
+    }));
+
+    setTextSelection(null);
+    setNewFieldName('');
+    setNewFieldLabel('');
+  };
+
+  const removeField = (fieldToRemove) => {
+    // Restore original text in template_content
+    const placeholder = `{${fieldToRemove.field_name}}`;
+    const restoredContent = createForm.template_content.replace(placeholder, fieldToRemove.original_text);
+
+    setCreateForm(prev => ({
+      ...prev,
+      template_content: restoredContent,
+      fields: prev.fields.filter(f => f.id !== fieldToRemove.id)
+    }));
+  };
+
+  const handleCreateTemplate = async () => {
+    if (!createForm.name || !createForm.template_content) {
+      showToast('Please provide a name and template content');
+      return;
+    }
+    try {
+      await axios.post(`${API}/admin/translation-templates?admin_key=${adminKey}`, createForm);
+      showToast('Template created successfully!');
+      setShowCreateModal(false);
+      setCreateForm({
+        name: '', document_type: 'birth_certificate', source_language: 'Portuguese',
+        target_language: 'English', original_content: '', template_content: '', fields: []
+      });
+      setSelectionMode(false);
+      fetchTemplates();
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'Error creating template');
+    }
+  };
+
+  const handleDeleteTemplate = async (templateId) => {
+    if (!window.confirm('Delete this template?')) return;
+    try {
+      await axios.delete(`${API}/admin/translation-templates/${templateId}?admin_key=${adminKey}`);
+      showToast('Template deleted');
+      fetchTemplates();
+      if (selectedTemplate?.id === templateId) setSelectedTemplate(null);
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'Error deleting template');
+    }
+  };
+
+  const openUseTemplate = (template) => {
+    setSelectedTemplate(template);
+    const initialValues = {};
+    (template.fields || []).forEach(f => {
+      initialValues[f.field_name] = '';
+    });
+    setFieldValues(initialValues);
+    setFilledResult('');
+    setShowUseModal(true);
+  };
+
+  const handleFillTemplate = async () => {
+    try {
+      const response = await axios.post(
+        `${API}/admin/translation-templates/${selectedTemplate.id}/use?admin_key=${adminKey}`,
+        { field_values: fieldValues }
+      );
+      setFilledResult(response.data.filled_content);
+    } catch (err) {
+      showToast('Error filling template');
+    }
+  };
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text).then(() => {
+      showToast('Copied to clipboard!');
+    });
+  };
+
+  const renderHighlightedContent = (content) => {
+    // Highlight placeholders in the template content
+    const parts = content.split(/(\{[^}]+\})/g);
+    return parts.map((part, i) => {
+      if (part.match(/^\{[^}]+\}$/)) {
+        return <span key={i} className="bg-yellow-200 text-yellow-900 px-1 rounded font-medium">{part}</span>;
+      }
+      return <span key={i}>{part}</span>;
+    });
+  };
+
+  if (loading) return <div className="p-6 text-center text-gray-500">Loading templates...</div>;
+
+  return (
+    <div className="bg-white rounded shadow">
+      <div className="p-4 border-b flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          <span className="text-lg">📑</span>
+          <div>
+            <h2 className="text-sm font-bold">Translation Templates</h2>
+            <p className="text-xs text-gray-500">Reusable templates for common documents (birth certificates, diplomas, etc.)</p>
+          </div>
+        </div>
+        <div className="flex items-center space-x-2">
+          <select
+            value={filterDocType}
+            onChange={(e) => setFilterDocType(e.target.value)}
+            className="px-3 py-1.5 border rounded text-xs"
+          >
+            <option value="">All Types</option>
+            {DOCUMENT_TYPES.filter(dt => dt.value).map(dt => (
+              <option key={dt.value} value={dt.value}>{dt.label}</option>
+            ))}
+          </select>
+          <select
+            value={filterSourceLang}
+            onChange={(e) => setFilterSourceLang(e.target.value)}
+            className="px-3 py-1.5 border rounded text-xs"
+          >
+            <option value="">All Languages</option>
+            {LANGUAGES.map(lang => (
+              <option key={lang} value={lang}>{lang}</option>
+            ))}
+          </select>
+          <button
+            onClick={() => {
+              setCreateForm({
+                name: '', document_type: 'birth_certificate', source_language: 'Portuguese',
+                target_language: 'English', original_content: '', template_content: '', fields: []
+              });
+              setSelectionMode(false);
+              setTextSelection(null);
+              setShowCreateModal(true);
+            }}
+            className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+          >
+            + New Template
+          </button>
+        </div>
+      </div>
+
+      <div className="p-4">
+        {templates.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            <div className="text-4xl mb-2">📑</div>
+            <p className="text-sm font-medium mb-1">No templates yet</p>
+            <p className="text-xs">Click "New Template" to create a reusable translation template.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {templates.map(template => (
+              <div key={template.id} className="border rounded-lg p-4 hover:border-blue-300 transition-colors">
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-800">{template.name}</h3>
+                    <span className="inline-block px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] mt-1">
+                      {DOCUMENT_TYPES.find(dt => dt.value === template.document_type)?.label || template.document_type}
+                    </span>
+                  </div>
+                  {(isAdmin || isPM) && (
+                    <button
+                      onClick={() => handleDeleteTemplate(template.id)}
+                      className="text-red-400 hover:text-red-600 text-xs"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
+                <div className="text-[10px] text-gray-500 mb-2">
+                  {template.source_language} → {template.target_language}
+                </div>
+                <div className="text-xs text-gray-600 mb-3 line-clamp-3">
+                  {template.template_content?.substring(0, 150)}...
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="text-[10px] text-gray-400">
+                    {(template.fields || []).length} fields | Used {template.usage_count || 0}x
+                  </div>
+                  <button
+                    onClick={() => openUseTemplate(template)}
+                    className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                  >
+                    Use Template
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Create Template Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="p-4 border-b flex justify-between items-center sticky top-0 bg-white z-10">
+              <h3 className="font-bold text-gray-800">Create Translation Template</h3>
+              <button onClick={() => setShowCreateModal(false)} className="text-gray-500 hover:text-gray-700 text-xl">&times;</button>
+            </div>
+            <div className="p-4 space-y-4">
+              {/* Step 1: Basic Info */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Template Name *</label>
+                  <input
+                    type="text"
+                    value={createForm.name}
+                    onChange={(e) => setCreateForm({...createForm, name: e.target.value})}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                    placeholder="e.g. Birth Certificate - SP"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Document Type *</label>
+                  <select
+                    value={createForm.document_type}
+                    onChange={(e) => setCreateForm({...createForm, document_type: e.target.value})}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  >
+                    {DOCUMENT_TYPES.map(dt => (
+                      <option key={dt.value} value={dt.value}>{dt.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Source Language (Original)</label>
+                  <select
+                    value={createForm.source_language}
+                    onChange={(e) => setCreateForm({...createForm, source_language: e.target.value})}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  >
+                    {LANGUAGES.map(lang => (
+                      <option key={lang} value={lang}>{lang}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Target Language</label>
+                  <select
+                    value={createForm.target_language}
+                    onChange={(e) => setCreateForm({...createForm, target_language: e.target.value})}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  >
+                    {LANGUAGES.map(lang => (
+                      <option key={lang} value={lang}>{lang}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Step 2: Paste Translation */}
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">
+                  Paste your completed translation below *
+                </label>
+                <p className="text-[10px] text-gray-400 mb-2">
+                  Paste the full translated text from a real document. You will then select variable parts to turn into fillable fields.
+                </p>
+                {!selectionMode ? (
+                  <textarea
+                    value={createForm.template_content}
+                    onChange={(e) => {
+                      setCreateForm({...createForm, template_content: e.target.value, original_content: e.target.value});
+                    }}
+                    className="w-full px-3 py-2 border rounded text-sm font-mono"
+                    rows="10"
+                    placeholder="Paste the full translated document text here..."
+                  />
+                ) : (
+                  <div
+                    className="w-full px-3 py-2 border-2 border-blue-300 rounded text-sm font-mono bg-blue-50 min-h-[200px] whitespace-pre-wrap select-text cursor-text"
+                    onMouseUp={handleTextSelect}
+                  >
+                    {renderHighlightedContent(createForm.template_content)}
+                  </div>
+                )}
+              </div>
+
+              {/* Step 3: Field Selection */}
+              {createForm.template_content && (
+                <div className="border-t pt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <h4 className="text-sm font-bold text-gray-700">Variable Fields</h4>
+                      <p className="text-[10px] text-gray-500">
+                        {selectionMode
+                          ? 'Select text in the document above, then name the field below'
+                          : 'Enable selection mode to start marking variable fields'
+                        }
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setSelectionMode(!selectionMode)}
+                      className={`px-3 py-1.5 text-xs rounded font-medium ${
+                        selectionMode
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                    >
+                      {selectionMode ? 'Selection Mode ON' : 'Enable Selection Mode'}
+                    </button>
+                  </div>
+
+                  {/* Add field from selection */}
+                  {selectionMode && textSelection && (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-3">
+                      <p className="text-xs text-yellow-800 mb-2">
+                        Selected: "<strong>{textSelection.text}</strong>"
+                      </p>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={newFieldName}
+                          onChange={(e) => setNewFieldName(e.target.value)}
+                          placeholder="Field name (e.g. full_name)"
+                          className="flex-1 px-2 py-1 border rounded text-xs"
+                        />
+                        <input
+                          type="text"
+                          value={newFieldLabel}
+                          onChange={(e) => setNewFieldLabel(e.target.value)}
+                          placeholder="Label (e.g. Full Name)"
+                          className="flex-1 px-2 py-1 border rounded text-xs"
+                        />
+                        <button
+                          onClick={addFieldFromSelection}
+                          disabled={!newFieldName}
+                          className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:opacity-50"
+                        >
+                          Add Field
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Existing fields list */}
+                  {createForm.fields.length > 0 && (
+                    <div className="space-y-2">
+                      {createForm.fields.map(field => (
+                        <div key={field.id} className="flex items-center justify-between bg-gray-50 rounded px-3 py-2">
+                          <div className="flex items-center gap-3">
+                            <span className="bg-yellow-200 text-yellow-900 px-2 py-0.5 rounded text-xs font-mono">
+                              {`{${field.field_name}}`}
+                            </span>
+                            <span className="text-xs text-gray-600">{field.label}</span>
+                            <span className="text-[10px] text-gray-400">was: "{field.original_text}"</span>
+                          </div>
+                          <button
+                            onClick={() => removeField(field)}
+                            className="text-red-400 hover:text-red-600 text-xs"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex justify-end space-x-2 pt-4 border-t">
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  className="px-4 py-2 border rounded text-sm text-gray-600 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateTemplate}
+                  disabled={!createForm.name || !createForm.template_content}
+                  className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50"
+                >
+                  Save Template
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Use Template Modal - Side by Side */}
+      {showUseModal && selectedTemplate && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] overflow-hidden">
+            <div className="p-4 border-b flex justify-between items-center">
+              <div>
+                <h3 className="font-bold text-gray-800">Use Template: {selectedTemplate.name}</h3>
+                <span className="text-xs text-gray-500">
+                  {DOCUMENT_TYPES.find(dt => dt.value === selectedTemplate.document_type)?.label} |
+                  {selectedTemplate.source_language} → {selectedTemplate.target_language}
+                </span>
+              </div>
+              <button onClick={() => setShowUseModal(false)} className="text-gray-500 hover:text-gray-700 text-xl">&times;</button>
+            </div>
+            <div className="grid grid-cols-2 gap-0 h-[calc(90vh-130px)]">
+              {/* Left: Fill Fields */}
+              <div className="border-r p-4 overflow-y-auto">
+                <h4 className="text-sm font-bold text-gray-700 mb-3">Fill in the Fields</h4>
+                <div className="space-y-3">
+                  {(selectedTemplate.fields || []).map(field => (
+                    <div key={field.field_name}>
+                      <label className="block text-xs text-gray-600 mb-1">{field.label}</label>
+                      <input
+                        type="text"
+                        value={fieldValues[field.field_name] || ''}
+                        onChange={(e) => setFieldValues({...fieldValues, [field.field_name]: e.target.value})}
+                        className="w-full px-3 py-2 border rounded text-sm"
+                        placeholder={field.original_text}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={handleFillTemplate}
+                  className="mt-4 w-full py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+                >
+                  Generate Translation
+                </button>
+              </div>
+
+              {/* Right: Preview */}
+              <div className="p-4 overflow-y-auto bg-gray-50">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-bold text-gray-700">Preview</h4>
+                  {filledResult && (
+                    <button
+                      onClick={() => copyToClipboard(filledResult)}
+                      className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                    >
+                      Copy to Clipboard
+                    </button>
+                  )}
+                </div>
+                <div className="bg-white border rounded-lg p-4 text-sm font-mono whitespace-pre-wrap min-h-[300px]">
+                  {filledResult ? (
+                    filledResult
+                  ) : (
+                    <div className="text-gray-400">
+                      {renderHighlightedContent(selectedTemplate.template_content)}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ==================== TRANSLATION WORKSPACE ====================
 const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   // User role checks
@@ -7608,7 +8151,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'pm', 'translator_inhouse'] },
           { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin', 'pm', 'translator_inhouse'] },
           { id: 'tm', label: 'TM', icon: '🧠', roles: ['admin', 'pm', 'translator_inhouse'] },
-          { id: 'instructions', label: 'INSTRUCTIONS', icon: '📋', roles: ['admin', 'pm', 'translator_inhouse'] }
+          { id: 'instructions', label: 'INSTRUCTIONS', icon: '📋', roles: ['admin', 'pm', 'translator_inhouse'] },
+          { id: 'templates', label: 'TEMPLATES', icon: '📑', roles: ['admin', 'pm', 'translator_inhouse'] }
         ].filter(tab => {
           const userRole = user?.role || 'translator';
           // For translators, check translator_type for extended access
@@ -13883,6 +14427,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             )}
           </div>
         </div>
+      )}
+
+      {/* TEMPLATES TAB - Admin, PM, and In-House Translators */}
+      {activeSubTab === 'templates' && (isAdmin || isPM || isInHouseTranslator) && (
+        <TemplatesTab adminKey={adminKey} isAdmin={isAdmin} isPM={isPM} orderId={selectedOrder?.id} />
       )}
 
       {/* TRANSLATION MEMORY TAB - Admin, PM, and In-House Translators */}
