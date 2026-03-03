@@ -660,6 +660,7 @@ const DOCUMENT_TYPES = [
   { value: 'medical_report', label: 'Relatório Médico / Medical Report' },
   { value: 'contract', label: 'Contrato / Contract' },
   { value: 'immigration_doc', label: 'Documento de Imigração / Immigration Document' },
+  { value: 'bank_statement', label: 'Extrato Bancário / Bank Statement' },
   { value: 'other', label: 'Outros / Other' }
 ];
 
