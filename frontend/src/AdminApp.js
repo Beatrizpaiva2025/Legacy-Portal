@@ -34928,11 +34928,11 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                                 const { date, time } = getDateTimePartsInNY(order.translator_deadline);
                                 setTempTrDeadline({ date, time });
                               } else {
-                                // Default to 2 days before client deadline if set, otherwise tomorrow at 5pm
+                                // Default to 1 day before client deadline if set, otherwise tomorrow at 5pm
                                 if (order.deadline) {
                                   const { date, time } = getDateTimePartsInNY(order.deadline);
                                   const d = new Date(date);
-                                  d.setDate(d.getDate() - 2);
+                                  d.setDate(d.getDate() - 1);
                                   const adjustedDate = d.toISOString().split('T')[0];
                                   setTempTrDeadline({ date: adjustedDate, time: time || '17:00' });
                                 } else {

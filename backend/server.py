@@ -3315,7 +3315,7 @@ def calculate_client_deadline(source_type: str = "website", created_at: datetime
 
     Standard deadlines:
         - Website/WhatsApp: 3 business days (excluding weekends)
-        - Partner Portal: 48 hours (calendar hours)
+        - Partner Portal: 24 hours (calendar hours)
     """
     if created_at is None:
         created_at = datetime.utcnow()
@@ -3324,8 +3324,8 @@ def calculate_client_deadline(source_type: str = "website", created_at: datetime
     ny_time = created_at.replace(tzinfo=ZoneInfo("UTC")).astimezone(NY_TIMEZONE)
 
     if source_type == "partner":
-        # Partner portal standard: 48 hours (calendar hours, not business days)
-        deadline_ny = ny_time + timedelta(hours=48)
+        # Partner portal standard: 24 hours (calendar hours, not business days)
+        deadline_ny = ny_time + timedelta(hours=24)
     else:
         # Website/WhatsApp: 3 business days (skip weekends)
         deadline_ny = ny_time
@@ -3908,7 +3908,7 @@ def get_estimated_delivery(urgency: str, source_type: str = "website") -> str:
 
     Standard deadlines:
         - Website/Customer: 3 business days
-        - Partner Portal: 48 hours (2 days)
+        - Partner Portal: 24 hours (1 business day)
     """
     today = datetime.now(NY_TIMEZONE)
 
@@ -3920,9 +3920,9 @@ def get_estimated_delivery(urgency: str, source_type: str = "website") -> str:
         days_text = "24 hours"
     else:
         if source_type == "partner":
-            # Partner portal standard: 48 hours (2 days)
-            delivery_date = today + timedelta(hours=48)
-            days_text = "2 days"
+            # Partner portal standard: 24 hours (1 business day)
+            delivery_date = today + timedelta(hours=24)
+            days_text = "1 day"
         else:
             # Website/Customer standard: 3 business days
             delivery_date = today
@@ -9054,7 +9054,7 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
             backend_url = os.environ.get("BACKEND_URL", "https://legacy-portal-cont-backend.onrender.com")
             zelle_receipt_url = f"{backend_url}/api/download-document/{order_data.zelle_receipt_id}"
 
-        # Create order with automatic client deadline (2 business days for partner portal)
+        # Create order with automatic client deadline (1 business day for partner portal)
         created_at = datetime.utcnow()
         client_deadline = calculate_client_deadline("partner", created_at)
 
@@ -9077,7 +9077,7 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
             urgency_fee=urgency_fee,
             total_price=total_price,
             due_date=due_date,
-            deadline=client_deadline,  # 2 business days for partner portal
+            deadline=client_deadline,  # 1 business day for partner portal
             revenue_source="partner",
             document_filename=order_data.document_filename,
             payment_method=order_data.payment_method,
@@ -10101,7 +10101,7 @@ async def admin_create_manual_order(project_data: ManualProjectCreate, admin_key
         if deadline is None:
             source_type = project_data.revenue_source or "website"
             if source_type == "partner":
-                deadline = calculate_client_deadline("partner", created_at)  # 48 hours
+                deadline = calculate_client_deadline("partner", created_at)  # 24 hours
             elif source_type == "whatsapp":
                 deadline = calculate_client_deadline("whatsapp", created_at)  # 3 business days
             else:
@@ -24012,7 +24012,7 @@ async def convert_partner_budget_to_order(budget_id: str, token: str, client_nam
         if not budget:
             raise HTTPException(status_code=404, detail="Budget not found")
 
-        # Create order from budget with automatic client deadline (2 business days for partner portal)
+        # Create order from budget with automatic client deadline (1 business day for partner portal)
         page_count = max(1, math.ceil(budget["word_count"] / 250))
         created_at = datetime.utcnow()
         due_date = created_at + timedelta(days=30)
@@ -24034,7 +24034,7 @@ async def convert_partner_budget_to_order(budget_id: str, token: str, client_nam
             urgency_fee=budget["urgency_fee"],
             total_price=budget["total_price"],
             due_date=due_date,
-            deadline=client_deadline,  # 2 business days for partner portal
+            deadline=client_deadline,  # 1 business day for partner portal
             revenue_source="partner"
         )
 
