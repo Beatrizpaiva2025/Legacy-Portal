@@ -1674,6 +1674,12 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState('');
 
+  // Visual document rendering (preserves layout)
+  const [documentHTML, setDocumentHTML] = useState(''); // HTML from mammoth (DOCX)
+  const [documentPages, setDocumentPages] = useState([]); // PDF page images (data URLs)
+  const [docSourceType, setDocSourceType] = useState(''); // 'docx', 'pdf', 'text'
+  const contentEditableRef = useRef(null);
+
   const handleFileUploadForTemplate = async (file) => {
     if (!file) return;
     const ext = file.name.split('.').pop().toLowerCase();
@@ -1683,22 +1689,79 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
     }
     setUploadingFile(true);
     setUploadedFileName(file.name);
+    setDocumentHTML('');
+    setDocumentPages([]);
+    setDocSourceType('');
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('admin_key', adminKey);
-      const response = await axios.post(`${API}/admin/translation-templates/extract-text`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      const extractedText = response.data.text || '';
-      setCreateForm(prev => ({
-        ...prev,
-        template_content: extractedText,
-        original_content: extractedText
-      }));
-      showToast(`Text extracted from "${file.name}" successfully!`, 'success');
+      if (['docx', 'doc'].includes(ext)) {
+        // DOCX: Convert to HTML client-side using mammoth (preserves layout)
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.convertToHtml({ arrayBuffer }, {
+          styleMap: [
+            "p[style-name='Title'] => h1:fresh",
+            "p[style-name='Heading 1'] => h1:fresh",
+            "p[style-name='Heading 2'] => h2:fresh",
+            "p[style-name='Heading 3'] => h3:fresh",
+          ]
+        });
+        const html = result.value || '';
+        setDocumentHTML(html);
+        setDocSourceType('docx');
+        setCreateForm(prev => ({
+          ...prev,
+          template_content: html,
+          original_content: html
+        }));
+        showToast(`Document "${file.name}" loaded with formatting preserved!`, 'success');
+      } else if (ext === 'pdf') {
+        // PDF: Render pages as images client-side using pdf.js
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+        const pages = [];
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const viewport = page.getViewport({ scale: 2.0 });
+          const canvas = document.createElement('canvas');
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          const ctx = canvas.getContext('2d');
+          await page.render({ canvasContext: ctx, viewport }).promise;
+          pages.push(canvas.toDataURL('image/png'));
+        }
+        setDocumentPages(pages);
+        setDocSourceType('pdf');
+        // Also extract text via backend for the fillable fields
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('admin_key', adminKey);
+        try {
+          const response = await axios.post(`${API}/admin/translation-templates/extract-text`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
+          const extractedText = response.data.text || '';
+          setCreateForm(prev => ({
+            ...prev,
+            template_content: extractedText,
+            original_content: extractedText
+          }));
+        } catch (textErr) {
+          // If text extraction fails, use empty text - user can type manually
+          console.warn('Text extraction failed, visual preview still available', textErr);
+        }
+        showToast(`PDF "${file.name}" loaded with ${pages.length} page(s)!`, 'success');
+      } else if (ext === 'txt') {
+        const text = await file.text();
+        setDocSourceType('text');
+        setCreateForm(prev => ({
+          ...prev,
+          template_content: text,
+          original_content: text
+        }));
+        showToast(`Text file "${file.name}" loaded!`, 'success');
+      }
     } catch (err) {
-      showToast(err.response?.data?.detail || 'Error extracting text from document', 'error');
+      console.error('Error processing document:', err);
+      showToast(err.response?.data?.detail || 'Error processing document. Please try again.', 'error');
       setUploadedFileName('');
     } finally {
       setUploadingFile(false);
@@ -1729,14 +1792,31 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
     const selection = window.getSelection();
     const text = selection?.toString()?.trim();
     if (text && text.length > 0) {
+      // Check if the selection is within our content area
       const content = createForm.template_content;
-      const startIndex = content.indexOf(text);
-      if (startIndex !== -1) {
-        setTextSelection({
-          text,
-          startIndex,
-          endIndex: startIndex + text.length
-        });
+      if (docSourceType === 'docx') {
+        // For HTML content, find the text in the HTML string
+        // We need to find the text in the visible text content, not in HTML tags
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = content;
+        const textContent = tempDiv.textContent || tempDiv.innerText;
+        const startIndex = textContent.indexOf(text);
+        if (startIndex !== -1) {
+          setTextSelection({
+            text,
+            startIndex,
+            endIndex: startIndex + text.length
+          });
+        }
+      } else {
+        const startIndex = content.indexOf(text);
+        if (startIndex !== -1) {
+          setTextSelection({
+            text,
+            startIndex,
+            endIndex: startIndex + text.length
+          });
+        }
       }
     }
   };
@@ -1755,15 +1835,26 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
       field_type: 'text'
     };
 
-    // Replace the selected text with a placeholder in template_content
-    const placeholder = `{${fieldName}}`;
-    const updatedContent = createForm.template_content.replace(textSelection.text, placeholder);
-
-    setCreateForm(prev => ({
-      ...prev,
-      template_content: updatedContent,
-      fields: [...prev.fields, newField]
-    }));
+    if (docSourceType === 'docx') {
+      // For HTML content: wrap the selected text with a styled span placeholder
+      const placeholder = `<span class="template-field" data-field="${fieldName}" style="background:#fef08a;border:1px dashed #ca8a04;padding:1px 4px;border-radius:3px;font-weight:600;">{${fieldName}}</span>`;
+      const updatedContent = createForm.template_content.replace(textSelection.text, placeholder);
+      setCreateForm(prev => ({
+        ...prev,
+        template_content: updatedContent,
+        fields: [...prev.fields, newField]
+      }));
+      setDocumentHTML(updatedContent);
+    } else {
+      // For text content: simple placeholder replacement
+      const placeholder = `{${fieldName}}`;
+      const updatedContent = createForm.template_content.replace(textSelection.text, placeholder);
+      setCreateForm(prev => ({
+        ...prev,
+        template_content: updatedContent,
+        fields: [...prev.fields, newField]
+      }));
+    }
 
     setTextSelection(null);
     setNewFieldName('');
@@ -1771,8 +1862,9 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
   };
 
   const removeField = (fieldToRemove) => {
-    // Restore original text in template_content
-    const placeholder = `{${fieldToRemove.field_name}}`;
+    const placeholder = docSourceType === 'docx'
+      ? `<span class="template-field" data-field="${fieldToRemove.field_name}" style="background:#fef08a;border:1px dashed #ca8a04;padding:1px 4px;border-radius:3px;font-weight:600;">{${fieldToRemove.field_name}}</span>`
+      : `{${fieldToRemove.field_name}}`;
     const restoredContent = createForm.template_content.replace(placeholder, fieldToRemove.original_text);
 
     setCreateForm(prev => ({
@@ -1780,6 +1872,9 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
       template_content: restoredContent,
       fields: prev.fields.filter(f => f.id !== fieldToRemove.id)
     }));
+    if (docSourceType === 'docx') {
+      setDocumentHTML(restoredContent);
+    }
   };
 
   const handleCreateTemplate = async () => {
@@ -1796,6 +1891,10 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
         target_language: 'English', original_content: '', template_content: '', fields: []
       });
       setSelectionMode(false);
+      setDocumentHTML('');
+      setDocumentPages([]);
+      setDocSourceType('');
+      setUploadedFileName('');
       fetchTemplates();
     } catch (err) {
       showToast(err.response?.data?.detail || 'Error creating template');
@@ -1826,14 +1925,46 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
   };
 
   const handleFillTemplate = async () => {
-    try {
-      const response = await axios.post(
-        `${API}/admin/translation-templates/${selectedTemplate.id}/use?admin_key=${adminKey}`,
-        { field_values: fieldValues }
-      );
-      setFilledResult(response.data.filled_content);
-    } catch (err) {
-      showToast('Error filling template');
+    const templateContent = selectedTemplate.template_content;
+    const isHTML = isHTMLContent(templateContent);
+
+    if (isHTML) {
+      // For HTML templates, do client-side replacement to preserve formatting
+      let filled = templateContent;
+      Object.entries(fieldValues).forEach(([fieldName, value]) => {
+        if (value) {
+          // Replace the styled span placeholder with the filled value (keeping it styled differently)
+          const spanPattern = new RegExp(
+            `<span[^>]*data-field="${fieldName}"[^>]*>\\{${fieldName}\\}</span>`,
+            'g'
+          );
+          const filledSpan = `<span style="background:#bbf7d0;border:1px solid #16a34a;padding:1px 4px;border-radius:3px;font-weight:600;">${value}</span>`;
+          filled = filled.replace(spanPattern, filledSpan);
+          // Also handle simple {field_name} placeholders in HTML
+          filled = filled.replace(new RegExp(`\\{${fieldName}\\}`, 'g'), value);
+        }
+      });
+      setFilledResult(filled);
+      // Also increment usage count on the server
+      try {
+        await axios.post(
+          `${API}/admin/translation-templates/${selectedTemplate.id}/use?admin_key=${adminKey}`,
+          { field_values: fieldValues }
+        );
+      } catch (err) {
+        // Silently fail - the client-side fill already worked
+      }
+    } else {
+      // For text templates, use the backend API
+      try {
+        const response = await axios.post(
+          `${API}/admin/translation-templates/${selectedTemplate.id}/use?admin_key=${adminKey}`,
+          { field_values: fieldValues }
+        );
+        setFilledResult(response.data.filled_content);
+      } catch (err) {
+        showToast('Error filling template');
+      }
     }
   };
 
@@ -1843,8 +1974,12 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
     });
   };
 
-  const renderHighlightedContent = (content) => {
-    // Highlight placeholders in the template content
+  const renderHighlightedContent = (content, isHTML = false) => {
+    if (isHTML) {
+      // For HTML content, the placeholders are already styled spans - render as HTML
+      return <div dangerouslySetInnerHTML={{ __html: content }} />;
+    }
+    // For text content, highlight {field_name} placeholders
     const parts = content.split(/(\{[^}]+\})/g);
     return parts.map((part, i) => {
       if (part.match(/^\{[^}]+\}$/)) {
@@ -1852,6 +1987,11 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
       }
       return <span key={i}>{part}</span>;
     });
+  };
+
+  // Check if template content is HTML (from DOCX upload)
+  const isHTMLContent = (content) => {
+    return content && (content.includes('<p>') || content.includes('<table') || content.includes('<h1') || content.includes('<div') || content.includes('template-field'));
   };
 
   if (loading) return <div className="p-6 text-center text-gray-500">Loading templates...</div>;
@@ -1896,6 +2036,9 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
               setSelectionMode(false);
               setTextSelection(null);
               setUploadedFileName('');
+              setDocumentHTML('');
+              setDocumentPages([]);
+              setDocSourceType('');
               setShowCreateModal(true);
             }}
             className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
@@ -1936,8 +2079,14 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
                   {template.source_language} → {template.target_language}
                 </div>
                 <div className="text-xs text-gray-600 mb-3 line-clamp-3">
-                  {template.template_content?.substring(0, 150)}...
+                  {isHTMLContent(template.template_content)
+                    ? (() => { const d = document.createElement('div'); d.innerHTML = template.template_content; return (d.textContent || d.innerText || '').substring(0, 150); })()
+                    : template.template_content?.substring(0, 150)
+                  }...
                 </div>
+                {isHTMLContent(template.template_content) && (
+                  <span className="inline-block px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded text-[9px] mb-2">Layout Preserved</span>
+                )}
                 <div className="flex items-center justify-between">
                   <div className="text-[10px] text-gray-400">
                     {(template.fields || []).length} fields | Used {template.usage_count || 0}x
@@ -2023,7 +2172,7 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
                 </label>
 
                 {/* Upload area - shown when no content yet */}
-                {!createForm.template_content && !uploadingFile && (
+                {!createForm.template_content && !uploadingFile && documentPages.length === 0 && (
                   <div>
                     <div
                       className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-blue-400 hover:bg-blue-50/50 transition-colors cursor-pointer"
@@ -2048,8 +2197,8 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
                       <svg className="w-10 h-10 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                       </svg>
-                      <p className="text-sm font-medium text-gray-700 mb-1">Upload translated document</p>
-                      <p className="text-xs text-gray-500 mb-2">Drag & drop or click to browse</p>
+                      <p className="text-sm font-medium text-gray-700 mb-1">Upload document (layout preserved)</p>
+                      <p className="text-xs text-gray-500 mb-2">Drag & drop or click to browse - DOCX keeps formatting, PDF keeps visual layout</p>
                       <p className="text-[10px] text-gray-400">PDF, DOCX, DOC, TXT</p>
                     </div>
                     <div className="flex items-center gap-3 my-3">
@@ -2061,6 +2210,7 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
                       value={createForm.template_content}
                       onChange={(e) => {
                         setCreateForm({...createForm, template_content: e.target.value, original_content: e.target.value});
+                        setDocSourceType('text');
                       }}
                       className="w-full px-3 py-2 border rounded text-sm font-mono"
                       rows="6"
@@ -2073,24 +2223,156 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
                 {uploadingFile && (
                   <div className="border-2 border-blue-300 bg-blue-50 rounded-xl p-8 text-center">
                     <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-3"></div>
-                    <p className="text-sm font-medium text-blue-700">Extracting text from "{uploadedFileName}"...</p>
-                    <p className="text-xs text-blue-500 mt-1">This may take a few seconds</p>
+                    <p className="text-sm font-medium text-blue-700">Processing "{uploadedFileName}" - preserving layout...</p>
+                    <p className="text-xs text-blue-500 mt-1">Converting document with formatting intact</p>
                   </div>
                 )}
 
-                {/* Content loaded - show text and allow editing/selection */}
-                {createForm.template_content && !uploadingFile && (
+                {/* DOCX Content - Rich HTML Preview */}
+                {docSourceType === 'docx' && createForm.template_content && !uploadingFile && (
                   <div>
                     {uploadedFileName && (
                       <div className="flex items-center gap-2 mb-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
                         <svg className="w-4 h-4 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                         </svg>
-                        <span className="text-xs text-green-700">Text extracted from <strong>{uploadedFileName}</strong></span>
+                        <span className="text-xs text-green-700">Document loaded with formatting from <strong>{uploadedFileName}</strong></span>
+                        <span className="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded ml-2">DOCX - Layout Preserved</span>
                         <button
                           onClick={() => {
                             setCreateForm(prev => ({...prev, template_content: '', original_content: ''}));
                             setUploadedFileName('');
+                            setDocumentHTML('');
+                            setDocSourceType('');
+                            setSelectionMode(false);
+                            setTextSelection(null);
+                          }}
+                          className="ml-auto text-xs text-gray-500 hover:text-red-500"
+                        >
+                          Clear & re-upload
+                        </button>
+                      </div>
+                    )}
+                    {/* Document-like visual preview */}
+                    <div
+                      ref={contentEditableRef}
+                      className={`bg-white rounded-lg overflow-auto ${selectionMode ? 'border-2 border-blue-400 ring-2 ring-blue-100' : 'border border-gray-300'}`}
+                      style={{ maxHeight: '500px' }}
+                    >
+                      <div
+                        className="mx-auto bg-white shadow-md select-text cursor-text"
+                        style={{
+                          maxWidth: '750px',
+                          padding: '40px 50px',
+                          minHeight: '400px',
+                          fontFamily: "'Georgia', 'Times New Roman', serif",
+                          fontSize: '12px',
+                          lineHeight: '1.6',
+                        }}
+                        onMouseUp={selectionMode ? handleTextSelect : undefined}
+                        dangerouslySetInnerHTML={{ __html: createForm.template_content }}
+                      />
+                    </div>
+                    {selectionMode && (
+                      <p className="text-[10px] text-blue-600 mt-1 text-center">
+                        Select text in the document above to mark as a fillable field
+                      </p>
+                    )}
+                    <style>{`
+                      .template-field { background: #fef08a !important; border: 1px dashed #ca8a04 !important; padding: 1px 4px !important; border-radius: 3px !important; font-weight: 600 !important; }
+                    `}</style>
+                  </div>
+                )}
+
+                {/* PDF Content - Page Images + Text Fields */}
+                {docSourceType === 'pdf' && (documentPages.length > 0 || createForm.template_content) && !uploadingFile && (
+                  <div>
+                    {uploadedFileName && (
+                      <div className="flex items-center gap-2 mb-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                        <svg className="w-4 h-4 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span className="text-xs text-green-700">PDF loaded from <strong>{uploadedFileName}</strong> ({documentPages.length} pages)</span>
+                        <span className="text-[10px] text-purple-600 bg-purple-50 px-2 py-0.5 rounded ml-2">PDF - Visual Preview</span>
+                        <button
+                          onClick={() => {
+                            setCreateForm(prev => ({...prev, template_content: '', original_content: ''}));
+                            setUploadedFileName('');
+                            setDocumentPages([]);
+                            setDocSourceType('');
+                            setSelectionMode(false);
+                            setTextSelection(null);
+                          }}
+                          className="ml-auto text-xs text-gray-500 hover:text-red-500"
+                        >
+                          Clear & re-upload
+                        </button>
+                      </div>
+                    )}
+                    {/* Two-column layout: PDF pages + text for field marking */}
+                    <div className="grid grid-cols-2 gap-3" style={{ maxHeight: '500px' }}>
+                      {/* Left: PDF visual pages */}
+                      <div className="overflow-auto border rounded-lg bg-gray-100 p-2">
+                        <p className="text-[10px] text-gray-500 mb-2 text-center font-medium">Original Document (Visual)</p>
+                        <div className="space-y-2">
+                          {documentPages.map((pageDataUrl, idx) => (
+                            <div key={idx} className="bg-white shadow rounded overflow-hidden">
+                              <img
+                                src={pageDataUrl}
+                                alt={`Page ${idx + 1}`}
+                                className="w-full h-auto"
+                                style={{ imageRendering: 'auto' }}
+                              />
+                              <div className="text-center text-[9px] text-gray-400 py-1 bg-gray-50">
+                                Page {idx + 1} of {documentPages.length}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      {/* Right: Extracted text for field marking */}
+                      <div className="overflow-auto">
+                        <p className="text-[10px] text-gray-500 mb-2 text-center font-medium">
+                          Extracted Text (mark fillable fields here)
+                        </p>
+                        {!selectionMode ? (
+                          <textarea
+                            value={createForm.template_content}
+                            onChange={(e) => {
+                              setCreateForm({...createForm, template_content: e.target.value, original_content: createForm.original_content || e.target.value});
+                            }}
+                            className="w-full px-3 py-2 border rounded text-xs font-mono"
+                            style={{ minHeight: '400px' }}
+                            placeholder="Edit the text if needed..."
+                          />
+                        ) : (
+                          <div
+                            className="w-full px-3 py-2 border-2 border-blue-300 rounded text-xs font-mono bg-blue-50/50 whitespace-pre-wrap select-text cursor-text"
+                            style={{ minHeight: '400px' }}
+                            onMouseUp={handleTextSelect}
+                          >
+                            {renderHighlightedContent(createForm.template_content)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Text Content (manual paste or TXT file) */}
+                {(docSourceType === 'text' || docSourceType === '') && createForm.template_content && !uploadingFile && (
+                  <div>
+                    {uploadedFileName && (
+                      <div className="flex items-center gap-2 mb-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                        <svg className="w-4 h-4 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span className="text-xs text-green-700">Text loaded from <strong>{uploadedFileName}</strong></span>
+                        <button
+                          onClick={() => {
+                            setCreateForm(prev => ({...prev, template_content: '', original_content: ''}));
+                            setUploadedFileName('');
+                            setDocSourceType('');
                             setSelectionMode(false);
                             setTextSelection(null);
                           }}
@@ -2233,8 +2515,11 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
               <div>
                 <h3 className="font-bold text-gray-800">Use Template: {selectedTemplate.name}</h3>
                 <span className="text-xs text-gray-500">
-                  {DOCUMENT_TYPES.find(dt => dt.value === selectedTemplate.document_type)?.label} |
+                  {DOCUMENT_TYPES.find(dt => dt.value === selectedTemplate.document_type)?.label} |{' '}
                   {selectedTemplate.source_language} → {selectedTemplate.target_language}
+                  {isHTMLContent(selectedTemplate.template_content) && (
+                    <span className="ml-2 text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded">Layout Preserved</span>
+                  )}
                 </span>
               </div>
               <button onClick={() => setShowUseModal(false)} className="text-gray-500 hover:text-gray-700 text-xl">&times;</button>
@@ -2243,50 +2528,85 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
               {/* Left: Fill Fields */}
               <div className="border-r p-4 overflow-y-auto">
                 <h4 className="text-sm font-bold text-gray-700 mb-3">Fill in the Fields</h4>
-                <div className="space-y-3">
-                  {(selectedTemplate.fields || []).map(field => (
-                    <div key={field.field_name}>
-                      <label className="block text-xs text-gray-600 mb-1">{field.label}</label>
-                      <input
-                        type="text"
-                        value={fieldValues[field.field_name] || ''}
-                        onChange={(e) => setFieldValues({...fieldValues, [field.field_name]: e.target.value})}
-                        className="w-full px-3 py-2 border rounded text-sm"
-                        placeholder={field.original_text}
-                      />
-                    </div>
-                  ))}
-                </div>
+                {(selectedTemplate.fields || []).length === 0 ? (
+                  <div className="text-center py-6 text-gray-400">
+                    <p className="text-sm">No fillable fields defined</p>
+                    <p className="text-xs mt-1">This template has no variable fields to fill in.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {(selectedTemplate.fields || []).map(field => (
+                      <div key={field.field_name} className="bg-gray-50 rounded-lg p-3">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">{field.label}</label>
+                        <input
+                          type="text"
+                          value={fieldValues[field.field_name] || ''}
+                          onChange={(e) => setFieldValues({...fieldValues, [field.field_name]: e.target.value})}
+                          className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400"
+                          placeholder={field.original_text}
+                        />
+                        <p className="text-[10px] text-gray-400 mt-1">Original: "{field.original_text}"</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <button
                   onClick={handleFillTemplate}
-                  className="mt-4 w-full py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+                  className="mt-4 w-full py-2.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
                 >
                   Generate Translation
                 </button>
               </div>
 
-              {/* Right: Preview */}
-              <div className="p-4 overflow-y-auto bg-gray-50">
+              {/* Right: Preview - Layout-preserved for HTML templates */}
+              <div className="p-4 overflow-y-auto bg-gray-100">
                 <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-sm font-bold text-gray-700">Preview</h4>
+                  <h4 className="text-sm font-bold text-gray-700">Document Preview</h4>
                   {filledResult && (
                     <button
-                      onClick={() => copyToClipboard(filledResult)}
+                      onClick={() => copyToClipboard(isHTMLContent(filledResult)
+                        ? (() => { const d = document.createElement('div'); d.innerHTML = filledResult; return d.textContent || d.innerText; })()
+                        : filledResult
+                      )}
                       className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
                     >
-                      Copy to Clipboard
+                      Copy Text
                     </button>
                   )}
                 </div>
-                <div className="bg-white border rounded-lg p-4 text-sm font-mono whitespace-pre-wrap min-h-[300px]">
-                  {filledResult ? (
-                    filledResult
-                  ) : (
-                    <div className="text-gray-400">
-                      {renderHighlightedContent(selectedTemplate.template_content)}
-                    </div>
-                  )}
-                </div>
+                {isHTMLContent(selectedTemplate.template_content) ? (
+                  /* HTML template - show with document styling */
+                  <div className="bg-white border rounded-lg shadow-sm overflow-auto" style={{ maxHeight: 'calc(90vh - 220px)' }}>
+                    <div
+                      className="mx-auto"
+                      style={{
+                        maxWidth: '700px',
+                        padding: '40px 50px',
+                        minHeight: '500px',
+                        fontFamily: "'Georgia', 'Times New Roman', serif",
+                        fontSize: '12px',
+                        lineHeight: '1.6',
+                      }}
+                      dangerouslySetInnerHTML={{
+                        __html: filledResult || selectedTemplate.template_content
+                      }}
+                    />
+                    <style>{`
+                      .template-field { background: #fef08a !important; border: 1px dashed #ca8a04 !important; padding: 1px 4px !important; border-radius: 3px !important; font-weight: 600 !important; }
+                    `}</style>
+                  </div>
+                ) : (
+                  /* Plain text template */
+                  <div className="bg-white border rounded-lg p-4 text-sm font-mono whitespace-pre-wrap min-h-[300px]">
+                    {filledResult ? (
+                      filledResult
+                    ) : (
+                      <div className="text-gray-400">
+                        {renderHighlightedContent(selectedTemplate.template_content)}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
