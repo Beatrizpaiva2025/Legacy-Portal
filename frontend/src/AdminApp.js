@@ -22764,6 +22764,11 @@ const SettingsPage = ({ adminKey }) => {
   const [creatingBackup, setCreatingBackup] = useState(false);
   const [exportProgress, setExportProgress] = useState('');
 
+  // Connected Users State
+  const [connectedUsers, setConnectedUsers] = useState([]);
+  const [loadingConnectedUsers, setLoadingConnectedUsers] = useState(false);
+  const [connectedUsersFilter, setConnectedUsersFilter] = useState('all'); // 'all', 'pm', 'translator', 'online'
+
   // Restore Points State
   const [restorePoints, setRestorePoints] = useState([]);
   const [loadingRestorePoints, setLoadingRestorePoints] = useState(false);
@@ -22799,6 +22804,67 @@ const SettingsPage = ({ adminKey }) => {
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, [adminKey]);
+
+  // Fetch connected users
+  const fetchConnectedUsers = async () => {
+    setLoadingConnectedUsers(true);
+    try {
+      const response = await axios.get(`${API}/admin/connected-users?admin_key=${adminKey}`);
+      setConnectedUsers(response.data.users || []);
+    } catch (err) {
+      console.error('Failed to fetch connected users:', err);
+    } finally {
+      setLoadingConnectedUsers(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchConnectedUsers();
+    const interval = setInterval(fetchConnectedUsers, 60000); // Refresh every 60s
+    return () => clearInterval(interval);
+  }, [adminKey]);
+
+  const filteredConnectedUsers = connectedUsers.filter(u => {
+    if (connectedUsersFilter === 'all') return true;
+    if (connectedUsersFilter === 'online') return u.is_online;
+    return u.role === connectedUsersFilter;
+  });
+
+  const formatLoginTime = (isoString) => {
+    if (!isoString) return 'Never';
+    try {
+      const date = new Date(isoString);
+      return date.toLocaleString('en-US', {
+        timeZone: 'America/New_York',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch {
+      return isoString;
+    }
+  };
+
+  const getTimeSinceLogin = (isoString) => {
+    if (!isoString) return '';
+    try {
+      const now = new Date();
+      const loginDate = new Date(isoString);
+      const diffMs = now - loginDate;
+      const diffMins = Math.floor(diffMs / 60000);
+      if (diffMins < 1) return 'Just now';
+      if (diffMins < 60) return `${diffMins}m ago`;
+      const diffHours = Math.floor(diffMins / 60);
+      if (diffHours < 24) return `${diffHours}h ago`;
+      const diffDays = Math.floor(diffHours / 24);
+      return `${diffDays}d ago`;
+    } catch {
+      return '';
+    }
+  };
 
   const connectQuickBooks = async () => {
     setQbConnecting(true);
@@ -23155,6 +23221,140 @@ const SettingsPage = ({ adminKey }) => {
   return (
     <div className="p-4 space-y-6">
       <h1 className="text-lg font-bold text-blue-600 mb-4">SETTINGS</h1>
+
+      {/* Connected Users Section */}
+      <div className="bg-white rounded shadow overflow-hidden">
+        <div className="p-4 border-b bg-gray-50">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-bold text-gray-800">Connected Users</h2>
+              <p className="text-xs text-gray-500 mt-1">
+                PMs and Translators - login activity and status
+                {connectedUsers.length > 0 && (
+                  <span className="ml-2 text-blue-600">
+                    ({connectedUsers.filter(u => u.is_online).length} online / {connectedUsers.length} total)
+                  </span>
+                )}
+              </p>
+            </div>
+            <button
+              onClick={fetchConnectedUsers}
+              disabled={loadingConnectedUsers}
+              className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300"
+            >
+              {loadingConnectedUsers ? 'Refreshing...' : 'Refresh'}
+            </button>
+          </div>
+          {/* Filter tabs */}
+          <div className="flex space-x-2 mt-3">
+            {[
+              { key: 'all', label: 'All' },
+              { key: 'online', label: 'Online' },
+              { key: 'pm', label: 'Project Managers' },
+              { key: 'translator', label: 'Translators' }
+            ].map(filter => (
+              <button
+                key={filter.key}
+                onClick={() => setConnectedUsersFilter(filter.key)}
+                className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                  connectedUsersFilter === filter.key
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-100'
+                }`}
+              >
+                {filter.label}
+                {filter.key === 'online' && (
+                  <span className="ml-1">({connectedUsers.filter(u => u.is_online).length})</span>
+                )}
+                {filter.key === 'pm' && (
+                  <span className="ml-1">({connectedUsers.filter(u => u.role === 'pm').length})</span>
+                )}
+                {filter.key === 'translator' && (
+                  <span className="ml-1">({connectedUsers.filter(u => u.role === 'translator').length})</span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {loadingConnectedUsers && connectedUsers.length === 0 ? (
+          <div className="p-8 text-center text-xs text-gray-500">Loading connected users...</div>
+        ) : filteredConnectedUsers.length === 0 ? (
+          <div className="p-8 text-center text-xs text-gray-500">
+            {connectedUsersFilter === 'online' ? 'No users currently online' : 'No users found'}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-gray-100">
+                  <th className="text-left p-3 font-semibold text-gray-700 border-b">Status</th>
+                  <th className="text-left p-3 font-semibold text-gray-700 border-b">Name</th>
+                  <th className="text-left p-3 font-semibold text-gray-700 border-b">Email</th>
+                  <th className="text-left p-3 font-semibold text-gray-700 border-b">Role</th>
+                  <th className="text-left p-3 font-semibold text-gray-700 border-b">Type</th>
+                  <th className="text-left p-3 font-semibold text-gray-700 border-b">Last Login</th>
+                  <th className="text-left p-3 font-semibold text-gray-700 border-b">Region / IP</th>
+                  <th className="text-left p-3 font-semibold text-gray-700 border-b">Languages</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredConnectedUsers.map((user, idx) => (
+                  <tr key={user.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 transition-colors`}>
+                    <td className="p-3 border-b">
+                      <div className="flex items-center">
+                        <span className={`w-2.5 h-2.5 rounded-full ${user.is_online ? 'bg-green-500' : 'bg-gray-300'}`}></span>
+                        <span className={`ml-2 text-[10px] font-medium ${user.is_online ? 'text-green-700' : 'text-gray-500'}`}>
+                          {user.is_online ? 'Online' : 'Offline'}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="p-3 border-b font-medium text-gray-800">{user.name}</td>
+                    <td className="p-3 border-b text-gray-600">{user.email}</td>
+                    <td className="p-3 border-b">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+                        user.role === 'pm'
+                          ? 'bg-purple-100 text-purple-700'
+                          : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        {user.role === 'pm' ? 'Project Manager' : 'Translator'}
+                      </span>
+                    </td>
+                    <td className="p-3 border-b">
+                      {user.role === 'translator' && (
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+                          user.translator_type === 'in-house'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {user.translator_type === 'in-house' ? 'In-House' : 'Contractor'}
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-3 border-b">
+                      <div className="text-gray-800">{formatLoginTime(user.last_login_at)}</div>
+                      {user.last_login_at && (
+                        <div className="text-[10px] text-gray-400">{getTimeSinceLogin(user.last_login_at)}</div>
+                      )}
+                    </td>
+                    <td className="p-3 border-b">
+                      <div className="text-gray-600">{user.last_login_ip || '-'}</div>
+                      {user.region && (
+                        <div className="text-[10px] text-gray-400">{user.region}</div>
+                      )}
+                    </td>
+                    <td className="p-3 border-b">
+                      <div className="text-gray-600 max-w-[200px] truncate" title={user.language_pairs || ''}>
+                        {user.language_pairs || '-'}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* Permissions Matrix */}
       <div className="bg-white rounded shadow overflow-hidden">
