@@ -8611,12 +8611,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             </div>
           )}
 
-          {/* Assigned Projects/Files Section - For Translators and Admin */}
-          {(user?.role === 'translator' || user?.role === 'admin') && (
+          {/* Assigned Projects/Files Section - For Translators, Admin, and PM */}
+          {(user?.role === 'translator' || user?.role === 'admin' || user?.role === 'pm') && (
             <div className={`bg-gradient-to-r ${user?.role === 'admin' ? 'from-blue-50 to-blue-100 border-blue-200' : 'from-blue-50 to-blue-100 border-blue-200'} border rounded-lg p-4`}>
               <div className="flex items-center justify-between mb-3">
                 <h3 className={`text-sm font-bold ${user?.role === 'admin' ? 'text-blue-800' : 'text-blue-800'}`}>
-                  {user?.role === 'admin' ? '👑 Admin Translation' : '📋 My Assigned Work'}
+                  {user?.role === 'admin' ? '👑 Admin Translation' : user?.role === 'pm' ? '🎯 PM Translation' : '📋 My Assigned Work'}
                 </h3>
                 <div className="flex items-center gap-2">
                   {/* Admin/PM: Add Document Button */}
