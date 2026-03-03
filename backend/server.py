@@ -21801,16 +21801,28 @@ Referência de traduções aprovadas - verifique se foram seguidas:
         elif request.original_image:
             all_images = [request.original_image]
 
+        # Helper to detect image media type from raw bytes
+        def detect_image_media_type(image_bytes: bytes) -> str:
+            if image_bytes[:8] == b'\x89PNG\r\n\x1a\n':
+                return "image/png"
+            elif image_bytes[:2] == b'\xff\xd8':
+                return "image/jpeg"
+            elif image_bytes[:4] == b'GIF8':
+                return "image/gif"
+            elif image_bytes[:4] == b'RIFF' and image_bytes[8:12] == b'WEBP':
+                return "image/webp"
+            return "image/jpeg"  # Default to JPEG
+
         # Helper to compress a single image for proofreading
         def compress_proofread_image(raw_b64: str) -> tuple:
-            media_type = "image/png"
             try:
                 image_bytes = base64.b64decode(raw_b64)
+                media_type = detect_image_media_type(image_bytes)
                 compressed_bytes, final_media_type = compress_image_for_claude_api(image_bytes, media_type)
                 return base64.b64encode(compressed_bytes).decode('utf-8'), final_media_type
             except Exception as e:
                 logger.warning(f"Could not compress image, using original: {str(e)}")
-                return raw_b64, media_type
+                return raw_b64, "image/jpeg"
 
         # Build the message content based on whether we have images or just text
         if all_images:
