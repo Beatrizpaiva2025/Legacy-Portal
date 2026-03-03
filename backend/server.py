@@ -22229,6 +22229,38 @@ async def convert_pdf_to_images(request: PDFToImageRequest, admin_key: str):
 
 # ==================== TRANSLATION TEMPLATES ====================
 
+@api_router.post("/admin/translation-templates/extract-text")
+async def extract_text_for_template(file: UploadFile = File(...), admin_key: str = Form(...)):
+    """Upload a document (DOCX/PDF) and extract its text for template creation."""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    user_role = user_info.get("role", "")
+    is_in_house = user_role == "translator" and user_info.get("translator_type") == "in_house"
+    if user_role not in ["admin", "pm"] and not is_in_house:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+
+    file_extension = file.filename.split('.')[-1].lower() if file.filename else ''
+    if file_extension not in ['pdf', 'docx', 'doc', 'txt']:
+        raise HTTPException(status_code=400, detail="Unsupported file type. Use PDF, DOCX, DOC, or TXT.")
+
+    try:
+        extracted_text = await extract_text_from_file(file)
+        if not extracted_text or len(extracted_text.strip()) < 5:
+            raise HTTPException(status_code=422, detail="Could not extract text from the uploaded document.")
+
+        return {
+            "status": "success",
+            "filename": file.filename,
+            "text": extracted_text.strip()
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error extracting text for template: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error processing document: {str(e)}")
+
 @api_router.get("/admin/translation-templates")
 async def get_translation_templates(admin_key: str, document_type: Optional[str] = None, source_language: Optional[str] = None):
     """Get all translation templates. Accessible by admin, pm, and in-house translators."""
