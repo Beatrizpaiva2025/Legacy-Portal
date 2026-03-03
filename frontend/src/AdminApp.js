@@ -1670,6 +1670,41 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
   const [newFieldLabel, setNewFieldLabel] = useState('');
   const [textSelection, setTextSelection] = useState(null);
 
+  // File upload for template creation
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState('');
+
+  const handleFileUploadForTemplate = async (file) => {
+    if (!file) return;
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['pdf', 'docx', 'doc', 'txt'].includes(ext)) {
+      showToast('Please upload a PDF, DOCX, DOC, or TXT file', 'error');
+      return;
+    }
+    setUploadingFile(true);
+    setUploadedFileName(file.name);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('admin_key', adminKey);
+      const response = await axios.post(`${API}/admin/translation-templates/extract-text`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      const extractedText = response.data.text || '';
+      setCreateForm(prev => ({
+        ...prev,
+        template_content: extractedText,
+        original_content: extractedText
+      }));
+      showToast(`Text extracted from "${file.name}" successfully!`, 'success');
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'Error extracting text from document', 'error');
+      setUploadedFileName('');
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
   const fetchTemplates = async () => {
     try {
       setLoading(true);
@@ -1860,6 +1895,7 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
               });
               setSelectionMode(false);
               setTextSelection(null);
+              setUploadedFileName('');
               setShowCreateModal(true);
             }}
             className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
@@ -1980,30 +2016,108 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
                 </div>
               </div>
 
-              {/* Step 2: Paste Translation */}
+              {/* Step 2: Upload Document or Paste Translation */}
               <div>
                 <label className="block text-xs text-gray-600 mb-1">
-                  Paste your completed translation below *
+                  Upload a document or paste text *
                 </label>
-                <p className="text-[10px] text-gray-400 mb-2">
-                  Paste the full translated text from a real document. You will then select variable parts to turn into fillable fields.
-                </p>
-                {!selectionMode ? (
-                  <textarea
-                    value={createForm.template_content}
-                    onChange={(e) => {
-                      setCreateForm({...createForm, template_content: e.target.value, original_content: e.target.value});
-                    }}
-                    className="w-full px-3 py-2 border rounded text-sm font-mono"
-                    rows="10"
-                    placeholder="Paste the full translated document text here..."
-                  />
-                ) : (
-                  <div
-                    className="w-full px-3 py-2 border-2 border-blue-300 rounded text-sm font-mono bg-blue-50 min-h-[200px] whitespace-pre-wrap select-text cursor-text"
-                    onMouseUp={handleTextSelect}
-                  >
-                    {renderHighlightedContent(createForm.template_content)}
+
+                {/* Upload area - shown when no content yet */}
+                {!createForm.template_content && !uploadingFile && (
+                  <div>
+                    <div
+                      className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-blue-400 hover:bg-blue-50/50 transition-colors cursor-pointer"
+                      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (e.dataTransfer.files?.[0]) handleFileUploadForTemplate(e.dataTransfer.files[0]);
+                      }}
+                      onClick={() => document.getElementById('template-file-upload')?.click()}
+                    >
+                      <input
+                        id="template-file-upload"
+                        type="file"
+                        className="hidden"
+                        accept=".pdf,.docx,.doc,.txt"
+                        onChange={(e) => {
+                          if (e.target.files?.[0]) handleFileUploadForTemplate(e.target.files[0]);
+                          e.target.value = '';
+                        }}
+                      />
+                      <svg className="w-10 h-10 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                      <p className="text-sm font-medium text-gray-700 mb-1">Upload translated document</p>
+                      <p className="text-xs text-gray-500 mb-2">Drag & drop or click to browse</p>
+                      <p className="text-[10px] text-gray-400">PDF, DOCX, DOC, TXT</p>
+                    </div>
+                    <div className="flex items-center gap-3 my-3">
+                      <div className="flex-1 border-t border-gray-200" />
+                      <span className="text-xs text-gray-400">or paste text manually</span>
+                      <div className="flex-1 border-t border-gray-200" />
+                    </div>
+                    <textarea
+                      value={createForm.template_content}
+                      onChange={(e) => {
+                        setCreateForm({...createForm, template_content: e.target.value, original_content: e.target.value});
+                      }}
+                      className="w-full px-3 py-2 border rounded text-sm font-mono"
+                      rows="6"
+                      placeholder="Paste the full translated document text here..."
+                    />
+                  </div>
+                )}
+
+                {/* Uploading state */}
+                {uploadingFile && (
+                  <div className="border-2 border-blue-300 bg-blue-50 rounded-xl p-8 text-center">
+                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-3"></div>
+                    <p className="text-sm font-medium text-blue-700">Extracting text from "{uploadedFileName}"...</p>
+                    <p className="text-xs text-blue-500 mt-1">This may take a few seconds</p>
+                  </div>
+                )}
+
+                {/* Content loaded - show text and allow editing/selection */}
+                {createForm.template_content && !uploadingFile && (
+                  <div>
+                    {uploadedFileName && (
+                      <div className="flex items-center gap-2 mb-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                        <svg className="w-4 h-4 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span className="text-xs text-green-700">Text extracted from <strong>{uploadedFileName}</strong></span>
+                        <button
+                          onClick={() => {
+                            setCreateForm(prev => ({...prev, template_content: '', original_content: ''}));
+                            setUploadedFileName('');
+                            setSelectionMode(false);
+                            setTextSelection(null);
+                          }}
+                          className="ml-auto text-xs text-gray-500 hover:text-red-500"
+                        >
+                          Clear & re-upload
+                        </button>
+                      </div>
+                    )}
+                    {!selectionMode ? (
+                      <textarea
+                        value={createForm.template_content}
+                        onChange={(e) => {
+                          setCreateForm({...createForm, template_content: e.target.value, original_content: createForm.original_content || e.target.value});
+                        }}
+                        className="w-full px-3 py-2 border rounded text-sm font-mono"
+                        rows="12"
+                        placeholder="Edit the text if needed..."
+                      />
+                    ) : (
+                      <div
+                        className="w-full px-3 py-2 border-2 border-blue-300 rounded text-sm font-mono bg-blue-50 min-h-[200px] whitespace-pre-wrap select-text cursor-text"
+                        onMouseUp={handleTextSelect}
+                      >
+                        {renderHighlightedContent(createForm.template_content)}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -8503,12 +8617,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             </div>
           )}
 
-          {/* Assigned Projects/Files Section - For Translators and Admin */}
-          {(user?.role === 'translator' || user?.role === 'admin') && (
+          {/* Assigned Projects/Files Section - For Translators, Admin, and PM */}
+          {(user?.role === 'translator' || user?.role === 'admin' || user?.role === 'pm') && (
             <div className={`bg-gradient-to-r ${user?.role === 'admin' ? 'from-blue-50 to-blue-100 border-blue-200' : 'from-blue-50 to-blue-100 border-blue-200'} border rounded-lg p-4`}>
               <div className="flex items-center justify-between mb-3">
                 <h3 className={`text-sm font-bold ${user?.role === 'admin' ? 'text-blue-800' : 'text-blue-800'}`}>
-                  {user?.role === 'admin' ? '👑 Admin Translation' : '📋 My Assigned Work'}
+                  {user?.role === 'admin' ? '👑 Admin Translation' : user?.role === 'pm' ? '🎯 PM Translation' : '📋 My Assigned Work'}
                 </h3>
                 <div className="flex items-center gap-2">
                   {/* Admin/PM: Add Document Button */}
