@@ -15327,8 +15327,72 @@ async def admin_save_translation(order_id: str, data: TranslationData, admin_key
     if destination != "save" and data.translation_html:
         try:
             order_number = order.get("order_number", "Translation")
-            doc_filename = f"{order_number}_Translation.html"
-            doc_base64 = base64.b64encode(data.translation_html.encode('utf-8')).decode('utf-8')
+
+            # For finalize_admin: convert HTML to PDF before saving
+            if destination == "finalize_admin":
+                import fitz  # PyMuPDF
+                from bs4 import BeautifulSoup
+
+                doc_filename = f"{order_number}_Translation.pdf"
+                doc_content_type = "application/pdf"
+
+                pdf_doc = fitz.open()
+                page_width = 612   # US Letter
+                page_height = 792
+                margin = 72
+                blue_color = (0.11, 0.27, 0.53)
+                gray_color = (0.4, 0.4, 0.4)
+
+                source_lang = data.source_language or "Portuguese"
+                target_lang = data.target_language or "English"
+
+                def draw_translation_header(pg):
+                    pg.draw_rect(fitz.Rect(50, 40, page_width - 50, 43), color=blue_color, fill=blue_color)
+                    pg.insert_text((page_width/2 - 60, 30), "Legacy Translations", fontsize=12, fontname="helv", color=blue_color)
+                    pg.insert_text((page_width/2 - 50, 60), "TRANSLATION", fontsize=12, fontname="helvB", color=blue_color)
+                    pg.insert_text((page_width/2 - 100, 80), f"Order: {order_number} | {source_lang} → {target_lang}", fontsize=9, fontname="helv", color=gray_color)
+
+                # Parse HTML and extract text content
+                soup = BeautifulSoup(data.translation_html, 'html.parser')
+                for script in soup(["script", "style"]):
+                    script.decompose()
+                text_content = soup.get_text(separator='\n')
+                lines = [line.strip() for line in text_content.split('\n') if line.strip()]
+
+                # Create first page with header
+                page = pdf_doc.new_page(width=page_width, height=page_height)
+                y_position = 100
+                draw_translation_header(page)
+
+                # Render text content line by line with page breaks
+                for line in lines:
+                    if y_position > page_height - margin:
+                        page = pdf_doc.new_page(width=page_width, height=page_height)
+                        draw_translation_header(page)
+                        y_position = 100
+
+                    max_chars = 85
+                    while len(line) > max_chars:
+                        page.insert_text((margin, y_position), line[:max_chars], fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
+                        y_position += 14
+                        line = line[max_chars:]
+                        if y_position > page_height - margin:
+                            page = pdf_doc.new_page(width=page_width, height=page_height)
+                            draw_translation_header(page)
+                            y_position = 100
+
+                    if line:
+                        page.insert_text((margin, y_position), line, fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
+                        y_position += 14
+
+                pdf_bytes = pdf_doc.tobytes()
+                pdf_doc.close()
+                doc_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
+                logger.info(f"Converted translation HTML to PDF for finalize_admin: {doc_filename}")
+            else:
+                doc_filename = f"{order_number}_Translation.html"
+                doc_content_type = "text/html"
+                doc_base64 = base64.b64encode(data.translation_html.encode('utf-8')).decode('utf-8')
 
             # Remove only workspace/translator-generated translated documents
             # PM and admin file uploads must be preserved
@@ -15344,7 +15408,7 @@ async def admin_save_translation(order_id: str, data: TranslationData, admin_key
                 "filename": doc_filename,
                 "data": doc_base64,
                 "file_data": doc_base64,
-                "content_type": "text/html",
+                "content_type": doc_content_type,
                 "source": "translated_document",
                 "uploaded_by": "workspace",
                 "uploaded_at": datetime.utcnow()
