@@ -8275,6 +8275,68 @@ async def get_suspicious_users(admin_key: str):
         logger.error(f"Error getting suspicious users: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to get suspicious users")
 
+@api_router.get("/admin/connected-users")
+async def get_connected_users(admin_key: str):
+    """Get all PMs and translators with their login info and region"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin", "pm"]:
+            is_valid = True
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        users = await db.admin_users.find(
+            {"role": {"$in": ["pm", "translator"]}, "is_active": {"$ne": False}}
+        ).to_list(200)
+
+        connected_users = []
+        for u in users:
+            last_login_at = u.get("last_login_at")
+            last_login_str = ""
+            if last_login_at:
+                try:
+                    if hasattr(last_login_at, 'isoformat'):
+                        last_login_str = last_login_at.isoformat()
+                    else:
+                        last_login_str = str(last_login_at)
+                except Exception:
+                    last_login_str = str(last_login_at) if last_login_at else ""
+
+            # Check if user has an active token (currently connected)
+            is_online = False
+            for token, info in active_admin_tokens.items():
+                if info.get("user_id") == u.get("id"):
+                    is_online = True
+                    break
+
+            # Get region from IP using ip_history or last_login_ip
+            region = ""
+            last_ip = u.get("last_login_ip", "")
+
+            connected_users.append({
+                "id": u.get("id", ""),
+                "name": u.get("name", ""),
+                "email": u.get("email", ""),
+                "role": u.get("role", ""),
+                "is_online": is_online,
+                "last_login_at": last_login_str,
+                "last_login_ip": last_ip,
+                "region": region,
+                "language_pairs": u.get("language_pairs", ""),
+                "translator_type": u.get("translator_type", "contractor"),
+            })
+
+        # Sort: online users first, then by last login
+        connected_users.sort(key=lambda x: (not x["is_online"], x["last_login_at"] or ""), reverse=False)
+        connected_users.sort(key=lambda x: not x["is_online"])
+
+        return {"users": connected_users, "total": len(connected_users)}
+    except Exception as e:
+        logger.error(f"Error getting connected users: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get connected users")
+
 # ==================== TRANSLATOR SUBMISSIONS ====================
 
 @api_router.post("/admin/translations/submit")
