@@ -9499,6 +9499,13 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
             order_dict["quickbooks_invoice_id"] = quickbooks_invoice_id
             order_dict["quickbooks_invoice_number"] = quickbooks_invoice_number
 
+        # Mark any abandoned quote as recovered for this client
+        if order.client_email:
+            try:
+                await _mark_abandoned_quote_recovered(order.client_email, order.order_number)
+            except Exception as e:
+                logger.error(f"Failed to mark abandoned quote as recovered: {str(e)}")
+
         # Auto-generate partner invoice for this order
         partner_invoice_id = None
         try:
@@ -10404,6 +10411,13 @@ async def admin_create_manual_order(project_data: ManualProjectCreate, admin_key
                 doc_record["data"] = doc_data
 
             await db.order_documents.insert_one(doc_record)
+
+        # Mark any abandoned quote as recovered for this customer
+        if project_data.client_email:
+            try:
+                await _mark_abandoned_quote_recovered(project_data.client_email, order_number)
+            except Exception as e:
+                logger.error(f"Failed to mark abandoned quote as recovered: {str(e)}")
 
         # Send to Make webhook for QuickBooks invoice if requested
         if project_data.create_invoice and not project_data.payment_received:
@@ -23973,6 +23987,12 @@ async def create_customer_order(order_data: CustomerOrderCreate, token: str):
         except Exception as e:
             logger.error(f"Failed to send order emails: {str(e)}")
 
+        # Mark any abandoned quote as recovered for this customer
+        try:
+            await _mark_abandoned_quote_recovered(customer["email"], order.order_number)
+        except Exception as e:
+            logger.error(f"Failed to mark abandoned quote as recovered: {str(e)}")
+
         return {
             "status": "success",
             "message": "Order created successfully",
@@ -24740,6 +24760,27 @@ async def _execute_followup_processing():
     # Process abandoned quotes
     for quote in abandoned_quotes:
         try:
+            # Cross-reference: check if an order already exists for this email
+            customer_email = quote.get("email", "")
+            if customer_email:
+                existing_order = await db.translation_orders.find_one({
+                    "client_email": {"$regex": f"^{re.escape(customer_email)}$", "$options": "i"},
+                    "payment_status": {"$in": ["paid", "pending"]},
+                    "translation_status": {"$ne": "Quote"}
+                })
+                if existing_order:
+                    await db.abandoned_quotes.update_one(
+                        {"id": quote["id"]},
+                        {"$set": {
+                            "status": "recovered",
+                            "recovered_at": datetime.utcnow(),
+                            "recovered_order_number": existing_order.get("order_number", "")
+                        }}
+                    )
+                    logger.info(f"Auto-recovered abandoned quote {quote['id']} - order found for {customer_email}")
+                    results["marked_recovered"] = results.get("marked_recovered", 0) + 1
+                    continue
+
             created_at = quote.get("created_at", now)
             if isinstance(created_at, str):
                 created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00')).replace(tzinfo=None)
