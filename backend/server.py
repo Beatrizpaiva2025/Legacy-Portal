@@ -5129,7 +5129,7 @@ async def create_payment_intent(request: InlinePaymentRequest):
         intent_params = {
             "amount": int(amount_in_currency * 100),  # Stripe expects cents
             "currency": currency,
-            "payment_method_types": ["card"],
+            "automatic_payment_methods": {"enabled": True},
             "metadata": {
                 "quote_id": request.quote_id,
                 "customer_email": customer_email or "",
