@@ -24505,7 +24505,7 @@ async def save_abandoned_quote(quote_data: AbandonedQuoteCreate):
                 <p>Ready to proceed? Click the button below to complete your order:</p>
 
                 <div style="text-align: center; margin: 30px 0;">
-                    <a href="{frontend_url}/#/customer" style="background: #0d9488; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Complete Your Order</a>
+                    <a href="{frontend_url}?resume={quote.id}#/customer" style="background: #0d9488; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Complete Your Order</a>
                 </div>
 
                 <p style="color: #666; font-size: 14px;">If you have any questions, please reply to this email or contact us at info@legacytranslations.com</p>
@@ -24524,6 +24524,51 @@ async def save_abandoned_quote(quote_data: AbandonedQuoteCreate):
     except Exception as e:
         logger.error(f"Error saving abandoned quote: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to save quote")
+
+@api_router.get("/abandoned-quotes/resume/{quote_id}")
+async def resume_abandoned_quote(quote_id: str):
+    """Get abandoned quote data for pre-filling the order form"""
+    try:
+        quote = await db.abandoned_quotes.find_one({"id": quote_id})
+        if not quote:
+            raise HTTPException(status_code=404, detail="Quote not found")
+
+        # Get document info for pre-filling
+        documents = []
+        document_ids = quote.get("document_ids", [])
+        if document_ids:
+            docs = await db.documents.find({"id": {"$in": document_ids}}).to_list(20)
+            for doc in docs:
+                documents.append({
+                    "documentId": doc.get("id"),
+                    "fileName": doc.get("filename", doc.get("original_filename", "document")),
+                    "wordCount": doc.get("word_count", 0),
+                    "fileSize": doc.get("file_size", 0),
+                })
+
+        return {
+            "id": quote["id"],
+            "email": quote.get("email", ""),
+            "name": quote.get("name", ""),
+            "service_type": quote.get("service_type", "certified"),
+            "translate_from": quote.get("translate_from", ""),
+            "translate_to": quote.get("translate_to", ""),
+            "word_count": quote.get("word_count", 0),
+            "urgency": quote.get("urgency", "no"),
+            "total_price": quote.get("total_price", 0),
+            "document_ids": document_ids,
+            "documents": documents,
+            "files_info": quote.get("files_info", []),
+            "discount_code": quote.get("discount_code"),
+            "status": quote.get("status", "abandoned"),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error resuming abandoned quote: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to load quote")
+
 
 @api_router.get("/admin/abandoned-quotes")
 async def get_abandoned_quotes(admin_key: str, status: Optional[str] = None):
@@ -24914,7 +24959,9 @@ async def process_quote_followups(admin_key: str):
 
 async def send_followup_email(email: str, name: str, quote: dict, reminder_number: int, discount_percent: int, discount_code: str = None):
     """Send follow-up email for abandoned quote"""
-    frontend_url = os.environ.get('FRONTEND_URL', 'https://portal.legacytranslations.com/#/customer')
+    base_url = os.environ.get('FRONTEND_URL', 'https://portal.legacytranslations.com')
+    quote_id = quote.get("id", "")
+    frontend_url = f"{base_url}?resume={quote_id}#/customer" if quote_id else f"{base_url}/#/customer"
     total_price = quote.get("total_price", 0)
     discounted_price = total_price * (1 - discount_percent / 100) if discount_percent > 0 else total_price
 
@@ -24989,7 +25036,9 @@ async def send_followup_email(email: str, name: str, quote: dict, reminder_numbe
 
 async def send_quote_order_followup_email(email: str, name: str, order: dict, reminder_number: int, discount_percent: int, discount_code: str = None):
     """Send follow-up email for quote order"""
-    frontend_url = os.environ.get('FRONTEND_URL', 'https://portal.legacytranslations.com/#/customer')
+    base_url = os.environ.get('FRONTEND_URL', 'https://portal.legacytranslations.com')
+    quote_id = order.get("id", "")
+    frontend_url = f"{base_url}?resume={quote_id}#/customer" if quote_id else f"{base_url}/#/customer"
     total_price = order.get("total_price", order.get("base_price", 0))
     discounted_price = total_price * (1 - discount_percent / 100) if discount_percent > 0 else total_price
     order_number = order.get("order_number", "N/A")

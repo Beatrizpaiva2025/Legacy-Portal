@@ -1276,6 +1276,56 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
     }
   }, [t]);
 
+  // Resume abandoned quote from email link (?resume=quote_id)
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const resumeId = urlParams.get('resume');
+    if (!resumeId) return;
+
+    const loadAbandonedQuote = async () => {
+      try {
+        const response = await axios.get(`${API}/abandoned-quotes/resume/${resumeId}`);
+        const q = response.data;
+
+        // Pre-fill form data
+        setGuestName(q.name || '');
+        setGuestEmail(q.email || '');
+        setFormData(prev => ({
+          ...prev,
+          service_type: q.service_type || 'certified',
+          translate_from: q.translate_from || prev.translate_from,
+          translate_to: q.translate_to || prev.translate_to,
+          urgency: q.urgency || 'no',
+        }));
+        setWordCount(q.word_count || 0);
+
+        // Restore uploaded files references
+        if (q.documents && q.documents.length > 0) {
+          setUploadedFiles(q.documents.map(doc => ({
+            documentId: doc.documentId,
+            fileName: doc.fileName,
+            wordCount: doc.wordCount,
+            fileSize: doc.fileSize,
+          })));
+        }
+
+        // Apply discount code if one was generated
+        if (q.discount_code) {
+          setDiscountCode(q.discount_code);
+        }
+
+        setFormRestored(true);
+
+        // Clean URL but keep hash
+        window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
+      } catch (err) {
+        console.error('Failed to resume quote:', err);
+      }
+    };
+
+    loadAbandonedQuote();
+  }, []);
+
   // Restore form data on component mount (for when user navigates away and comes back)
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
