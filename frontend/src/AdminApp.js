@@ -16489,10 +16489,6 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [replyContent, setReplyContent] = useState('');
   const [sendingReply, setSendingReply] = useState(false);
 
-  // Archived messages state
-  const [archivedPartnerMessages, setArchivedPartnerMessages] = useState([]);
-  const [archivedTranslatorMessages, setArchivedTranslatorMessages] = useState([]);
-
   // QuickBooks state
   const [qbConnected, setQbConnected] = useState(false);
   const [qbSyncing, setQbSyncing] = useState({});
@@ -17829,68 +17825,6 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       setShowTranslatorInbox(false);
     } catch (err) {
       console.error('Failed to dismiss all translator messages:', err);
-    }
-  };
-
-  // Archive partner message
-  const archivePartnerMessage = async (messageId) => {
-    try {
-      await axios.put(`${API}/admin/partner-messages/${messageId}/archive?admin_key=${adminKey}`);
-      fetchPartnerMessages();
-      fetchArchivedMessages();
-    } catch (err) {
-      console.error('Failed to archive partner message:', err);
-      showToast('Error archiving message');
-    }
-  };
-
-  // Archive translator message
-  const archiveTranslatorMessage = async (messageId) => {
-    try {
-      await axios.put(`${API}/translator/messages/${messageId}/archive?admin_key=${adminKey}`);
-      fetchTranslatorInbox();
-      fetchArchivedMessages();
-    } catch (err) {
-      console.error('Failed to archive translator message:', err);
-      showToast('Error archiving message');
-    }
-  };
-
-  // Unarchive partner message
-  const unarchivePartnerMessage = async (messageId) => {
-    try {
-      await axios.put(`${API}/admin/partner-messages/${messageId}/unarchive?admin_key=${adminKey}`);
-      fetchPartnerMessages();
-      fetchArchivedMessages();
-    } catch (err) {
-      console.error('Failed to unarchive message:', err);
-    }
-  };
-
-  // Unarchive translator message
-  const unarchiveTranslatorMessage = async (messageId) => {
-    try {
-      await axios.put(`${API}/translator/messages/${messageId}/unarchive?admin_key=${adminKey}`);
-      fetchTranslatorInbox();
-      fetchArchivedMessages();
-    } catch (err) {
-      console.error('Failed to unarchive message:', err);
-    }
-  };
-
-  // Fetch archived messages
-  const fetchArchivedMessages = async () => {
-    try {
-      if (isAdmin) {
-        const partnerRes = await axios.get(`${API}/admin/partner-messages?admin_key=${adminKey}&archived=true`);
-        setArchivedPartnerMessages(partnerRes.data.messages || []);
-      }
-      if (isAdmin || isPM) {
-        const translatorRes = await axios.get(`${API}/admin/translator-messages?admin_key=${adminKey}&archived=true`);
-        setArchivedTranslatorMessages(translatorRes.data.messages || []);
-      }
-    } catch (err) {
-      console.error('Failed to fetch archived messages:', err);
     }
   };
 
@@ -39357,6 +39291,197 @@ function AdminApp() {
     }
   }, [activeTab, adminKey]);
 
+  // ---- Global message state for notification bar ----
+  const isAdmin = user?.role === 'admin';
+  const isPM = user?.role === 'pm';
+
+  const [partnerMessages, setPartnerMessages] = useState([]);
+  const [translatorInbox, setTranslatorInbox] = useState([]);
+  const [archivedPartnerMessages, setArchivedPartnerMessages] = useState([]);
+  const [archivedTranslatorMessages, setArchivedTranslatorMessages] = useState([]);
+  const [replyingToMessage, setReplyingToMessage] = useState(null);
+  const [replyContent, setReplyContent] = useState('');
+  const [sendingReply, setSendingReply] = useState(false);
+  const [replyingToTranslatorMsg, setReplyingToTranslatorMsg] = useState(null);
+  const [translatorReplyContent, setTranslatorReplyContent] = useState('');
+  const [sendingTranslatorMessage, setSendingTranslatorMessage] = useState(false);
+
+  const fetchPartnerMessagesGlobal = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/partner-messages?admin_key=${adminKey}`);
+      setPartnerMessages(response.data.messages || []);
+    } catch (err) {
+      console.error('Failed to fetch partner messages:', err);
+    }
+  };
+
+  const fetchTranslatorInboxGlobal = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/translator-messages?admin_key=${adminKey}`);
+      setTranslatorInbox(response.data.messages || []);
+    } catch (err) {
+      console.error('Failed to fetch translator inbox:', err);
+    }
+  };
+
+  const markPartnerMessageRead = async (messageId) => {
+    try {
+      await axios.put(`${API}/admin/partner-messages/${messageId}/read?admin_key=${adminKey}`);
+      fetchPartnerMessagesGlobal();
+    } catch (err) {
+      console.error('Failed to mark message as read:', err);
+    }
+  };
+
+  const markTranslatorInboxMessageRead = async (messageId) => {
+    try {
+      await axios.put(`${API}/translator/messages/${messageId}/read?admin_key=${adminKey}`);
+      fetchTranslatorInboxGlobal();
+    } catch (err) {
+      console.error('Failed to mark translator message as read:', err);
+    }
+  };
+
+  const dismissAllPartnerMessages = async () => {
+    try {
+      const unread = partnerMessages.filter(m => !m.read);
+      await Promise.all(unread.map(m => axios.put(`${API}/admin/partner-messages/${m.id}/read?admin_key=${adminKey}`)));
+      fetchPartnerMessagesGlobal();
+    } catch (err) {
+      console.error('Failed to dismiss all partner messages:', err);
+    }
+  };
+
+  const dismissAllTranslatorInbox = async () => {
+    try {
+      const unread = translatorInbox.filter(m => !m.read);
+      await Promise.all(unread.map(m => axios.put(`${API}/translator/messages/${m.id}/read?admin_key=${adminKey}`)));
+      fetchTranslatorInboxGlobal();
+    } catch (err) {
+      console.error('Failed to dismiss all translator messages:', err);
+    }
+  };
+
+  const archivePartnerMessage = async (messageId) => {
+    try {
+      await axios.put(`${API}/admin/partner-messages/${messageId}/archive?admin_key=${adminKey}`);
+      fetchPartnerMessagesGlobal();
+      fetchArchivedMessages();
+    } catch (err) {
+      console.error('Failed to archive partner message:', err);
+      showToast('Error archiving message');
+    }
+  };
+
+  const archiveTranslatorMessage = async (messageId) => {
+    try {
+      await axios.put(`${API}/translator/messages/${messageId}/archive?admin_key=${adminKey}`);
+      fetchTranslatorInboxGlobal();
+      fetchArchivedMessages();
+    } catch (err) {
+      console.error('Failed to archive translator message:', err);
+      showToast('Error archiving message');
+    }
+  };
+
+  const unarchivePartnerMessage = async (messageId) => {
+    try {
+      await axios.put(`${API}/admin/partner-messages/${messageId}/unarchive?admin_key=${adminKey}`);
+      fetchPartnerMessagesGlobal();
+      fetchArchivedMessages();
+    } catch (err) {
+      console.error('Failed to unarchive message:', err);
+    }
+  };
+
+  const unarchiveTranslatorMessage = async (messageId) => {
+    try {
+      await axios.put(`${API}/translator/messages/${messageId}/unarchive?admin_key=${adminKey}`);
+      fetchTranslatorInboxGlobal();
+      fetchArchivedMessages();
+    } catch (err) {
+      console.error('Failed to unarchive message:', err);
+    }
+  };
+
+  const fetchArchivedMessages = async () => {
+    try {
+      if (isAdmin) {
+        const partnerRes = await axios.get(`${API}/admin/partner-messages?admin_key=${adminKey}&archived=true`);
+        setArchivedPartnerMessages(partnerRes.data.messages || []);
+      }
+      if (isAdmin || isPM) {
+        const translatorRes = await axios.get(`${API}/admin/translator-messages?admin_key=${adminKey}&archived=true`);
+        setArchivedTranslatorMessages(translatorRes.data.messages || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch archived messages:', err);
+    }
+  };
+
+  const replyToPartnerMessageGlobal = async () => {
+    if (!replyingToMessage || !replyContent.trim()) return;
+    setSendingReply(true);
+    try {
+      await axios.post(`${API}/admin/partner-messages/${replyingToMessage.id}/reply?admin_key=${adminKey}`, {
+        content: replyContent,
+        partner_email: replyingToMessage.from_partner_email,
+        partner_name: replyingToMessage.from_partner_name,
+        admin_name: user?.name || 'Admin'
+      });
+      showToast('Reply sent!');
+      setReplyingToMessage(null);
+      setReplyContent('');
+      markPartnerMessageRead(replyingToMessage.id);
+    } catch (err) {
+      console.error('Failed to reply:', err);
+      showToast('Failed to send reply.');
+    } finally {
+      setSendingReply(false);
+    }
+  };
+
+  const replyToTranslatorMessageGlobal = async () => {
+    if (!replyingToTranslatorMsg || !translatorReplyContent.trim()) return;
+    setSendingTranslatorMessage(true);
+    try {
+      await axios.post(`${API}/admin/translator-messages?admin_key=${adminKey}`, {
+        translator_id: replyingToTranslatorMsg.from_translator_id,
+        translator_name: replyingToTranslatorMsg.from_translator_name,
+        translator_email: '',
+        content: translatorReplyContent,
+        order_number: replyingToTranslatorMsg.order_number || '',
+        admin_name: user?.name || 'Admin'
+      });
+      showToast('Reply sent!');
+      markTranslatorInboxMessageRead(replyingToTranslatorMsg.id);
+      setReplyingToTranslatorMsg(null);
+      setTranslatorReplyContent('');
+    } catch (err) {
+      console.error('Failed to reply:', err);
+      showToast('Failed to send reply.');
+    } finally {
+      setSendingTranslatorMessage(false);
+    }
+  };
+
+  // Poll for messages
+  useEffect(() => {
+    if (adminKey && (isAdmin || isPM)) {
+      fetchTranslatorInboxGlobal();
+      if (isAdmin) {
+        fetchPartnerMessagesGlobal();
+      }
+      const interval = setInterval(() => {
+        fetchTranslatorInboxGlobal();
+        if (isAdmin) {
+          fetchPartnerMessagesGlobal();
+        }
+      }, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [adminKey, user]);
+
   // Navigate to translation with order
   const navigateToTranslation = (order) => {
     setSelectedOrder(order);
@@ -39637,6 +39762,87 @@ function AdminApp() {
       />
       <div className="flex-1 overflow-auto">{renderContent()}</div>
       <FloatingChatWidget adminKey={adminKey} user={user} />
+
+      {/* Reply to Partner Message Modal (Global) */}
+      {replyingToMessage && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
+            <div className="p-4 border-b flex justify-between items-center bg-yellow-500 text-white rounded-t-lg">
+              <div>
+                <h3 className="font-bold">Reply to Partner</h3>
+                <p className="text-xs opacity-80">{replyingToMessage.from_partner_name}</p>
+              </div>
+              <button onClick={() => setReplyingToMessage(null)} className="text-white hover:text-gray-200 text-xl">×</button>
+            </div>
+            <div className="p-4">
+              <div className="mb-4 p-3 bg-gray-50 rounded border">
+                <div className="text-xs text-gray-500 mb-1">Original message:</div>
+                <div className="text-sm text-gray-700">{replyingToMessage.content}</div>
+              </div>
+              <textarea
+                value={replyContent}
+                onChange={(e) => setReplyContent(e.target.value)}
+                rows="4"
+                className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
+                placeholder="Type your reply..."
+                autoFocus
+              />
+            </div>
+            <div className="p-3 border-t bg-gray-50 flex justify-end gap-2 rounded-b-lg">
+              <button onClick={() => setReplyingToMessage(null)} className="px-4 py-1.5 text-gray-600 text-sm hover:text-gray-800">Cancel</button>
+              <button
+                onClick={replyToPartnerMessageGlobal}
+                disabled={sendingReply || !replyContent.trim()}
+                className="px-4 py-1.5 bg-yellow-500 text-white rounded text-sm hover:bg-yellow-600 disabled:bg-gray-400"
+              >
+                {sendingReply ? 'Sending...' : 'Send Reply'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reply to Translator Message Modal (Global) */}
+      {replyingToTranslatorMsg && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
+            <div className="p-4 border-b flex justify-between items-center bg-blue-600 text-white rounded-t-lg">
+              <div>
+                <h3 className="font-bold">Reply to {replyingToTranslatorMsg.from_translator_name}</h3>
+                {replyingToTranslatorMsg.order_number && (
+                  <p className="text-xs opacity-80">Project: {replyingToTranslatorMsg.order_number}</p>
+                )}
+              </div>
+              <button onClick={() => setReplyingToTranslatorMsg(null)} className="text-white hover:text-gray-200 text-xl">×</button>
+            </div>
+            <div className="p-4">
+              <div className="mb-4 p-3 bg-gray-50 rounded border">
+                <div className="text-xs text-gray-500 mb-1">Original message:</div>
+                <div className="text-sm text-gray-700">{replyingToTranslatorMsg.content}</div>
+              </div>
+              <textarea
+                value={translatorReplyContent}
+                onChange={(e) => setTranslatorReplyContent(e.target.value)}
+                rows="4"
+                className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Type your reply..."
+                autoFocus
+              />
+            </div>
+            <div className="p-3 border-t bg-gray-50 flex justify-end gap-2 rounded-b-lg">
+              <button onClick={() => setReplyingToTranslatorMsg(null)} className="px-4 py-1.5 text-gray-600 text-sm hover:text-gray-800">Cancel</button>
+              <button
+                onClick={replyToTranslatorMessageGlobal}
+                disabled={sendingTranslatorMessage || !translatorReplyContent.trim()}
+                className="px-4 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:bg-gray-400"
+              >
+                {sendingTranslatorMessage ? 'Sending...' : 'Send Reply'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <ToastContainer />
     </div>
   );
