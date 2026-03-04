@@ -26738,7 +26738,7 @@ const FinancesPage = ({ adminKey }) => {
   const handleOpenCreateInvoice = async (partner) => {
     setSelectedPartnerForInvoice(partner);
     setSelectedOrdersForInvoice([]);
-    setInvoiceDueDays(30);
+    setInvoiceDueDays(partner.payment_plan === 'biweekly' ? 15 : 30);
     setInvoiceNotes('');
     setInvoiceManualDiscount('');
     setInvoiceDiscountReason('');
