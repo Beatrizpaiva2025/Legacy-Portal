@@ -9580,7 +9580,7 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
         raise HTTPException(status_code=500, detail="Failed to create order")
 
 @api_router.get("/orders")
-async def get_orders(token: str, status: Optional[str] = None):
+async def get_orders(token: str, status: Optional[str] = None, translation_filter: Optional[str] = None):
     """Get all orders for a partner"""
     try:
         partner = await get_current_partner(token)
@@ -9591,6 +9591,11 @@ async def get_orders(token: str, status: Optional[str] = None):
         query = {"partner_id": partner["id"]}
         if status:
             query["payment_status"] = status
+        if translation_filter:
+            if translation_filter == "in_progress":
+                query["translation_status"] = {"$in": ["received", "in_translation", "review"]}
+            elif translation_filter == "delivered":
+                query["translation_status"] = {"$in": ["ready", "delivered"]}
 
         orders = await db.translation_orders.find(query).sort("created_at", -1).to_list(100)
 

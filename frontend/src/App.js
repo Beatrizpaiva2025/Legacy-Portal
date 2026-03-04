@@ -964,18 +964,18 @@ const getLocalCurrency = () => {
 
 // Translation stages
 const TRANSLATION_STAGES = {
-  'received': { id: 1, name: 'Received', icon: '📥' },
-  'in_translation': { id: 2, name: 'In Translation', icon: '✍️' },
-  'review': { id: 3, name: 'Review', icon: '🔍' },
-  'ready': { id: 4, name: 'Ready', icon: '📦' },
-  'delivered': { id: 5, name: 'Final', icon: '🎉' }
+  'received': { id: 1, name: 'Received', icon: '📥', color: 'bg-gray-100 text-gray-700' },
+  'in_translation': { id: 2, name: 'In Progress', icon: '✍️', color: 'bg-blue-100 text-blue-800' },
+  'review': { id: 3, name: 'In Review', icon: '🔍', color: 'bg-yellow-100 text-yellow-800' },
+  'ready': { id: 4, name: 'Ready', icon: '📦', color: 'bg-emerald-100 text-emerald-800' },
+  'delivered': { id: 5, name: 'Delivered', icon: '✅', color: 'bg-green-100 text-green-800' }
 };
 
 // Payment status colors
 const PAYMENT_STATUS = {
-  'pending': { color: 'bg-yellow-100 text-yellow-800', label: 'Pending' },
-  'paid': { color: 'bg-green-100 text-green-800', label: 'Paid' },
-  'overdue': { color: 'bg-red-100 text-red-800', label: 'Overdue' }
+  'pending': { color: 'border border-yellow-300 text-yellow-700 bg-yellow-50', label: '💰 Pending' },
+  'paid': { color: 'border border-green-300 text-green-700 bg-green-50', label: '✅ Paid' },
+  'overdue': { color: 'border border-red-300 text-red-700 bg-red-50', label: '⚠️ Overdue' }
 };
 
 // Languages list for FROM field (all common languages)
@@ -3189,7 +3189,8 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency, refreshPart
 const OrdersPage = ({ token, currency }) => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter] = useState('all'); // payment filter
+  const [translationFilter, setTranslationFilter] = useState('all'); // translation filter
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [orderDocuments, setOrderDocuments] = useState({});
   const [loadingDocuments, setLoadingDocuments] = useState({});
@@ -3207,7 +3208,7 @@ const OrdersPage = ({ token, currency }) => {
 
   useEffect(() => {
     fetchOrders();
-  }, [filter]);
+  }, [filter, translationFilter]);
 
   const fetchOrderDocuments = async (orderId) => {
     if (orderDocuments[orderId]) return; // Already fetched
@@ -3263,7 +3264,9 @@ const OrdersPage = ({ token, currency }) => {
 
   const fetchOrders = async () => {
     try {
-      const params = filter !== 'all' ? `&status=${filter}` : '';
+      let params = '';
+      if (filter !== 'all') params += `&status=${filter}`;
+      if (translationFilter !== 'all') params += `&translation_filter=${translationFilter}`;
       const response = await axios.get(`${API}/orders?token=${token}${params}`);
       setOrders(response.data.orders || []);
     } catch (err) {
@@ -3307,7 +3310,7 @@ const OrdersPage = ({ token, currency }) => {
   const getTranslationBadge = (status) => {
     const stage = TRANSLATION_STAGES[status] || TRANSLATION_STAGES.received;
     return (
-      <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+      <span className={`px-2 py-1 rounded-full text-xs font-medium ${stage.color}`}>
         {stage.icon} {stage.name}
       </span>
     );
@@ -3324,22 +3327,57 @@ const OrdersPage = ({ token, currency }) => {
 
   return (
     <div className="p-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">My Orders</h1>
-        <div className="flex gap-2">
-          {['all', 'pending', 'paid', 'overdue'].map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-4 py-2 rounded-md text-sm font-medium ${
-                filter === f
-                  ? 'bg-teal-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              {f.charAt(0).toUpperCase() + f.slice(1)}
-            </button>
-          ))}
+      <div className="flex flex-col gap-3 mb-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-gray-800">My Orders</h1>
+        </div>
+        <div className="flex flex-wrap items-center gap-4">
+          {/* Translation Status Filter */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-medium text-gray-500 mr-1">Translation:</span>
+            {[
+              { key: 'all', label: 'All' },
+              { key: 'in_progress', label: '✍️ In Progress' },
+              { key: 'delivered', label: '✅ Delivered' }
+            ].map((f) => (
+              <button
+                key={f.key}
+                onClick={() => setTranslationFilter(f.key)}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  translationFilter === f.key
+                    ? 'bg-teal-600 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="w-px h-6 bg-gray-300"></div>
+
+          {/* Payment Status Filter */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-medium text-gray-500 mr-1">Payment:</span>
+            {[
+              { key: 'all', label: 'All' },
+              { key: 'pending', label: '💰 Pending' },
+              { key: 'paid', label: '✅ Paid' },
+              { key: 'overdue', label: '⚠️ Overdue' }
+            ].map((f) => (
+              <button
+                key={f.key}
+                onClick={() => setFilter(f.key)}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  filter === f.key
+                    ? 'bg-teal-600 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
