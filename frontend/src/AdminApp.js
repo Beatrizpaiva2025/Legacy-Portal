@@ -1411,6 +1411,161 @@ const TopBar = ({
   );
 };
 
+// ==================== MESSAGE NOTIFICATION BAR (Yellow Highlight) ====================
+const MessageNotificationBar = ({
+  partnerMessages = [],
+  translatorInbox = [],
+  onMarkPartnerRead,
+  onMarkTranslatorRead,
+  onDismissAllPartner,
+  onDismissAllTranslator,
+  onReplyPartner,
+  onReplyTranslator,
+  isAdmin,
+  isPM,
+  onArchivePartner,
+  onArchiveTranslator
+}) => {
+  const [expanded, setExpanded] = useState(false);
+  const [activeFilter, setActiveFilter] = useState('all'); // 'all', 'partner', 'translator'
+
+  const unreadPartner = partnerMessages.filter(m => !m.read && !m.archived);
+  const unreadTranslator = translatorInbox.filter(m => !m.read && !m.archived);
+  const totalUnread = (isAdmin ? unreadPartner.length : 0) + ((isAdmin || isPM) ? unreadTranslator.length : 0);
+
+  if (totalUnread === 0) return null;
+
+  const filteredMessages = [];
+  if ((activeFilter === 'all' || activeFilter === 'partner') && isAdmin) {
+    unreadPartner.forEach(m => filteredMessages.push({ ...m, _type: 'partner' }));
+  }
+  if ((activeFilter === 'all' || activeFilter === 'translator') && (isAdmin || isPM)) {
+    unreadTranslator.forEach(m => filteredMessages.push({ ...m, _type: 'translator' }));
+  }
+  filteredMessages.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  return (
+    <div className="bg-yellow-50 border-b border-yellow-200">
+      {/* Collapsed bar */}
+      <div
+        className="flex items-center justify-between px-4 py-2 cursor-pointer hover:bg-yellow-100 transition-colors"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-lg">💬</span>
+          <span className="text-xs font-bold text-yellow-800">
+            {totalUnread} unread message{totalUnread !== 1 ? 's' : ''}
+          </span>
+          <div className="flex gap-1.5">
+            {isAdmin && unreadPartner.length > 0 && (
+              <span className="text-[10px] px-2 py-0.5 bg-yellow-200 text-yellow-800 rounded-full font-medium">
+                {unreadPartner.length} Partner
+              </span>
+            )}
+            {(isAdmin || isPM) && unreadTranslator.length > 0 && (
+              <span className="text-[10px] px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full font-medium">
+                {unreadTranslator.length} Translator
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (isAdmin && unreadPartner.length > 0) onDismissAllPartner();
+              if ((isAdmin || isPM) && unreadTranslator.length > 0) onDismissAllTranslator();
+            }}
+            className="text-[10px] px-2 py-1 bg-yellow-200 text-yellow-700 rounded hover:bg-yellow-300 font-medium"
+          >
+            Mark all read
+          </button>
+          <span className="text-yellow-600 text-xs">{expanded ? '▲' : '▼'}</span>
+        </div>
+      </div>
+
+      {/* Expanded message list */}
+      {expanded && (
+        <div className="border-t border-yellow-200">
+          {/* Filter tabs */}
+          <div className="flex gap-1 px-4 py-1.5 bg-yellow-100/50">
+            {['all', ...(isAdmin ? ['partner'] : []), ...((isAdmin || isPM) ? ['translator'] : [])].map(filter => (
+              <button
+                key={filter}
+                onClick={() => setActiveFilter(filter)}
+                className={`text-[10px] px-2.5 py-0.5 rounded-full font-medium transition-colors ${
+                  activeFilter === filter
+                    ? 'bg-yellow-400 text-yellow-900'
+                    : 'bg-yellow-200/50 text-yellow-700 hover:bg-yellow-200'
+                }`}
+              >
+                {filter === 'all' ? 'All' : filter === 'partner' ? 'Partners' : 'Translators'}
+              </button>
+            ))}
+          </div>
+
+          <div className="max-h-64 overflow-y-auto">
+            {filteredMessages.map((msg) => (
+              <div
+                key={`${msg._type}-${msg.id}`}
+                className={`px-4 py-2.5 border-t border-yellow-100 hover:bg-yellow-100/50 flex items-start gap-3 ${
+                  msg._type === 'partner' ? 'border-l-2 border-l-yellow-400' : 'border-l-2 border-l-blue-400'
+                }`}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                      msg._type === 'partner' ? 'bg-yellow-200 text-yellow-800' : 'bg-blue-100 text-blue-800'
+                    }`}>
+                      {msg._type === 'partner' ? 'Partner' : 'Translator'}
+                    </span>
+                    <span className="text-xs font-medium text-gray-800 truncate">
+                      {msg._type === 'partner' ? msg.from_partner_name : msg.from_translator_name}
+                    </span>
+                    {msg.order_number && (
+                      <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">
+                        {msg.order_number}
+                      </span>
+                    )}
+                    <span className="text-[10px] text-gray-400 ml-auto flex-shrink-0">
+                      {msg.created_at ? new Date(msg.created_at).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-700 truncate">
+                    {msg.content?.length > 120 ? msg.content.substring(0, 120) + '...' : msg.content}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <button
+                    onClick={() => msg._type === 'partner' ? onReplyPartner(msg) : onReplyTranslator(msg)}
+                    className="px-2 py-1 bg-green-500 text-white rounded text-[10px] hover:bg-green-600"
+                  >
+                    Reply
+                  </button>
+                  <button
+                    onClick={() => msg._type === 'partner' ? onMarkPartnerRead(msg.id) : onMarkTranslatorRead(msg.id)}
+                    className="px-2 py-1 text-gray-500 border border-gray-300 rounded text-[10px] hover:bg-gray-100"
+                    title="Mark as read"
+                  >
+                    ✓
+                  </button>
+                  <button
+                    onClick={() => msg._type === 'partner' ? onArchivePartner(msg.id) : onArchiveTranslator(msg.id)}
+                    className="px-2 py-1 text-gray-400 border border-gray-200 rounded text-[10px] hover:bg-gray-100"
+                    title="Archive"
+                  >
+                    📥
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ==================== SEARCH BAR ====================
 const SearchBar = ({ value, onChange, placeholder }) => (
   <div className="relative">
@@ -16334,6 +16489,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [replyContent, setReplyContent] = useState('');
   const [sendingReply, setSendingReply] = useState(false);
 
+  // Archived messages state
+  const [archivedPartnerMessages, setArchivedPartnerMessages] = useState([]);
+  const [archivedTranslatorMessages, setArchivedTranslatorMessages] = useState([]);
+
   // QuickBooks state
   const [qbConnected, setQbConnected] = useState(false);
   const [qbSyncing, setQbSyncing] = useState({});
@@ -17670,6 +17829,68 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       setShowTranslatorInbox(false);
     } catch (err) {
       console.error('Failed to dismiss all translator messages:', err);
+    }
+  };
+
+  // Archive partner message
+  const archivePartnerMessage = async (messageId) => {
+    try {
+      await axios.put(`${API}/admin/partner-messages/${messageId}/archive?admin_key=${adminKey}`);
+      fetchPartnerMessages();
+      fetchArchivedMessages();
+    } catch (err) {
+      console.error('Failed to archive partner message:', err);
+      showToast('Error archiving message');
+    }
+  };
+
+  // Archive translator message
+  const archiveTranslatorMessage = async (messageId) => {
+    try {
+      await axios.put(`${API}/translator/messages/${messageId}/archive?admin_key=${adminKey}`);
+      fetchTranslatorInbox();
+      fetchArchivedMessages();
+    } catch (err) {
+      console.error('Failed to archive translator message:', err);
+      showToast('Error archiving message');
+    }
+  };
+
+  // Unarchive partner message
+  const unarchivePartnerMessage = async (messageId) => {
+    try {
+      await axios.put(`${API}/admin/partner-messages/${messageId}/unarchive?admin_key=${adminKey}`);
+      fetchPartnerMessages();
+      fetchArchivedMessages();
+    } catch (err) {
+      console.error('Failed to unarchive message:', err);
+    }
+  };
+
+  // Unarchive translator message
+  const unarchiveTranslatorMessage = async (messageId) => {
+    try {
+      await axios.put(`${API}/translator/messages/${messageId}/unarchive?admin_key=${adminKey}`);
+      fetchTranslatorInbox();
+      fetchArchivedMessages();
+    } catch (err) {
+      console.error('Failed to unarchive message:', err);
+    }
+  };
+
+  // Fetch archived messages
+  const fetchArchivedMessages = async () => {
+    try {
+      if (isAdmin) {
+        const partnerRes = await axios.get(`${API}/admin/partner-messages?admin_key=${adminKey}&archived=true`);
+        setArchivedPartnerMessages(partnerRes.data.messages || []);
+      }
+      if (isAdmin || isPM) {
+        const translatorRes = await axios.get(`${API}/admin/translator-messages?admin_key=${adminKey}&archived=true`);
+        setArchivedTranslatorMessages(translatorRes.data.messages || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch archived messages:', err);
     }
   };
 
@@ -20676,7 +20897,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                               <div>
                                 <div className="text-sm font-medium">{doc.filename || 'Document'}</div>
                                 <div className="text-[10px] text-gray-500">
-                                  {doc.source === 'manual_upload' ? 'Manual upload' : 'Partner portal'}
+                                  {doc.source === 'manual_upload' ? 'Manual upload' : doc.source === 'web_upload' ? 'Web' : 'Partner portal'}
                                   {doc.uploaded_at && ` • ${new Date(doc.uploaded_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}`}
                                 </div>
                               </div>
@@ -22757,7 +22978,8 @@ const FollowupsPage = ({ adminKey }) => {
 };
 
 // ==================== SETTINGS PAGE ====================
-const SettingsPage = ({ adminKey }) => {
+const SettingsPage = ({ adminKey, archivedPartnerMessages = [], archivedTranslatorMessages = [], onUnarchivePartner, onUnarchiveTranslator, onFetchArchived }) => {
+  const [showArchivedMessages, setShowArchivedMessages] = useState(false);
   const [exportingProjects, setExportingProjects] = useState(false);
   const [exportingClients, setExportingClients] = useState(false);
   const [exportingTranslators, setExportingTranslators] = useState(false);
@@ -23331,6 +23553,83 @@ const SettingsPage = ({ adminKey }) => {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Archived Conversations Section */}
+      <div className="bg-white rounded shadow overflow-hidden">
+        <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+          <div>
+            <h2 className="text-sm font-bold text-gray-800">Archived Conversations</h2>
+            <p className="text-xs text-gray-500 mt-1">View and manage archived partner and translator messages</p>
+          </div>
+          <button
+            onClick={() => {
+              setShowArchivedMessages(!showArchivedMessages);
+              if (!showArchivedMessages && onFetchArchived) onFetchArchived();
+            }}
+            className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded text-xs hover:bg-gray-300"
+          >
+            {showArchivedMessages ? 'Hide' : 'Show'} Archived ({archivedPartnerMessages.length + archivedTranslatorMessages.length})
+          </button>
+        </div>
+        {showArchivedMessages && (
+          <div className="p-4">
+            {archivedPartnerMessages.length === 0 && archivedTranslatorMessages.length === 0 ? (
+              <div className="text-center text-gray-400 text-xs py-6">No archived conversations</div>
+            ) : (
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {archivedPartnerMessages.map((msg) => (
+                  <div key={`partner-${msg.id}`} className="flex items-center justify-between p-3 bg-yellow-50 rounded border border-yellow-100">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="text-[10px] px-1.5 py-0.5 bg-yellow-200 text-yellow-800 rounded font-medium">Partner</span>
+                        <span className="text-xs font-medium text-gray-800 truncate">{msg.from_partner_name}</span>
+                        {msg.order_number && (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">{msg.order_number}</span>
+                        )}
+                        <span className="text-[10px] text-gray-400">
+                          {msg.created_at ? new Date(msg.created_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' }) : ''}
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-600 truncate">{msg.content?.substring(0, 100)}</div>
+                    </div>
+                    <button
+                      onClick={() => onUnarchivePartner && onUnarchivePartner(msg.id)}
+                      className="ml-2 px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50 flex-shrink-0"
+                      title="Unarchive"
+                    >
+                      📤 Restore
+                    </button>
+                  </div>
+                ))}
+                {archivedTranslatorMessages.map((msg) => (
+                  <div key={`translator-${msg.id}`} className="flex items-center justify-between p-3 bg-blue-50 rounded border border-blue-100">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded font-medium">Translator</span>
+                        <span className="text-xs font-medium text-gray-800 truncate">{msg.from_translator_name}</span>
+                        {msg.order_number && (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">{msg.order_number}</span>
+                        )}
+                        <span className="text-[10px] text-gray-400">
+                          {msg.created_at ? new Date(msg.created_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' }) : ''}
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-600 truncate">{msg.content?.substring(0, 100)}</div>
+                    </div>
+                    <button
+                      onClick={() => onUnarchiveTranslator && onUnarchiveTranslator(msg.id)}
+                      className="ml-2 px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50 flex-shrink-0"
+                      title="Unarchive"
+                    >
+                      📤 Restore
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Export & Backup Section */}
@@ -36377,7 +36676,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                           <div>
                             <div className="text-sm font-medium">{doc.filename || 'Document'}</div>
                             <div className="text-[10px] text-gray-500">
-                              {doc.source === 'manual_upload' ? 'Manual upload' : 'Partner portal'}
+                              {doc.source === 'manual_upload' ? 'Manual upload' : doc.source === 'web_upload' ? 'Web' : 'Partner portal'}
                               {(doc.assigned_translator_name || fileAssignments[doc.id]?.name) && (
                                 <span className="ml-1 text-blue-600"> — {fileAssignments[doc.id]?.name || doc.assigned_translator_name}</span>
                               )}
@@ -39222,7 +39521,14 @@ function AdminApp() {
           : <div className="p-6 text-center text-gray-500">Access denied</div>;
       case 'settings':
         return userRole === 'admin'
-          ? <SettingsPage adminKey={adminKey} />
+          ? <SettingsPage
+              adminKey={adminKey}
+              archivedPartnerMessages={archivedPartnerMessages}
+              archivedTranslatorMessages={archivedTranslatorMessages}
+              onUnarchivePartner={unarchivePartnerMessage}
+              onUnarchiveTranslator={unarchiveTranslatorMessage}
+              onFetchArchived={fetchArchivedMessages}
+            />
           : <div className="p-6 text-center text-gray-500">Access denied</div>;
       case 'sales-control':
         return userRole === 'admin'
@@ -39314,6 +39620,20 @@ function AdminApp() {
         currentTheme={currentTheme}
         setCurrentTheme={setCurrentTheme}
         theme={theme}
+      />
+      <MessageNotificationBar
+        partnerMessages={partnerMessages}
+        translatorInbox={translatorInbox}
+        onMarkPartnerRead={markPartnerMessageRead}
+        onMarkTranslatorRead={markTranslatorInboxMessageRead}
+        onDismissAllPartner={dismissAllPartnerMessages}
+        onDismissAllTranslator={dismissAllTranslatorInbox}
+        onReplyPartner={(msg) => { setReplyingToMessage(msg); setReplyContent(''); }}
+        onReplyTranslator={(msg) => { setReplyingToTranslatorMsg(msg); setTranslatorReplyContent(''); }}
+        isAdmin={isAdmin}
+        isPM={isPM}
+        onArchivePartner={archivePartnerMessage}
+        onArchiveTranslator={archiveTranslatorMessage}
       />
       <div className="flex-1 overflow-auto">{renderContent()}</div>
       <FloatingChatWidget adminKey={adminKey} user={user} />

@@ -18597,13 +18597,14 @@ async def mark_conversation_read(conversation_id: str, token: str):
 
 
 @api_router.get("/admin/partner-messages")
-async def get_admin_partner_messages(admin_key: str, limit: int = 50):
+async def get_admin_partner_messages(admin_key: str, limit: int = 50, archived: bool = False):
     """Get messages sent by partners - admin only"""
     user_info = await validate_admin_or_user_token(admin_key)
     if not user_info or user_info.get("role") not in ["admin"]:
         raise HTTPException(status_code=401, detail="Invalid admin key or insufficient permissions")
 
-    messages = await db.partner_messages.find().sort("created_at", -1).limit(limit).to_list(limit)
+    query = {"archived": True} if archived else {"archived": {"$ne": True}}
+    messages = await db.partner_messages.find(query).sort("created_at", -1).limit(limit).to_list(limit)
 
     for msg in messages:
         msg["_id"] = str(msg["_id"])
@@ -18623,6 +18624,42 @@ async def mark_partner_message_read(message_id: str, admin_key: str):
     result = await db.partner_messages.update_one(
         {"id": message_id},
         {"$set": {"read": True, "read_at": datetime.utcnow()}}
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    return {"status": "success"}
+
+
+@api_router.put("/admin/partner-messages/{message_id}/archive")
+async def archive_partner_message(message_id: str, admin_key: str):
+    """Archive a partner message - admin only"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info or user_info.get("role") not in ["admin"]:
+        raise HTTPException(status_code=401, detail="Invalid admin key or insufficient permissions")
+
+    result = await db.partner_messages.update_one(
+        {"id": message_id},
+        {"$set": {"archived": True, "read": True, "archived_at": datetime.utcnow()}}
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    return {"status": "success"}
+
+
+@api_router.put("/admin/partner-messages/{message_id}/unarchive")
+async def unarchive_partner_message(message_id: str, admin_key: str):
+    """Unarchive a partner message - admin only"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info or user_info.get("role") not in ["admin"]:
+        raise HTTPException(status_code=401, detail="Invalid admin key or insufficient permissions")
+
+    result = await db.partner_messages.update_one(
+        {"id": message_id},
+        {"$set": {"archived": False}, "$unset": {"archived_at": ""}}
     )
 
     if result.modified_count == 0:
@@ -19311,7 +19348,7 @@ async def send_translator_message(request: TranslatorMessageRequest, admin_key: 
 
 
 @api_router.get("/admin/translator-messages")
-async def get_translator_messages_for_admin(admin_key: str, recipient_id: str = None):
+async def get_translator_messages_for_admin(admin_key: str, recipient_id: str = None, archived: bool = False):
     """Get messages from translators to this admin/PM"""
     is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
     if not is_valid:
@@ -19326,6 +19363,10 @@ async def get_translator_messages_for_admin(admin_key: str, recipient_id: str = 
     query = {"type": "translator_to_admin"}
     if recipient_id:
         query["to_recipient_id"] = recipient_id
+    if archived:
+        query["archived"] = True
+    else:
+        query["archived"] = {"$ne": True}
 
     messages = await db.translator_messages.find(query).sort("created_at", -1).limit(50).to_list(50)
 
@@ -19335,6 +19376,50 @@ async def get_translator_messages_for_admin(admin_key: str, recipient_id: str = 
             msg["created_at"] = msg["created_at"].isoformat()
 
     return {"messages": messages}
+
+
+@api_router.put("/translator/messages/{message_id}/archive")
+async def archive_translator_message(message_id: str, admin_key: str):
+    """Archive a translator message"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await db.admin_users.find_one({"token": admin_key, "is_active": {"$ne": False}})
+        if user and user.get("role") in ("admin", "pm"):
+            is_valid = True
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    result = await db.translator_messages.update_one(
+        {"id": message_id},
+        {"$set": {"archived": True, "read": True, "archived_at": datetime.utcnow()}}
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    return {"status": "success"}
+
+
+@api_router.put("/translator/messages/{message_id}/unarchive")
+async def unarchive_translator_message(message_id: str, admin_key: str):
+    """Unarchive a translator message"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await db.admin_users.find_one({"token": admin_key, "is_active": {"$ne": False}})
+        if user and user.get("role") in ("admin", "pm"):
+            is_valid = True
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    result = await db.translator_messages.update_one(
+        {"id": message_id},
+        {"$set": {"archived": False}, "$unset": {"archived_at": ""}}
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    return {"status": "success"}
 
 
 @api_router.get("/admin/translator-messages/conversations")
@@ -19764,6 +19849,11 @@ async def admin_get_order_documents(order_id: str, admin_key: str):
     # Get documents from order_documents collection (manual uploads)
     docs_manual = await db.order_documents.find({"order_id": order_id}).to_list(50)
 
+    # Determine document source based on order's revenue_source
+    order = await db.translation_orders.find_one({"id": order_id})
+    revenue_source = order.get("revenue_source", "website") if order else "website"
+    upload_source = "partner_upload" if revenue_source == "partner" else "web_upload"
+
     all_docs = []
 
     for doc in docs_main:
@@ -19773,7 +19863,7 @@ async def admin_get_order_documents(order_id: str, admin_key: str):
             "filename": doc.get("filename"),
             "content_type": doc.get("content_type", "application/pdf"),
             "has_data": bool(doc.get("file_data") or doc.get("gridfs_id")),
-            "source": "partner_upload",
+            "source": upload_source,
             "assigned_translator_id": doc.get("assigned_translator_id"),
             "assigned_translator_name": doc.get("assigned_translator_name"),
             "assignment_status": doc.get("assignment_status"),
