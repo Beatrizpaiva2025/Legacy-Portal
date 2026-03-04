@@ -5111,18 +5111,22 @@ async def create_payment_checkout(request: PaymentCheckoutRequest):
         else:
             amount_in_currency = base_price_usd
 
-        # Create payment transaction record
+        # Get customer email from request or quote
+        customer_email = request.customer_email or quote.get("customer_email")
+
+        # Create payment transaction record with customer email in metadata
         transaction = PaymentTransaction(
             session_id="",  # Will be updated with Stripe session ID
             quote_id=request.quote_id,
             amount=amount_in_currency,
             currency=currency,
             payment_status="pending",
-            status="initiated"
+            status="initiated",
+            metadata={
+                "customer_email": customer_email or "",
+                "customer_name": request.customer_name or quote.get("customer_name", "")
+            }
         )
-
-        # Get customer email from request or quote
-        customer_email = request.customer_email or quote.get("customer_email")
 
         # Get payment methods for this currency
         payment_methods = currency_info["payment_methods"]
@@ -5179,6 +5183,8 @@ async def create_payment_checkout(request: PaymentCheckoutRequest):
             "transaction_id": transaction.id
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error creating payment checkout: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to create payment checkout")
@@ -5465,10 +5471,11 @@ async def get_payment_status(session_id: str):
                 }
             )
             
-            # Handle successful payment
+            # Handle successful payment - pass Stripe metadata for customer email fallback
             if new_status == 'completed':
-                await handle_successful_payment(session_id, transaction)
-        
+                stripe_metadata = checkout_session.get('metadata', {}) if isinstance(checkout_session, dict) else getattr(checkout_session, 'metadata', {}) or {}
+                await handle_successful_payment(session_id, transaction, stripe_metadata)
+
         return {
             "session_id": session_id,
             "status": new_status,
@@ -5619,6 +5626,12 @@ async def handle_successful_payment(session_id: str, payment_transaction: dict, 
     """Handle successful payment by creating order, sending confirmation emails, and creating Protemos project"""
 
     try:
+        # Duplicate protection: check if an order already exists for this session
+        existing_order = await db.translation_orders.find_one({"session_id": session_id})
+        if existing_order:
+            logger.info(f"Order already exists for session {session_id} (order {existing_order.get('order_number')}), skipping duplicate creation")
+            return
+
         # Get quote details
         quote_id = payment_transaction.get("quote_id")
         quote = await db.translation_quotes.find_one({"id": quote_id})
@@ -5627,9 +5640,17 @@ async def handle_successful_payment(session_id: str, payment_transaction: dict, 
             logger.error(f"Quote not found for payment session: {session_id}")
             return
 
-        # Get customer info from quote, with Stripe metadata as fallback
+        # Get customer info from quote, payment transaction metadata, and Stripe metadata as fallbacks
         stripe_metadata = stripe_metadata or {}
-        customer_email = quote.get("customer_email") or stripe_metadata.get("customer_email")
+        tx_metadata = payment_transaction.get("metadata", {}) or {}
+        customer_email = (
+            quote.get("customer_email")
+            or stripe_metadata.get("customer_email")
+            or tx_metadata.get("customer_email")
+            or payment_transaction.get("customer_email")
+        )
+        # Filter out empty strings
+        customer_email = customer_email if customer_email else None
         customer_name = quote.get("customer_name") or stripe_metadata.get("customer_name") or "Valued Customer"
 
         # Generate order number with P prefix (like P6377) to match admin panel format
@@ -5694,7 +5715,7 @@ async def handle_successful_payment(session_id: str, payment_transaction: dict, 
             "total_price": quote.get("total_price"),
             "client_name": customer_name,
             "customer_name": customer_name,
-            "client_email": customer_email or "contact@legacytranslations.com",
+            "client_email": customer_email or "",
             "customer_email": customer_email
         }
 
@@ -5729,6 +5750,7 @@ async def handle_successful_payment(session_id: str, payment_transaction: dict, 
         # Send confirmation email to customer (if email available)
         if customer_email:
             try:
+                logger.info(f"Sending order confirmation email to customer: {customer_email} for order {order_number}")
                 await email_service.send_order_confirmation_email(
                     customer_email,
                     order_details,
@@ -5738,7 +5760,9 @@ async def handle_successful_payment(session_id: str, payment_transaction: dict, 
             except Exception as e:
                 logger.error(f"Failed to send customer confirmation email: {str(e)}")
         else:
-            logger.warning(f"No customer email found for session {session_id} - email not sent to customer")
+            logger.warning(f"No customer email found for session {session_id} - email not sent to customer. "
+                          f"Quote customer_email: {quote.get('customer_email')}, "
+                          f"Stripe metadata customer_email: {stripe_metadata.get('customer_email', 'N/A')}")
 
         # Send confirmation email to company (always)
         try:
