@@ -9326,7 +9326,7 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
         # Auto-generate partner invoice for this order
         partner_invoice_id = None
         try:
-            # Calculate due date using partner's fixed day or default 30 days
+            # Calculate due date using partner's fixed day or payment plan
             fixed_day = partner.get("invoice_fixed_due_day")
             if fixed_day and 1 <= fixed_day <= 28:
                 now = datetime.utcnow()
@@ -9338,7 +9338,10 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
                     else:
                         inv_due_date = now.replace(month=now.month + 1, day=fixed_day, hour=23, minute=59, second=59)
             else:
-                inv_due_date = datetime.utcnow() + timedelta(days=30)
+                # Biweekly = 15 days, monthly = 30 days
+                payment_plan = partner.get("payment_plan", "monthly")
+                due_days = 15 if payment_plan == "biweekly" else 30
+                inv_due_date = datetime.utcnow() + timedelta(days=due_days)
                 fixed_day = None
 
             # Build discount details if coupon was applied
@@ -12705,7 +12708,11 @@ async def create_partner_invoice(invoice_data: PartnerInvoiceCreate, admin_key: 
                 else:
                     due_date = now.replace(month=now.month + 1, day=fixed_day, hour=23, minute=59, second=59)
         else:
-            due_date = datetime.utcnow() + timedelta(days=invoice_data.due_days)
+            # Use provided due_days, but if it's the default (30) and partner is biweekly, use 15
+            effective_due_days = invoice_data.due_days
+            if effective_due_days == 30 and partner.get("payment_plan") == "biweekly":
+                effective_due_days = 15
+            due_date = datetime.utcnow() + timedelta(days=effective_due_days)
             fixed_day = None
 
         # Get partner's effective tier for invoice
