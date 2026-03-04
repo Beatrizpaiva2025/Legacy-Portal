@@ -20676,7 +20676,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                               <div>
                                 <div className="text-sm font-medium">{doc.filename || 'Document'}</div>
                                 <div className="text-[10px] text-gray-500">
-                                  {doc.source === 'manual_upload' ? 'Manual upload' : 'Partner portal'}
+                                  {doc.source === 'manual_upload' ? 'Manual upload' : doc.source === 'web_upload' ? 'Web' : 'Partner portal'}
                                   {doc.uploaded_at && ` • ${new Date(doc.uploaded_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}`}
                                 </div>
                               </div>
@@ -36377,7 +36377,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                           <div>
                             <div className="text-sm font-medium">{doc.filename || 'Document'}</div>
                             <div className="text-[10px] text-gray-500">
-                              {doc.source === 'manual_upload' ? 'Manual upload' : 'Partner portal'}
+                              {doc.source === 'manual_upload' ? 'Manual upload' : doc.source === 'web_upload' ? 'Web' : 'Partner portal'}
                               {(doc.assigned_translator_name || fileAssignments[doc.id]?.name) && (
                                 <span className="ml-1 text-blue-600"> — {fileAssignments[doc.id]?.name || doc.assigned_translator_name}</span>
                               )}

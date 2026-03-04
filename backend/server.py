@@ -19764,6 +19764,11 @@ async def admin_get_order_documents(order_id: str, admin_key: str):
     # Get documents from order_documents collection (manual uploads)
     docs_manual = await db.order_documents.find({"order_id": order_id}).to_list(50)
 
+    # Determine document source based on order's revenue_source
+    order = await db.translation_orders.find_one({"id": order_id})
+    revenue_source = order.get("revenue_source", "website") if order else "website"
+    upload_source = "partner_upload" if revenue_source == "partner" else "web_upload"
+
     all_docs = []
 
     for doc in docs_main:
@@ -19773,7 +19778,7 @@ async def admin_get_order_documents(order_id: str, admin_key: str):
             "filename": doc.get("filename"),
             "content_type": doc.get("content_type", "application/pdf"),
             "has_data": bool(doc.get("file_data") or doc.get("gridfs_id")),
-            "source": "partner_upload",
+            "source": upload_source,
             "assigned_translator_id": doc.get("assigned_translator_id"),
             "assigned_translator_name": doc.get("assigned_translator_name"),
             "assignment_status": doc.get("assignment_status"),
