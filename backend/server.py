@@ -133,6 +133,7 @@ GRIDFS_SIZE_THRESHOLD = 0  # Always use GridFS for documents
 
 # Configure Stripe
 stripe.api_key = os.environ.get('STRIPE_API_KEY', 'sk_test_51KNwnnCZYqv7a95ovlRcZyuZtQNhfB8UgpGGjYaAxOgWgNa4V4D34m5M4hhURTK68GazMTmkJzy5V7jhC9Xya7RJ00305uur7C')
+STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY', 'pk_test_51KNwnnCZYqv7a95oJdPpRYuZfjklyMfwGMDQJVH0LtGnCE16mg0v83EcLtOv3IVlpxHkqGkqRFz2Xj8FSXQ5dFdq00rZ8wKnV')
 STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
 
 # Detect if running in test mode (test keys start with sk_test_)
@@ -5083,6 +5084,137 @@ async def get_word_count(text: str = Form(...)):
     return {"word_count": word_count, "text_length": len(text)}
 
 # Stripe Payment Integration
+
+@api_router.get("/stripe-config")
+async def get_stripe_config():
+    """Return Stripe publishable key for frontend initialization"""
+    return {"publishable_key": STRIPE_PUBLISHABLE_KEY}
+
+
+class InlinePaymentRequest(BaseModel):
+    quote_id: str
+    customer_email: Optional[str] = None
+    customer_name: Optional[str] = None
+    currency: Optional[str] = "usd"
+
+
+@api_router.post("/create-payment-intent")
+async def create_payment_intent(request: InlinePaymentRequest):
+    """Create a Stripe PaymentIntent for inline (embedded) card payment"""
+    try:
+        # Get quote
+        quote = await db.translation_quotes.find_one({"id": request.quote_id})
+        if not quote:
+            raise HTTPException(status_code=404, detail="Quote not found")
+
+        # Get currency configuration
+        currency = request.currency.lower() if request.currency else "usd"
+        if currency not in CURRENCY_CONFIG:
+            currency = "usd"
+
+        # Calculate amount in target currency
+        base_price_usd = quote["total_price"]
+        if currency != "usd":
+            rates_response = await get_exchange_rates()
+            rates = rates_response.get("rates", {"usd": 1.0, "brl": 5.0, "eur": 0.92, "gbp": 0.79})
+            exchange_rate = rates.get(currency, 1.0)
+            amount_in_currency = base_price_usd * exchange_rate
+        else:
+            amount_in_currency = base_price_usd
+
+        customer_email = request.customer_email or quote.get("customer_email")
+        customer_name = request.customer_name or quote.get("customer_name", "")
+
+        # Create PaymentIntent
+        intent_params = {
+            "amount": int(amount_in_currency * 100),  # Stripe expects cents
+            "currency": currency,
+            "payment_method_types": ["card"],
+            "metadata": {
+                "quote_id": request.quote_id,
+                "customer_email": customer_email or "",
+                "customer_name": customer_name,
+                "original_currency": "usd",
+                "original_amount": str(base_price_usd),
+                "charged_currency": currency,
+                "charged_amount": str(amount_in_currency),
+            },
+            "description": f"Translation Service - {quote.get('service_type', '').title()} ({quote.get('translate_from', '')} → {quote.get('translate_to', '')})",
+        }
+
+        if customer_email:
+            intent_params["receipt_email"] = customer_email
+
+        payment_intent = stripe.PaymentIntent.create(**intent_params)
+
+        # Create payment transaction record
+        transaction = PaymentTransaction(
+            session_id=payment_intent.id,
+            quote_id=request.quote_id,
+            amount=amount_in_currency,
+            currency=currency,
+            payment_status="pending",
+            status="initiated",
+            metadata={
+                "customer_email": customer_email or "",
+                "customer_name": customer_name,
+                "payment_type": "inline",
+            },
+        )
+        await db.payment_transactions.insert_one(transaction.dict())
+
+        return {
+            "status": "success",
+            "client_secret": payment_intent.client_secret,
+            "payment_intent_id": payment_intent.id,
+            "transaction_id": transaction.id,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating payment intent: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create payment intent")
+
+
+@api_router.post("/confirm-inline-payment")
+async def confirm_inline_payment(payment_intent_id: str = Body(..., embed=True)):
+    """Confirm an inline payment was successful and create the order"""
+    try:
+        # Verify with Stripe that payment is actually complete
+        payment_intent = stripe.PaymentIntent.retrieve(payment_intent_id)
+
+        if payment_intent.status != "succeeded":
+            raise HTTPException(status_code=400, detail="Payment not completed")
+
+        # Get transaction from database
+        transaction = await db.payment_transactions.find_one({"session_id": payment_intent_id})
+        if not transaction:
+            raise HTTPException(status_code=404, detail="Payment transaction not found")
+
+        # Check if already processed
+        if transaction.get("status") == "completed":
+            return {"status": "success", "message": "Payment already processed"}
+
+        # Update transaction status
+        await db.payment_transactions.update_one(
+            {"session_id": payment_intent_id},
+            {"$set": {"status": "completed", "payment_status": "paid", "updated_at": datetime.utcnow()}},
+        )
+
+        # Handle successful payment (create order, send emails, etc.)
+        stripe_metadata = payment_intent.get("metadata", {}) if isinstance(payment_intent, dict) else getattr(payment_intent, "metadata", {}) or {}
+        await handle_successful_payment(payment_intent_id, transaction, stripe_metadata)
+
+        return {"status": "success", "message": "Payment confirmed and order created"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error confirming inline payment: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to confirm payment")
+
+
 @api_router.post("/create-payment-checkout")
 async def create_payment_checkout(request: PaymentCheckoutRequest):
     """Create a Stripe checkout session with multi-currency support"""
@@ -5111,18 +5243,22 @@ async def create_payment_checkout(request: PaymentCheckoutRequest):
         else:
             amount_in_currency = base_price_usd
 
-        # Create payment transaction record
+        # Get customer email from request or quote
+        customer_email = request.customer_email or quote.get("customer_email")
+
+        # Create payment transaction record with customer email in metadata
         transaction = PaymentTransaction(
             session_id="",  # Will be updated with Stripe session ID
             quote_id=request.quote_id,
             amount=amount_in_currency,
             currency=currency,
             payment_status="pending",
-            status="initiated"
+            status="initiated",
+            metadata={
+                "customer_email": customer_email or "",
+                "customer_name": request.customer_name or quote.get("customer_name", "")
+            }
         )
-
-        # Get customer email from request or quote
-        customer_email = request.customer_email or quote.get("customer_email")
 
         # Get payment methods for this currency
         payment_methods = currency_info["payment_methods"]
@@ -5179,6 +5315,8 @@ async def create_payment_checkout(request: PaymentCheckoutRequest):
             "transaction_id": transaction.id
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error creating payment checkout: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to create payment checkout")
@@ -5465,10 +5603,11 @@ async def get_payment_status(session_id: str):
                 }
             )
             
-            # Handle successful payment
+            # Handle successful payment - pass Stripe metadata for customer email fallback
             if new_status == 'completed':
-                await handle_successful_payment(session_id, transaction)
-        
+                stripe_metadata = checkout_session.get('metadata', {}) if isinstance(checkout_session, dict) else getattr(checkout_session, 'metadata', {}) or {}
+                await handle_successful_payment(session_id, transaction, stripe_metadata)
+
         return {
             "session_id": session_id,
             "status": new_status,
@@ -5599,6 +5738,26 @@ async def stripe_webhook(request: Request):
                 if transaction:
                     await handle_successful_payment(session_id, transaction, metadata)
                     logger.info(f"Successfully processed payment for session: {session_id}")
+        elif event['type'] == 'payment_intent.succeeded':
+            # Handle inline PaymentIntent payments
+            payment_intent = event['data']['object']
+            pi_id = payment_intent['id']
+            metadata = payment_intent.get('metadata', {})
+            logger.info(f"Processing payment_intent.succeeded for: {pi_id}")
+
+            # Update transaction status
+            result = await db.payment_transactions.update_one(
+                {"session_id": pi_id},
+                {"$set": {"status": "completed", "payment_status": "paid", "updated_at": datetime.utcnow()}}
+            )
+
+            if result.matched_count > 0:
+                transaction = await db.payment_transactions.find_one({"session_id": pi_id})
+                if transaction:
+                    await handle_successful_payment(pi_id, transaction, metadata)
+                    logger.info(f"Successfully processed inline payment for: {pi_id}")
+            else:
+                logger.info(f"No transaction found for payment_intent {pi_id} (may be external)")
         else:
             logger.info(f"Received unhandled webhook event type: {event['type']}")
 
@@ -5619,6 +5778,12 @@ async def handle_successful_payment(session_id: str, payment_transaction: dict, 
     """Handle successful payment by creating order, sending confirmation emails, and creating Protemos project"""
 
     try:
+        # Duplicate protection: check if an order already exists for this session
+        existing_order = await db.translation_orders.find_one({"session_id": session_id})
+        if existing_order:
+            logger.info(f"Order already exists for session {session_id} (order {existing_order.get('order_number')}), skipping duplicate creation")
+            return
+
         # Get quote details
         quote_id = payment_transaction.get("quote_id")
         quote = await db.translation_quotes.find_one({"id": quote_id})
@@ -5627,9 +5792,17 @@ async def handle_successful_payment(session_id: str, payment_transaction: dict, 
             logger.error(f"Quote not found for payment session: {session_id}")
             return
 
-        # Get customer info from quote, with Stripe metadata as fallback
+        # Get customer info from quote, payment transaction metadata, and Stripe metadata as fallbacks
         stripe_metadata = stripe_metadata or {}
-        customer_email = quote.get("customer_email") or stripe_metadata.get("customer_email")
+        tx_metadata = payment_transaction.get("metadata", {}) or {}
+        customer_email = (
+            quote.get("customer_email")
+            or stripe_metadata.get("customer_email")
+            or tx_metadata.get("customer_email")
+            or payment_transaction.get("customer_email")
+        )
+        # Filter out empty strings
+        customer_email = customer_email if customer_email else None
         customer_name = quote.get("customer_name") or stripe_metadata.get("customer_name") or "Valued Customer"
 
         # Generate order number with P prefix (like P6377) to match admin panel format
@@ -5694,7 +5867,7 @@ async def handle_successful_payment(session_id: str, payment_transaction: dict, 
             "total_price": quote.get("total_price"),
             "client_name": customer_name,
             "customer_name": customer_name,
-            "client_email": customer_email or "contact@legacytranslations.com",
+            "client_email": customer_email or "",
             "customer_email": customer_email
         }
 
@@ -5729,6 +5902,7 @@ async def handle_successful_payment(session_id: str, payment_transaction: dict, 
         # Send confirmation email to customer (if email available)
         if customer_email:
             try:
+                logger.info(f"Sending order confirmation email to customer: {customer_email} for order {order_number}")
                 await email_service.send_order_confirmation_email(
                     customer_email,
                     order_details,
@@ -5738,7 +5912,9 @@ async def handle_successful_payment(session_id: str, payment_transaction: dict, 
             except Exception as e:
                 logger.error(f"Failed to send customer confirmation email: {str(e)}")
         else:
-            logger.warning(f"No customer email found for session {session_id} - email not sent to customer")
+            logger.warning(f"No customer email found for session {session_id} - email not sent to customer. "
+                          f"Quote customer_email: {quote.get('customer_email')}, "
+                          f"Stripe metadata customer_email: {stripe_metadata.get('customer_email', 'N/A')}")
 
         # Send confirmation email to company (always)
         try:
@@ -9323,6 +9499,13 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
             order_dict["quickbooks_invoice_id"] = quickbooks_invoice_id
             order_dict["quickbooks_invoice_number"] = quickbooks_invoice_number
 
+        # Mark any abandoned quote as recovered for this client
+        if order.client_email:
+            try:
+                await _mark_abandoned_quote_recovered(order.client_email, order.order_number)
+            except Exception as e:
+                logger.error(f"Failed to mark abandoned quote as recovered: {str(e)}")
+
         # Auto-generate partner invoice for this order
         partner_invoice_id = None
         try:
@@ -10231,6 +10414,13 @@ async def admin_create_manual_order(project_data: ManualProjectCreate, admin_key
                 doc_record["data"] = doc_data
 
             await db.order_documents.insert_one(doc_record)
+
+        # Mark any abandoned quote as recovered for this customer
+        if project_data.client_email:
+            try:
+                await _mark_abandoned_quote_recovered(project_data.client_email, order_number)
+            except Exception as e:
+                logger.error(f"Failed to mark abandoned quote as recovered: {str(e)}")
 
         # Send to Make webhook for QuickBooks invoice if requested
         if project_data.create_invoice and not project_data.payment_received:
@@ -23804,6 +23994,12 @@ async def create_customer_order(order_data: CustomerOrderCreate, token: str):
         except Exception as e:
             logger.error(f"Failed to send order emails: {str(e)}")
 
+        # Mark any abandoned quote as recovered for this customer
+        try:
+            await _mark_abandoned_quote_recovered(customer["email"], order.order_number)
+        except Exception as e:
+            logger.error(f"Failed to mark abandoned quote as recovered: {str(e)}")
+
         return {
             "status": "success",
             "message": "Order created successfully",
@@ -24336,7 +24532,7 @@ async def save_abandoned_quote(quote_data: AbandonedQuoteCreate):
                 <p>Ready to proceed? Click the button below to complete your order:</p>
 
                 <div style="text-align: center; margin: 30px 0;">
-                    <a href="{frontend_url}/#/customer" style="background: #0d9488; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Complete Your Order</a>
+                    <a href="{frontend_url}?resume={quote.id}#/customer" style="background: #0d9488; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Complete Your Order</a>
                 </div>
 
                 <p style="color: #666; font-size: 14px;">If you have any questions, please reply to this email or contact us at info@legacytranslations.com</p>
@@ -24355,6 +24551,51 @@ async def save_abandoned_quote(quote_data: AbandonedQuoteCreate):
     except Exception as e:
         logger.error(f"Error saving abandoned quote: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to save quote")
+
+@api_router.get("/abandoned-quotes/resume/{quote_id}")
+async def resume_abandoned_quote(quote_id: str):
+    """Get abandoned quote data for pre-filling the order form"""
+    try:
+        quote = await db.abandoned_quotes.find_one({"id": quote_id})
+        if not quote:
+            raise HTTPException(status_code=404, detail="Quote not found")
+
+        # Get document info for pre-filling
+        documents = []
+        document_ids = quote.get("document_ids", [])
+        if document_ids:
+            docs = await db.documents.find({"id": {"$in": document_ids}}).to_list(20)
+            for doc in docs:
+                documents.append({
+                    "documentId": doc.get("id"),
+                    "fileName": doc.get("filename", doc.get("original_filename", "document")),
+                    "wordCount": doc.get("word_count", 0),
+                    "fileSize": doc.get("file_size", 0),
+                })
+
+        return {
+            "id": quote["id"],
+            "email": quote.get("email", ""),
+            "name": quote.get("name", ""),
+            "service_type": quote.get("service_type", "certified"),
+            "translate_from": quote.get("translate_from", ""),
+            "translate_to": quote.get("translate_to", ""),
+            "word_count": quote.get("word_count", 0),
+            "urgency": quote.get("urgency", "no"),
+            "total_price": quote.get("total_price", 0),
+            "document_ids": document_ids,
+            "documents": documents,
+            "files_info": quote.get("files_info", []),
+            "discount_code": quote.get("discount_code"),
+            "status": quote.get("status", "abandoned"),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error resuming abandoned quote: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to load quote")
+
 
 @api_router.get("/admin/abandoned-quotes")
 async def get_abandoned_quotes(admin_key: str, status: Optional[str] = None):
@@ -24526,6 +24767,27 @@ async def _execute_followup_processing():
     # Process abandoned quotes
     for quote in abandoned_quotes:
         try:
+            # Cross-reference: check if an order already exists for this email
+            customer_email = quote.get("email", "")
+            if customer_email:
+                existing_order = await db.translation_orders.find_one({
+                    "client_email": {"$regex": f"^{re.escape(customer_email)}$", "$options": "i"},
+                    "payment_status": {"$in": ["paid", "pending"]},
+                    "translation_status": {"$ne": "Quote"}
+                })
+                if existing_order:
+                    await db.abandoned_quotes.update_one(
+                        {"id": quote["id"]},
+                        {"$set": {
+                            "status": "recovered",
+                            "recovered_at": datetime.utcnow(),
+                            "recovered_order_number": existing_order.get("order_number", "")
+                        }}
+                    )
+                    logger.info(f"Auto-recovered abandoned quote {quote['id']} - order found for {customer_email}")
+                    results["marked_recovered"] = results.get("marked_recovered", 0) + 1
+                    continue
+
             created_at = quote.get("created_at", now)
             if isinstance(created_at, str):
                 created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00')).replace(tzinfo=None)
@@ -24745,7 +25007,9 @@ async def process_quote_followups(admin_key: str):
 
 async def send_followup_email(email: str, name: str, quote: dict, reminder_number: int, discount_percent: int, discount_code: str = None):
     """Send follow-up email for abandoned quote"""
-    frontend_url = os.environ.get('FRONTEND_URL', 'https://portal.legacytranslations.com/#/customer')
+    base_url = os.environ.get('FRONTEND_URL', 'https://portal.legacytranslations.com')
+    quote_id = quote.get("id", "")
+    frontend_url = f"{base_url}?resume={quote_id}#/customer" if quote_id else f"{base_url}/#/customer"
     total_price = quote.get("total_price", 0)
     discounted_price = total_price * (1 - discount_percent / 100) if discount_percent > 0 else total_price
 
@@ -24820,7 +25084,9 @@ async def send_followup_email(email: str, name: str, quote: dict, reminder_numbe
 
 async def send_quote_order_followup_email(email: str, name: str, order: dict, reminder_number: int, discount_percent: int, discount_code: str = None):
     """Send follow-up email for quote order"""
-    frontend_url = os.environ.get('FRONTEND_URL', 'https://portal.legacytranslations.com/#/customer')
+    base_url = os.environ.get('FRONTEND_URL', 'https://portal.legacytranslations.com')
+    quote_id = order.get("id", "")
+    frontend_url = f"{base_url}?resume={quote_id}#/customer" if quote_id else f"{base_url}/#/customer"
     total_price = order.get("total_price", order.get("base_price", 0))
     discounted_price = total_price * (1 - discount_percent / 100) if discount_percent > 0 else total_price
     order_number = order.get("order_number", "N/A")

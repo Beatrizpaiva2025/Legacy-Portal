@@ -1,9 +1,97 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import axios from 'axios';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import './App.css';
 
 const API = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+
+// ==================== STRIPE INITIALIZATION ====================
+let stripePromise = null;
+const getStripePromise = async () => {
+  if (!stripePromise) {
+    try {
+      const response = await axios.get(`${API}/stripe-config`);
+      stripePromise = loadStripe(response.data.publishable_key);
+    } catch (err) {
+      console.error('Failed to load Stripe config:', err);
+    }
+  }
+  return stripePromise;
+};
+
+// Inline Card Payment Form Component (used inside Elements provider)
+const CardPaymentForm = ({ onSuccess, onError, amount, currency, t, formatPrice }) => {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [processing, setProcessing] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+
+    setProcessing(true);
+    setError('');
+
+    try {
+      const { error: submitError } = await elements.submit();
+      if (submitError) {
+        setError(submitError.message);
+        setProcessing(false);
+        return;
+      }
+
+      const { error: paymentError, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: window.location.href, // Fallback, won't normally redirect
+        },
+        redirect: 'if_required',
+      });
+
+      if (paymentError) {
+        setError(paymentError.message);
+        onError(paymentError.message);
+      } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+        // Confirm with backend
+        try {
+          await axios.post(`${API}/confirm-inline-payment`, {
+            payment_intent_id: paymentIntent.id,
+          });
+        } catch (confirmErr) {
+          console.error('Backend confirmation error (order will be created via webhook):', confirmErr);
+        }
+        onSuccess();
+      }
+    } catch (err) {
+      const msg = err.message || t.cardPaymentError;
+      setError(msg);
+      onError(msg);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <PaymentElement options={{ layout: 'tabs' }} />
+      {error && (
+        <div className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-2">
+          {error}
+        </div>
+      )}
+      <button
+        type="submit"
+        disabled={!stripe || processing}
+        className="w-full mt-4 py-3 bg-teal-600 text-white rounded-md font-semibold hover:bg-teal-700 transition-colors disabled:bg-gray-400"
+      >
+        {processing ? t.payingAmount : `${t.payNow} - ${formatPrice}`}
+      </button>
+    </form>
+  );
+};
 
 // ==================== NEW YORK TIMEZONE HELPERS ====================
 const NY_TIMEZONE = 'America/New_York';
@@ -270,6 +358,15 @@ const CUSTOMER_TRANSLATIONS = {
     invalidCoupon: 'Invalid coupon code',
     zelleAmountToPay: 'Amount to pay',
 
+    // Inline Card Payment
+    payWithCardBtn: 'Pay with Card',
+    cardPaymentSecure: 'Secure payment powered by Stripe',
+    enterCardDetails: 'Enter your card details below',
+    payNow: 'Pay Now',
+    payingAmount: 'Processing payment...',
+    cardPaymentSuccess: 'Payment successful! Your order has been confirmed. Check your email for details.',
+    cardPaymentError: 'Payment failed. Please check your card details and try again.',
+
     // Buttons
     continueToPayment: 'Continue to Payment',
     processingBtn: 'Processing...',
@@ -488,6 +585,15 @@ const CUSTOMER_TRANSLATIONS = {
     invalidCoupon: 'Código de cupón inválido',
     zelleAmountToPay: 'Monto a pagar',
 
+    // Inline Card Payment
+    payWithCardBtn: 'Pagar con Tarjeta',
+    cardPaymentSecure: 'Pago seguro con Stripe',
+    enterCardDetails: 'Ingresa los datos de tu tarjeta abajo',
+    payNow: 'Pagar Ahora',
+    payingAmount: 'Procesando pago...',
+    cardPaymentSuccess: '¡Pago exitoso! Tu pedido ha sido confirmado. Revisa tu correo para más detalles.',
+    cardPaymentError: 'El pago falló. Verifica los datos de tu tarjeta e intenta de nuevo.',
+
     // Buttons
     continueToPayment: 'Continuar al Pago',
     processingBtn: 'Procesando...',
@@ -705,6 +811,15 @@ const CUSTOMER_TRANSLATIONS = {
     enterCouponCode: 'Digite o código do cupom',
     invalidCoupon: 'Código do cupom inválido',
     zelleAmountToPay: 'Valor a pagar',
+
+    // Inline Card Payment
+    payWithCardBtn: 'Pagar com Cartão',
+    cardPaymentSecure: 'Pagamento seguro via Stripe',
+    enterCardDetails: 'Digite os dados do seu cartão abaixo',
+    payNow: 'Pagar Agora',
+    payingAmount: 'Processando pagamento...',
+    cardPaymentSuccess: 'Pagamento realizado! Seu pedido foi confirmado. Verifique seu e-mail para detalhes.',
+    cardPaymentError: 'O pagamento falhou. Verifique os dados do seu cartão e tente novamente.',
 
     // Buttons
     continueToPayment: 'Continuar para Pagamento',
@@ -1036,6 +1151,15 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
   const [pixDiscountError, setPixDiscountError] = useState('');
   const pixReceiptInputRef = useRef(null);
 
+  // Inline card payment states
+  const [showCardForm, setShowCardForm] = useState(false);
+  const [cardClientSecret, setCardClientSecret] = useState(null);
+  const [stripeInstance, setStripeInstance] = useState(null);
+  const [cardPaymentLoading, setCardPaymentLoading] = useState(false);
+  const [cardCouponCode, setCardCouponCode] = useState('');
+  const [cardDiscount, setCardDiscount] = useState(null);
+  const [cardDiscountError, setCardDiscountError] = useState('');
+
   // Support form states
   const [supportIssueType, setSupportIssueType] = useState('');
   const [supportDescription, setSupportDescription] = useState('');
@@ -1151,6 +1275,56 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, [t]);
+
+  // Resume abandoned quote from email link (?resume=quote_id)
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const resumeId = urlParams.get('resume');
+    if (!resumeId) return;
+
+    const loadAbandonedQuote = async () => {
+      try {
+        const response = await axios.get(`${API}/abandoned-quotes/resume/${resumeId}`);
+        const q = response.data;
+
+        // Pre-fill form data
+        setGuestName(q.name || '');
+        setGuestEmail(q.email || '');
+        setFormData(prev => ({
+          ...prev,
+          service_type: q.service_type || 'certified',
+          translate_from: q.translate_from || prev.translate_from,
+          translate_to: q.translate_to || prev.translate_to,
+          urgency: q.urgency || 'no',
+        }));
+        setWordCount(q.word_count || 0);
+
+        // Restore uploaded files references
+        if (q.documents && q.documents.length > 0) {
+          setUploadedFiles(q.documents.map(doc => ({
+            documentId: doc.documentId,
+            fileName: doc.fileName,
+            wordCount: doc.wordCount,
+            fileSize: doc.fileSize,
+          })));
+        }
+
+        // Apply discount code if one was generated
+        if (q.discount_code) {
+          setDiscountCode(q.discount_code);
+        }
+
+        setFormRestored(true);
+
+        // Clean URL but keep hash
+        window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
+      } catch (err) {
+        console.error('Failed to resume quote:', err);
+      }
+    };
+
+    loadAbandonedQuote();
+  }, []);
 
   // Restore form data on component mount (for when user navigates away and comes back)
   useEffect(() => {
@@ -1687,6 +1861,107 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
     }
   };
 
+  // Handle inline card payment - opens Stripe form on the same page
+  const handleCardPayment = async () => {
+    // Validate required fields
+    const errors = {};
+    if (!guestName) errors.name = t.pleaseEnterName;
+    if (!guestEmail) errors.email = t.pleaseEnterEmail;
+    if (uploadedFiles.length === 0) errors.files = t.pleaseUploadDocument;
+    if ((needsPhysicalCopy || formData.service_type === 'rmv') &&
+        (!shippingAddress.street || !shippingAddress.city || !shippingAddress.state || !shippingAddress.zipCode)) {
+      errors.shipping = t.pleaseCompleteShipping;
+    }
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      return;
+    }
+
+    setCardPaymentLoading(true);
+    setError('');
+
+    try {
+      // Step 1: Create a quote
+      const quoteData = {
+        reference: `WEB-${Date.now()}`,
+        service_type: formData.service_type,
+        translate_from: formData.translate_from,
+        translate_to: formData.translate_to,
+        word_count: wordCount,
+        urgency: formData.urgency,
+        customer_email: guestEmail,
+        customer_name: guestName,
+        notes: formData.notes,
+        document_ids: uploadedFiles.map(f => f.documentId).filter(Boolean),
+        shipping_fee: quote?.shipping_fee || 0,
+        discount_amount: quote?.discount || 0,
+        discount_code: appliedDiscount ? discountCode : null
+      };
+
+      const quoteResponse = await axios.post(`${API}/calculate-quote`, quoteData);
+      const quoteId = quoteResponse.data.id;
+
+      // Step 2: Create PaymentIntent
+      const intentResponse = await axios.post(`${API}/create-payment-intent`, {
+        quote_id: quoteId,
+        customer_email: guestEmail,
+        customer_name: guestName,
+        currency: userCurrency.currency,
+      });
+
+      // Step 3: Load Stripe and show the form
+      const stripeObj = await getStripePromise();
+      setStripeInstance(stripeObj);
+      setCardClientSecret(intentResponse.data.client_secret);
+      setShowCardForm(true);
+    } catch (err) {
+      setError(err.response?.data?.detail || t.cardPaymentError);
+    } finally {
+      setCardPaymentLoading(false);
+    }
+  };
+
+  // Handle successful inline card payment
+  const handleCardPaymentSuccess = () => {
+    setShowCardForm(false);
+    setCardClientSecret(null);
+    setSuccess(t.cardPaymentSuccess);
+    // Clear form
+    setFormData({
+      service_type: 'certified',
+      translate_from: 'Portuguese (Brazil)',
+      translate_to: 'English (USA)',
+      urgency: 'no',
+      reference: '',
+      notes: ''
+    });
+    setUploadedFiles([]);
+    setQuote(null);
+    sessionStorage.removeItem('customerOrderFormData');
+  };
+
+  // Validate card coupon code
+  const validateCardCoupon = async () => {
+    if (!cardCouponCode.trim()) {
+      setCardDiscount(null);
+      setCardDiscountError('');
+      return;
+    }
+    try {
+      const response = await axios.get(`${API}/discount-codes/validate?code=${cardCouponCode}`);
+      if (response.data.valid) {
+        setCardDiscount({ type: response.data.type, value: response.data.value });
+        setCardDiscountError('');
+      } else {
+        setCardDiscount(null);
+        setCardDiscountError(t.invalidCoupon);
+      }
+    } catch (err) {
+      setCardDiscount(null);
+      setCardDiscountError(t.invalidCoupon);
+    }
+  };
+
   // Validate Zelle coupon code
   const validateZelleCoupon = async () => {
     if (!zelleCouponCode.trim()) {
@@ -2095,7 +2370,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Form */}
         <div className="lg:col-span-2">
-          <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-sm p-6 space-y-6">
+          <form onSubmit={(e) => e.preventDefault()} className="bg-white rounded-lg shadow-sm p-6 space-y-6">
 
             {/* Contact Info - Subtle at top */}
             <div className="bg-gradient-to-r from-teal-50 to-cyan-50 p-4 rounded-lg border border-teal-100">
@@ -2519,14 +2794,10 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
               </button>
             </div>
 
-            {/* Continue to Payment Button */}
-            <button
-              type="submit"
-              disabled={submitting || uploadedFiles.length === 0 || !guestName || !guestEmail || ((needsPhysicalCopy || formData.service_type === 'rmv') && (!shippingAddress.street || !shippingAddress.city || !shippingAddress.state || !shippingAddress.zipCode))}
-              className="w-full py-3 text-white rounded-md font-semibold bg-teal-600 hover:bg-teal-700 disabled:bg-gray-400"
-            >
-              {submitting ? t.processingBtn : t.continueToPayment}
-            </button>
+            {/* Payment options are in the sidebar - scroll indicator */}
+            <div className="text-center text-sm text-gray-500 mt-4 md:hidden">
+              {t.selectPaymentMethod} &darr;
+            </div>
           </form>
         </div>
 
@@ -2620,6 +2891,67 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
                 >
                   {t.payWithZelleBtn}
                 </button>
+              </div>
+            </div>
+
+            {/* Card Payment Option - Inline Stripe */}
+            <div className="mt-3">
+              <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <svg className="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                  </svg>
+                  <span className="font-semibold text-teal-700">{t.payWithCard}</span>
+                </div>
+
+                {!showCardForm ? (
+                  <>
+                    <p className="text-sm text-teal-600 mb-3">{t.cardPaymentSecure}</p>
+                    <button
+                      type="button"
+                      onClick={handleCardPayment}
+                      disabled={cardPaymentLoading || uploadedFiles.length === 0 || !guestName || !guestEmail}
+                      className="w-full py-2 bg-teal-600 text-white rounded-md text-sm font-medium hover:bg-teal-700 transition-colors disabled:bg-gray-400"
+                    >
+                      {cardPaymentLoading ? t.processingBtn : t.payWithCardBtn}
+                    </button>
+                  </>
+                ) : (
+                  <div className="mt-2">
+                    <p className="text-sm text-teal-600 mb-3">{t.enterCardDetails}</p>
+                    {cardClientSecret && stripeInstance && (
+                      <Elements
+                        stripe={stripeInstance}
+                        options={{
+                          clientSecret: cardClientSecret,
+                          appearance: {
+                            theme: 'stripe',
+                            variables: {
+                              colorPrimary: '#0d9488',
+                              borderRadius: '6px',
+                            },
+                          },
+                        }}
+                      >
+                        <CardPaymentForm
+                          onSuccess={handleCardPaymentSuccess}
+                          onError={(msg) => setError(msg)}
+                          amount={quote?.total_price || 0}
+                          currency={userCurrency.currency}
+                          t={t}
+                          formatPrice={formatLocalPrice(quote?.total_price || 0)}
+                        />
+                      </Elements>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => { setShowCardForm(false); setCardClientSecret(null); }}
+                      className="w-full mt-2 py-2 text-gray-500 text-sm hover:text-gray-700 transition-colors"
+                    >
+                      {t.cancel}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
