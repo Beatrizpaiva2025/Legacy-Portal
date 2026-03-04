@@ -133,6 +133,7 @@ GRIDFS_SIZE_THRESHOLD = 0  # Always use GridFS for documents
 
 # Configure Stripe
 stripe.api_key = os.environ.get('STRIPE_API_KEY', 'sk_test_51KNwnnCZYqv7a95ovlRcZyuZtQNhfB8UgpGGjYaAxOgWgNa4V4D34m5M4hhURTK68GazMTmkJzy5V7jhC9Xya7RJ00305uur7C')
+STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY', 'pk_test_51KNwnnCZYqv7a95oJdPpRYuZfjklyMfwGMDQJVH0LtGnCE16mg0v83EcLtOv3IVlpxHkqGkqRFz2Xj8FSXQ5dFdq00rZ8wKnV')
 STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
 
 # Detect if running in test mode (test keys start with sk_test_)
@@ -5083,6 +5084,137 @@ async def get_word_count(text: str = Form(...)):
     return {"word_count": word_count, "text_length": len(text)}
 
 # Stripe Payment Integration
+
+@api_router.get("/stripe-config")
+async def get_stripe_config():
+    """Return Stripe publishable key for frontend initialization"""
+    return {"publishable_key": STRIPE_PUBLISHABLE_KEY}
+
+
+class InlinePaymentRequest(BaseModel):
+    quote_id: str
+    customer_email: Optional[str] = None
+    customer_name: Optional[str] = None
+    currency: Optional[str] = "usd"
+
+
+@api_router.post("/create-payment-intent")
+async def create_payment_intent(request: InlinePaymentRequest):
+    """Create a Stripe PaymentIntent for inline (embedded) card payment"""
+    try:
+        # Get quote
+        quote = await db.translation_quotes.find_one({"id": request.quote_id})
+        if not quote:
+            raise HTTPException(status_code=404, detail="Quote not found")
+
+        # Get currency configuration
+        currency = request.currency.lower() if request.currency else "usd"
+        if currency not in CURRENCY_CONFIG:
+            currency = "usd"
+
+        # Calculate amount in target currency
+        base_price_usd = quote["total_price"]
+        if currency != "usd":
+            rates_response = await get_exchange_rates()
+            rates = rates_response.get("rates", {"usd": 1.0, "brl": 5.0, "eur": 0.92, "gbp": 0.79})
+            exchange_rate = rates.get(currency, 1.0)
+            amount_in_currency = base_price_usd * exchange_rate
+        else:
+            amount_in_currency = base_price_usd
+
+        customer_email = request.customer_email or quote.get("customer_email")
+        customer_name = request.customer_name or quote.get("customer_name", "")
+
+        # Create PaymentIntent
+        intent_params = {
+            "amount": int(amount_in_currency * 100),  # Stripe expects cents
+            "currency": currency,
+            "payment_method_types": ["card"],
+            "metadata": {
+                "quote_id": request.quote_id,
+                "customer_email": customer_email or "",
+                "customer_name": customer_name,
+                "original_currency": "usd",
+                "original_amount": str(base_price_usd),
+                "charged_currency": currency,
+                "charged_amount": str(amount_in_currency),
+            },
+            "description": f"Translation Service - {quote.get('service_type', '').title()} ({quote.get('translate_from', '')} → {quote.get('translate_to', '')})",
+        }
+
+        if customer_email:
+            intent_params["receipt_email"] = customer_email
+
+        payment_intent = stripe.PaymentIntent.create(**intent_params)
+
+        # Create payment transaction record
+        transaction = PaymentTransaction(
+            session_id=payment_intent.id,
+            quote_id=request.quote_id,
+            amount=amount_in_currency,
+            currency=currency,
+            payment_status="pending",
+            status="initiated",
+            metadata={
+                "customer_email": customer_email or "",
+                "customer_name": customer_name,
+                "payment_type": "inline",
+            },
+        )
+        await db.payment_transactions.insert_one(transaction.dict())
+
+        return {
+            "status": "success",
+            "client_secret": payment_intent.client_secret,
+            "payment_intent_id": payment_intent.id,
+            "transaction_id": transaction.id,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating payment intent: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create payment intent")
+
+
+@api_router.post("/confirm-inline-payment")
+async def confirm_inline_payment(payment_intent_id: str = Body(..., embed=True)):
+    """Confirm an inline payment was successful and create the order"""
+    try:
+        # Verify with Stripe that payment is actually complete
+        payment_intent = stripe.PaymentIntent.retrieve(payment_intent_id)
+
+        if payment_intent.status != "succeeded":
+            raise HTTPException(status_code=400, detail="Payment not completed")
+
+        # Get transaction from database
+        transaction = await db.payment_transactions.find_one({"session_id": payment_intent_id})
+        if not transaction:
+            raise HTTPException(status_code=404, detail="Payment transaction not found")
+
+        # Check if already processed
+        if transaction.get("status") == "completed":
+            return {"status": "success", "message": "Payment already processed"}
+
+        # Update transaction status
+        await db.payment_transactions.update_one(
+            {"session_id": payment_intent_id},
+            {"$set": {"status": "completed", "payment_status": "paid", "updated_at": datetime.utcnow()}},
+        )
+
+        # Handle successful payment (create order, send emails, etc.)
+        stripe_metadata = payment_intent.get("metadata", {}) if isinstance(payment_intent, dict) else getattr(payment_intent, "metadata", {}) or {}
+        await handle_successful_payment(payment_intent_id, transaction, stripe_metadata)
+
+        return {"status": "success", "message": "Payment confirmed and order created"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error confirming inline payment: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to confirm payment")
+
+
 @api_router.post("/create-payment-checkout")
 async def create_payment_checkout(request: PaymentCheckoutRequest):
     """Create a Stripe checkout session with multi-currency support"""
@@ -5606,6 +5738,26 @@ async def stripe_webhook(request: Request):
                 if transaction:
                     await handle_successful_payment(session_id, transaction, metadata)
                     logger.info(f"Successfully processed payment for session: {session_id}")
+        elif event['type'] == 'payment_intent.succeeded':
+            # Handle inline PaymentIntent payments
+            payment_intent = event['data']['object']
+            pi_id = payment_intent['id']
+            metadata = payment_intent.get('metadata', {})
+            logger.info(f"Processing payment_intent.succeeded for: {pi_id}")
+
+            # Update transaction status
+            result = await db.payment_transactions.update_one(
+                {"session_id": pi_id},
+                {"$set": {"status": "completed", "payment_status": "paid", "updated_at": datetime.utcnow()}}
+            )
+
+            if result.matched_count > 0:
+                transaction = await db.payment_transactions.find_one({"session_id": pi_id})
+                if transaction:
+                    await handle_successful_payment(pi_id, transaction, metadata)
+                    logger.info(f"Successfully processed inline payment for: {pi_id}")
+            else:
+                logger.info(f"No transaction found for payment_intent {pi_id} (may be external)")
         else:
             logger.info(f"Received unhandled webhook event type: {event['type']}")
 
