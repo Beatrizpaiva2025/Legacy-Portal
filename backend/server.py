@@ -366,7 +366,7 @@ class EmailService:
                 "attachments": [
                     {
                         "filename": filename,
-                        "content": file_content,  # base64 string - Resend accepts this directly
+                        "content": file_content,  # Resend accepts base64 string directly
                     }
                 ]
             }
@@ -432,13 +432,23 @@ class EmailService:
         """Internal: send a single email with attachments using base64 content directly."""
         try:
             attachment_list = []
+            total_size = 0
             for att in attachments:
-                # Pass base64 content directly - Resend API accepts base64 strings
-                # This avoids converting to list(bytes) which inflates payload 4-5x
+                b64_content = att["content"]
+                # Estimate actual file size from base64 (base64 is ~4/3 of original)
+                estimated_size = len(b64_content) * 3 / 4
+                total_size += estimated_size
                 attachment_list.append({
                     "filename": att["filename"],
-                    "content": att["content"],
+                    "content": b64_content,  # Resend accepts base64 string directly
                 })
+
+            total_size_mb = total_size / (1024 * 1024)
+            logger.info(f"Sending email with {len(attachments)} attachment(s), estimated total size: {total_size_mb:.1f}MB")
+
+            # Resend limit is 40MB total (including email HTML). Warn if close.
+            if total_size_mb > 35:
+                logger.warning(f"Attachments are very large ({total_size_mb:.1f}MB), may exceed Resend 40MB limit")
 
             params = {
                 "from": self.sender_email,
@@ -16899,6 +16909,48 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                     translator_name=translator_name
                 )
 
+                # Compress PDF to reduce file size using PyMuPDF
+                original_size_mb = len(combined_pdf_bytes) / (1024 * 1024)
+                logger.info(f"Combined PDF size before compression: {original_size_mb:.1f}MB")
+
+                try:
+                    import fitz as fitz_compress
+                    compress_doc = fitz_compress.open(stream=combined_pdf_bytes, filetype="pdf")
+                    combined_pdf_bytes = compress_doc.tobytes(
+                        garbage=4,       # Maximum garbage collection (remove unused objects)
+                        deflate=True,    # Compress streams
+                        clean=True       # Clean up content streams
+                    )
+                    compress_doc.close()
+                    compressed_size_mb = len(combined_pdf_bytes) / (1024 * 1024)
+                    logger.info(f"Combined PDF size after compression: {compressed_size_mb:.1f}MB (saved {original_size_mb - compressed_size_mb:.1f}MB)")
+                except Exception as compress_err:
+                    logger.warning(f"PDF compression failed (using uncompressed): {str(compress_err)}")
+
+                # Check if PDF is too large for email (Resend limit ~40MB, base64 adds ~33%)
+                pdf_size_mb = len(combined_pdf_bytes) / (1024 * 1024)
+                base64_size_mb = pdf_size_mb * 4 / 3  # base64 overhead
+                if base64_size_mb > 30 and include_original and original_file_data:
+                    # PDF is too large - retry WITHOUT original documents
+                    logger.warning(f"Combined PDF too large ({base64_size_mb:.1f}MB base64), regenerating WITHOUT original documents")
+                    combined_pdf_bytes, translation_page_count = await generate_combined_delivery_pdf(
+                        order=order_with_original,
+                        include_certificate=include_certificate,
+                        include_translation=include_translation,
+                        include_original=False,  # Exclude originals to reduce size
+                        include_verification=include_verification_page,
+                        certification_data=certification_data,
+                        translator_name=translator_name
+                    )
+                    # Compress the retry too
+                    try:
+                        compress_doc = fitz_compress.open(stream=combined_pdf_bytes, filetype="pdf")
+                        combined_pdf_bytes = compress_doc.tobytes(garbage=4, deflate=True, clean=True)
+                        compress_doc.close()
+                    except Exception:
+                        pass
+                    logger.info(f"Regenerated PDF without originals: {len(combined_pdf_bytes) / (1024 * 1024):.1f}MB")
+
                 # Compute PDF hash for integrity verification
                 pdf_hash = hashlib.sha256(combined_pdf_bytes).hexdigest()
 
@@ -16926,7 +16978,7 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                 }]
                 attachment_filenames = [f"Certified_Translation_{order['order_number']}.pdf"]
                 has_attachments = True
-                logger.info(f"Generated combined PDF: Certified_Translation_{order['order_number']}.pdf")
+                logger.info(f"Generated combined PDF: Certified_Translation_{order['order_number']}.pdf ({len(combined_pdf_bytes) / (1024 * 1024):.1f}MB)")
 
                 # Add additional translated documents (if more than one was uploaded)
                 if len(translated_docs) > 1:
