@@ -396,12 +396,8 @@ class EmailService:
         attachments: list of dicts with keys: content (base64), filename, content_type
 
         If total attachment size exceeds 25MB, attachments are split across multiple emails.
-        Uses base64 content directly (Resend API accepts base64 strings) instead of
-        list(bytes) which inflates payload 4-5x and causes extreme slowness.
+        Always sends ALL attachments in a single email. The Resend hard limit is 40MB.
         """
-        # Calculate total raw size of attachments
-        MAX_EMAIL_SIZE_BYTES = 25 * 1024 * 1024  # 25MB safe limit (Resend hard limit is 40MB)
-
         total_raw_size = 0
         for att in attachments:
             # base64 string is ~33% larger than raw bytes, so raw ≈ len(base64) * 3/4
@@ -409,35 +405,8 @@ class EmailService:
 
         logger.info(f"Total attachment size (estimated raw): {total_raw_size / (1024*1024):.1f}MB for {len(attachments)} file(s)")
 
-        if total_raw_size <= MAX_EMAIL_SIZE_BYTES:
-            # Send all attachments in one email
-            return await self._send_email_with_attachments_batch(to, subject, content, attachments)
-        else:
-            # Split: send each attachment in its own email
-            logger.warning(f"Attachments too large ({total_raw_size / (1024*1024):.1f}MB), splitting into separate emails")
-            sent_count = 0
-            errors = []
-            for i, att in enumerate(attachments):
-                att_size = len(att["content"]) * 3 // 4
-                if att_size > MAX_EMAIL_SIZE_BYTES:
-                    error_msg = f"Single file '{att['filename']}' is {att_size / (1024*1024):.1f}MB which exceeds the 25MB email limit"
-                    logger.error(error_msg)
-                    errors.append(error_msg)
-                    continue
-                try:
-                    part_subject = f"{subject} ({i+1}/{len(attachments)})" if len(attachments) > 1 else subject
-                    await self._send_email_with_attachments_batch(to, part_subject, content, [att])
-                    sent_count += 1
-                    logger.info(f"Sent attachment {i+1}/{len(attachments)}: {att['filename']}")
-                except Exception as e:
-                    errors.append(f"Failed to send '{att['filename']}': {str(e)}")
-                    logger.error(f"Failed to send attachment {i+1}/{len(attachments)}: {str(e)}")
-
-            if sent_count == 0:
-                raise EmailDeliveryError(f"Failed to send any attachments: {'; '.join(errors)}")
-            if errors:
-                logger.warning(f"Sent {sent_count}/{len(attachments)} attachments. Errors: {'; '.join(errors)}")
-            return True
+        # Always send all attachments in one email - never split
+        return await self._send_email_with_attachments_batch(to, subject, content, attachments)
 
     async def _send_email_with_attachments_batch(self, to: str, subject: str, content: str,
                                                    attachments: list):
