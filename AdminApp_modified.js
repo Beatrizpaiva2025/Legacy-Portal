@@ -118,19 +118,19 @@ const AdminLogin = ({ onLogin }) => {
 // ==================== COMPACT SIDEBAR ====================
 const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
   const menuItems = [
-    { id: 'projects', label: 'Projects', icon: '📋' },
-    { id: 'translators', label: 'Translators', icon: '👥' },
-    { id: 'settings', label: 'Settings', icon: '⚙️' }
+    { id: 'projects', label: 'PROJECTS', icon: '📋' },
+    { id: 'translators', label: 'TRANSLATORS', icon: '👥' },
+    { id: 'settings', label: 'SETTINGS', icon: '⚙️' }
   ];
 
   return (
-    <div className="w-48 bg-slate-800 text-white min-h-screen flex flex-col text-xs">
+    <div className="w-48 bg-slate-800 text-white min-h-screen flex flex-col">
       <div className="p-3 border-b border-slate-700">
         <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 bg-teal-500 rounded flex items-center justify-center text-sm">🌐</div>
+          <div className="w-8 h-8 bg-teal-500 rounded flex items-center justify-center text-lg">🌐</div>
           <div>
-            <div className="font-bold text-sm">Legacy Admin</div>
-            <div className="text-[10px] text-slate-400">Management</div>
+            <div className="font-bold text-lg uppercase">LEGACY ADMIN</div>
+            <div className="text-[10px] text-slate-400 uppercase">MANAGEMENT</div>
           </div>
         </div>
       </div>
@@ -147,7 +147,7 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
             }`}
           >
             <span className="mr-2">{item.icon}</span>
-            <span>{item.label}</span>
+            <span className="text-lg uppercase">{item.label}</span>
           </button>
         ))}
 
@@ -155,10 +155,10 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
           href="/admin/translation-tool"
           target="_blank"
           rel="noopener noreferrer"
-          className="w-full flex items-center px-3 py-2 text-left transition-colors text-slate-300 hover:bg-slate-700"
+          className="w-full flex items-center px-3 py-2 text-left transition-colors text-slate-300 hover:bg-slate-700 text-lg"
         >
           <span className="mr-2">✍️</span>
-          <span>Translation Tool</span>
+          <span className="uppercase">TRANSLATION TOOL</span>
           <span className="ml-auto text-[10px]">↗</span>
         </a>
       </nav>
@@ -1511,7 +1511,7 @@ const ProjectsPage = ({ adminKey }) => {
   });
 
   const getStatusLabel = (status) => {
-    const labels = { 'received': 'Quote', 'in_translation': 'In progress', 'review': 'Client Review', 'ready': 'Completed', 'delivered': 'Delivered' };
+    const labels = { 'received': 'QUOTE', 'in_translation': 'IN PROGRESS', 'review': 'CLIENT REVIEW', 'ready': 'COMPLETED', 'delivered': 'DELIVERED' };
     return labels[status] || status;
   };
 

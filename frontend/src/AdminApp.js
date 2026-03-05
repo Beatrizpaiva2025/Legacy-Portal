@@ -1169,19 +1169,19 @@ const TopBar = ({
 
   // Define menu items with role-based access
   const allMenuItems = [
-    { id: 'projects', label: 'Projects', icon: '📋', roles: ['admin', 'sales'] },
-    { id: 'new-quote', label: 'New Quote', icon: '📝', roles: ['sales'] },
-    { id: 'translation', label: 'Translation', icon: '✍️', roles: ['admin', 'pm', 'translator'] },
-    { id: 'production', label: 'Reports', icon: '📊', roles: ['admin'] },
-    { id: 'expenses', label: 'Expenses', icon: '💸', roles: ['admin'] },
-    { id: 'finances', label: 'Partners', icon: '🤝', roles: ['admin'] },
-    { id: 'followups', label: 'Follow-ups', icon: '🔔', roles: ['admin'] },
-    { id: 'pm-dashboard', label: 'PM Dashboard', icon: '🎯', roles: ['pm'] },
-    { id: 'messages', label: 'Messages', icon: '💬', roles: ['pm'] },
-    { id: 'sales-control', label: 'Sales', icon: '📈', roles: ['admin'] },
-    { id: 'users', label: 'Translators', icon: '👥', roles: ['admin'] },
-    { id: 'settings', label: 'Settings', icon: '⚙️', roles: ['admin'] },
-    { id: 'mia-bot', label: 'MIA Bot', icon: '🤖', roles: ['admin'], isExternal: true }
+    { id: 'projects', label: 'PROJECTS', icon: '📋', roles: ['admin', 'sales'] },
+    { id: 'new-quote', label: 'NEW QUOTE', icon: '📝', roles: ['sales'] },
+    { id: 'translation', label: 'TRANSLATION', icon: '✍️', roles: ['admin', 'pm', 'translator'] },
+    { id: 'production', label: 'REPORTS', icon: '📊', roles: ['admin'] },
+    { id: 'expenses', label: 'EXPENSES', icon: '💸', roles: ['admin'] },
+    { id: 'finances', label: 'PARTNERS', icon: '🤝', roles: ['admin'] },
+    { id: 'followups', label: 'FOLLOW-UPS', icon: '🔔', roles: ['admin'] },
+    { id: 'pm-dashboard', label: 'PM DASHBOARD', icon: '🎯', roles: ['pm'] },
+    { id: 'messages', label: 'MESSAGES', icon: '💬', roles: ['pm'] },
+    { id: 'sales-control', label: 'SALES', icon: '📈', roles: ['admin'] },
+    { id: 'users', label: 'TRANSLATORS', icon: '👥', roles: ['admin'] },
+    { id: 'settings', label: 'SETTINGS', icon: '⚙️', roles: ['admin'] },
+    { id: 'mia-bot', label: 'MIA BOT', icon: '🤖', roles: ['admin'], isExternal: true }
   ];
 
   // Filter menu items based on user role
@@ -1199,13 +1199,13 @@ const TopBar = ({
   const roleInfo = roleConfig[userRole] || roleConfig.admin;
 
   return (
-    <div className="bg-slate-800 text-white flex items-center justify-between px-4 py-2 text-xs">
+    <div className="bg-slate-800 text-white flex items-center justify-between px-4 py-2">
       {/* Logo and Brand */}
       <div className="flex items-center space-x-3">
         <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 bg-blue-500 rounded flex items-center justify-center text-sm">🌐</div>
+          <div className="w-8 h-8 bg-blue-500 rounded flex items-center justify-center text-lg">🌐</div>
           <div>
-            <div className="font-bold text-sm">Legacy Admin</div>
+            <div className="font-bold text-lg uppercase">LEGACY ADMIN</div>
           </div>
         </div>
       </div>
@@ -1216,7 +1216,7 @@ const TopBar = ({
           <button
             key={item.id}
             onClick={() => setActiveTab(item.id)}
-            className={`flex items-center px-3 py-1.5 rounded transition-colors ${
+            className={`flex items-center px-3 py-1.5 rounded transition-colors text-lg ${
               activeTab === item.id
                 ? item.id === 'mia-bot' ? 'bg-blue-600 text-white' : 'bg-blue-600 text-white'
                 : item.id === 'mia-bot'
@@ -1225,7 +1225,7 @@ const TopBar = ({
             }`}
           >
             <span className="mr-1.5">{item.icon}</span>
-            <span>{item.label}</span>
+            <span className="uppercase">{item.label}</span>
           </button>
         ))}
       </nav>
@@ -8551,18 +8551,18 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
       {/* Top header bar */}
-      <div className="bg-slate-800 text-white flex items-center justify-between px-4 py-2 text-xs">
+      <div className="bg-slate-800 text-white flex items-center justify-between px-4 py-2">
         <div className="flex items-center space-x-3">
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-blue-500 rounded flex items-center justify-center text-sm">🌐</div>
+            <div className="w-8 h-8 bg-blue-500 rounded flex items-center justify-center text-lg">🌐</div>
             <div>
-              <div className="font-bold text-sm">Legacy Admin</div>
+              <div className="font-bold text-lg uppercase">LEGACY ADMIN</div>
             </div>
           </div>
         </div>
-        <div className="flex items-center px-3 py-1.5 rounded bg-blue-600 text-white">
+        <div className="flex items-center px-3 py-1.5 rounded bg-blue-600 text-white text-lg">
           <span className="mr-1.5">✍️</span>
-          <span>Translation</span>
+          <span className="uppercase">TRANSLATION</span>
         </div>
         <div className="flex items-center space-x-3">
           {user && (
@@ -18440,18 +18440,18 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
   const getStatusLabel = (status) => {
     const labels = {
-      'received': 'In Progress',
-      'Quote': 'In Progress',
-      'quote': 'In Progress',
-      'pending': 'In Progress',
-      'in_translation': 'In Progress',
-      'review': 'PM Review',
-      'pending_pm_review': 'PM Review',
-      'pending_admin_approval': 'Pending Admin',
-      'pending_admin_review': 'Admin Review',
-      'finalized_pending_admin': 'Ready (Admin)',
-      'client_review': 'Client Review',
-      'ready': 'Ready',
+      'received': 'IN PROGRESS',
+      'Quote': 'IN PROGRESS',
+      'quote': 'IN PROGRESS',
+      'pending': 'IN PROGRESS',
+      'in_translation': 'IN PROGRESS',
+      'review': 'PM REVIEW',
+      'pending_pm_review': 'PM REVIEW',
+      'pending_admin_approval': 'PENDING ADMIN',
+      'pending_admin_review': 'ADMIN REVIEW',
+      'finalized_pending_admin': 'READY (ADMIN)',
+      'client_review': 'CLIENT REVIEW',
+      'ready': 'READY',
       'delivered': 'FINAL',
       'pm_upload_ready': 'READY',
       'final': 'FINAL'
@@ -19244,20 +19244,20 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
       <div className="flex justify-between items-center mb-3">
         <div className="flex items-center space-x-3">
-          <h1 className="text-lg font-bold text-blue-600">{isPM ? 'MY PROJECTS' : 'PROJECTS'}</h1>
+          <h1 className="text-lg font-bold text-blue-600 uppercase">{isPM ? 'MY PROJECTS' : 'PROJECTS'}</h1>
           {/* New Project button - Admin only */}
           {isAdmin && (
             <button
               onClick={() => setShowNewProjectForm(!showNewProjectForm)}
-              className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+              className="px-3 py-1 bg-blue-600 text-white text-lg rounded hover:bg-blue-700 uppercase"
             >
-              + New Project
+              + NEW PROJECT
             </button>
           )}
           <div className="flex space-x-1">
             {['all', 'received', 'review', 'client_review', 'ready', 'pm_upload_ready', 'final'].map((s) => (
               <button key={s} onClick={() => setStatusFilter(s)}
-                className={`px-2 py-1 text-xs rounded ${statusFilter === s ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                className={`px-2 py-1 text-lg rounded uppercase ${statusFilter === s ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
                 {s === 'all' ? 'All' : getStatusLabel(s)}
               </button>
             ))}
@@ -19266,7 +19266,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
           <select
             value={documentTypeFilter}
             onChange={(e) => setDocumentTypeFilter(e.target.value)}
-            className="px-2 py-1 text-xs border rounded bg-white"
+            className="px-2 py-1 text-lg border rounded bg-white uppercase"
           >
             <option value="">All Documents</option>
             {DOCUMENT_TYPES.filter(d => d.value).map(doc => (
