@@ -16257,6 +16257,7 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
     client_email_sent = False
     all_attachments = []
     attachment_filenames = []
+    included_doc_ids = set()  # Track document IDs already added to prevent duplicates
 
     # Send emails
     try:
@@ -16932,6 +16933,14 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                 logger.info(f"Generated combined PDF: Certified_Translation_{order['order_number']}.pdf ({len(combined_pdf_bytes) / (1024 * 1024):.1f}MB)")
 
                 # Add additional translated documents (if more than one was uploaded)
+                # Track IDs of documents already included to prevent duplicates
+                included_doc_ids = set()
+                # Mark ALL translated docs as included (first one is in combined PDF, rest will be added below)
+                for td in translated_docs:
+                    if td.get("id"):
+                        included_doc_ids.add(td["id"])
+                logger.info(f"Tracking {len(included_doc_ids)} translated doc IDs to prevent duplicates in additional_document_ids")
+
                 if len(translated_docs) > 1:
                     logger.info(f"Adding {len(translated_docs) - 1} additional translated document(s) as separate attachments")
                     for idx, extra_doc in enumerate(translated_docs[1:], start=2):
@@ -17668,6 +17677,11 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
             logger.info(f"Processing {len(attachments_selection.additional_document_ids)} additional document(s)")
             for doc_id in attachments_selection.additional_document_ids:
                 try:
+                    # Skip documents already included by the combined PDF section
+                    if doc_id in included_doc_ids:
+                        logger.info(f"Skipping document {doc_id} - already included in combined PDF or as translated doc attachment")
+                        continue
+
                     # Find document in order_documents collection
                     doc = await db.order_documents.find_one({"id": doc_id})
                     if doc:
@@ -17686,11 +17700,6 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                             doc_source = doc.get("source", "")
                             doc_content_type = doc.get("content_type", "application/pdf").lower()
                             doc_filename = doc.get("filename", f"document_{doc_id}.pdf")
-
-                            # NOTE: Do NOT skip translated_document source here!
-                            # The combined PDF is generated from workspace HTML (order.translation_html),
-                            # while additional_document_ids are SEPARATE uploaded files that should always be included.
-                            # Previous bug was skipping all uploaded translations when workspace translation was included.
 
                             # Convert HTML files to PDF before attaching
                             if "html" in doc_content_type or doc_filename.lower().endswith(".html"):
