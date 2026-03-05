@@ -43,3 +43,32 @@
 input:focus, select:focus, textarea:focus {
     @apply outline-none ring-2 ring-blue-500 ring-opacity-50;
 }
+
+/* ==================== ADMIN PORTAL READABILITY IMPROVEMENTS ==================== */
+
+/* Increase base font size for modals/popups */
+.fixed .bg-white {
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+/* Make modal labels and content text more readable */
+.fixed .bg-white .text-xs {
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+/* Ensure modal input fields have comfortable size */
+.fixed .bg-white input[type="text"],
+.fixed .bg-white input[type="email"],
+.fixed .bg-white input[type="number"],
+.fixed .bg-white textarea,
+.fixed .bg-white select {
+    font-size: 14px;
+    padding: 8px 12px;
+}
+
+/* Comfortable button text in modals */
+.fixed .bg-white button {
+    font-size: 13px;
+}
