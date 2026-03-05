@@ -351,6 +351,9 @@ class EmailService:
                                           file_content: str, filename: str, file_type: str = "application/pdf"):
         """Send email with file attachment via Resend"""
         try:
+            # Decode base64 content for attachment
+            file_bytes = base64.b64decode(file_content)
+
             params = {
                 "from": self.sender_email,
                 "to": [to],
@@ -364,7 +367,7 @@ class EmailService:
                 "attachments": [
                     {
                         "filename": filename,
-                        "content": file_content,  # Resend accepts base64 string directly
+                        "content": list(file_bytes),
                     }
                 ]
             }
@@ -385,17 +388,15 @@ class EmailService:
             attachment_list = []
             total_size = 0
             for att in attachments:
-                b64_content = att["content"]
-                # Estimate actual file size from base64 (base64 is ~4/3 of original)
-                estimated_size = len(b64_content) * 3 / 4
-                total_size += estimated_size
+                file_bytes = base64.b64decode(att["content"])
+                total_size += len(file_bytes)
                 attachment_list.append({
                     "filename": att["filename"],
-                    "content": b64_content,  # Resend accepts base64 string directly
+                    "content": list(file_bytes),
                 })
 
             total_size_mb = total_size / (1024 * 1024)
-            logger.info(f"Sending email with {len(attachments)} attachment(s), estimated total size: {total_size_mb:.1f}MB")
+            logger.info(f"Sending email with {len(attachments)} attachment(s), total size: {total_size_mb:.1f}MB")
 
             # Resend limit is 40MB total (including email HTML). Warn if close.
             if total_size_mb > 35:
