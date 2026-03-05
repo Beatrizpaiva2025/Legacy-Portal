@@ -17335,14 +17335,14 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       let message = '✅ Email sent to the client!\n\n';
 
       if (response.data.attachments_sent > 0) {
-        message += `📎 ${response.data.attachments_sent} anexo(s) enviado(s)\n`;
+        message += `📎 ${response.data.attachments_sent} attachment(s) sent\n`;
         if (response.data.attachment_filenames) {
-          message += `   Arquivos: ${response.data.attachment_filenames.join(', ')}\n`;
+          message += `Files: ${response.data.attachment_filenames.join(', ')}\n`;
         }
       } else if (response.data.attachment_sent) {
-        message += `📎 Anexo: ${response.data.attachment_filename || 'Sim'}\n`;
+        message += `📎 Attachment: ${response.data.attachment_filename || 'Yes'}\n`;
       } else {
-        message += '⚠️ Sem anexo (arquivo de tradução não encontrado)\n';
+        message += '⚠️ No attachment (translation file not found)\n';
         if (response.data.debug) {
           message += `\nDebug: had_file=${response.data.debug.had_file}, had_html=${response.data.debug.had_html}, html_length=${response.data.debug.html_length}`;
         }
@@ -17353,12 +17353,16 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       }
 
       if (response.data.pm_notified) {
-        message += '\n📧 PM notificado.';
+        message += '\n📧 PM notified.';
       }
       if (response.data.bcc_sent) {
-        message += '\n📧 Cópia BCC enviada.';
+        message += '\n📧 BCC copy sent.';
       } else if (response.data.bcc_error) {
-        message += `\n⚠️ Cópia BCC FALHOU: ${response.data.bcc_error}`;
+        message += `\n⚠️ BCC copy FAILED: ${response.data.bcc_error}`;
+      }
+
+      if (response.data.resend_email_id) {
+        message += `\n\nResend ID: ${response.data.resend_email_id}`;
       }
 
       showToast(message);

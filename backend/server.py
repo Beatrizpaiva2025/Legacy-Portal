@@ -341,8 +341,14 @@ class EmailService:
 
             # Use Resend SDK with tracking disabled
             response = resend.Emails.send(params)
-            logger.info(f"Email sent successfully: {response}")
-            return True
+            email_id = response.get("id") if isinstance(response, dict) else None
+            if not email_id:
+                logger.error(f"Resend API returned unexpected response (no email ID): {response}")
+                raise EmailDeliveryError(f"Resend API did not return email ID. Response: {response}")
+            logger.info(f"Email sent successfully. Resend ID: {email_id}, to: {to}")
+            return email_id
+        except EmailDeliveryError:
+            raise
         except Exception as e:
             logger.error(f"Failed to send email: {str(e)}")
             raise EmailDeliveryError(f"Failed to send email: {str(e)}")
@@ -372,8 +378,14 @@ class EmailService:
             }
 
             response = resend.Emails.send(params)
-            logger.info(f"Email with attachment sent successfully: {response}")
-            return True
+            email_id = response.get("id") if isinstance(response, dict) else None
+            if not email_id:
+                logger.error(f"Resend API returned unexpected response (no email ID): {response}")
+                raise EmailDeliveryError(f"Resend API did not return email ID. Response: {response}")
+            logger.info(f"Email with attachment sent successfully. Resend ID: {email_id}, to: {to}")
+            return email_id
+        except EmailDeliveryError:
+            raise
         except Exception as e:
             logger.error(f"Failed to send email with attachment: {str(e)}")
             raise EmailDeliveryError(f"Failed to send email with attachment: {str(e)}")
@@ -463,8 +475,15 @@ class EmailService:
             }
 
             response = resend.Emails.send(params)
-            logger.info(f"Email with {len(attachments)} attachment(s) sent successfully: {response}")
-            return True
+            # Validate the Resend API response - it should return {"id": "email-uuid"}
+            email_id = response.get("id") if isinstance(response, dict) else None
+            if not email_id:
+                logger.error(f"Resend API returned unexpected response (no email ID): {response}")
+                raise EmailDeliveryError(f"Resend API did not return email ID. Response: {response}")
+            logger.info(f"Email with {len(attachments)} attachment(s) sent successfully. Resend ID: {email_id}, to: {to}")
+            return email_id
+        except EmailDeliveryError:
+            raise
         except Exception as e:
             logger.error(f"Failed to send email with attachments: {str(e)}")
             raise EmailDeliveryError(f"Failed to send email with attachments: {str(e)}")
@@ -17830,22 +17849,23 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
 
         # Send email to client
         client_email_error = None
+        resend_email_id = None
         try:
             if has_attachments:
-                await email_service.send_email_with_multiple_attachments(
+                resend_email_id = await email_service.send_email_with_multiple_attachments(
                     order["client_email"],
                     f"Your Translation is Ready - {order['order_number']}",
                     email_html,
                     all_attachments
                 )
             else:
-                await email_service.send_email(
+                resend_email_id = await email_service.send_email(
                     order["client_email"],
                     f"Your Translation is Ready - {order['order_number']}",
                     email_html
                 )
             client_email_sent = True
-            logger.info(f"Client email sent successfully to {order['client_email']} for order {order['order_number']}")
+            logger.info(f"Client email sent successfully to {order['client_email']} for order {order['order_number']}. Resend ID: {resend_email_id}")
         except Exception as e:
             client_email_error = str(e)
             logger.error(f"FAILED to send client email to {order['client_email']} for order {order['order_number']}: {client_email_error}")
@@ -17856,7 +17876,8 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
             "delivered_at": datetime.utcnow(),
             "email_sent": client_email_sent,
             "email_sent_at": datetime.utcnow() if client_email_sent else None,
-            "email_error": client_email_error
+            "email_error": client_email_error,
+            "resend_email_id": resend_email_id
         }
         await db.translation_orders.update_one(
             {"id": order_id},
@@ -17954,6 +17975,7 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
             "message": message,
             "client_email_sent": client_email_sent,
             "client_email_error": client_email_error,
+            "resend_email_id": resend_email_id,
             "attachment_sent": has_attachments,
             "attachments_sent": len(all_attachments),
             "attachment_filenames": attachment_filenames,
@@ -18068,22 +18090,23 @@ async def resend_delivery_email(order_id: str, request: DeliverOrderRequest = No
         # Send to client
         client_email_sent = False
         client_email_error = None
+        resend_email_id = None
         try:
             if has_attachments:
-                await email_service.send_email_with_multiple_attachments(
+                resend_email_id = await email_service.send_email_with_multiple_attachments(
                     order["client_email"],
                     f"Your Translation is Ready - {order['order_number']}",
                     email_html,
                     all_attachments
                 )
             else:
-                await email_service.send_email(
+                resend_email_id = await email_service.send_email(
                     order["client_email"],
                     f"Your Translation is Ready - {order['order_number']}",
                     email_html
                 )
             client_email_sent = True
-            logger.info(f"RESEND: Client email sent to {order['client_email']} for order {order['order_number']}")
+            logger.info(f"RESEND: Client email sent to {order['client_email']} for order {order['order_number']}. Resend ID: {resend_email_id}")
         except Exception as e:
             client_email_error = str(e)
             logger.error(f"RESEND FAILED: Client email to {order['client_email']} for order {order['order_number']}: {client_email_error}")
@@ -18095,7 +18118,8 @@ async def resend_delivery_email(order_id: str, request: DeliverOrderRequest = No
                 "email_sent": client_email_sent,
                 "email_sent_at": datetime.utcnow() if client_email_sent else None,
                 "email_error": client_email_error,
-                "email_resent_at": datetime.utcnow() if client_email_sent else None
+                "email_resent_at": datetime.utcnow() if client_email_sent else None,
+                "resend_email_id": resend_email_id
             }}
         )
 
@@ -18128,6 +18152,7 @@ async def resend_delivery_email(order_id: str, request: DeliverOrderRequest = No
             "message": f"Delivery email {'resent successfully' if client_email_sent else 'FAILED to resend: ' + (client_email_error or 'Unknown error')}",
             "client_email_sent": client_email_sent,
             "client_email_error": client_email_error,
+            "resend_email_id": resend_email_id,
             "bcc_sent": bcc_sent,
             "bcc_error": bcc_error,
             "attachment_sent": has_attachments,
