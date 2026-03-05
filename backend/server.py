@@ -16715,8 +16715,12 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                     logger.warning(f"  NO translated documents found in order_documents for order_id={order_id}")
 
                 if translated_docs:
-                    # Use the most recent translated document
+                    # Merge ALL translated documents into a single PDF for the combined delivery
                     logger.info(f"  Processing {len(translated_docs)} translated documents from order_documents")
+                    import fitz as fitz_merge
+
+                    all_trans_pdfs = []  # List of (pdf_bytes, filename) tuples
+
                     for idx, trans_doc in enumerate(translated_docs):
                         # Check for GridFS storage first
                         trans_data = None
@@ -16731,110 +16735,83 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                             trans_data = trans_doc.get("file_data") or trans_doc.get("data")
                         if trans_data and len(str(trans_data)) > 100:
                             content_type = trans_doc.get("content_type", "application/pdf")
-                            logger.info(f"  Using document from order_documents: {trans_doc.get('filename')} ({content_type})")
+                            filename = trans_doc.get("filename", f"translation_{idx}.pdf")
+                            logger.info(f"  Processing translated doc: {filename} ({content_type})")
 
-                            # If it's a PDF, use it directly
-                            if "pdf" in content_type.lower():
-                                order_with_original["translated_file"] = trans_data
-                                order_with_original["translated_filename"] = trans_doc.get("filename", "translation.pdf")
-                                order_with_original["translated_file_type"] = "application/pdf"
-                                logger.info(f"  Set translated_file from order_documents PDF: {trans_doc.get('filename')}")
-                                break
-                            # If it's an image, convert to PDF
-                            elif "image" in content_type.lower():
-                                try:
-                                    import fitz
+                            try:
+                                # Convert all formats to PDF bytes
+                                if "pdf" in content_type.lower():
+                                    all_trans_pdfs.append((base64.b64decode(trans_data), filename))
+                                elif "image" in content_type.lower():
                                     from PIL import Image
-                                    import io
-
+                                    import io as img_io
                                     img_bytes = base64.b64decode(trans_data)
-                                    pil_img = Image.open(io.BytesIO(img_bytes))
-                                    img_width, img_height = pil_img.size
-
-                                    pdf_doc = fitz.open()
-                                    pdf_page = pdf_doc.new_page(width=612, height=792)
-
-                                    margin = 36
-                                    max_width = 612 - 2 * margin
-                                    max_height = 792 - 2 * margin
-                                    scale = min(max_width / img_width, max_height / img_height)
-
-                                    new_width = img_width * scale
-                                    new_height = img_height * scale
-                                    x_offset = (612 - new_width) / 2
-                                    y_offset = (792 - new_height) / 2
-                                    insert_rect = fitz.Rect(x_offset, y_offset, x_offset + new_width, y_offset + new_height)
-
-                                    pdf_page.insert_image(insert_rect, stream=img_bytes)
-
-                                    pdf_bytes = pdf_doc.tobytes()
-                                    order_with_original["translated_file"] = base64.b64encode(pdf_bytes).decode('utf-8')
-                                    order_with_original["translated_filename"] = trans_doc.get("filename", "translation.pdf").rsplit('.', 1)[0] + ".pdf"
-                                    order_with_original["translated_file_type"] = "application/pdf"
-                                    logger.info(f"  Converted image to PDF: {trans_doc.get('filename')}")
-                                    pdf_doc.close()
+                                    pil_img = Image.open(img_io.BytesIO(img_bytes))
+                                    img_w, img_h = pil_img.size
+                                    pdf_tmp = fitz_merge.open()
+                                    pdf_page = pdf_tmp.new_page(width=612, height=792)
+                                    scale = min((612 - 72) / img_w, (792 - 72) / img_h)
+                                    nw, nh = img_w * scale, img_h * scale
+                                    xo, yo = (612 - nw) / 2, (792 - nh) / 2
+                                    pdf_page.insert_image(fitz_merge.Rect(xo, yo, xo + nw, yo + nh), stream=img_bytes)
+                                    all_trans_pdfs.append((pdf_tmp.tobytes(), filename.rsplit('.', 1)[0] + ".pdf"))
+                                    pdf_tmp.close()
                                     pil_img.close()
-                                    break
-                                except Exception as img_err:
-                                    logger.error(f"  Error converting image to PDF: {str(img_err)}")
-                                    continue
-                            # If it's HTML, convert to PDF
-                            elif "html" in content_type.lower() or trans_doc.get("filename", "").lower().endswith(".html"):
-                                try:
-                                    import fitz
+                                elif "html" in content_type.lower() or filename.lower().endswith(".html"):
                                     from bs4 import BeautifulSoup
-
                                     html_bytes = base64.b64decode(trans_data)
                                     html_content = html_bytes.decode('utf-8')
-
                                     soup = BeautifulSoup(html_content, 'html.parser')
                                     for script in soup(["script", "style"]):
                                         script.decompose()
                                     text_content = soup.get_text(separator='\n')
                                     lines = [line.strip() for line in text_content.split('\n') if line.strip()]
-
-                                    pdf_doc = fitz.open()
-                                    page_width, page_height = 612, 792
-                                    blue_color = (0.11, 0.27, 0.53)
-
-                                    def draw_header(pg):
-                                        pg.draw_rect(fitz.Rect(50, 40, page_width - 50, 43), color=blue_color, fill=blue_color)
-                                        pg.insert_text((page_width/2 - 60, 30), "Legacy Translations", fontsize=12, fontname="helv", color=blue_color)
-                                        pg.insert_text((page_width/2 - 50, 60), "TRANSLATION", fontsize=12, fontname="helvB", color=blue_color)
-
-                                    page = pdf_doc.new_page(width=page_width, height=page_height)
-                                    draw_header(page)
-                                    margin = 72
+                                    pdf_tmp = fitz_merge.open()
+                                    pw, ph = 612, 792
+                                    bc = (0.11, 0.27, 0.53)
+                                    page = pdf_tmp.new_page(width=pw, height=ph)
+                                    page.draw_rect(fitz_merge.Rect(50, 40, pw - 50, 43), color=bc, fill=bc)
+                                    page.insert_text((pw/2 - 60, 30), "Legacy Translations", fontsize=12, fontname="helv", color=bc)
+                                    page.insert_text((pw/2 - 50, 60), "TRANSLATION", fontsize=12, fontname="helvB", color=bc)
                                     y_pos = 100
-
                                     for line in lines:
-                                        if y_pos > page_height - margin:
-                                            page = pdf_doc.new_page(width=page_width, height=page_height)
-                                            draw_header(page)
-                                            y_pos = 100
-                                        max_chars = 85
-                                        while len(line) > max_chars:
-                                            page.insert_text((margin, y_pos), line[:max_chars], fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
-                                            y_pos += 14
-                                            line = line[max_chars:]
-                                            if y_pos > page_height - margin:
-                                                page = pdf_doc.new_page(width=page_width, height=page_height)
-                                                draw_header(page)
-                                                y_pos = 100
-                                        if line:
-                                            page.insert_text((margin, y_pos), line, fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
-                                            y_pos += 14
+                                        if y_pos > ph - 72:
+                                            page = pdf_tmp.new_page(width=pw, height=ph)
+                                            y_pos = 72
+                                        page.insert_text((72, y_pos), line[:85], fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
+                                        y_pos += 14
+                                    all_trans_pdfs.append((pdf_tmp.tobytes(), filename.rsplit('.', 1)[0] + ".pdf"))
+                                    pdf_tmp.close()
+                            except Exception as conv_err:
+                                logger.error(f"  Error processing translated doc {filename}: {str(conv_err)}")
 
-                                    pdf_bytes = pdf_doc.tobytes()
-                                    order_with_original["translated_file"] = base64.b64encode(pdf_bytes).decode('utf-8')
-                                    order_with_original["translated_filename"] = trans_doc.get("filename", "translation.html").rsplit('.', 1)[0] + ".pdf"
-                                    order_with_original["translated_file_type"] = "application/pdf"
-                                    logger.info(f"  Converted HTML to PDF: {trans_doc.get('filename')}")
-                                    pdf_doc.close()
-                                    break
-                                except Exception as html_err:
-                                    logger.error(f"  Error converting HTML to PDF: {str(html_err)}")
-                                    continue
+                    # Merge all translated PDFs into one
+                    if all_trans_pdfs:
+                        if len(all_trans_pdfs) == 1:
+                            # Single file - use directly
+                            merged_b64 = base64.b64encode(all_trans_pdfs[0][0]).decode('utf-8')
+                            order_with_original["translated_file"] = merged_b64
+                            order_with_original["translated_filename"] = all_trans_pdfs[0][1]
+                            order_with_original["translated_file_type"] = "application/pdf"
+                            logger.info(f"  Single translated file: {all_trans_pdfs[0][1]}")
+                        else:
+                            # Multiple files - merge into one PDF
+                            merged_pdf = fitz_merge.open()
+                            for pdf_bytes, fname in all_trans_pdfs:
+                                try:
+                                    src_doc = fitz_merge.open(stream=pdf_bytes, filetype="pdf")
+                                    merged_pdf.insert_pdf(src_doc)
+                                    logger.info(f"  Merged {fname} ({len(src_doc)} pages) into combined translation")
+                                    src_doc.close()
+                                except Exception as merge_err:
+                                    logger.error(f"  Error merging {fname}: {str(merge_err)}")
+                            merged_bytes = merged_pdf.tobytes()
+                            merged_pdf.close()
+                            merged_b64 = base64.b64encode(merged_bytes).decode('utf-8')
+                            order_with_original["translated_file"] = merged_b64
+                            order_with_original["translated_filename"] = f"{order.get('order_number', 'translation')}_all_translations.pdf"
+                            order_with_original["translated_file_type"] = "application/pdf"
+                            logger.info(f"  Merged {len(all_trans_pdfs)} translated documents into single PDF ({len(merged_bytes) / (1024*1024):.1f}MB)")
 
                 # Fallback: use translated_file from order if order_documents didn't provide anything
                 if not order_with_original.get("translated_file") or len(str(order_with_original.get("translated_file", ""))) < 100:
@@ -16935,105 +16912,14 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                 # Add additional translated documents (if more than one was uploaded)
                 # Track IDs of documents already included to prevent duplicates
                 included_doc_ids = set()
-                # Mark ALL translated docs as included (first one is in combined PDF, rest will be added below)
+                # Mark ALL translated docs as included to prevent duplicates in additional_document_ids
                 for td in translated_docs:
                     if td.get("id"):
                         included_doc_ids.add(td["id"])
-                logger.info(f"Tracking {len(included_doc_ids)} translated doc IDs to prevent duplicates in additional_document_ids")
+                logger.info(f"Tracking {len(included_doc_ids)} translated doc IDs to prevent duplicates")
 
-                if len(translated_docs) > 1:
-                    logger.info(f"Adding {len(translated_docs) - 1} additional translated document(s) as separate attachments")
-                    for idx, extra_doc in enumerate(translated_docs[1:], start=2):
-                        try:
-                            # Get document data from GridFS or inline
-                            extra_data = None
-                            if extra_doc.get("gridfs_id"):
-                                try:
-                                    extra_data = await get_file_base64_from_gridfs(extra_doc["gridfs_id"])
-                                except Exception as gfs_err:
-                                    logger.error(f"Error getting extra doc from GridFS: {str(gfs_err)}")
-                            if not extra_data:
-                                extra_data = extra_doc.get("file_data") or extra_doc.get("data")
-
-                            if extra_data:
-                                extra_filename = extra_doc.get("filename", f"translation_{idx}.pdf")
-                                extra_content_type = extra_doc.get("content_type", "application/pdf")
-
-                                # PDFs: send directly without modification (maintain quality)
-                                if "pdf" in extra_content_type.lower() or extra_filename.lower().endswith(".pdf"):
-                                    # PDF - send as-is
-                                    pass
-
-                                # Images: convert to PDF maintaining full quality
-                                elif "image" in extra_content_type.lower() or extra_filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif')):
-                                    try:
-                                        from PIL import Image
-                                        img_bytes = base64.b64decode(extra_data)
-                                        pil_img = Image.open(io.BytesIO(img_bytes))
-                                        img_width, img_height = pil_img.size
-
-                                        # Create PDF with full image quality
-                                        extra_pdf = fitz.open()
-                                        # Use image dimensions for page (max letter size)
-                                        scale = min(612 / img_width, 792 / img_height, 1.0)  # Don't upscale
-                                        pdf_w = img_width * scale
-                                        pdf_h = img_height * scale
-                                        pdf_page = extra_pdf.new_page(width=612, height=792)
-                                        # Center image on page
-                                        x_off = (612 - pdf_w) / 2
-                                        y_off = (792 - pdf_h) / 2
-                                        pdf_page.insert_image(
-                                            fitz.Rect(x_off, y_off, x_off + pdf_w, y_off + pdf_h),
-                                            stream=img_bytes
-                                        )
-                                        extra_data = base64.b64encode(extra_pdf.tobytes()).decode('utf-8')
-                                        extra_pdf.close()
-                                        pil_img.close()
-                                        extra_filename = extra_filename.rsplit('.', 1)[0] + ".pdf"
-                                        extra_content_type = "application/pdf"
-                                        logger.info(f"Converted image to PDF with full quality: {extra_filename}")
-                                    except Exception as img_err:
-                                        logger.error(f"Error converting image to PDF: {str(img_err)}")
-                                        # Send image as-is if conversion fails
-
-                                # HTML: convert to PDF
-                                elif "html" in extra_content_type.lower() or extra_filename.lower().endswith(".html"):
-                                    try:
-                                        html_bytes = base64.b64decode(extra_data)
-                                        html_content = html_bytes.decode('utf-8')
-                                        soup = BeautifulSoup(html_content, 'html.parser')
-                                        for script in soup(["script", "style"]):
-                                            script.decompose()
-                                        text_content = soup.get_text(separator='\n')
-                                        lines = [line.strip() for line in text_content.split('\n') if line.strip()]
-
-                                        extra_pdf = fitz.open()
-                                        pw, ph = 612, 792
-                                        ep = extra_pdf.new_page(width=pw, height=ph)
-                                        y = 72
-                                        for line in lines:
-                                            if y > ph - 72:
-                                                ep = extra_pdf.new_page(width=pw, height=ph)
-                                                y = 72
-                                            ep.insert_text((72, y), line[:90], fontsize=10, fontname="helv")
-                                            y += 14
-                                        extra_data = base64.b64encode(extra_pdf.tobytes()).decode('utf-8')
-                                        extra_pdf.close()
-                                        extra_filename = extra_filename.rsplit('.', 1)[0] + ".pdf"
-                                        extra_content_type = "application/pdf"
-                                    except Exception as conv_err:
-                                        logger.error(f"Error converting extra HTML to PDF: {str(conv_err)}")
-                                        continue
-
-                                all_attachments.append({
-                                    "content": extra_data,
-                                    "filename": extra_filename,
-                                    "content_type": extra_content_type
-                                })
-                                attachment_filenames.append(extra_filename)
-                                logger.info(f"Added additional attachment: {extra_filename}")
-                        except Exception as extra_err:
-                            logger.error(f"Error adding extra document: {str(extra_err)}")
+                # NOTE: All translated documents are now merged into the combined PDF above.
+                # No separate attachments needed for translated_docs[1:].
 
             except Exception as e:
                 logger.error(f"Failed to generate combined PDF: {str(e)}")
