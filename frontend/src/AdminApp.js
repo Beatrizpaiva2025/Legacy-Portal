@@ -31,7 +31,7 @@ const showToast = (message) => {
   } else if (msgLower.includes('success') || msgLower.includes('✅') || msgLower.includes('sent') ||
              msgLower.includes('created') || msgLower.includes('uploaded') || msgLower.includes('saved') ||
              msgLower.includes('approved') || msgLower.includes('deleted') || msgLower.includes('copied') ||
-             msgLower.includes('enviado') || msgLower.includes('sucesso') || msgLower.includes('criado')) {
+             msgLower.includes('enviado') || msgLower.includes('sucesso') || msgLower.includes('criado') || msgLower.includes('sent') || msgLower.includes('success') || msgLower.includes('created')) {
     type = 'success';
   }
 
@@ -45,7 +45,7 @@ const parseApiError = (error) => {
   if (detail.includes('Insufficient balance') || detail.includes('API Key') ||
       detail.includes('Rate limit') || detail.includes('overloaded') ||
       detail.includes('Saldo insuficiente') || detail.includes('Chave de API') ||
-      detail.includes('Limite de requisições') || detail.includes('sobrecarregado')) {
+      detail.includes('Rate limit exceeded') || detail.includes('overloaded')) {
     return detail;
   }
   // Fallback: parse raw JSON error from Anthropic API
@@ -644,24 +644,24 @@ const PROJECT_MANAGERS = [
 // Document Types for translation projects
 const DOCUMENT_TYPES = [
   { value: '', label: '-- Select Document Type --' },
-  { value: 'birth_certificate', label: 'Certidão de Nascimento / Birth Certificate' },
-  { value: 'marriage_certificate', label: 'Certidão de Casamento / Marriage Certificate' },
-  { value: 'vaccination_card', label: 'Cartão de Vacina / Vaccination Card' },
-  { value: 'divorce_certificate', label: 'Divórcio / Divorce Certificate' },
+  { value: 'birth_certificate', label: 'Birth Certificate' },
+  { value: 'marriage_certificate', label: 'Marriage Certificate' },
+  { value: 'vaccination_card', label: 'Vaccination Card' },
+  { value: 'divorce_certificate', label: 'Divorce Certificate' },
   { value: 'rg', label: 'RG (Brazilian ID)' },
   { value: 'cnh', label: 'CNH (Brazilian Driver\'s License)' },
   { value: 'dmv', label: 'DMV Document' },
   { value: 'rmv', label: 'RMV Document' },
-  { value: 'passport', label: 'Passaporte / Passport' },
+  { value: 'passport', label: 'Passport' },
   { value: 'diploma', label: 'Diploma / Academic Degree' },
-  { value: 'transcript', label: 'Histórico Escolar / Academic Transcript' },
-  { value: 'power_of_attorney', label: 'Procuração / Power of Attorney' },
-  { value: 'criminal_record', label: 'Antecedentes Criminais / Criminal Record' },
-  { value: 'medical_report', label: 'Relatório Médico / Medical Report' },
-  { value: 'contract', label: 'Contrato / Contract' },
-  { value: 'immigration_doc', label: 'Documento de Imigração / Immigration Document' },
-  { value: 'bank_statement', label: 'Extrato Bancário / Bank Statement' },
-  { value: 'other', label: 'Outros / Other' }
+  { value: 'transcript', label: 'Academic Transcript' },
+  { value: 'power_of_attorney', label: 'Power of Attorney' },
+  { value: 'criminal_record', label: 'Criminal Record' },
+  { value: 'medical_report', label: 'Medical Report' },
+  { value: 'contract', label: 'Contract' },
+  { value: 'immigration_doc', label: 'Immigration Document' },
+  { value: 'bank_statement', label: 'Bank Statement' },
+  { value: 'other', label: 'Other' }
 ];
 
 // Document Categories for uploaded files
@@ -864,7 +864,7 @@ const AdminLogin = ({ onLogin }) => {
   if (showForgotPassword) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
+        <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
           <div className="text-center mb-6">
             <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-3">
               <span className="text-xl text-white">🔑</span>
@@ -922,7 +922,7 @@ const AdminLogin = ({ onLogin }) => {
 
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-      <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
+      <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
         <div className="text-center mb-6">
           <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-3">
             <span className="text-xl text-white">🔐</span>
@@ -1066,7 +1066,7 @@ const NotificationBell = ({ adminKey, user, onNotificationClick }) => {
       >
         🔔
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold w-4 h-4 rounded-full flex items-center justify-center">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
@@ -1077,7 +1077,7 @@ const NotificationBell = ({ adminKey, user, onNotificationClick }) => {
           <div className="p-2 border-b bg-gray-50 flex justify-between items-center">
             <span className="font-bold text-xs">Notifications</span>
             {unreadCount > 0 && (
-              <button onClick={markAllRead} className="text-[10px] text-blue-600 hover:text-blue-800">
+              <button onClick={markAllRead} className="text-xs text-blue-600 hover:text-blue-800">
                 Mark all read
               </button>
             )}
@@ -1098,8 +1098,8 @@ const NotificationBell = ({ adminKey, user, onNotificationClick }) => {
                     </span>
                     <div className="flex-1">
                       <div className="font-medium text-xs">{notif.title}</div>
-                      <div className="text-[10px] text-gray-600 mt-0.5">{notif.message}</div>
-                      <div className="text-[9px] text-gray-400 mt-1">
+                      <div className="text-xs text-gray-600 mt-0.5">{notif.message}</div>
+                      <div className="text-xs text-gray-400 mt-1">
                         {formatDateTimeLocal(notif.created_at)}
                       </div>
                     </div>
@@ -1242,7 +1242,7 @@ const TopBar = ({
             >
               <span className="text-lg">🔔</span>
               {totalNotifCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
                   {totalNotifCount > 9 ? '9+' : totalNotifCount}
                 </span>
               )}
@@ -1267,7 +1267,7 @@ const TopBar = ({
                     <div className="border-b">
                       <div className="px-3 py-2 bg-purple-50 text-purple-800 text-xs font-bold flex items-center justify-between">
                         <span>🏦 Pending Zelle Verification</span>
-                        <span className="bg-purple-600 text-white rounded-full px-2 py-0.5 text-[10px]">
+                        <span className="bg-purple-600 text-white rounded-full px-2 py-0.5 text-xs">
                           {pendingZelleInvoices.length}
                         </span>
                       </div>
@@ -1277,7 +1277,7 @@ const TopBar = ({
                             <div>
                               <div className="font-mono text-xs font-medium">{inv.invoice_number}</div>
                               <div className="text-xs text-gray-600">{inv.partner_company}</div>
-                              <div className="text-[10px] text-gray-400">
+                              <div className="text-xs text-gray-400">
                                 {inv.zelle_submitted_at ? new Date(inv.zelle_submitted_at).toLocaleString() : ''}
                               </div>
                             </div>
@@ -1288,7 +1288,7 @@ const TopBar = ({
                                   href={inv.zelle_receipt_url}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="text-[10px] text-blue-600 hover:underline"
+                                  className="text-xs text-blue-600 hover:underline"
                                 >
                                   View Receipt
                                 </a>
@@ -1334,8 +1334,8 @@ const TopBar = ({
                             </span>
                             <div className="flex-1">
                               <div className="text-xs font-medium text-gray-800">{notif.title}</div>
-                              <div className="text-[10px] text-gray-500">{notif.message}</div>
-                              <div className="text-[10px] text-gray-400 mt-1">
+                              <div className="text-xs text-gray-500">{notif.message}</div>
+                              <div className="text-xs text-gray-400 mt-1">
                                 {new Date(notif.created_at).toLocaleString()}
                               </div>
                             </div>
@@ -1375,11 +1375,11 @@ const TopBar = ({
 
         {user && (
           <div className="flex items-center space-x-2">
-            <div className={`px-3 py-1 ${roleInfo.color} rounded text-[10px] font-medium text-center`}>
+            <div className={`px-3 py-1 ${roleInfo.color} rounded text-xs font-medium text-center`}>
               {roleInfo.label}
             </div>
             {(userRole === 'pm' || userRole === 'translator') && user.name && (
-              <span className="text-white text-[11px]">
+              <span className="text-white text-xs">
                 Welcome, {user.name.split(' ')[0]}
               </span>
             )}
@@ -1392,7 +1392,7 @@ const TopBar = ({
             <select
               value={currentTheme}
               onChange={(e) => setCurrentTheme(e.target.value)}
-              className="px-2 py-1 text-[10px] bg-gray-800 text-white border border-gray-600 rounded cursor-pointer hover:bg-gray-700"
+              className="px-2 py-1 text-xs bg-gray-800 text-white border border-gray-600 rounded cursor-pointer hover:bg-gray-700"
               title="Switch brand theme"
             >
               <option value="legacy">Legacy</option>
@@ -1458,12 +1458,12 @@ const MessageNotificationBar = ({
           </span>
           <div className="flex gap-1.5">
             {isAdmin && unreadPartner.length > 0 && (
-              <span className="text-[10px] px-2 py-0.5 bg-yellow-200 text-yellow-800 rounded-full font-medium">
+              <span className="text-xs px-2 py-0.5 bg-yellow-200 text-yellow-800 rounded-full font-medium">
                 {unreadPartner.length} Partner
               </span>
             )}
             {(isAdmin || isPM) && unreadTranslator.length > 0 && (
-              <span className="text-[10px] px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full font-medium">
+              <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full font-medium">
                 {unreadTranslator.length} Translator
               </span>
             )}
@@ -1476,7 +1476,7 @@ const MessageNotificationBar = ({
               if (isAdmin && unreadPartner.length > 0) onDismissAllPartner();
               if ((isAdmin || isPM) && unreadTranslator.length > 0) onDismissAllTranslator();
             }}
-            className="text-[10px] px-2 py-1 bg-yellow-200 text-yellow-700 rounded hover:bg-yellow-300 font-medium"
+            className="text-xs px-2 py-1 bg-yellow-200 text-yellow-700 rounded hover:bg-yellow-300 font-medium"
           >
             Mark all read
           </button>
@@ -1493,7 +1493,7 @@ const MessageNotificationBar = ({
               <button
                 key={filter}
                 onClick={() => setActiveFilter(filter)}
-                className={`text-[10px] px-2.5 py-0.5 rounded-full font-medium transition-colors ${
+                className={`text-xs px-2.5 py-0.5 rounded-full font-medium transition-colors ${
                   activeFilter === filter
                     ? 'bg-yellow-400 text-yellow-900'
                     : 'bg-yellow-200/50 text-yellow-700 hover:bg-yellow-200'
@@ -1514,7 +1514,7 @@ const MessageNotificationBar = ({
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                    <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
                       msg._type === 'partner' ? 'bg-yellow-200 text-yellow-800' : 'bg-blue-100 text-blue-800'
                     }`}>
                       {msg._type === 'partner' ? 'Partner' : 'Translator'}
@@ -1523,11 +1523,11 @@ const MessageNotificationBar = ({
                       {msg._type === 'partner' ? msg.from_partner_name : msg.from_translator_name}
                     </span>
                     {msg.order_number && (
-                      <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">
+                      <span className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">
                         {msg.order_number}
                       </span>
                     )}
-                    <span className="text-[10px] text-gray-400 ml-auto flex-shrink-0">
+                    <span className="text-xs text-gray-400 ml-auto flex-shrink-0">
                       {msg.created_at ? new Date(msg.created_at).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
                     </span>
                   </div>
@@ -1538,20 +1538,20 @@ const MessageNotificationBar = ({
                 <div className="flex items-center gap-1 flex-shrink-0">
                   <button
                     onClick={() => msg._type === 'partner' ? onReplyPartner(msg) : onReplyTranslator(msg)}
-                    className="px-2 py-1 bg-green-500 text-white rounded text-[10px] hover:bg-green-600"
+                    className="px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600"
                   >
                     Reply
                   </button>
                   <button
                     onClick={() => msg._type === 'partner' ? onMarkPartnerRead(msg.id) : onMarkTranslatorRead(msg.id)}
-                    className="px-2 py-1 text-gray-500 border border-gray-300 rounded text-[10px] hover:bg-gray-100"
+                    className="px-2 py-1 text-gray-500 border border-gray-300 rounded text-xs hover:bg-gray-100"
                     title="Mark as read"
                   >
                     ✓
                   </button>
                   <button
                     onClick={() => msg._type === 'partner' ? onArchivePartner(msg.id) : onArchiveTranslator(msg.id)}
-                    className="px-2 py-1 text-gray-400 border border-gray-200 rounded text-[10px] hover:bg-gray-100"
+                    className="px-2 py-1 text-gray-400 border border-gray-200 rounded text-xs hover:bg-gray-100"
                     title="Archive"
                   >
                     📥
@@ -2218,7 +2218,7 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
                 <div className="flex justify-between items-start mb-2">
                   <div>
                     <h3 className="text-sm font-bold text-gray-800">{template.name}</h3>
-                    <span className="inline-block px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] mt-1">
+                    <span className="inline-block px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs mt-1">
                       {DOCUMENT_TYPES.find(dt => dt.value === template.document_type)?.label || template.document_type}
                     </span>
                   </div>
@@ -2231,7 +2231,7 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
                     </button>
                   )}
                 </div>
-                <div className="text-[10px] text-gray-500 mb-2">
+                <div className="text-xs text-gray-500 mb-2">
                   {template.source_language} → {template.target_language}
                 </div>
                 <div className="text-xs text-gray-600 mb-3 line-clamp-3">
@@ -2241,10 +2241,10 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
                   }...
                 </div>
                 {isHTMLContent(template.template_content) && (
-                  <span className="inline-block px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded text-[9px] mb-2">Layout Preserved</span>
+                  <span className="inline-block px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded text-xs mb-2">Layout Preserved</span>
                 )}
                 <div className="flex items-center justify-between">
-                  <div className="text-[10px] text-gray-400">
+                  <div className="text-xs text-gray-400">
                     {(template.fields || []).length} fields | Used {template.usage_count || 0}x
                   </div>
                   <button
@@ -2355,7 +2355,7 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
                       </svg>
                       <p className="text-sm font-medium text-gray-700 mb-1">Upload document (layout preserved)</p>
                       <p className="text-xs text-gray-500 mb-2">Drag & drop or click to browse - DOCX keeps formatting, PDF keeps visual layout</p>
-                      <p className="text-[10px] text-gray-400">PDF, DOCX, DOC, TXT</p>
+                      <p className="text-xs text-gray-400">PDF, DOCX, DOC, TXT</p>
                     </div>
                     <div className="flex items-center gap-3 my-3">
                       <div className="flex-1 border-t border-gray-200" />
@@ -2393,7 +2393,7 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                         </svg>
                         <span className="text-xs text-green-700">Document loaded with formatting from <strong>{uploadedFileName}</strong></span>
-                        <span className="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded ml-2">DOCX - Layout Preserved</span>
+                        <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded ml-2">DOCX - Layout Preserved</span>
                         <button
                           onClick={() => {
                             setCreateForm(prev => ({...prev, template_content: '', original_content: ''}));
@@ -2430,7 +2430,7 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
                       />
                     </div>
                     {selectionMode && (
-                      <p className="text-[10px] text-blue-600 mt-1 text-center">
+                      <p className="text-xs text-blue-600 mt-1 text-center">
                         Select text in the document above to mark as a fillable field
                       </p>
                     )}
@@ -2449,7 +2449,7 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                         </svg>
                         <span className="text-xs text-green-700">PDF loaded from <strong>{uploadedFileName}</strong> ({documentPages.length} pages)</span>
-                        <span className="text-[10px] text-purple-600 bg-purple-50 px-2 py-0.5 rounded ml-2">PDF - Visual Preview</span>
+                        <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded ml-2">PDF - Visual Preview</span>
                         <button
                           onClick={() => {
                             setCreateForm(prev => ({...prev, template_content: '', original_content: ''}));
@@ -2469,7 +2469,7 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
                     <div className="grid grid-cols-2 gap-3" style={{ maxHeight: '500px' }}>
                       {/* Left: PDF visual pages */}
                       <div className="overflow-auto border rounded-lg bg-gray-100 p-2">
-                        <p className="text-[10px] text-gray-500 mb-2 text-center font-medium">Original Document (Visual)</p>
+                        <p className="text-xs text-gray-500 mb-2 text-center font-medium">Original Document (Visual)</p>
                         <div className="space-y-2">
                           {documentPages.map((pageDataUrl, idx) => (
                             <div key={idx} className="bg-white shadow rounded overflow-hidden">
@@ -2479,7 +2479,7 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
                                 className="w-full h-auto"
                                 style={{ imageRendering: 'auto' }}
                               />
-                              <div className="text-center text-[9px] text-gray-400 py-1 bg-gray-50">
+                              <div className="text-center text-xs text-gray-400 py-1 bg-gray-50">
                                 Page {idx + 1} of {documentPages.length}
                               </div>
                             </div>
@@ -2488,7 +2488,7 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
                       </div>
                       {/* Right: Extracted text for field marking */}
                       <div className="overflow-auto">
-                        <p className="text-[10px] text-gray-500 mb-2 text-center font-medium">
+                        <p className="text-xs text-gray-500 mb-2 text-center font-medium">
                           Extracted Text (mark fillable fields here)
                         </p>
                         {!selectionMode ? (
@@ -2566,7 +2566,7 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
                   <div className="flex items-center justify-between mb-3">
                     <div>
                       <h4 className="text-sm font-bold text-gray-700">Variable Fields</h4>
-                      <p className="text-[10px] text-gray-500">
+                      <p className="text-xs text-gray-500">
                         {selectionMode
                           ? 'Select text in the document above, then name the field below'
                           : 'Enable selection mode to start marking variable fields'
@@ -2627,7 +2627,7 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
                               {`{${field.field_name}}`}
                             </span>
                             <span className="text-xs text-gray-600">{field.label}</span>
-                            <span className="text-[10px] text-gray-400">was: "{field.original_text}"</span>
+                            <span className="text-xs text-gray-400">was: "{field.original_text}"</span>
                           </div>
                           <button
                             onClick={() => removeField(field)}
@@ -2674,7 +2674,7 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
                   {DOCUMENT_TYPES.find(dt => dt.value === selectedTemplate.document_type)?.label} |{' '}
                   {selectedTemplate.source_language} → {selectedTemplate.target_language}
                   {isHTMLContent(selectedTemplate.template_content) && (
-                    <span className="ml-2 text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded">Layout Preserved</span>
+                    <span className="ml-2 text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded">Layout Preserved</span>
                   )}
                 </span>
               </div>
@@ -2701,7 +2701,7 @@ const TemplatesTab = ({ adminKey, isAdmin, isPM, orderId }) => {
                           className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400"
                           placeholder={field.original_text}
                         />
-                        <p className="text-[10px] text-gray-400 mt-1">Original: "{field.original_text}"</p>
+                        <p className="text-xs text-gray-400 mt-1">Original: "{field.original_text}"</p>
                       </div>
                     ))}
                   </div>
@@ -3887,7 +3887,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     >
       {children}
       {activeTooltip === id && (
-        <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 bg-gray-900 text-white text-[10px] rounded-lg shadow-lg p-2.5" style={{pointerEvents: 'auto'}}>
+        <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 bg-gray-900 text-white text-xs rounded-lg shadow-lg p-2.5" style={{pointerEvents: 'auto'}}>
           <p className="mb-1.5 leading-relaxed">{reviewTooltips[id]}</p>
           <label className="flex items-center gap-1.5 cursor-pointer text-gray-300 hover:text-white"
             onClick={(e) => { e.stopPropagation(); dismissTooltip(id); }}
@@ -8567,11 +8567,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         <div className="flex items-center space-x-3">
           {user && (
             <div className="flex items-center space-x-2">
-              <div className={`px-3 py-1 ${user?.role === 'admin' ? 'bg-red-500' : user?.role === 'pm' ? 'bg-blue-500' : 'bg-green-500'} rounded text-[10px] font-medium text-center`}>
+              <div className={`px-3 py-1 ${user?.role === 'admin' ? 'bg-red-500' : user?.role === 'pm' ? 'bg-blue-500' : 'bg-green-500'} rounded text-xs font-medium text-center`}>
                 {user?.role === 'admin' ? 'Administrator' : user?.role === 'pm' ? 'Project Manager' : 'Translator'}
               </div>
               {user.name && (
-                <span className="text-white text-[11px]">
+                <span className="text-white text-xs">
                   Welcome, {user.name.split(' ')[0]}
                 </span>
               )}
@@ -8596,7 +8596,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           <h1 className="text-lg font-bold text-blue-600">TRANSLATION WORKSPACE</h1>
           {/* Auto-save indicator */}
           {(originalImages.length > 0 || translationResults.length > 0) && (
-            <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] ${
+            <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
               hasUnsavedChanges
                 ? 'bg-yellow-100 text-yellow-700 border border-yellow-300'
                 : 'bg-green-100 text-green-700 border border-green-300'
@@ -8648,7 +8648,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       <span className="text-lg">📂</span>
                       <div className="text-left">
                         <div className="font-medium">Open Documents</div>
-                        <div className="text-[10px] text-gray-500">View project files</div>
+                        <div className="text-xs text-gray-500">View project files</div>
                       </div>
                     </button>
 
@@ -8663,7 +8663,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       <span className="text-lg">📄</span>
                       <div className="text-left">
                         <div className="font-medium">Translate Document</div>
-                        <div className="text-[10px] text-gray-500">OCR and manual translation</div>
+                        <div className="text-xs text-gray-500">OCR and manual translation</div>
                       </div>
                     </button>
 
@@ -8687,7 +8687,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         <div className="font-medium">
                           {selectedOrder.translation_ready ? '✅ Review Translation' : 'Review'}
                         </div>
-                        <div className="text-[10px] text-gray-500">
+                        <div className="text-xs text-gray-500">
                           {selectedOrder.translation_ready ? 'Translation ready for review' : 'Review and approve'}
                         </div>
                       </div>
@@ -8703,14 +8703,14 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     >
                       <span className="text-lg">✅</span>
                       <div className="text-left">
-                        <div className="font-medium">Entregar ao Cliente</div>
-                        <div className="text-[10px] text-gray-500">Finalize and send</div>
+                        <div className="font-medium">Deliver to Client</div>
+                        <div className="text-xs text-gray-500">Finalize and send</div>
                       </div>
                     </button>
                   </div>
 
                   <div className="border-t border-gray-100 p-1">
-                    <div className="px-3 py-2 text-[10px] text-gray-400">
+                    <div className="px-3 py-2 text-xs text-gray-400">
                       Status: <span className="font-medium">{selectedOrder.translation_status || 'received'}</span>
                     </div>
                   </div>
@@ -8799,7 +8799,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   Claude API Key: {claudeApiKey ? 'Configured' : 'Not configured'}
                 </span>
                 {claudeApiKey && (
-                  <span className="text-[10px] text-gray-500">({claudeApiKey.slice(0, 7)}...{claudeApiKey.slice(-4)})</span>
+                  <span className="text-xs text-gray-500">({claudeApiKey.slice(0, 7)}...{claudeApiKey.slice(-4)})</span>
                 )}
               </div>
               <div className="flex items-center gap-2">
@@ -8837,7 +8837,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               </div>
             )}
             {!claudeApiKey && (
-              <p className="text-[10px] text-red-600 mt-1">
+              <p className="text-xs text-red-600 mt-1">
                 Configure your Claude API key to use AI translation. Get it at console.anthropic.com
               </p>
             )}
@@ -8849,7 +8849,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               >
                 Diagnosticar todas as chaves
               </button>
-              <span className="text-[10px] text-gray-500">Verifica todas as fontes de chave de API</span>
+              <span className="text-xs text-gray-500">Checks all API key sources</span>
             </div>
             {/* Diagnosis results */}
             {diagnosisResult && diagnosisResult.sources && (
@@ -8877,7 +8877,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-3">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-bold text-green-800">📤 Upload Document to Translate</h3>
-              <span className="text-[10px] text-green-600">PDF, Images, Word (.docx)</span>
+              <span className="text-xs text-green-600">PDF, Images, Word (.docx)</span>
             </div>
 
             <div className="border-2 border-dashed border-green-300 rounded-lg p-3 text-center hover:border-green-500 transition-colors">
@@ -8971,7 +8971,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           setTranslationResults([]);
                         }
                       }}
-                      className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
+                      className="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
                     >
                       🗑️ Clear All
                     </button>
@@ -8992,7 +8992,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       </span>
                       <button
                         onClick={() => setOriginalImages(prev => prev.filter((_, i) => i !== idx))}
-                        className="ml-2 px-1.5 py-0.5 bg-red-100 text-red-600 rounded hover:bg-red-200 text-[10px]"
+                        className="ml-2 px-1.5 py-0.5 bg-red-100 text-red-600 rounded hover:bg-red-200 text-xs"
                         title="Remove file"
                       >
                         ✕
@@ -9006,7 +9006,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       </span>
                       <button
                         onClick={() => setTranslationResults(prev => prev.filter((_, i) => i !== idx))}
-                        className="ml-2 px-1.5 py-0.5 bg-red-100 text-red-600 rounded hover:bg-red-200 text-[10px]"
+                        className="ml-2 px-1.5 py-0.5 bg-red-100 text-red-600 rounded hover:bg-red-200 text-xs"
                         title="Remove file"
                       >
                         ✕
@@ -9058,12 +9058,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                               From: {msg.from_admin_name}
                             </span>
                             {msg.order_number && (
-                              <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded">
+                              <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded">
                                 {msg.order_number}
                               </span>
                             )}
                             {msg.read && (
-                              <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded">
+                              <span className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded">
                                 Read
                               </span>
                             )}
@@ -9071,7 +9071,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           <div className="text-sm text-gray-700 bg-gray-50 p-2 rounded mt-2">
                             {msg.content}
                           </div>
-                          <div className="text-[10px] text-gray-400 mt-2">
+                          <div className="text-xs text-gray-400 mt-2">
                             {formatDateTimeLocal(msg.created_at)}
                           </div>
                         </div>
@@ -9328,7 +9328,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                               }}
                               className="w-4 h-4 text-indigo-600 rounded border-indigo-300 focus:ring-indigo-500"
                             />
-                            <span className="text-[10px] text-indigo-600 font-medium">
+                            <span className="text-xs text-indigo-600 font-medium">
                               {batchSelectedFileIds.has(file.id) ? 'Selected for batch' : 'Select for batch translation'}
                             </span>
                           </div>
@@ -9337,7 +9337,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         {/* Page Grouping Input */}
                         {pageGroupMode && !file.page_group_id && (
                           <div className="mb-2 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                            <label className="text-[10px] text-orange-600 font-medium whitespace-nowrap">Page #:</label>
+                            <label className="text-xs text-orange-600 font-medium whitespace-nowrap">Page #:</label>
                             <input
                               type="number"
                               min="0"
@@ -9359,7 +9359,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         {/* Existing Group Badge */}
                         {file.page_group_id && (
                           <div className="mb-2 flex items-center justify-between">
-                            <span className="text-[10px] px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full font-medium">
+                            <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full font-medium">
                               🔗 Page {file.page_number} of {allProjectFiles.filter(f => f.page_group_id === file.page_group_id).length}
                             </span>
                             <button
@@ -9369,7 +9369,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                   removePageGroup(file.page_group_id, file.order_id);
                                 }
                               }}
-                              className="text-[10px] text-red-400 hover:text-red-600"
+                              className="text-xs text-red-400 hover:text-red-600"
                               title="Remove group"
                             >
                               ✕
@@ -9381,7 +9381,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           <span className="font-bold text-blue-700 text-xs truncate max-w-[120px]" title={file.filename}>
                             {file.filename || 'Document'}
                           </span>
-                          <span className={`text-[10px] px-2 py-0.5 rounded ${
+                          <span className={`text-xs px-2 py-0.5 rounded ${
                             file.file_status === 'pending' || file.file_status === 'received' ? 'bg-yellow-100 text-yellow-700' :
                             file.file_status === 'in_translation' ? 'bg-blue-100 text-blue-700' :
                             file.file_status === 'review' || file.file_status === 'pending_review' ? 'bg-purple-100 text-purple-700' :
@@ -9397,34 +9397,34 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         </div>
                         {file.batch_translated && (
                           <div className="mb-1">
-                            <span className="text-[10px] px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full font-medium">
+                            <span className="text-xs px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full font-medium">
                               📑 Batch translated
                             </span>
                           </div>
                         )}
-                        <div className="text-[10px] text-gray-500 mb-1">
+                        <div className="text-xs text-gray-500 mb-1">
                           Project: <span className="font-medium text-blue-600">{file.order_number}</span>
                         </div>
                         <div className="text-xs text-gray-600">
                           {file.translate_from} → {file.translate_to}
                         </div>
                         {(file.translator_deadline || file.deadline) && (
-                          <div className="text-[10px] text-blue-600 mt-1">
+                          <div className="text-xs text-blue-600 mt-1">
                             ⏰ Due: {new Date(file.translator_deadline || file.deadline).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
                           </div>
                         )}
                         {file.team_notes && (
-                          <div className="text-[10px] text-purple-600 mt-1">
+                          <div className="text-xs text-purple-600 mt-1">
                             👥 Has team notes
                           </div>
                         )}
                         {isAdmin && file.internal_notes && (
-                          <div className="text-[10px] text-sky-600 mt-1">
+                          <div className="text-xs text-sky-600 mt-1">
                             🔒 Has internal notes
                           </div>
                         )}
                         {selectedFileId === file.id && (
-                          <div className="mt-2 text-[10px] text-blue-600 font-medium">✓ File loaded</div>
+                          <div className="mt-2 text-xs text-blue-600 font-medium">✓ File loaded</div>
                         )}
                         {/* Action buttons */}
                         <div className="mt-2 flex flex-wrap gap-1">
@@ -9538,14 +9538,14 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           {/* Pending acceptance banner for contractors / bulk invites */}
                           {isPendingAcceptance && (
                             <div className={`${isBulkPending ? 'bg-purple-100 border-purple-300' : 'bg-yellow-100 border-yellow-300'} border rounded px-2 py-1 mb-2 text-center`}>
-                              <span className={`text-[10px] ${isBulkPending ? 'text-purple-800' : 'text-yellow-800'} font-medium`}>
+                              <span className={`text-xs ${isBulkPending ? 'text-purple-800' : 'text-yellow-800'} font-medium`}>
                                 {isBulkPending ? '📢 Bulk invite - Accept via email (first to accept gets it!)' : '⚠️ Accept via email to start'}
                               </span>
                             </div>
                           )}
                           <div className="flex items-center justify-between mb-2">
                             <span className="font-bold text-blue-700 text-sm">{order.order_number}</span>
-                            <span className={`text-[10px] px-2 py-0.5 rounded ${
+                            <span className={`text-xs px-2 py-0.5 rounded ${
                               order.translation_status === 'received' ? 'bg-yellow-100 text-yellow-700' :
                               order.translation_status === 'in_translation' ? 'bg-blue-100 text-blue-700' :
                               order.translation_status === 'review' ? 'bg-blue-100 text-blue-700' :
@@ -9561,22 +9561,22 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             {order.document_type || 'Document'} • {order.page_count || 1} page(s)
                           </div>
                           {(order.translator_deadline || order.deadline) && (
-                            <div className="text-[10px] text-blue-600 mt-1">
+                            <div className="text-xs text-blue-600 mt-1">
                               ⏰ Due: {new Date(order.translator_deadline || order.deadline).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
                             </div>
                           )}
                           {order.team_notes && (
-                            <div className="text-[10px] text-purple-600 mt-1">
+                            <div className="text-xs text-purple-600 mt-1">
                               👥 Has team notes
                             </div>
                           )}
                           {isAdmin && order.internal_notes && (
-                            <div className="text-[10px] text-sky-600 mt-1">
+                            <div className="text-xs text-sky-600 mt-1">
                               🔒 Has internal notes
                             </div>
                           )}
                           {!isPendingAcceptance && selectedOrderId === order.id && (
-                            <div className="mt-2 text-[10px] text-blue-600 font-medium">✓ Project selected</div>
+                            <div className="mt-2 text-xs text-blue-600 font-medium">✓ Project selected</div>
                           )}
                         </div>
                       );
@@ -9657,7 +9657,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         <span className="text-sm font-medium text-gray-700 truncate block" title={file.filename}>
                           {file.filename || 'Document'}
                         </span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${
                           file.file_status === 'pending' || file.file_status === 'received' ? 'bg-yellow-100 text-yellow-700' :
                           file.file_status === 'in_translation' ? 'bg-blue-100 text-blue-700' :
                           file.file_status === 'completed' || file.file_status === 'ready' ? 'bg-green-100 text-green-700' :
@@ -9719,7 +9719,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
           {/* Quick Start Guide - Compact */}
           <div className="bg-blue-50 border border-blue-200 rounded px-3 py-1.5">
-            <p className="text-[10px] text-blue-700">
+            <p className="text-xs text-blue-700">
               <strong>Workflow:</strong> {isInHouseTranslator
                 ? 'START → TRANSLATE (edit) → PROOFREADING'
                 : isAdmin || isPM
@@ -9833,7 +9833,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <span className="text-lg">💱</span>
                 <div>
                   <span className="text-sm font-medium">Translator's Note (Financial Documents)</span>
-                  <p className="text-[10px] text-gray-500">Currency conversion for bank statements, tax returns</p>
+                  <p className="text-xs text-gray-500">Currency conversion for bank statements, tax returns</p>
                 </div>
                 {translatorNoteEnabled && <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded">✓ Active</span>}
               </div>
@@ -9951,13 +9951,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         📋 Copy
                       </button>
                     </div>
-                    <p className="text-[11px] text-gray-600 italic leading-relaxed">
+                    <p className="text-xs text-gray-600 italic leading-relaxed">
                       {generateTranslatorNote()}
                     </p>
 
                     {/* Example Conversion */}
                     <div className="mt-3 pt-3 border-t border-gray-200">
-                      <span className="text-[10px] font-medium text-gray-500">Example Conversion:</span>
+                      <span className="text-xs font-medium text-gray-500">Example Conversion:</span>
                       <div className="mt-1 text-sm">
                         <span className="text-gray-700">{CURRENCIES[translatorNoteSettings.sourceCurrency].symbol}1,000.00 </span>
                         <span dangerouslySetInnerHTML={{ __html: convertCurrencyValue(1000 * parseFloat(translatorNoteSettings.exchangeRate || 1)) }} className="text-green-700" />
@@ -9967,7 +9967,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 )}
 
                 {/* Quick Info */}
-                <div className="text-[10px] text-gray-500 bg-blue-50 p-2 rounded">
+                <div className="text-xs text-gray-500 bg-blue-50 p-2 rounded">
                   <strong>💡 How it works:</strong> When enabled, the translator's note will be added at the beginning of the FIRST PAGE of EACH FILE (if multiple files).
                   If "Convert values" is checked, main financial values will show converted amounts in brackets.
                   <br/><strong>Note:</strong> The preview above auto-updates when you change currency, date, or source.
@@ -9981,16 +9981,16 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             <div className="flex justify-between items-center mb-3">
               <h3 className="text-xs font-bold text-blue-700">📄 Certificate Preview (Live)</h3>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] text-green-600 bg-green-50 px-2 py-1 rounded">
+                <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
                   Template: {selectedCertificateTemplate.startsWith('custom-')
                     ? customCertificateTemplates.find(t => `custom-${t.id}` === selectedCertificateTemplate)?.name || 'Custom'
                     : CERTIFICATE_TEMPLATES[selectedCertificateTemplate]?.name || 'Default'}
                 </span>
-                <span className="text-[10px] text-blue-500 bg-blue-50 px-2 py-1 rounded">🔄 Edit highlighted fields directly</span>
+                <span className="text-xs text-blue-500 bg-blue-50 px-2 py-1 rounded">🔄 Edit highlighted fields directly</span>
                 {(isAdmin || isPM) && (
                   <button
                     onClick={handleDownloadCertificatePreview}
-                    className="text-[10px] text-white bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded flex items-center gap-1"
+                    className="text-xs text-white bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded flex items-center gap-1"
                     title="Download certificate preview as PDF"
                   >
                     ⬇ Download
@@ -10020,15 +10020,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 {/* Header with logos */}
                 <div className="flex justify-between items-center mb-2 pb-2">
                   <div className="w-32">
-                    {logoLeft ? <img src={logoLeft} alt="Logo" className="max-h-12" /> : <div className="text-[10px] text-blue-600 font-bold">LEGACY<br/><span className="font-normal text-[8px]">TRANSLATIONS</span></div>}
+                    {logoLeft ? <img src={logoLeft} alt="Logo" className="max-h-12" /> : <div className="text-xs text-blue-600 font-bold">LEGACY<br/><span className="font-normal text-xs">TRANSLATIONS</span></div>}
                   </div>
                   <div className="text-center flex-1 px-4">
                     <div className="font-bold text-blue-600 text-sm">Legacy Translations</div>
-                    <div className="text-[10px] text-gray-600">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
-                    <div className="text-[10px] text-gray-600">(857) 316-7770 · contact@legacytranslations.com</div>
+                    <div className="text-xs text-gray-600">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                    <div className="text-xs text-gray-600">(857) 316-7770 · contact@legacytranslations.com</div>
                   </div>
                   <div className="w-32 text-right">
-                    {logoRight ? <img src={logoRight} alt="ATA" className="max-h-12 ml-auto" /> : <div className="text-[9px] text-gray-600 italic">ata<br/><span className="text-[8px]">Member # 275993</span></div>}
+                    {logoRight ? <img src={logoRight} alt="ATA" className="max-h-12 ml-auto" /> : <div className="text-xs text-gray-600 italic">ata<br/><span className="text-xs">Member # 275993</span></div>}
                   </div>
                 </div>
                 {/* Light blue line below header */}
@@ -10105,9 +10105,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     <img src={logoStamp} alt="Stamp" className="w-[146px] h-[146px] object-contain" />
                   ) : (
                     <div className="w-[146px] h-[146px] rounded-full border-[5px] border-blue-600 flex flex-col items-center justify-center p-3" style={{borderStyle: 'double'}}>
-                      <div className="text-[10px] text-blue-600 font-bold">CERTIFIED TRANSLATOR</div>
+                      <div className="text-xs text-blue-600 font-bold">CERTIFIED TRANSLATOR</div>
                       <div className="text-[13px] text-blue-600 font-bold mt-1">LEGACY TRANSLATIONS</div>
-                      <div className="text-[10px] text-blue-600">ATA # 275993</div>
+                      <div className="text-xs text-blue-600">ATA # 275993</div>
                     </div>
                   )}
                 </div>
@@ -10123,10 +10123,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
             {/* Header Info Section */}
             <div className="mb-4 p-3 bg-gray-50 rounded border">
-              <h4 className="text-[10px] font-bold text-gray-600 mb-2">📝 Certificate Header Info</h4>
+              <h4 className="text-xs font-bold text-gray-600 mb-2">📝 Certificate Header Info</h4>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[10px] text-gray-500 mb-0.5">Company Name</label>
+                  <label className="block text-xs text-gray-500 mb-0.5">Company Name</label>
                   <input
                     type="text"
                     value={certCompanyName}
@@ -10139,7 +10139,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] text-gray-500 mb-0.5">Address</label>
+                  <label className="block text-xs text-gray-500 mb-0.5">Address</label>
                   <input
                     type="text"
                     value={certCompanyAddress}
@@ -10152,7 +10152,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] text-gray-500 mb-0.5">Phone</label>
+                  <label className="block text-xs text-gray-500 mb-0.5">Phone</label>
                   <input
                     type="text"
                     value={certCompanyPhone}
@@ -10165,7 +10165,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] text-gray-500 mb-0.5">Email</label>
+                  <label className="block text-xs text-gray-500 mb-0.5">Email</label>
                   <input
                     type="text"
                     value={certCompanyEmail}
@@ -10184,73 +10184,73 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             <div className="grid grid-cols-4 gap-2">
               {/* Left Logo (Legacy/Partner) */}
               <div className="text-center">
-                <label className="block text-[10px] font-medium text-gray-700 mb-1">Left Logo</label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Left Logo</label>
                 <div className="border-2 border-dashed border-gray-300 rounded p-1 bg-white h-14 flex items-center justify-center">
                   {logoLeft ? (
                     <img src={logoLeft} alt="Left Logo" className="max-h-10 max-w-full object-contain" />
                   ) : (
-                    <span className="text-[9px] text-gray-400">No logo</span>
+                    <span className="text-xs text-gray-400">No logo</span>
                   )}
                 </div>
                 <input ref={logoLeftInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'left')} className="hidden" />
                 <div className="flex justify-center gap-1 mt-1">
-                  {user?.role === 'admin' && <button onClick={() => logoLeftInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>}
-                  {user?.role === 'admin' && logoLeft && <button onClick={() => saveAssetToBackend('logo_left', logoLeft)} className="px-1.5 py-0.5 bg-green-500 text-white text-[9px] rounded hover:bg-green-600">Save</button>}
-                  {user?.role === 'admin' && logoLeft && <button onClick={() => removeLogo('left')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
+                  {user?.role === 'admin' && <button onClick={() => logoLeftInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-xs rounded hover:bg-blue-600">Upload</button>}
+                  {user?.role === 'admin' && logoLeft && <button onClick={() => saveAssetToBackend('logo_left', logoLeft)} className="px-1.5 py-0.5 bg-green-500 text-white text-xs rounded hover:bg-green-600">Save</button>}
+                  {user?.role === 'admin' && logoLeft && <button onClick={() => removeLogo('left')} className="px-1.5 py-0.5 bg-red-500 text-white text-xs rounded hover:bg-red-600">🗑️</button>}
                 </div>
               </div>
 
               {/* Center Logo (ATA) */}
               <div className="text-center">
-                <label className="block text-[10px] font-medium text-gray-700 mb-1">Center Logo</label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Center Logo</label>
                 <div className="border-2 border-dashed border-gray-300 rounded p-1 bg-white h-14 flex items-center justify-center">
                   {logoRight ? (
                     <img src={logoRight} alt="ATA Logo" className="max-h-10 max-w-full object-contain" />
                   ) : (
-                    <span className="text-[9px] text-gray-400">No logo</span>
+                    <span className="text-xs text-gray-400">No logo</span>
                   )}
                 </div>
                 <input ref={logoRightInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'right')} className="hidden" />
                 <div className="flex justify-center gap-1 mt-1">
-                  {user?.role === 'admin' && <button onClick={() => logoRightInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>}
-                  {user?.role === 'admin' && logoRight && <button onClick={() => saveAssetToBackend('logo_right', logoRight)} className="px-1.5 py-0.5 bg-green-500 text-white text-[9px] rounded hover:bg-green-600">Save</button>}
-                  {user?.role === 'admin' && logoRight && <button onClick={() => removeLogo('right')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
+                  {user?.role === 'admin' && <button onClick={() => logoRightInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-xs rounded hover:bg-blue-600">Upload</button>}
+                  {user?.role === 'admin' && logoRight && <button onClick={() => saveAssetToBackend('logo_right', logoRight)} className="px-1.5 py-0.5 bg-green-500 text-white text-xs rounded hover:bg-green-600">Save</button>}
+                  {user?.role === 'admin' && logoRight && <button onClick={() => removeLogo('right')} className="px-1.5 py-0.5 bg-red-500 text-white text-xs rounded hover:bg-red-600">🗑️</button>}
                 </div>
               </div>
 
               {/* Stamp Logo */}
               <div className="text-center">
-                <label className="block text-[10px] font-medium text-gray-700 mb-1">Stamp</label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Stamp</label>
                 <div className="border-2 border-dashed border-gray-300 rounded p-1 bg-white h-14 flex items-center justify-center">
                   {logoStamp ? (
                     <img src={logoStamp} alt="Stamp Logo" className="max-h-10 max-w-full object-contain" />
                   ) : (
-                    <span className="text-[9px] text-gray-400">No stamp</span>
+                    <span className="text-xs text-gray-400">No stamp</span>
                   )}
                 </div>
                 <input ref={logoStampInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'stamp')} className="hidden" />
                 <div className="flex justify-center gap-1 mt-1">
-                  {user?.role === 'admin' && <button onClick={() => logoStampInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>}
-                  {user?.role === 'admin' && logoStamp && <button onClick={() => saveAssetToBackend('logo_stamp', logoStamp)} className="px-1.5 py-0.5 bg-green-500 text-white text-[9px] rounded hover:bg-green-600">Save</button>}
-                  {user?.role === 'admin' && logoStamp && <button onClick={() => removeLogo('stamp')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
+                  {user?.role === 'admin' && <button onClick={() => logoStampInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-xs rounded hover:bg-blue-600">Upload</button>}
+                  {user?.role === 'admin' && logoStamp && <button onClick={() => saveAssetToBackend('logo_stamp', logoStamp)} className="px-1.5 py-0.5 bg-green-500 text-white text-xs rounded hover:bg-green-600">Save</button>}
+                  {user?.role === 'admin' && logoStamp && <button onClick={() => removeLogo('stamp')} className="px-1.5 py-0.5 bg-red-500 text-white text-xs rounded hover:bg-red-600">🗑️</button>}
                 </div>
               </div>
 
               {/* Signature Image */}
               <div className="text-center">
-                <label className="block text-[10px] font-medium text-gray-700 mb-1">Signature</label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Signature</label>
                 <div className="border-2 border-dashed border-gray-300 rounded p-1 bg-white h-14 flex items-center justify-center">
                   {signatureImage ? (
                     <img src={signatureImage} alt="Signature" className="max-h-10 max-w-full object-contain" />
                   ) : (
-                    <span className="text-[9px] text-gray-400">No signature</span>
+                    <span className="text-xs text-gray-400">No signature</span>
                   )}
                 </div>
                 <input ref={signatureInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'signature')} className="hidden" />
                 <div className="flex justify-center gap-1 mt-1">
-                  {user?.role === 'admin' && <button onClick={() => signatureInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>}
-                  {user?.role === 'admin' && signatureImage && <button onClick={() => saveAssetToBackend('signature_image', signatureImage)} className="px-1.5 py-0.5 bg-green-500 text-white text-[9px] rounded hover:bg-green-600">Save</button>}
-                  {user?.role === 'admin' && signatureImage && <button onClick={() => removeLogo('signature')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
+                  {user?.role === 'admin' && <button onClick={() => signatureInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-xs rounded hover:bg-blue-600">Upload</button>}
+                  {user?.role === 'admin' && signatureImage && <button onClick={() => saveAssetToBackend('signature_image', signatureImage)} className="px-1.5 py-0.5 bg-green-500 text-white text-xs rounded hover:bg-green-600">Save</button>}
+                  {user?.role === 'admin' && signatureImage && <button onClick={() => removeLogo('signature')} className="px-1.5 py-0.5 bg-red-500 text-white text-xs rounded hover:bg-red-600">🗑️</button>}
                 </div>
               </div>
             </div>
@@ -10279,7 +10279,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     }
                   }
                 }}
-                className="text-[10px] px-2 py-1 rounded border border-dashed border-blue-400 text-blue-600 hover:bg-blue-50"
+                className="text-xs px-2 py-1 rounded border border-dashed border-blue-400 text-blue-600 hover:bg-blue-50"
               >
                 + Custom
               </button>
@@ -10294,10 +10294,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 if (templatesInCategory.length === 0) return null;
                 return (
                   <div key={catKey} className="border rounded p-2">
-                    <div className="text-[10px] font-semibold text-gray-600 mb-1.5 flex items-center gap-1">
+                    <div className="text-xs font-semibold text-gray-600 mb-1.5 flex items-center gap-1">
                       <span>{category.icon}</span>
                       <span>{category.name}</span>
-                      <span className="text-[9px] text-gray-400 font-normal">({templatesInCategory.length})</span>
+                      <span className="text-xs text-gray-400 font-normal">({templatesInCategory.length})</span>
                     </div>
                     <div className="flex flex-wrap gap-1">
                       {templatesInCategory.map(([key, template]) => (
@@ -10307,7 +10307,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             setSelectedCertificateTemplate(key);
                             localStorage.setItem('selected_certificate_template', key);
                           }}
-                          className={`px-2 py-1 text-[9px] rounded transition-all ${selectedCertificateTemplate === key
+                          className={`px-2 py-1 text-xs rounded transition-all ${selectedCertificateTemplate === key
                             ? 'bg-blue-500 text-white font-medium'
                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
                           title={template.description}
@@ -10323,10 +10323,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               {/* Custom Templates */}
               {customCertificateTemplates.length > 0 && (
                 <div className="border rounded p-2 border-dashed">
-                  <div className="text-[10px] font-semibold text-gray-600 mb-1.5 flex items-center gap-1">
+                  <div className="text-xs font-semibold text-gray-600 mb-1.5 flex items-center gap-1">
                     <span>⭐</span>
                     <span>Custom Templates</span>
-                    <span className="text-[9px] text-gray-400 font-normal">({customCertificateTemplates.length})</span>
+                    <span className="text-xs text-gray-400 font-normal">({customCertificateTemplates.length})</span>
                   </div>
                   <div className="flex flex-wrap gap-1">
                     {customCertificateTemplates.map(tpl => (
@@ -10336,7 +10336,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             setSelectedCertificateTemplate(`custom-${tpl.id}`);
                             localStorage.setItem('selected_certificate_template', `custom-${tpl.id}`);
                           }}
-                          className={`px-2 py-1 text-[9px] rounded-l transition-all ${selectedCertificateTemplate === `custom-${tpl.id}`
+                          className={`px-2 py-1 text-xs rounded-l transition-all ${selectedCertificateTemplate === `custom-${tpl.id}`
                             ? 'bg-blue-500 text-white font-medium'
                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
                         >
@@ -10354,7 +10354,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                               }
                             }
                           }}
-                          className="px-1 py-1 text-[9px] bg-red-100 text-red-600 rounded-r hover:bg-red-200"
+                          className="px-1 py-1 text-xs bg-red-100 text-red-600 rounded-r hover:bg-red-200"
                         >
                           ✕
                         </button>
@@ -10488,7 +10488,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               </label>
               )}
             </div>
-            <p className="text-[10px] text-gray-500 text-center mt-2">
+            <p className="text-xs text-gray-500 text-center mt-2">
               {workflowMode === 'ai' ? 'Upload document and translate with AI' : workflowMode === 'external' ? 'Upload original + existing translation for review' : workflowMode === 'ocr' ? 'Extract text for external CAT tools (SDL Trados, MemoQ, etc.)' : 'Fill document template with original for reference'}
             </p>
           </div>
@@ -10655,7 +10655,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     <option value="general">📄 General</option>
                     <option value="personal">👤 Personal</option>
                   </select>
-                  <p className="text-[10px] text-gray-500 mt-1">Auto-selected from document type</p>
+                  <p className="text-xs text-gray-500 mt-1">Auto-selected from document type</p>
                 </div>
               </div>
             </div>
@@ -10798,7 +10798,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   >
                     Next →
                   </button>
-                  <span className="text-[10px] text-gray-500 ml-2">
+                  <span className="text-xs text-gray-500 ml-2">
                     Page {selectedResultIndex + 1} of {Math.max(originalImages.length, translationResults.length)}
                     {translationResults.length > 0 && ` | ${translationResults.filter(r => r?.translatedText).length} translated`}
                   </span>
@@ -10811,7 +10811,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   <div className="px-3 py-2 border-r flex items-center justify-between">
                     <span className="text-xs font-bold text-gray-700">📄 Original Document</span>
                     <div className="flex items-center gap-1">
-                      <label className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded cursor-pointer hover:bg-blue-600">
+                      <label className="px-2 py-1 bg-blue-500 text-white text-xs rounded cursor-pointer hover:bg-blue-600">
                         Upload
                         <input
                           type="file"
@@ -10843,7 +10843,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                               setOriginalImages(newOriginalImages);
                             }
                           }}
-                          className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
+                          className="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
                           title="Delete original page"
                         >
                           Delete
@@ -10854,7 +10854,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   <div className="px-3 py-2 flex items-center justify-between">
                     <span className="text-xs font-bold text-gray-700">🌐 Translation ({targetLanguage})</span>
                     <div className="flex items-center gap-1">
-                      <label className="px-2 py-0.5 text-[10px] rounded bg-green-600 text-white cursor-pointer hover:bg-green-700">
+                      <label className="px-2 py-0.5 text-xs rounded bg-green-600 text-white cursor-pointer hover:bg-green-700">
                         Upload
                         <input
                           type="file"
@@ -10924,7 +10924,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                               showToast('Page deleted!');
                             }
                           }}
-                          className="px-2 py-0.5 text-[10px] rounded bg-red-500 text-white hover:bg-red-600"
+                          className="px-2 py-0.5 text-xs rounded bg-red-500 text-white hover:bg-red-600"
                           title="Delete translated page"
                         >
                           Delete
@@ -10936,17 +10936,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 {/* Edit Mode Toggle and Toolbar - Outside the grid for consistent height */}
                 {(isInHouseTranslator || isPM || isAdmin) && translationResults.length > 0 && (
                   <div className="flex items-center justify-between px-2 py-1 bg-gray-100 border-b">
-                    <span className="text-[10px] text-gray-600">Mode:</span>
+                    <span className="text-xs text-gray-600">Mode:</span>
                     <div className="flex gap-1">
                       <button
                         onClick={() => setTranslationEditMode && setTranslationEditMode(false)}
-                        className={`px-2 py-0.5 text-[10px] rounded ${!translationEditMode ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border'}`}
+                        className={`px-2 py-0.5 text-xs rounded ${!translationEditMode ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border'}`}
                       >
                         Preview
                       </button>
                       <button
                         onClick={() => setTranslationEditMode && setTranslationEditMode(true)}
-                        className={`px-2 py-0.5 text-[10px] rounded ${translationEditMode ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border'}`}
+                        className={`px-2 py-0.5 text-xs rounded ${translationEditMode ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border'}`}
                       >
                         ✏️ Edit
                       </button>
@@ -10959,7 +10959,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     <button onClick={() => document.execCommand('italic')} className="px-2 py-0.5 text-xs border rounded hover:bg-gray-100 italic" title="Italic">I</button>
                     <button onClick={() => document.execCommand('underline')} className="px-2 py-0.5 text-xs border rounded hover:bg-gray-100 underline" title="Underline">U</button>
                     <span className="border-l mx-1"></span>
-                    <button onClick={() => document.execCommand('fontSize', false, '2')} className="px-2 py-0.5 text-[10px] border rounded hover:bg-gray-100" title="Small">A-</button>
+                    <button onClick={() => document.execCommand('fontSize', false, '2')} className="px-2 py-0.5 text-xs border rounded hover:bg-gray-100" title="Small">A-</button>
                     <button onClick={() => document.execCommand('fontSize', false, '4')} className="px-2 py-0.5 text-xs border rounded hover:bg-gray-100" title="Normal">A</button>
                     <button onClick={() => document.execCommand('fontSize', false, '6')} className="px-2 py-0.5 text-sm border rounded hover:bg-gray-100" title="Large">A+</button>
                   </div>
@@ -11056,7 +11056,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   placeholder='e.g., "Describe what is written in Arabic between brackets" or "Keep original formatting with tables"'
                   className="w-full px-2 py-1.5 text-xs border rounded h-16 resize-none"
                 />
-                <p className="text-[10px] text-blue-600 mt-1">
+                <p className="text-xs text-blue-600 mt-1">
                   These instructions will be sent to Claude along with each page. Max recommended: 5-10 pages at once.
                 </p>
               </div>
@@ -11071,7 +11071,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   {isProcessing ? '⏳ Translating...' : `🌐 Translate ${originalImages.length > 0 ? `(${originalImages.length} page${originalImages.length > 1 ? 's' : ''})` : ''} with Claude AI`}
                 </button>
                 {!claudeApiKey && (
-                  <p className="text-[10px] text-red-500 mt-1 text-center">
+                  <p className="text-xs text-red-500 mt-1 text-center">
                     ⚠️ Please add your API Key in the Setup tab
                   </p>
                 )}
@@ -11175,7 +11175,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                               setProcessingStatus('❌ Failed to convert: ' + err.message);
                             }
                           }}
-                          className="mt-1 w-full px-3 py-1.5 bg-blue-50 text-blue-600 text-[10px] rounded border border-blue-200 hover:bg-blue-100"
+                          className="mt-1 w-full px-3 py-1.5 bg-blue-50 text-blue-600 text-xs rounded border border-blue-200 hover:bg-blue-100"
                         >
                           🖼️ Download as Images (PNG)
                         </button>
@@ -11322,7 +11322,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         <button className="px-3 py-1.5 bg-blue-500 text-white text-xs rounded hover:bg-blue-600">
                           Upload Original
                         </button>
-                        <p className="text-[10px] text-gray-500 mt-1">Image or PDF (auto-converted)</p>
+                        <p className="text-xs text-gray-500 mt-1">Image or PDF (auto-converted)</p>
                       </div>
                     )}
                   </div>
@@ -11366,7 +11366,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         <button className="px-3 py-1.5 bg-green-500 text-white text-xs rounded hover:bg-green-600">
                           Upload Translation
                         </button>
-                        <p className="text-[10px] text-gray-500 mt-1">Word, PDF, HTML, TXT, or Image</p>
+                        <p className="text-xs text-gray-500 mt-1">Word, PDF, HTML, TXT, or Image</p>
                       </div>
                     )}
                   </div>
@@ -11645,7 +11645,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               {/* Template Selection - Non-Certificate Templates */}
               <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
                 <h3 className="text-xs font-bold text-purple-800 mb-3">📋 Select a Document Template to Fill</h3>
-                <p className="text-[10px] text-purple-600 mb-3">Choose a template below, fill in the fields, and save as translation</p>
+                <p className="text-xs text-purple-600 mb-3">Choose a template below, fill in the fields, and save as translation</p>
 
                 <div className="space-y-3">
                   {Object.entries(TEMPLATE_CATEGORIES)
@@ -11655,10 +11655,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       if (templatesInCategory.length === 0) return null;
                       return (
                         <div key={catKey} className="bg-white border rounded p-3">
-                          <div className="text-[11px] font-semibold text-gray-700 mb-2 flex items-center gap-1">
+                          <div className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1">
                             <span>{category.icon}</span>
                             <span>{category.name}</span>
-                            <span className="text-[9px] text-gray-400 font-normal">({templatesInCategory.length})</span>
+                            <span className="text-xs text-gray-400 font-normal">({templatesInCategory.length})</span>
                           </div>
                           <div className="flex flex-wrap gap-2">
                             {templatesInCategory.map(([key, template]) => (
@@ -11669,7 +11669,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                   setFillableTemplateData({});
                                   setShowTemplatePreview(true);
                                 }}
-                                className={`px-3 py-1.5 text-[10px] rounded-lg transition-all ${selectedFillableTemplate === key
+                                className={`px-3 py-1.5 text-xs rounded-lg transition-all ${selectedFillableTemplate === key
                                   ? 'bg-purple-600 text-white font-medium shadow'
                                   : 'bg-gray-100 text-gray-700 hover:bg-purple-100 hover:text-purple-700'}`}
                                 title={template.description}
@@ -11686,7 +11686,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 {/* Custom Uploaded Templates */}
                 {customCertificateTemplates.filter(t => t.category && t.category !== 'certificates').length > 0 && (
                   <div className="bg-white border border-dashed border-purple-300 rounded p-3 mt-3">
-                    <div className="text-[11px] font-semibold text-purple-700 mb-2 flex items-center gap-1">
+                    <div className="text-xs font-semibold text-purple-700 mb-2 flex items-center gap-1">
                       <span>⭐</span>
                       <span>Custom Uploaded Templates</span>
                     </div>
@@ -11701,7 +11701,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                 setFillableTemplateData({});
                                 setShowTemplatePreview(true);
                               }}
-                              className={`px-3 py-1.5 text-[10px] rounded-l-lg transition-all ${selectedFillableTemplate === `custom-${tpl.id}`
+                              className={`px-3 py-1.5 text-xs rounded-l-lg transition-all ${selectedFillableTemplate === `custom-${tpl.id}`
                                 ? 'bg-purple-600 text-white font-medium shadow'
                                 : 'bg-gray-100 text-gray-700 hover:bg-purple-100 hover:text-purple-700'}`}
                             >
@@ -11720,7 +11720,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                     }
                                   }
                                 }}
-                                className="px-1.5 py-1.5 text-[10px] bg-red-100 text-red-600 rounded-r-lg hover:bg-red-200"
+                                className="px-1.5 py-1.5 text-xs bg-red-100 text-red-600 rounded-r-lg hover:bg-red-200"
                               >
                                 ✕
                               </button>
@@ -11735,7 +11735,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 {(user?.role === 'admin' || user?.role === 'pm') && (
                   <div className="mt-4 pt-4 border-t border-purple-200">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-purple-700 font-medium">Upload Custom Template (Admin/PM only)</span>
+                      <span className="text-xs text-purple-700 font-medium">Upload Custom Template (Admin/PM only)</span>
                       <input
                         type="file"
                         accept=".html,.htm"
@@ -11770,7 +11770,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       />
                       <label
                         htmlFor="template-upload-input"
-                        className="px-3 py-1.5 bg-purple-100 text-purple-700 text-[10px] rounded-lg cursor-pointer hover:bg-purple-200 transition-colors"
+                        className="px-3 py-1.5 bg-purple-100 text-purple-700 text-xs rounded-lg cursor-pointer hover:bg-purple-200 transition-colors"
                       >
                         📤 Upload HTML Template
                       </label>
@@ -11881,7 +11881,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
                   {/* Action Buttons */}
                   <div className="bg-purple-50 px-4 py-3 flex items-center justify-between border-t border-purple-200">
-                    <div className="text-[10px] text-purple-600">
+                    <div className="text-xs text-purple-600">
                       Fill in the template fields, then save as translation
                     </div>
                     <div className="flex items-center gap-2">
@@ -12143,7 +12143,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       <span className="text-sm font-medium">{currentOrder?.order_number || selectedOrderId}</span>
                     </div>
                     {orderStatus && (
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                      <span className={`px-2 py-0.5 rounded text-xs font-bold ${
                         orderStatus === 'pm_upload_ready' ? 'bg-green-200 text-green-800' :
                         orderStatus === 'final' ? 'bg-blue-100 text-blue-700' :
                         'bg-gray-100 text-gray-600'
@@ -12333,13 +12333,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             <div className="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-indigo-600 font-bold text-xs">📑 Batch Translation</span>
-                <span className="text-[10px] px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full">
+                <span className="text-xs px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full">
                   {window.__batchTranslationFileInfo.length} files
                 </span>
               </div>
               <div className="flex flex-wrap gap-1">
                 {window.__batchTranslationFileInfo.map((file, idx) => (
-                  <span key={idx} className="text-[10px] px-2 py-1 bg-white border border-indigo-200 rounded text-indigo-700">
+                  <span key={idx} className="text-xs px-2 py-1 bg-white border border-indigo-200 rounded text-indigo-700">
                     {idx + 1}. {file.filename}
                   </span>
                 ))}
@@ -12434,22 +12434,22 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             <button
                               onClick={() => setSelectedOriginalPageIndex(Math.max(0, selectedOriginalPageIndex - 1))}
                               disabled={selectedOriginalPageIndex === 0}
-                              className="px-1.5 py-0.5 text-[10px] rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
+                              className="px-1.5 py-0.5 text-xs rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
                             >
                               ←
                             </button>
-                            <span className="text-[10px] text-gray-500 font-medium">{selectedOriginalPageIndex + 1}/{originalImages.length}</span>
+                            <span className="text-xs text-gray-500 font-medium">{selectedOriginalPageIndex + 1}/{originalImages.length}</span>
                             <button
                               onClick={() => setSelectedOriginalPageIndex(Math.min(originalImages.length - 1, selectedOriginalPageIndex + 1))}
                               disabled={selectedOriginalPageIndex >= originalImages.length - 1}
-                              className="px-1.5 py-0.5 text-[10px] rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
+                              className="px-1.5 py-0.5 text-xs rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
                             >
                               →
                             </button>
                           </>
                         )}
                         <ReviewTooltip id="upload_original">
-                          <label className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded cursor-pointer hover:bg-blue-600">
+                          <label className="px-2 py-1 bg-blue-500 text-white text-xs rounded cursor-pointer hover:bg-blue-600">
                             Upload
                             <input
                               type="file"
@@ -12483,7 +12483,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                   setOriginalImages(newOriginalImages);
                                 }
                               }}
-                              className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
+                              className="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
                             >
                               Delete
                             </button>
@@ -12502,15 +12502,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           <button
                             onClick={() => setSelectedResultIndex(Math.max(0, selectedResultIndex - 1))}
                             disabled={selectedResultIndex === 0}
-                            className="px-1.5 py-0.5 text-[10px] rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
+                            className="px-1.5 py-0.5 text-xs rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
                           >
                             ←
                           </button>
-                          <span className="text-[10px] text-gray-500 font-medium">{selectedResultIndex + 1}/{translationResults.length}</span>
+                          <span className="text-xs text-gray-500 font-medium">{selectedResultIndex + 1}/{translationResults.length}</span>
                           <button
                             onClick={() => setSelectedResultIndex(Math.min(translationResults.length - 1, selectedResultIndex + 1))}
                             disabled={selectedResultIndex >= translationResults.length - 1}
-                            className="px-1.5 py-0.5 text-[10px] rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
+                            className="px-1.5 py-0.5 text-xs rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
                           >
                             →
                           </button>
@@ -12519,7 +12519,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       <ReviewTooltip id="preview">
                         <button
                           onClick={() => setReviewViewMode('preview')}
-                          className={`px-2 py-1 text-[10px] font-medium rounded ${
+                          className={`px-2 py-1 text-xs font-medium rounded ${
                             reviewViewMode === 'preview'
                               ? 'bg-blue-600 text-white'
                               : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50'
@@ -12531,7 +12531,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       <ReviewTooltip id="edit">
                         <button
                           onClick={() => setReviewViewMode('edit')}
-                          className={`px-2 py-1 text-[10px] font-medium rounded ${
+                          className={`px-2 py-1 text-xs font-medium rounded ${
                             reviewViewMode === 'edit'
                               ? 'bg-blue-600 text-white'
                               : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50'
@@ -12552,13 +12552,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             a.click();
                             URL.revokeObjectURL(url);
                           }}
-                          className="px-2 py-1 bg-green-600 text-white text-[10px] rounded hover:bg-green-700"
+                          className="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
                         >
                           Download
                         </button>
                       </ReviewTooltip>
                       <ReviewTooltip id="upload_translation">
-                        <label className="px-2 py-1 bg-green-600 text-white text-[10px] rounded cursor-pointer hover:bg-green-700">
+                        <label className="px-2 py-1 bg-green-600 text-white text-xs rounded cursor-pointer hover:bg-green-700">
                           Upload
                           <input
                             type="file"
@@ -12631,7 +12631,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                 showToast('Page deleted!');
                               }
                             }}
-                            className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
+                            className="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
                           >
                             Delete
                           </button>
@@ -12857,13 +12857,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             <div className="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-indigo-600 font-bold text-xs">📑 Batch Translation</span>
-                <span className="text-[10px] px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full">
+                <span className="text-xs px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full">
                   {window.__batchTranslationFileInfo.length} files
                 </span>
               </div>
               <div className="flex flex-wrap gap-1">
                 {window.__batchTranslationFileInfo.map((file, idx) => (
-                  <span key={idx} className="text-[10px] px-2 py-1 bg-white border border-indigo-200 rounded text-indigo-700">
+                  <span key={idx} className="text-xs px-2 py-1 bg-white border border-indigo-200 rounded text-indigo-700">
                     {idx + 1}. {file.filename}
                   </span>
                 ))}
@@ -12885,21 +12885,21 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             <button
                               onClick={() => setSelectedOriginalPageIndex(Math.max(0, selectedOriginalPageIndex - 1))}
                               disabled={selectedOriginalPageIndex === 0}
-                              className="px-1.5 py-0.5 text-[10px] rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
+                              className="px-1.5 py-0.5 text-xs rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
                             >
                               ←
                             </button>
-                            <span className="text-[10px] text-gray-500 font-medium">{selectedOriginalPageIndex + 1}/{originalImages.length}</span>
+                            <span className="text-xs text-gray-500 font-medium">{selectedOriginalPageIndex + 1}/{originalImages.length}</span>
                             <button
                               onClick={() => setSelectedOriginalPageIndex(Math.min(originalImages.length - 1, selectedOriginalPageIndex + 1))}
                               disabled={selectedOriginalPageIndex >= originalImages.length - 1}
-                              className="px-1.5 py-0.5 text-[10px] rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
+                              className="px-1.5 py-0.5 text-xs rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
                             >
                               →
                             </button>
                           </>
                         )}
-                        <label className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded cursor-pointer hover:bg-blue-600">
+                        <label className="px-2 py-1 bg-blue-500 text-white text-xs rounded cursor-pointer hover:bg-blue-600">
                           Upload
                           <input
                             type="file"
@@ -12931,7 +12931,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                 setOriginalImages(newOriginalImages);
                               }
                             }}
-                            className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
+                            className="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
                             title="Delete original page"
                           >
                             Delete
@@ -12951,15 +12951,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           <button
                             onClick={() => setSelectedResultIndex(Math.max(0, selectedResultIndex - 1))}
                             disabled={selectedResultIndex === 0}
-                            className="px-1.5 py-0.5 text-[10px] rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
+                            className="px-1.5 py-0.5 text-xs rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
                           >
                             ←
                           </button>
-                          <span className="text-[10px] text-gray-500 font-medium">{selectedResultIndex + 1}/{translationResults.length}</span>
+                          <span className="text-xs text-gray-500 font-medium">{selectedResultIndex + 1}/{translationResults.length}</span>
                           <button
                             onClick={() => setSelectedResultIndex(Math.min(translationResults.length - 1, selectedResultIndex + 1))}
                             disabled={selectedResultIndex >= translationResults.length - 1}
-                            className="px-1.5 py-0.5 text-[10px] rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
+                            className="px-1.5 py-0.5 text-xs rounded disabled:opacity-30 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
                           >
                             →
                           </button>
@@ -12967,17 +12967,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       )}
                       <button
                         onClick={() => setProofreadingViewMode('preview')}
-                        className={`px-2 py-0.5 text-[10px] rounded ${proofreadingViewMode === 'preview' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border'}`}
+                        className={`px-2 py-0.5 text-xs rounded ${proofreadingViewMode === 'preview' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border'}`}
                       >
                         Preview
                       </button>
                       <button
                         onClick={() => setProofreadingViewMode('edit')}
-                        className={`px-2 py-0.5 text-[10px] rounded ${proofreadingViewMode === 'edit' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border'}`}
+                        className={`px-2 py-0.5 text-xs rounded ${proofreadingViewMode === 'edit' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border'}`}
                       >
                         Edit
                       </button>
-                      <label className="px-2 py-0.5 text-[10px] rounded bg-green-600 text-white cursor-pointer hover:bg-green-700">
+                      <label className="px-2 py-0.5 text-xs rounded bg-green-600 text-white cursor-pointer hover:bg-green-700">
                         Upload
                         <input
                           type="file"
@@ -13044,7 +13044,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                               showToast('Page deleted!');
                             }
                           }}
-                          className="px-2 py-0.5 text-[10px] rounded bg-red-500 text-white hover:bg-red-600"
+                          className="px-2 py-0.5 text-xs rounded bg-red-500 text-white hover:bg-red-600"
                           title="Delete translated page"
                         >
                           Delete
@@ -13264,7 +13264,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                     }`}
                                     title="Click to highlight in translation">
                                     <td className="px-2 py-2">
-                                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                      <span className={`px-2 py-0.5 rounded text-xs font-bold ${
                                         severity === 'CRÍTICO' ? 'bg-red-500 text-white' :
                                         severity === 'ALTO' ? 'bg-blue-500 text-white' :
                                         severity === 'MÉDIO' ? 'bg-yellow-500 text-white' :
@@ -13285,16 +13285,16 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                     </td>
                                     <td className="px-2 py-2 text-center">
                                       {erro.applied ? (
-                                        <span className="text-green-600 text-[10px] font-medium">✓ Aplicado</span>
+                                        <span className="text-green-600 text-xs font-medium">✓ Aplicado</span>
                                       ) : foundText && suggestionText ? (
                                         <button
                                           onClick={() => applyProofreadingCorrection(erro, idx)}
-                                          className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
+                                          className="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
                                         >
                                           Aplicar
                                         </button>
                                       ) : (
-                                        <span className="text-gray-400 text-[10px]">-</span>
+                                        <span className="text-gray-400 text-xs">-</span>
                                       )}
                                     </td>
                                   </tr>
@@ -13420,7 +13420,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     </button>
                   </div>
                 </div>
-                <p className="text-[10px] text-gray-500 mt-2">
+                <p className="text-xs text-gray-500 mt-2">
                   {(isInHouseTranslator || isContractor) ? (
                     <>
                       📤 <strong>Send to PM:</strong> Sends translation to Project Manager for review and approval
@@ -13773,7 +13773,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   <span className="text-sm font-medium">Quick Package</span>
                 </label>
               </div>
-              <p className="text-[10px] text-gray-500 text-center mt-2">
+              <p className="text-xs text-gray-500 text-center mt-2">
                 {!quickPackageMode ? 'Use translation from previous flow' : 'Build package with ready translation (upload) - includes verification QR code'}
               </p>
             </div>
@@ -13814,7 +13814,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     }`}
                   />
                   {!documentType.trim() && (
-                    <p className="text-[10px] text-red-500 mt-1">⚠️ Document type is required</p>
+                    <p className="text-xs text-red-500 mt-1">⚠️ Document type is required</p>
                   )}
                 </div>
 
@@ -13846,7 +13846,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               {/* Upload Translation (Ready) */}
               <div className="p-4 bg-green-50 border border-green-200 rounded mb-4">
                 <h3 className="text-sm font-bold text-green-700 mb-2">📄 Upload Ready Translation</h3>
-                <p className="text-[10px] text-green-600 mb-3">Upload your translation document (recommended: Word .docx)</p>
+                <p className="text-xs text-green-600 mb-3">Upload your translation document (recommended: Word .docx)</p>
 
                 <div className={`border-2 border-dashed border-green-300 rounded-lg p-4 text-center transition-colors mb-2 ${quickPackageLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-green-500'}`}>
                   <input
@@ -13863,13 +13863,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     <span className="px-3 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700">
                       Upload Translation
                     </span>
-                    <p className="text-[10px] text-gray-500 mt-1">Word (.docx), HTML, TXT, PDF, Images</p>
+                    <p className="text-xs text-gray-500 mt-1">Word (.docx), HTML, TXT, PDF, Images</p>
                   </label>
                 </div>
 
                 {/* Paste HTML/Text directly */}
                 <div className="mt-3">
-                  <label className="block text-[10px] font-medium text-gray-600 mb-1">Or paste text/HTML directly:</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Or paste text/HTML directly:</label>
                   <textarea
                     placeholder="Paste your translation text or HTML here..."
                     className="w-full h-24 px-3 py-2 text-xs border border-green-200 rounded resize-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
@@ -13913,7 +13913,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       <p className="text-xs font-medium text-green-700">{quickTranslationFiles.length} image page(s):</p>
                       <button
                         onClick={() => setQuickTranslationFiles([])}
-                        className="text-[10px] text-gray-400 hover:text-red-500"
+                        className="text-xs text-gray-400 hover:text-red-500"
                         disabled={quickPackageLoading}
                       >
                         Clear all
@@ -13940,7 +13940,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               {/* Upload Originals */}
               <div className="p-4 bg-blue-50 border border-blue-200 rounded mb-4">
                 <h3 className="text-sm font-bold text-blue-700 mb-2">📑 Upload Original Documents</h3>
-                <p className="text-[10px] text-blue-600 mb-3">Upload original document (PDF auto-converted to images)</p>
+                <p className="text-xs text-blue-600 mb-3">Upload original document (PDF auto-converted to images)</p>
 
                 <div className={`border-2 border-dashed border-blue-300 rounded-lg p-4 text-center transition-colors mb-2 ${quickPackageLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-blue-500'}`}>
                   <input
@@ -13957,7 +13957,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     <span className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700">
                       Upload Originals
                     </span>
-                    <p className="text-[10px] text-gray-500 mt-1">PDF or images (PDF auto-converted)</p>
+                    <p className="text-xs text-gray-500 mt-1">PDF or images (PDF auto-converted)</p>
                   </label>
                 </div>
 
@@ -14078,7 +14078,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <h3 className="text-sm font-bold text-blue-700 mb-1">
                   📋 Translation Checklist <span className="text-red-500">*</span>
                 </h3>
-                <p className="text-[10px] text-blue-600 mb-3">⚠️ Complete all items before submitting</p>
+                <p className="text-xs text-blue-600 mb-3">⚠️ Complete all items before submitting</p>
                 <div className="space-y-2">
                   <label className={`flex items-center text-xs cursor-pointer p-2 rounded ${
                     approvalChecks.projectNumber ? 'bg-green-100' : 'bg-white'
@@ -14118,12 +14118,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   </label>
                 </div>
                 {!isApprovalComplete && (
-                  <p className="text-[10px] text-red-500 mt-3 font-medium">
+                  <p className="text-xs text-red-500 mt-3 font-medium">
                     ⚠️ Complete all checklist items to enable submission
                   </p>
                 )}
                 {isApprovalComplete && (
-                  <p className="text-[10px] text-green-600 mt-3 font-medium">
+                  <p className="text-xs text-green-600 mt-3 font-medium">
                     ✅ All checks completed - Ready to submit!
                   </p>
                 )}
@@ -14136,7 +14136,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   <h3 className="text-sm font-bold text-purple-700 mb-2">
                     📤 Send to Project Manager
                   </h3>
-                  <p className="text-[10px] text-purple-600 mb-3">
+                  <p className="text-xs text-purple-600 mb-3">
                     Send your completed translation to the PM for review and approval
                   </p>
 
@@ -14186,12 +14186,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       '📥 Download Package (Print/PDF)'
                     )}
                   </button>
-                  <p className="text-[10px] text-gray-500 mt-1 text-center">
+                  <p className="text-xs text-gray-500 mt-1 text-center">
                     Opens print window - save as PDF
                   </p>
 
                   {(!documentType.trim() || (quickTranslationFiles.length === 0 && !quickTranslationHtml)) && (
-                    <p className="text-[10px] text-purple-600 mt-2">
+                    <p className="text-xs text-purple-600 mt-2">
                       ⚠️ Fill document type and upload translation first
                     </p>
                   )}
@@ -14217,13 +14217,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       : 'bg-gray-50 border border-gray-200'
                   }`}>
                     <h3 className="text-sm font-bold text-green-700 mb-3">📤 Send to Projects</h3>
-                    <p className="text-[10px] text-gray-600 mb-3">Send this translation to a project for review and delivery.</p>
+                    <p className="text-xs text-gray-600 mb-3">Send this translation to a project for review and delivery.</p>
 
                     {/* Validation warnings */}
                     {(!isApprovalComplete || !documentType.trim()) && (
                       <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
-                        <p className="text-[10px] text-yellow-700 font-medium">⚠️ Before sending, please complete:</p>
-                        <ul className="text-[10px] text-yellow-600 mt-1 ml-4 list-disc">
+                        <p className="text-xs text-yellow-700 font-medium">⚠️ Before sending, please complete:</p>
+                        <ul className="text-xs text-yellow-600 mt-1 ml-4 list-disc">
                           {!documentType.trim() && <li>Fill in Document Type</li>}
                           {!isApprovalComplete && <li>Complete all Approval Checklist items</li>}
                         </ul>
@@ -14276,7 +14276,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       </div>
                     </div>
                     {availableOrders.length === 0 && (
-                      <p className="text-[10px] text-yellow-600 mt-2">No orders available. Create an order first in the Projects tab.</p>
+                      <p className="text-xs text-yellow-600 mt-2">No orders available. Create an order first in the Projects tab.</p>
                     )}
                   </div>
 
@@ -14295,7 +14295,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       '📦 Generate Complete Package (Print/PDF)'
                     )}
                   </button>
-                  <p className="text-[10px] text-gray-500 mt-2 text-center">
+                  <p className="text-xs text-gray-500 mt-2 text-center">
                     Opens print window - save as PDF
                   </p>
 
@@ -14303,11 +14303,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   {isPM && (
                     <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
                       <h4 className="text-sm font-bold text-orange-700 mb-2">📁 External Translation Upload</h4>
-                      <p className="text-[10px] text-orange-600 mb-3">
+                      <p className="text-xs text-orange-600 mb-3">
                         Upload translations from external translators (outside the system)
                       </p>
                       <div className="bg-white rounded p-3 border border-orange-100">
-                        <p className="text-[10px] text-gray-500 mb-2">
+                        <p className="text-xs text-gray-500 mb-2">
                           Use the "Upload Ready Translation" section above to upload external translations.
                           After uploading, complete the checklist and send to Admin for client delivery.
                         </p>
@@ -14319,7 +14319,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   {isPM && (
                     <div className="mt-4 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
                       <h4 className="text-sm font-bold text-indigo-700 mb-2">✅ Approve & Send to Admin</h4>
-                      <p className="text-[10px] text-indigo-600 mb-3">
+                      <p className="text-xs text-indigo-600 mb-3">
                         After reviewing the translation, approve it and send to Admin for final client delivery
                       </p>
 
@@ -14353,7 +14353,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           '✅ Approve & Send to Admin'
                         )}
                       </button>
-                      <p className="text-[10px] text-indigo-500 mt-2 text-center">
+                      <p className="text-xs text-indigo-500 mt-2 text-center">
                         Admin will send the final translation to the client
                       </p>
                     </div>
@@ -14377,7 +14377,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <h3 className="text-sm font-bold text-blue-700 mb-1">
                   📋 Translation Approval Checklist <span className="text-red-500">*</span>
                 </h3>
-                <p className="text-[10px] text-blue-600 mb-3">⚠️ All items must be checked before sending</p>
+                <p className="text-xs text-blue-600 mb-3">⚠️ All items must be checked before sending</p>
                 <div className="space-y-2">
                   <label className={`flex items-center text-xs cursor-pointer p-2 rounded ${
                     approvalChecks.projectNumber ? 'bg-green-100' : 'bg-white'
@@ -14417,12 +14417,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   </label>
                 </div>
                 {!isApprovalComplete && (
-                  <p className="text-[10px] text-red-500 mt-3 font-medium">
+                  <p className="text-xs text-red-500 mt-3 font-medium">
                     ⚠️ Complete all checklist items to enable sending
                   </p>
                 )}
                 {isApprovalComplete && (
-                  <p className="text-[10px] text-green-600 mt-3 font-medium">
+                  <p className="text-xs text-green-600 mt-3 font-medium">
                     ✅ All checks completed - Ready to send!
                   </p>
                 )}
@@ -14431,7 +14431,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               {/* Document Options */}
               <div className="p-4 bg-green-50 border border-green-200 rounded mb-4">
                 <h3 className="text-sm font-bold text-green-700 mb-2">📦 Document Options</h3>
-                <p className="text-[10px] text-green-600 mb-3">Select what to include in the final document:</p>
+                <p className="text-xs text-green-600 mb-3">Select what to include in the final document:</p>
                 <div className="space-y-2">
                   <label className="flex items-center text-xs cursor-pointer">
                     <input
@@ -14484,12 +14484,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     />
                     <div>
                       <span className="font-medium">💾 Save to Translation Memory</span>
-                      <p className="text-[10px] text-blue-600 mt-0.5">
+                      <p className="text-xs text-blue-600 mt-0.5">
                         Category: {documentCategory === 'financial' ? '📊 Financial' : documentCategory === 'education' ? '🎓 Education' : documentCategory === 'personal' ? '👤 Personal' : '📄 General'}
                       </p>
                     </div>
                   </label>
-                  <span className="text-[10px] bg-blue-200 text-blue-800 px-2 py-0.5 rounded">
+                  <span className="text-xs bg-blue-200 text-blue-800 px-2 py-0.5 rounded">
                     {glossaries.filter(g => g.name?.startsWith('TM -')).length} TMs saved
                   </span>
                 </div>
@@ -14498,7 +14498,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 {glossaries.filter(g => g.name?.startsWith('TM -')).length > 0 && (
                   <div className="mt-3 pt-3 border-t border-blue-200">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-[10px] font-medium text-blue-700">📚 Saved Translation Memories:</span>
+                      <span className="text-xs font-medium text-blue-700">📚 Saved Translation Memories:</span>
                       <div className="flex gap-1">
                         <button
                           onClick={() => {
@@ -14510,7 +14510,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             link.download = `translation_memories_${new Date().toISOString().split('T')[0]}.json`;
                             link.click();
                           }}
-                          className="px-2 py-1 text-[9px] bg-blue-600 text-white rounded hover:bg-blue-700"
+                          className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
                         >
                           📥 Export All (JSON)
                         </button>
@@ -14545,7 +14545,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             link.download = `translation_memories_${new Date().toISOString().split('T')[0]}.tmx`;
                             link.click();
                           }}
-                          className="px-2 py-1 text-[9px] bg-blue-600 text-white rounded hover:bg-blue-700"
+                          className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
                         >
                           📥 Export All (TMX)
                         </button>
@@ -14553,7 +14553,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     </div>
                     <div className="max-h-32 overflow-auto space-y-1">
                       {glossaries.filter(g => g.name?.startsWith('TM -')).map((tm, idx) => (
-                        <div key={tm.id || idx} className="flex items-center justify-between p-2 bg-white rounded border text-[10px]">
+                        <div key={tm.id || idx} className="flex items-center justify-between p-2 bg-white rounded border text-xs">
                           <div className="flex-1">
                             <span className="font-medium text-gray-700">{tm.name}</span>
                             <span className="text-gray-400 ml-2">({tm.terms?.length || 0} segments)</span>
@@ -14623,7 +14623,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       </>
                     )}
                   </div>
-                  <p className="text-[10px] text-gray-500 mt-2">
+                  <p className="text-xs text-gray-500 mt-2">
                     {includeLetterhead ? '✓ Letterhead on all pages' : '✗ No letterhead'}
                     {includeCertification ? ' • ✓ Verification page' : ''}
                   </p>
@@ -14652,7 +14652,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     📑 Print / Save PDF
                   </button>
                 </div>
-                <p className="text-[10px] text-gray-500 mt-2 text-center">
+                <p className="text-xs text-gray-500 mt-2 text-center">
                   Preview: Review before saving | HTML: Edit in browser | PDF: Direct download
                 </p>
               </div>
@@ -14664,13 +14664,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   : 'bg-gray-50 border border-gray-200'
               }`}>
                 <h3 className="text-sm font-bold text-green-700 mb-3">📤 Send to Projects</h3>
-                <p className="text-[10px] text-gray-600 mb-3">Send this translation to a project for final review and delivery to client.</p>
+                <p className="text-xs text-gray-600 mb-3">Send this translation to a project for final review and delivery to client.</p>
 
                 {/* Validation warnings */}
                 {(!isApprovalComplete || !documentType.trim()) && (
                   <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
-                    <p className="text-[10px] text-yellow-700 font-medium">⚠️ Before sending, please complete:</p>
-                    <ul className="text-[10px] text-yellow-600 mt-1 ml-4 list-disc">
+                    <p className="text-xs text-yellow-700 font-medium">⚠️ Before sending, please complete:</p>
+                    <ul className="text-xs text-yellow-600 mt-1 ml-4 list-disc">
                       {!documentType.trim() && <li>Fill in Document Type (in Details tab)</li>}
                       {!isApprovalComplete && <li>Complete all Approval Checklist items</li>}
                     </ul>
@@ -14727,7 +14727,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   </div>
                 </div>
                 {availableOrders.length === 0 && (
-                  <p className="text-[10px] text-yellow-600 mt-2">No orders available. Create an order first in the Projects tab.</p>
+                  <p className="text-xs text-yellow-600 mt-2">No orders available. Create an order first in the Projects tab.</p>
                 )}
               </div>
 
@@ -14846,13 +14846,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       <div>
                         <span className="text-xs font-medium">{gloss.name}</span>
                         <div className="flex flex-wrap gap-2 mt-1">
-                          <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px]">
+                          <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-xs">
                             {gloss.sourceLang || 'PT'} {gloss.bidirectional ? '↔' : '→'} {gloss.targetLang || 'EN'}
                           </span>
-                          <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px]">{gloss.field}</span>
-                          <span className="text-[10px] text-gray-500">{gloss.terms?.length || 0} terms</span>
+                          <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-xs">{gloss.field}</span>
+                          <span className="text-xs text-gray-500">{gloss.terms?.length || 0} terms</span>
                           {gloss.bidirectional && (
-                            <span className="px-2 py-0.5 bg-green-50 text-green-600 rounded text-[10px]">↔ Bidirectional</span>
+                            <span className="px-2 py-0.5 bg-green-50 text-green-600 rounded text-xs">↔ Bidirectional</span>
                           )}
                         </div>
                       </div>
@@ -14951,16 +14951,16 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-sm font-medium text-gray-800">{instr.title}</span>
                           {instr.isDefault && (
-                            <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-[10px]">Default</span>
+                            <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs">Default</span>
                           )}
                         </div>
                         <div className="flex flex-wrap gap-2 mb-2">
-                          <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px]">
+                          <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-xs">
                             {instr.sourceLang || 'PT'} → {instr.targetLang || 'EN'}
                           </span>
-                          <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px]">{instr.field || 'General'}</span>
+                          <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-xs">{instr.field || 'General'}</span>
                           {instr.documentType && instr.documentType !== 'All Documents' && (
-                            <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px]">{instr.documentType}</span>
+                            <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-xs">{instr.documentType}</span>
                           )}
                         </div>
                         <p className="text-xs text-gray-600 line-clamp-2">{instr.content}</p>
@@ -15199,17 +15199,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     {translationMemories.slice(0, 500).map((tm) => (
                       <tr key={tm.id} className="hover:bg-gray-50">
                         <td className="px-3 py-2">
-                          <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px]">
+                          <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-xs">
                             {tm.sourceLang?.substring(0, 10)} → {tm.targetLang?.substring(0, 10)}
                           </span>
                         </td>
                         <td className="px-3 py-2 max-w-xs truncate" title={tm.source}>{tm.source}</td>
                         <td className="px-3 py-2 max-w-xs truncate" title={tm.target}>{tm.target}</td>
                         <td className="px-3 py-2">
-                          <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px]">{tm.field || 'General'}</span>
+                          <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-xs">{tm.field || 'General'}</span>
                         </td>
                         <td className="px-3 py-2 text-center">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${
                             (tm.score || 0) >= 95 ? 'bg-green-100 text-green-700' :
                             (tm.score || 0) >= 85 ? 'bg-blue-100 text-blue-700' :
                             'bg-yellow-100 text-yellow-700'
@@ -15382,7 +15382,7 @@ Examples:
 - Use American English spelling
 - Preserve all official stamps and seals descriptions"
                 />
-                <p className="text-[10px] text-gray-500 mt-1">
+                <p className="text-xs text-gray-500 mt-1">
                   These instructions will be included in the AI prompt when translating matching documents.
                 </p>
               </div>
@@ -15405,7 +15405,7 @@ Examples:
                         ...instructionForm,
                         content: instructionForm.content + (instructionForm.content ? '\n- ' : '- ') + suggestion
                       })}
-                      className="px-2 py-1 text-[10px] bg-white border border-blue-300 text-blue-700 rounded hover:bg-blue-100"
+                      className="px-2 py-1 text-xs bg-white border border-blue-300 text-blue-700 rounded hover:bg-blue-100"
                     >
                       + {suggestion}
                     </button>
@@ -15563,11 +15563,11 @@ Examples:
               <div className="border-t pt-3">
                 <label className="block text-xs font-medium mb-2">📤 Bulk Upload Terms (Paste Entire Glossary)</label>
                 <div className="bg-green-50 border border-green-200 rounded p-2 mb-2">
-                  <p className="text-[10px] text-green-700">
+                  <p className="text-xs text-green-700">
                     <strong>Format:</strong> One term per line: <code className="bg-green-100 px-1">{glossaryForm.sourceLang} | {glossaryForm.targetLang} | notes (optional)</code>
                   </p>
                   {glossaryForm.bidirectional && (
-                    <p className="text-[10px] text-green-600 mt-1">
+                    <p className="text-xs text-green-600 mt-1">
                       ↔ <strong>Bidirectional enabled:</strong> Terms will work in both translation directions automatically!
                     </p>
                   )}
@@ -15645,7 +15645,7 @@ translation juramentada | certified translation`}
                             setTermSearchQuery('');
                           }
                         }}
-                        className="px-2 py-1 text-[10px] text-red-600 bg-red-50 rounded hover:bg-red-100"
+                        className="px-2 py-1 text-xs text-red-600 bg-red-50 rounded hover:bg-red-100"
                       >
                         🗑️ Clear All
                       </button>
@@ -15669,7 +15669,7 @@ translation juramentada | certified translation`}
                       )}
                     </div>
                     {termSearchQuery && (
-                      <p className="text-[10px] text-blue-600 mt-1">
+                      <p className="text-xs text-blue-600 mt-1">
                         Showing {glossaryForm.terms.filter(t =>
                           t.source.toLowerCase().includes(termSearchQuery.toLowerCase()) ||
                           t.target.toLowerCase().includes(termSearchQuery.toLowerCase()) ||
@@ -15792,7 +15792,7 @@ translation juramentada | certified translation`}
                 <span className="text-lg">📄</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium text-gray-700 truncate">{glossaryUploadFile.name}</p>
-                  <p className="text-[10px] text-gray-500">{(glossaryUploadFile.size / 1024).toFixed(1)} KB</p>
+                  <p className="text-xs text-gray-500">{(glossaryUploadFile.size / 1024).toFixed(1)} KB</p>
                 </div>
               </div>
 
@@ -15813,7 +15813,7 @@ translation juramentada | certified translation`}
                 <label className="block text-xs font-bold mb-2">Language Pair</label>
                 <div className="flex items-center gap-2">
                   <div className="flex-1">
-                    <label className="block text-[10px] text-gray-500 mb-1">Source Language</label>
+                    <label className="block text-xs text-gray-500 mb-1">Source Language</label>
                     <select
                       value={glossaryUploadConfig.sourceLang}
                       onChange={(e) => setGlossaryUploadConfig({ ...glossaryUploadConfig, sourceLang: e.target.value })}
@@ -15826,7 +15826,7 @@ translation juramentada | certified translation`}
                     {glossaryUploadConfig.bidirectional ? '↔' : '→'}
                   </span>
                   <div className="flex-1">
-                    <label className="block text-[10px] text-gray-500 mb-1">Target Language</label>
+                    <label className="block text-xs text-gray-500 mb-1">Target Language</label>
                     <select
                       value={glossaryUploadConfig.targetLang}
                       onChange={(e) => setGlossaryUploadConfig({ ...glossaryUploadConfig, targetLang: e.target.value })}
@@ -15933,7 +15933,7 @@ translation juramentada | certified translation`}
                 <span className="text-lg">📄</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium text-gray-700 truncate">{tmUploadFile.name}</p>
-                  <p className="text-[10px] text-gray-500">{(tmUploadFile.size / 1024).toFixed(1)} KB</p>
+                  <p className="text-xs text-gray-500">{(tmUploadFile.size / 1024).toFixed(1)} KB</p>
                 </div>
               </div>
 
@@ -15942,7 +15942,7 @@ translation juramentada | certified translation`}
                 <label className="block text-xs font-bold mb-2">Language Pair</label>
                 <div className="flex items-center gap-2">
                   <div className="flex-1">
-                    <label className="block text-[10px] text-gray-500 mb-1">Source Language</label>
+                    <label className="block text-xs text-gray-500 mb-1">Source Language</label>
                     <select
                       value={tmUploadConfig.sourceLang}
                       onChange={(e) => setTmUploadConfig({ ...tmUploadConfig, sourceLang: e.target.value })}
@@ -15953,7 +15953,7 @@ translation juramentada | certified translation`}
                   </div>
                   <span className="text-lg font-bold text-blue-600 mt-4">→</span>
                   <div className="flex-1">
-                    <label className="block text-[10px] text-gray-500 mb-1">Target Language</label>
+                    <label className="block text-xs text-gray-500 mb-1">Target Language</label>
                     <select
                       value={tmUploadConfig.targetLang}
                       onChange={(e) => setTmUploadConfig({ ...tmUploadConfig, targetLang: e.target.value })}
@@ -16044,7 +16044,7 @@ translation juramentada | certified translation`}
                 <label className="block text-xs font-bold mb-2">Language Pair</label>
                 <div className="flex items-center gap-2">
                   <div className="flex-1">
-                    <label className="block text-[10px] text-gray-500 mb-1">Source Language</label>
+                    <label className="block text-xs text-gray-500 mb-1">Source Language</label>
                     <select
                       value={tmEditForm.sourceLang}
                       onChange={(e) => setTmEditForm({ ...tmEditForm, sourceLang: e.target.value })}
@@ -16055,7 +16055,7 @@ translation juramentada | certified translation`}
                   </div>
                   <span className="text-lg font-bold text-blue-600 mt-4">→</span>
                   <div className="flex-1">
-                    <label className="block text-[10px] text-gray-500 mb-1">Target Language</label>
+                    <label className="block text-xs text-gray-500 mb-1">Target Language</label>
                     <select
                       value={tmEditForm.targetLang}
                       onChange={(e) => setTmEditForm({ ...tmEditForm, targetLang: e.target.value })}
@@ -17323,16 +17323,16 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
       // Check if email actually sent
       if (response.data.status === 'email_failed' || response.data.client_email_sent === false) {
-        let errorMsg = '⚠️ ATENÇÃO: O pedido foi marcado como entregue, mas o EMAIL NÃO FOI ENVIADO!\n\n';
-        errorMsg += `Erro: ${response.data.client_email_error || response.data.error || 'Erro desconhecido'}\n\n`;
-        errorMsg += 'Use o botão "Reenviar Email" para tentar novamente.';
+        let errorMsg = '⚠️ WARNING: The order was marked as delivered, but the EMAIL WAS NOT SENT!\n\n';
+        errorMsg += `Error: ${response.data.client_email_error || response.data.error || 'Unknown error'}\n\n`;
+        errorMsg += 'Use the "Resend Email" button to try again.';
         showToast(errorMsg);
         setSendingOrder(null);
         fetchOrders();
         return;
       }
 
-      let message = '✅ Email enviado ao cliente!\n\n';
+      let message = '✅ Email sent to the client!\n\n';
 
       if (response.data.attachments_sent > 0) {
         message += `📎 ${response.data.attachments_sent} anexo(s) enviado(s)\n`;
@@ -17349,7 +17349,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       }
 
       if (response.data.external_attachment_sent) {
-        message += `\n📎 Anexo externo: ${response.data.external_attachment_filename}`;
+        message += `\n📎 External attachment: ${response.data.external_attachment_filename}`;
       }
 
       if (response.data.pm_notified) {
@@ -17736,7 +17736,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       // Also refresh from server to ensure consistency
       fetchOrders();
 
-      showToast('✅ Projeto salvo successfully!');
+      showToast('✅ Project saved successfully!');
     } catch (err) {
       console.error('Failed to save project:', err);
       showToast('Error saving project: ' + (err.response?.data?.detail || err.message));
@@ -18470,7 +18470,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
             title="View notifications"
           >
             <span className="text-xl">🔔</span>
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1">
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1">
               {notifications.filter(n => !n.is_read).length}
             </span>
           </button>
@@ -18501,13 +18501,13 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         </div>
                         <div className="text-gray-600 mt-0.5">{notif.message}</div>
                         {notif.order_number && (
-                          <span className="text-[10px] text-purple-600 font-medium">Order: {notif.order_number}</span>
+                          <span className="text-xs text-purple-600 font-medium">Order: {notif.order_number}</span>
                         )}
                       </div>
                       {notif.type === 'translator_message' ? (
                         <button
                           onClick={() => { setShowTranslatorInbox(true); setShowNotifications(false); }}
-                          className="px-2 py-0.5 bg-blue-600 text-white rounded text-[10px] hover:bg-blue-700"
+                          className="px-2 py-0.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
                           title="View & Reply"
                         >
                           Reply
@@ -18515,7 +18515,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       ) : (
                         <button
                           onClick={() => markNotificationRead(notif.id)}
-                          className="text-gray-400 hover:text-red-500 text-[10px]"
+                          className="text-gray-400 hover:text-red-500 text-xs"
                           title="Mark as read"
                         >
                           ✓
@@ -18539,7 +18539,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
             title="View partner messages"
           >
             <span className="text-xl">💬</span>
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1">
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1">
               {partnerMessages.filter(m => !m.read).length}
             </span>
           </button>
@@ -18550,7 +18550,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={dismissAllPartnerMessages}
-                    className="text-[10px] px-2 py-0.5 bg-gray-200 text-gray-600 rounded hover:bg-gray-300"
+                    className="text-xs px-2 py-0.5 bg-gray-200 text-gray-600 rounded hover:bg-gray-300"
                     title="Dismiss all messages"
                   >
                     Dismiss All
@@ -18568,34 +18568,34 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       <span className="font-medium text-xs text-gray-800">
                         {msg.from_partner_name}
                       </span>
-                      <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded">
+                      <span className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded">
                         {msg.recipient_type === 'pm' ? `→ ${msg.recipient_name}` : '→ Admin'}
                       </span>
                       {msg.order_number && (
-                        <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">
+                        <span className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">
                           {msg.order_number}
                         </span>
                       )}
                     </div>
-                    <div className="text-[10px] text-gray-500 mb-1">{msg.from_partner_email}</div>
+                    <div className="text-xs text-gray-500 mb-1">{msg.from_partner_email}</div>
                     <div className="text-xs text-gray-700 bg-gray-50 p-2 rounded mb-2">
                       {msg.content.length > 100 ? msg.content.substring(0, 100) + '...' : msg.content}
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-gray-400">{formatDateTimeLocal(msg.created_at)}</span>
+                      <span className="text-xs text-gray-400">{formatDateTimeLocal(msg.created_at)}</span>
                       <div className="flex gap-1">
                         <button
                           onClick={() => {
                             setReplyingToMessage(msg);
                             setReplyContent('');
                           }}
-                          className="px-2 py-0.5 bg-green-500 text-white rounded text-[10px] hover:bg-green-600"
+                          className="px-2 py-0.5 bg-green-500 text-white rounded text-xs hover:bg-green-600"
                         >
                           Reply
                         </button>
                         <button
                           onClick={() => markPartnerMessageRead(msg.id)}
-                          className="px-2 py-0.5 text-gray-500 border border-gray-300 rounded text-[10px] hover:bg-gray-100"
+                          className="px-2 py-0.5 text-gray-500 border border-gray-300 rounded text-xs hover:bg-gray-100"
                         >
                           ✓
                         </button>
@@ -18673,7 +18673,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
             title="Translator messages"
           >
             <span className="text-xl text-white">💬</span>
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1 animate-pulse">
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1 animate-pulse">
               {translatorInbox.filter(m => !m.read).length}
             </span>
           </button>
@@ -18684,7 +18684,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={dismissAllTranslatorInbox}
-                    className="text-[10px] px-2 py-0.5 bg-gray-200 text-gray-600 rounded hover:bg-gray-300"
+                    className="text-xs px-2 py-0.5 bg-gray-200 text-gray-600 rounded hover:bg-gray-300"
                     title="Dismiss all messages"
                   >
                     Dismiss All
@@ -18703,7 +18703,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         {msg.from_translator_name}
                       </span>
                       {msg.order_number && (
-                        <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">
+                        <span className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">
                           {msg.order_number}
                         </span>
                       )}
@@ -18712,20 +18712,20 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       {msg.content}
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-gray-400">{formatDateTimeLocal(msg.created_at)}</span>
+                      <span className="text-xs text-gray-400">{formatDateTimeLocal(msg.created_at)}</span>
                       <div className="flex gap-1">
                         <button
                           onClick={() => {
                             setReplyingToTranslatorMsg(msg);
                             setTranslatorReplyContent('');
                           }}
-                          className="px-2 py-0.5 bg-blue-600 text-white rounded text-[10px] hover:bg-blue-700"
+                          className="px-2 py-0.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
                         >
                           Reply
                         </button>
                         <button
                           onClick={() => markTranslatorInboxMessageRead(msg.id)}
-                          className="px-2 py-0.5 text-gray-500 border border-gray-300 rounded text-[10px] hover:bg-gray-100"
+                          className="px-2 py-0.5 text-gray-500 border border-gray-300 rounded text-xs hover:bg-gray-100"
                           title="Dismiss message"
                         >
                           ✓
@@ -18842,7 +18842,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <label className="block text-xs font-medium text-gray-700">Select Translators * (min 2)</label>
-                      <span className="text-[10px] text-purple-600 font-medium">{bulkSelectedTranslators.size} selected</span>
+                      <span className="text-xs text-purple-600 font-medium">{bulkSelectedTranslators.size} selected</span>
                     </div>
                     <div className="max-h-48 overflow-y-auto border rounded p-2 space-y-1">
                       {translatorList.filter(t => t.is_active !== false).map(t => (
@@ -18867,8 +18867,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           />
                           <div className="flex-1">
                             <span className="text-sm font-medium">{t.name}</span>
-                            {t.language_pairs && <span className="text-[10px] text-gray-500 ml-1">({t.language_pairs})</span>}
-                            {t.rate_per_page && <span className="text-[10px] text-green-600 ml-1">${t.rate_per_page}/pg</span>}
+                            {t.language_pairs && <span className="text-xs text-gray-500 ml-1">({t.language_pairs})</span>}
+                            {t.rate_per_page && <span className="text-xs text-green-600 ml-1">${t.rate_per_page}/pg</span>}
                           </div>
                         </label>
                       ))}
@@ -18906,7 +18906,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       ))}
                     </select>
                     {translatorList.length === 0 && (
-                      <p className="text-[10px] text-blue-600 mt-1">No translators found. Register translators in the Users tab first.</p>
+                      <p className="text-xs text-blue-600 mt-1">No translators found. Register translators in the Users tab first.</p>
                     )}
                   </div>
 
@@ -19158,24 +19158,24 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         <>
           <div className="grid grid-cols-3 gap-3 mb-4">
             <div className="bg-white rounded shadow p-3">
-              <div className="text-[10px] text-gray-500 uppercase">Meus Pedidos</div>
+              <div className="text-xs text-gray-500 uppercase">Meus Pedidos</div>
               <div className="text-xl font-bold text-gray-800">{orders.length}</div>
             </div>
             <div
               onClick={() => setShowTranslatorsList(!showTranslatorsList)}
               className="bg-gradient-to-r from-green-500 to-green-600 rounded shadow p-3 text-white cursor-pointer hover:from-green-600 hover:to-green-700 transition-all"
             >
-              <div className="text-[10px] uppercase opacity-80">Available Translators</div>
+              <div className="text-xs uppercase opacity-80">Available Translators</div>
               <div className="text-xl font-bold">{translatorStats.available}</div>
-              <div className="text-[9px] opacity-70 mt-1">Click to view list</div>
+              <div className="text-xs opacity-70 mt-1">Click to view list</div>
             </div>
             <div
               onClick={() => setShowTranslatorsList(!showTranslatorsList)}
               className="bg-gradient-to-r from-yellow-500 to-yellow-600 rounded shadow p-3 text-white cursor-pointer hover:from-yellow-600 hover:to-yellow-700 transition-all"
             >
-              <div className="text-[10px] uppercase opacity-80">Busy Translators</div>
+              <div className="text-xs uppercase opacity-80">Busy Translators</div>
               <div className="text-xl font-bold">{translatorStats.busy}</div>
-              <div className="text-[9px] opacity-70 mt-1">Click to view list</div>
+              <div className="text-xs opacity-70 mt-1">Click to view list</div>
             </div>
           </div>
 
@@ -19204,7 +19204,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           <div className={`w-2 h-2 rounded-full mr-2 ${translator.status === 'available' ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
                           <span className="font-medium text-sm text-gray-800">{translator.name}</span>
                         </div>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
                           translator.status === 'available'
                             ? 'bg-green-500 text-white'
                             : 'bg-yellow-500 text-white'
@@ -19212,12 +19212,12 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           {translator.status === 'available' ? 'Available' : 'Busy'}
                         </span>
                       </div>
-                      <div className="text-[10px] text-gray-500 mb-1">{translator.email}</div>
+                      <div className="text-xs text-gray-500 mb-1">{translator.email}</div>
                       {translator.status === 'busy' && translator.projects && translator.projects.length > 0 && (
                         <div className="mt-2 pt-2 border-t border-gray-200">
-                          <div className="text-[10px] font-medium text-gray-600 mb-1">Projetos Ativos:</div>
+                          <div className="text-xs font-medium text-gray-600 mb-1">Active Projects:</div>
                           {translator.projects.map((proj, idx) => (
-                            <div key={idx} className="flex justify-between items-center text-[10px] py-0.5">
+                            <div key={idx} className="flex justify-between items-center text-xs py-0.5">
                               <span className="text-blue-600 font-mono">{proj.code}</span>
                               <span className="text-gray-500">
                                 {proj.deadline ? new Date(proj.deadline).toLocaleDateString('en-US', { timeZone: 'America/New_York' }) : 'No deadline'}
@@ -19227,7 +19227,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         </div>
                       )}
                       {translator.status === 'available' && (
-                        <div className="mt-2 text-[10px] text-green-600">✓ Ready to novos projects</div>
+                        <div className="mt-2 text-xs text-green-600">✓ Ready to novos projects</div>
                       )}
                     </div>
                   ))}
@@ -19240,7 +19240,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
       <div className="flex justify-between items-center mb-3">
         <div className="flex items-center space-x-3">
-          <h1 className="text-lg font-bold text-blue-600">{isPM ? 'MEUS PROJETOS' : 'PROJECTS'}</h1>
+          <h1 className="text-lg font-bold text-blue-600">{isPM ? 'MY PROJECTS' : 'PROJECTS'}</h1>
           {/* New Project button - Admin only */}
           {isAdmin && (
             <button
@@ -19253,7 +19253,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
           <div className="flex space-x-1">
             {['all', 'received', 'review', 'client_review', 'ready', 'pm_upload_ready', 'final'].map((s) => (
               <button key={s} onClick={() => setStatusFilter(s)}
-                className={`px-2 py-1 text-[10px] rounded ${statusFilter === s ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                className={`px-2 py-1 text-xs rounded ${statusFilter === s ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
                 {s === 'all' ? 'All' : getStatusLabel(s)}
               </button>
             ))}
@@ -19262,7 +19262,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
           <select
             value={documentTypeFilter}
             onChange={(e) => setDocumentTypeFilter(e.target.value)}
-            className="px-2 py-1 text-[10px] border rounded bg-white"
+            className="px-2 py-1 text-xs border rounded bg-white"
           >
             <option value="">All Documents</option>
             {DOCUMENT_TYPES.filter(d => d.value).map(doc => (
@@ -19281,7 +19281,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
             <div className="grid grid-cols-5 gap-3 mb-3">
               {/* Client Info */}
               <div>
-                <label className="block text-[10px] font-medium text-gray-600 mb-1">Client Name *</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Client Name *</label>
                 <input
                   type="text"
                   value={newProject.client_name}
@@ -19292,7 +19292,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-medium text-gray-600 mb-1">Client Email *</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Client Email *</label>
                 <input
                   type="email"
                   value={newProject.client_email}
@@ -19303,7 +19303,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-medium text-gray-600 mb-1">Client Phone (WhatsApp)</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Client Phone (WhatsApp)</label>
                 <input
                   type="tel"
                   value={newProject.client_phone}
@@ -19313,7 +19313,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-medium text-gray-600 mb-1">From Language *</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">From Language *</label>
                 <select
                   value={newProject.translate_from}
                   onChange={(e) => setNewProject({...newProject, translate_from: e.target.value})}
@@ -19323,7 +19323,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 </select>
               </div>
               <div>
-                <label className="block text-[10px] font-medium text-gray-600 mb-1">To Language *</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">To Language *</label>
                 <select
                   value={newProject.translate_to}
                   onChange={(e) => setNewProject({...newProject, translate_to: e.target.value})}
@@ -19337,7 +19337,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
             {/* Document Type Row */}
             <div className="grid grid-cols-2 gap-3 mb-3">
               <div>
-                <label className="block text-[10px] font-medium text-gray-600 mb-1">Document Type</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Document Type</label>
                 <select
                   value={newProject.document_type}
                   onChange={(e) => setNewProject({...newProject, document_type: e.target.value})}
@@ -19347,7 +19347,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 </select>
               </div>
               <div>
-                <label className="block text-[10px] font-medium text-gray-600 mb-1">Service Type</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Service Type</label>
                 <select
                   value={newProject.service_type}
                   onChange={(e) => setNewProject({...newProject, service_type: e.target.value})}
@@ -19363,7 +19363,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
             <div className="grid grid-cols-5 gap-3 mb-3">
               <div>
-                <label className="block text-[10px] font-medium text-gray-600 mb-1">Pages</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Pages</label>
                 <input
                   type="number"
                   value={newProject.page_count}
@@ -19373,7 +19373,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-medium text-gray-600 mb-1">Urgency</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Urgency</label>
                 <select
                   value={newProject.urgency}
                   onChange={(e) => setNewProject({...newProject, urgency: e.target.value})}
@@ -19385,7 +19385,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 </select>
               </div>
               <div>
-                <label className="block text-[10px] font-medium text-gray-600 mb-1">Deadline</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Deadline</label>
                 <div className="flex gap-1">
                   <input
                     type="date"
@@ -19402,7 +19402,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 </div>
               </div>
               <div>
-                <label className="block text-[10px] font-medium text-gray-600 mb-1">Price ($)</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Price ($)</label>
                 <input
                   type="number"
                   value={newProject.total_price}
@@ -19414,7 +19414,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-medium text-gray-600 mb-1">Payment Method</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Payment Method</label>
                 <select
                   value={newProject.payment_method}
                   onChange={(e) => setNewProject({...newProject, payment_method: e.target.value})}
@@ -19428,7 +19428,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
             {/* Payment Status Section */}
             <div className="mb-3 p-3 bg-gray-50 rounded border">
               <div className="flex items-center justify-between mb-2">
-                <label className="text-[10px] font-medium text-gray-700">Payment Status</label>
+                <label className="text-xs font-medium text-gray-700">Payment Status</label>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -19444,7 +19444,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
               {!newProject.payment_received && (
                 <div className="space-y-2">
-                  <div className="text-[10px] text-gray-500 mb-1">Payment Tag:</div>
+                  <div className="text-xs text-gray-500 mb-1">Payment Tag:</div>
                   <div className="flex flex-wrap gap-2">
                     {[
                       { value: '', label: 'Awaiting Payment' },
@@ -19461,7 +19461,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           onChange={(e) => setNewProject({...newProject, payment_tag: e.target.value})}
                           className="w-3 h-3"
                         />
-                        <span className="text-[10px] text-gray-600">{tag.label}</span>
+                        <span className="text-xs text-gray-600">{tag.label}</span>
                       </label>
                     ))}
                   </div>
@@ -19475,7 +19475,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         onChange={(e) => setNewProject({...newProject, create_invoice: e.target.checked})}
                         className="w-4 h-4 rounded border-gray-300"
                       />
-                      <span className="text-[10px] font-medium text-gray-700">📄 Create Invoice</span>
+                      <span className="text-xs font-medium text-gray-700">📄 Create Invoice</span>
                     </label>
 
                     {newProject.create_invoice && (
@@ -19494,7 +19494,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                               onChange={(e) => setNewProject({...newProject, invoice_terms: e.target.value})}
                               className="w-3 h-3"
                             />
-                            <span className="text-[10px] text-gray-600">{term.label}</span>
+                            <span className="text-xs text-gray-600">{term.label}</span>
                           </label>
                         ))}
                         {newProject.invoice_terms === 'custom' && (
@@ -19516,7 +19516,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
             <div className="mb-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-medium text-gray-600 mb-1">Documents to Translate (Multiple allowed)</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Documents to Translate (Multiple allowed)</label>
                   <div className="flex items-center space-x-2">
                     <input
                       type="file"
@@ -19529,10 +19529,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       <span className="text-xs text-green-600">✓ {documentFiles.length} file(s) selected</span>
                     )}
                   </div>
-                  <p className="text-[9px] text-gray-400 mt-1">Accepted: PDF, DOC, DOCX, TXT, JPG, PNG, TIFF, BMP, GIF - Max 100MB per file</p>
+                  <p className="text-xs text-gray-400 mt-1">Accepted: PDF, DOC, DOCX, TXT, JPG, PNG, TIFF, BMP, GIF - Max 100MB per file</p>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-medium text-gray-600 mb-1">Document Category</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Document Category</label>
                   <select
                     value={newProject.document_category}
                     onChange={(e) => setNewProject({...newProject, document_category: e.target.value})}
@@ -19540,7 +19540,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   >
                     {DOCUMENT_CATEGORIES.map(cat => <option key={cat.value} value={cat.value}>{cat.label}</option>)}
                   </select>
-                  <p className="text-[9px] text-gray-400 mt-1">Select the category that best describes your documents</p>
+                  <p className="text-xs text-gray-400 mt-1">Select the category that best describes your documents</p>
                 </div>
               </div>
               {documentFiles.length > 0 && (
@@ -19564,7 +19564,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
             <div className="grid grid-cols-4 gap-3 mb-3">
               <div>
-                <label className="block text-[10px] font-medium text-gray-600 mb-1">Project Manager</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Project Manager</label>
                 <select
                   value={newProject.assigned_pm_id}
                   onChange={(e) => setNewProject({...newProject, assigned_pm_id: e.target.value})}
@@ -19575,7 +19575,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 </select>
               </div>
               <div>
-                <label className="block text-[10px] font-medium text-gray-600 mb-1">Translator</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Translator</label>
                 <select
                   value={newProject.assigned_translator_id}
                   onChange={(e) => setNewProject({...newProject, assigned_translator_id: e.target.value})}
@@ -19589,7 +19589,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
             <div className="grid grid-cols-2 gap-3 mb-3">
               <div>
-                <label className="block text-[10px] font-medium text-gray-600 mb-1">Revenue Source</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Revenue Source</label>
                 <select
                   value={newProject.revenue_source}
                   onChange={(e) => setNewProject({...newProject, revenue_source: e.target.value})}
@@ -19599,7 +19599,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 </select>
               </div>
               <div>
-                <label className="block text-[10px] font-medium text-gray-600 mb-1">👥 Team Notes (PM / Translator)</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">👥 Team Notes (PM / Translator)</label>
                 <textarea
                   value={newProject.team_notes || ''}
                   onChange={(e) => setNewProject({...newProject, team_notes: e.target.value})}
@@ -19612,7 +19612,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
             {isAdmin && (
             <div className="mb-3">
               <div>
-                <label className="block text-[10px] font-medium text-gray-600 mb-1">🔒 Internal Notes (Admin only)</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">🔒 Internal Notes (Admin only)</label>
                 <textarea
                   value={newProject.internal_notes}
                   onChange={(e) => setNewProject({...newProject, internal_notes: e.target.value})}
@@ -19697,7 +19697,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       {['ready', 'review', 'delivered', 'pending_admin_approval', 'pending_admin_review', 'finalized_pending_admin'].includes(order.translation_status) && isAdmin && (
                         <button
                           onClick={() => openSendToClientModal(order)}
-                          className={`px-1 py-0.5 rounded text-[9px] ${
+                          className={`px-1 py-0.5 rounded text-xs ${
                             order.translation_status === 'delivered'
                               ? 'bg-blue-500 text-white hover:bg-blue-600'
                               : 'bg-blue-500 text-white hover:bg-blue-600'
@@ -20430,7 +20430,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             <tr className="border-b">
                               <td className="py-2 font-medium text-gray-600">Urgency</td>
                               <td className="py-2">
-                                <span className={`px-2 py-0.5 rounded text-[10px] ${viewingOrder.urgency === 'urgent' ? 'bg-red-100 text-red-700' : viewingOrder.urgency === 'priority' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}>
+                                <span className={`px-2 py-0.5 rounded text-xs ${viewingOrder.urgency === 'urgent' ? 'bg-red-100 text-red-700' : viewingOrder.urgency === 'priority' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}>
                                   {viewingOrder.urgency === 'no' ? 'Normal' : viewingOrder.urgency || 'Normal'}
                                 </span>
                               </td>
@@ -20490,7 +20490,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                           setTempModalDeadline({ date, time });
                                           setEditingModalDeadline(true);
                                         }}
-                                        className="px-2 py-0.5 bg-blue-100 text-blue-600 rounded text-[10px] hover:bg-blue-200"
+                                        className="px-2 py-0.5 bg-blue-100 text-blue-600 rounded text-xs hover:bg-blue-200"
                                       >
                                         ✏️ {viewingOrder.deadline ? 'Edit' : 'Set Deadline'}
                                       </button>
@@ -20520,7 +20520,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                               <tr className="border-b">
                                 <td className="py-2 font-medium text-gray-600">Payment Status</td>
                                 <td className="py-2">
-                                  <span className={`px-2 py-0.5 rounded text-[10px] ${
+                                  <span className={`px-2 py-0.5 rounded text-xs ${
                                     viewingOrder.payment_status === 'paid' ? 'bg-green-100 text-green-700' :
                                     viewingOrder.payment_status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
                                     'bg-gray-100 text-gray-700'
@@ -20543,7 +20543,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                               <tr className="border-b">
                                 <td className="py-2 font-medium text-gray-600 w-1/3">Delivery</td>
                                 <td className="py-2">
-                                  <span className="px-2 py-0.5 rounded text-[10px] bg-blue-100 text-blue-700">
+                                  <span className="px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-700">
                                     USPS Priority Mail
                                   </span>
                                 </td>
@@ -20586,7 +20586,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                 });
                                 setEditingNotes(true);
                               }}
-                              className="px-2 py-0.5 bg-blue-100 text-blue-600 rounded text-[10px] hover:bg-blue-200"
+                              className="px-2 py-0.5 bg-blue-100 text-blue-600 rounded text-xs hover:bg-blue-200"
                             >
                               ✏️ Edit Notes
                             </button>
@@ -20635,7 +20635,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       <div className="space-y-2">
                         {viewingOrder.team_notes ? (
                           <div className="p-2 bg-purple-50 rounded border border-purple-200">
-                            <div className="text-[10px] font-medium text-purple-600 mb-1">👥 Team Note (PM / Translator):</div>
+                            <div className="text-xs font-medium text-purple-600 mb-1">👥 Team Note (PM / Translator):</div>
                             <p className="text-xs text-gray-700">{viewingOrder.team_notes}</p>
                           </div>
                         ) : (
@@ -20644,7 +20644,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         {isAdmin && (
                           viewingOrder.internal_notes ? (
                             <div className="p-2 bg-yellow-50 rounded border border-yellow-200">
-                              <div className="text-[10px] font-medium text-yellow-600 mb-1">🔒 Internal Note (Admin only):</div>
+                              <div className="text-xs font-medium text-yellow-600 mb-1">🔒 Internal Note (Admin only):</div>
                               <p className="text-xs text-gray-700">{viewingOrder.internal_notes}</p>
                             </div>
                           ) : (
@@ -20698,7 +20698,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                     }
                                   }
                                 }}
-                                className={`ml-2 px-1.5 py-0.5 rounded text-[10px] ${
+                                className={`ml-2 px-1.5 py-0.5 rounded text-xs ${
                                   viewingOrder.translator_assignment_status === 'accepted' ? 'bg-green-100 text-green-700' :
                                   viewingOrder.translator_assignment_status === 'declined' ? 'bg-red-100 text-red-700' :
                                   'bg-yellow-100 text-yellow-700'
@@ -20713,7 +20713,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         <tr className="border-b">
                           <td className="py-2 font-medium text-gray-600">Status</td>
                           <td className="py-2">
-                            <span className={`px-2 py-0.5 rounded text-[10px] ${STATUS_COLORS[viewingOrder.translation_status] || 'bg-gray-100'}`}>
+                            <span className={`px-2 py-0.5 rounded text-xs ${STATUS_COLORS[viewingOrder.translation_status] || 'bg-gray-100'}`}>
                               {viewingOrder.translation_status}
                             </span>
                           </td>
@@ -20735,7 +20735,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           <tr className="border-b">
                             <td className="py-2 font-medium text-gray-600">Payment Status</td>
                             <td className="py-2">
-                              <span className={`px-2 py-0.5 rounded text-[10px] ${PAYMENT_COLORS[viewingOrder.payment_status] || 'bg-gray-100'}`}>
+                              <span className={`px-2 py-0.5 rounded text-xs ${PAYMENT_COLORS[viewingOrder.payment_status] || 'bg-gray-100'}`}>
                                 {viewingOrder.payment_status || 'pending'}
                               </span>
                             </td>
@@ -20851,7 +20851,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         >
                           {uploadingProjectDoc ? 'Uploading...' : 'Choose Files'}
                         </label>
-                        <span className="text-[10px] text-gray-500">All formats accepted • Max 100MB per file • Multiple files allowed</span>
+                        <span className="text-xs text-gray-500">All formats accepted • Max 100MB per file • Multiple files allowed</span>
                       </div>
                     </div>
                   )}
@@ -20871,7 +20871,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                               </span>
                               <div>
                                 <div className="text-sm font-medium">{doc.filename || 'Document'}</div>
-                                <div className="text-[10px] text-gray-500">
+                                <div className="text-xs text-gray-500">
                                   {doc.source === 'manual_upload' ? 'Manual upload' : doc.source === 'web_upload' ? 'Web' : 'Partner portal'}
                                   {doc.uploaded_at && ` • ${new Date(doc.uploaded_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}`}
                                 </div>
@@ -20902,7 +20902,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         <div className="text-2xl mb-1">📭</div>
                         <div className="text-xs">No original documents</div>
                         {viewingOrder.document_filename && (
-                          <div className="mt-1 text-[10px] text-gray-500">
+                          <div className="mt-1 text-xs text-gray-500">
                             Registered file: {viewingOrder.document_filename}
                           </div>
                         )}
@@ -20923,7 +20923,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             <div>
                               <div className="text-sm font-bold text-blue-800">FINAL - Delivered to Client</div>
                               {viewingOrder.completed_at && (
-                                <div className="text-[10px] text-blue-600">Completed: {new Date(viewingOrder.completed_at).toLocaleString()}</div>
+                                <div className="text-xs text-blue-600">Completed: {new Date(viewingOrder.completed_at).toLocaleString()}</div>
                               )}
                             </div>
                           </div>
@@ -20932,7 +20932,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                               <span className="text-xl">📎</span>
                               <div>
                                 <div className="text-sm font-medium">{viewingOrder.pm_upload_filename}</div>
-                                <div className="text-[10px] text-gray-500">
+                                <div className="text-xs text-gray-500">
                                   {viewingOrder.pm_upload_file_size ? `${(viewingOrder.pm_upload_file_size / 1024).toFixed(1)} KB` : ''}
                                   {viewingOrder.pm_uploaded_at ? ` • Uploaded ${new Date(viewingOrder.pm_uploaded_at).toLocaleString()}` : ''}
                                 </div>
@@ -20955,7 +20955,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white text-sm">✓</div>
                             <div>
                               <div className="text-sm font-bold text-green-800">Translation READY - Awaiting Review</div>
-                              <div className="text-[10px] text-green-700">PM has uploaded an external translation for this project</div>
+                              <div className="text-xs text-green-700">PM has uploaded an external translation for this project</div>
                             </div>
                           </div>
                           <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-green-300 mb-3">
@@ -20963,7 +20963,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                               <span className="text-xl">📎</span>
                               <div>
                                 <div className="text-sm font-medium">{viewingOrder.pm_upload_filename}</div>
-                                <div className="text-[10px] text-gray-500">
+                                <div className="text-xs text-gray-500">
                                   {viewingOrder.pm_upload_file_size ? `${(viewingOrder.pm_upload_file_size / 1024).toFixed(1)} KB` : ''}
                                   {viewingOrder.pm_uploaded_at ? ` • Uploaded ${new Date(viewingOrder.pm_uploaded_at).toLocaleString()}` : ''}
                                 </div>
@@ -21056,7 +21056,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                               <span className="text-2xl mr-3">📗</span>
                               <div>
                                 <div className="text-sm font-medium text-green-800">{doc.filename || 'Translated Document'}</div>
-                                <div className="text-[10px] text-green-600">
+                                <div className="text-xs text-green-600">
                                   {doc.uploaded_by === 'pm' ? 'PM upload' : doc.uploaded_by === 'workspace' ? 'Workspace' : doc.uploaded_by === 'translator' ? 'Translator' : 'Translation'}
                                   {doc.uploaded_at && ` • ${new Date(doc.uploaded_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}`}
                                   {doc.file_size && ` • ${(doc.file_size / 1024).toFixed(1)} KB`}
@@ -21110,7 +21110,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                 >
                                   ✅ Accept Translation
                                 </button>
-                                <p className="text-[10px] text-gray-500 text-center">
+                                <p className="text-xs text-gray-500 text-center">
                                   After accepting, you can send the email to the client with the translation
                                 </p>
                               </div>
@@ -21123,7 +21123,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                   <span className="text-2xl">📧</span>
                                   <div>
                                     <div className="text-sm font-medium text-purple-800">Translation Accepted!</div>
-                                    <div className="text-[10px] text-purple-600">Ready to send to client</div>
+                                    <div className="text-xs text-purple-600">Ready to send to client</div>
                                   </div>
                                 </div>
                                 <div className="flex flex-col gap-2">
@@ -21142,15 +21142,15 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                           const translatedDocIds = orderDocuments.filter(d => d.source === 'translated_document').map(d => d.id);
                                           setSelectedDocsForDelivery(translatedDocIds);
                                         }}
-                                        className="px-2 py-0.5 text-[10px] bg-purple-200 hover:bg-purple-300 rounded"
+                                        className="px-2 py-0.5 text-xs bg-purple-200 hover:bg-purple-300 rounded"
                                       >
                                         Todos
                                       </button>
                                       <button
                                         onClick={() => setSelectedDocsForDelivery([])}
-                                        className="px-2 py-0.5 text-[10px] bg-purple-200 hover:bg-purple-300 rounded"
+                                        className="px-2 py-0.5 text-xs bg-purple-200 hover:bg-purple-300 rounded"
                                       >
-                                        Nenhum
+                                        None
                                       </button>
                                     </div>
                                   </div>
@@ -21214,9 +21214,9 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                     }`}
                                   >
                                     <span className="text-lg">✉️</span>
-                                    Enviar Email ao Cliente
+                                    Send Email to Client
                                   </button>
-                                  <div className="text-[10px] text-purple-600 text-center">
+                                  <div className="text-xs text-purple-600 text-center">
                                     Will be sent to: <strong>{viewingOrder.client_email}</strong>
                                   </div>
                                 </div>
@@ -21230,11 +21230,11 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                   <span className="text-2xl">{viewingOrder.email_sent === false ? '⚠️' : '✅'}</span>
                                   <div className="flex-1">
                                     <div className={`text-sm font-medium ${viewingOrder.email_sent === false ? 'text-red-700' : 'text-gray-700'}`}>
-                                      {viewingOrder.email_sent === false ? 'Entregue - Email NÃO enviado' : 'Delivered to Client'}
+                                      {viewingOrder.email_sent === false ? 'Delivered - Email NOT sent' : 'Delivered to Client'}
                                     </div>
-                                    <div className="text-[10px] text-gray-500">
+                                    <div className="text-xs text-gray-500">
                                       {viewingOrder.email_sent === false
-                                        ? `Email falhou: ${viewingOrder.email_error || 'Erro desconhecido'}`
+                                        ? `Email failed: ${viewingOrder.email_error || 'Unknown error'}`
                                         : `Translation sent successfully${viewingOrder.delivered_at ? ` — ${formatDateTimeLocal(viewingOrder.delivered_at)} (EST)` : ''}`
                                       }
                                     </div>
@@ -21289,7 +21289,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       <div className="text-center py-4 text-gray-400">
                         <div className="text-2xl mb-1">📝</div>
                         <div className="text-xs">No translations uploaded yet</div>
-                        <div className="text-[10px] mt-1 text-gray-400">Use "Upload Translation" button above to add completed translations</div>
+                        <div className="text-xs mt-1 text-gray-400">Use "Upload Translation" button above to add completed translations</div>
                       </div>
                     )}
                   </div>
@@ -21324,9 +21324,9 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           <div className="flex-1">
                             <div className={`text-sm font-medium ${isCurrent ? 'text-blue-700' : isCompleted ? 'text-green-700' : 'text-gray-500'}`}>
                               {step.label}
-                              {isCurrent && <span className="ml-2 px-1.5 py-0.5 bg-blue-600 text-white rounded text-[10px]">Current</span>}
+                              {isCurrent && <span className="ml-2 px-1.5 py-0.5 bg-blue-600 text-white rounded text-xs">Current</span>}
                             </div>
-                            <div className="text-[10px] text-gray-500 mt-0.5">{step.desc}</div>
+                            <div className="text-xs text-gray-500 mt-0.5">{step.desc}</div>
                           </div>
                         </div>
                       );
@@ -21355,7 +21355,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                   <div className="text-sm font-bold text-purple-700">MULTIPLE ({names.length})</div>
                                   <div className="flex flex-wrap gap-1 mt-1">
                                     {names.map((n, i) => (
-                                      <span key={i} className="text-[10px] px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded border border-purple-200">{n}</span>
+                                      <span key={i} className="text-xs px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded border border-purple-200">{n}</span>
                                     ))}
                                   </div>
                                 </div>
@@ -21495,24 +21495,24 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       {/* Send to Client Modal */}
       {sendingOrder && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[85vh] flex flex-col">
-            <div className={`p-3 border-b flex justify-between items-center rounded-t-lg flex-shrink-0 ${
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col">
+            <div className={`p-4 border-b flex justify-between items-center rounded-t-lg flex-shrink-0 ${
               sendingOrder.translation_status === 'delivered' ? 'bg-blue-600' : 'bg-blue-600'
             } text-white`}>
               <div>
-                <h3 className="font-bold text-sm">
+                <h3 className="font-bold text-base">
                   {sendingOrder.translation_status === 'delivered' ? '🔄 Resend Translation' : '📤 Send to Client'}
                 </h3>
-                <p className="text-[10px] opacity-80">{sendingOrder.order_number} - {sendingOrder.client_name}</p>
+                <p className="text-sm opacity-80">{sendingOrder.order_number} - {sendingOrder.client_name}</p>
               </div>
               <button onClick={() => setSendingOrder(null)} className="text-white hover:text-gray-200 text-xl">×</button>
             </div>
 
-            <div className="p-3 overflow-y-auto flex-1">
+            <div className="p-4 overflow-y-auto flex-1">
               {/* Resend notice for delivered orders */}
               {sendingOrder.translation_status === 'delivered' && (
-                <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded">
-                  <div className="text-[10px] text-blue-700">
+                <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded">
+                  <div className="text-sm text-blue-700">
                     <strong>ℹ️ Resending:</strong> Delivered
                     {sendingOrder.delivered_at && ` on ${new Date(sendingOrder.delivered_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}`}.
                     Upload new file below if needed.
@@ -21521,17 +21521,17 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               )}
 
               {/* Client Info */}
-              <div className="mb-3 p-2 bg-gray-50 rounded border">
-                <div className="text-[10px] font-medium text-gray-600">Client:</div>
-                <div className="text-xs font-medium">{sendingOrder.client_name}</div>
-                <div className="text-[10px] text-gray-500">{sendingOrder.client_email}</div>
+              <div className="mb-4 p-3 bg-gray-50 rounded border">
+                <div className="text-sm font-medium text-gray-600">Client:</div>
+                <div className="text-sm font-semibold">{sendingOrder.client_name}</div>
+                <div className="text-sm text-gray-500">{sendingOrder.client_email}</div>
               </div>
 
               {/* Translated Document Status */}
-              <div className="mb-3">
-                <div className="text-[10px] font-medium text-gray-600 mb-1">📄 Translation to Attach:</div>
+              <div className="mb-4">
+                <div className="text-sm font-medium text-gray-600 mb-2">📄 Translation to Attach:</div>
                 {!translatedDocInfo ? (
-                  <div className="text-center py-2 text-gray-500 text-[10px]">Loading...</div>
+                  <div className="text-center py-2 text-gray-500 text-xs">Loading...</div>
                 ) : (
                   <div className="space-y-2">
                     {/* Workspace translation with checkbox */}
@@ -21546,16 +21546,16 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           />
                           <div className="flex-1">
                             <div className="flex items-center justify-between">
-                              <span className="text-[10px] text-green-800 font-medium">✅ Workspace Translation</span>
+                              <span className="text-xs text-green-800 font-medium">✅ Workspace Translation</span>
                               <button
                                 onClick={(e) => { e.preventDefault(); downloadTranslatedDocument(sendingOrder.id, 'translation.html'); }}
-                                className="px-2 py-0.5 bg-green-600 text-white rounded text-[10px] hover:bg-green-700"
+                                className="px-2 py-0.5 bg-green-600 text-white rounded text-xs hover:bg-green-700"
                               >
                                 👁️ Preview
                               </button>
                             </div>
                             {translatedDocInfo.translation_settings && (
-                              <div className="text-[9px] text-gray-600 mt-1">
+                              <div className="text-xs text-gray-600 mt-1">
                                 📝 {translatedDocInfo.translation_settings.document_type || 'N/A'} •
                                 {translatedDocInfo.translation_settings.source_language} → {translatedDocInfo.translation_settings.target_language}
                               </div>
@@ -21587,7 +21587,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                 className="w-4 h-4 text-blue-600 rounded"
                               />
                               <div className="flex-1 flex items-center justify-between">
-                                <span className="text-[10px] text-blue-800 font-medium truncate">
+                                <span className="text-xs text-blue-800 font-medium truncate">
                                   📎 File: {attachment.filename}
                                 </span>
                                 <button
@@ -21596,7 +21596,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                     setAdditionalAttachments(prev => prev.filter(a => a.id !== attachment.id));
                                     setSelectedAttachments(prev => ({ ...prev, uploaded: prev.uploaded.filter(id => id !== attachment.id) }));
                                   }}
-                                  className="px-1.5 py-0.5 bg-red-100 text-red-600 rounded text-[9px] hover:bg-red-200"
+                                  className="px-1.5 py-0.5 bg-red-100 text-red-600 rounded text-xs hover:bg-red-200"
                                   title="Remover"
                                 >
                                   ✕
@@ -21610,18 +21610,18 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
                     {/* No attachments warning */}
                     {!translatedDocInfo.has_html_translation && additionalAttachments.length === 0 && (
-                      <div className="p-2 bg-yellow-50 border border-yellow-200 rounded">
-                        <div className="text-[10px] text-yellow-800">⚠️ No translation anexada</div>
-                        <div className="text-[9px] text-yellow-600 mt-1">
-                          Faça upload de files tabixo ou complete a translation no Workspace
+                      <div className="p-3 bg-yellow-50 border border-yellow-200 rounded">
+                        <div className="text-sm text-yellow-800 font-medium">⚠️ No translation attached</div>
+                        <div className="text-sm text-yellow-600 mt-1">
+                          Upload translated files or complete the translation in the Workspace
                         </div>
                       </div>
                     )}
 
                     {/* Selection summary */}
                     {(translatedDocInfo.has_html_translation || additionalAttachments.length > 0) && (
-                      <div className="p-1.5 bg-gray-100 rounded text-[9px] text-gray-600">
-                        📋 {(selectedAttachments.workspace && translatedDocInfo.has_html_translation ? 1 : 0) + selectedAttachments.uploaded.length} file(s) selecionado(s) to envio
+                      <div className="p-2 bg-gray-100 rounded text-sm text-gray-600">
+                        📋 {(selectedAttachments.workspace && translatedDocInfo.has_html_translation ? 1 : 0) + selectedAttachments.uploaded.length} file(s) selected for sending
                       </div>
                     )}
                   </div>
@@ -21629,8 +21629,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               </div>
 
               {/* Upload new document - External translation (supports multiple) */}
-              <div className="mb-3">
-                <div className="text-[10px] font-medium text-gray-600 mb-1">📎 Upload External Translation:</div>
+              <div className="mb-4">
+                <div className="text-sm font-medium text-gray-600 mb-2">📎 Upload External Translation:</div>
                 <input
                   type="file"
                   id="translationFile"
@@ -21645,26 +21645,26 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 />
                 <label
                   htmlFor="translationFile"
-                  className={`block px-2 py-1.5 border-2 border-dashed rounded text-center cursor-pointer hover:bg-gray-50 text-[10px] ${uploadingFile ? 'opacity-50' : ''}`}
+                  className={`block px-3 py-2.5 border-2 border-dashed rounded-lg text-center cursor-pointer hover:bg-gray-50 text-sm ${uploadingFile ? 'opacity-50' : ''}`}
                 >
                   {uploadingFile ? 'Sending...' : '📁 Select file(s) (PDF, DOC, HTML)'}
                 </label>
-                <div className="text-[9px] text-gray-400 mt-1 text-center">
+                <div className="text-xs text-gray-400 mt-1 text-center">
                   For translations done outside the system
                 </div>
               </div>
 
               {/* Notify PM Option */}
               {sendingOrder?.assigned_pm_id && (
-                <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded">
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={notifyPM}
                       onChange={(e) => setNotifyPM(e.target.checked)}
-                      className="w-3 h-3 text-blue-600 rounded"
+                      className="w-4 h-4 text-blue-600 rounded"
                     />
-                    <span className="text-[10px] text-blue-700">
+                    <span className="text-sm text-blue-700">
                       Notify PM ({sendingOrder.assigned_pm_name || 'Assigned'})
                     </span>
                   </label>
@@ -21672,23 +21672,23 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               )}
 
               {/* BCC Field */}
-              <div className="mb-2">
-                <label className="text-[10px] font-medium text-gray-600 mb-1 block">📧 BCC:</label>
+              <div className="mb-4">
+                <label className="text-sm font-medium text-gray-600 mb-1 block">📧 BCC:</label>
                 <input
                   type="email"
                   value={sendBccEmail}
                   onChange={(e) => setSendBccEmail(e.target.value)}
                   placeholder="email@example.com (optional)"
-                  className="w-full px-2 py-1 border rounded text-xs"
+                  className="w-full px-3 py-2 border rounded text-sm"
                 />
               </div>
 
               {/* External Attachment for Resend - only for delivered orders */}
               {sendingOrder.translation_status === 'delivered' && (
-                <div className="mb-2">
-                  <div className="text-[10px] font-medium text-gray-600 mb-1">📎 Anexo Externo (Reenvio):</div>
-                  <div className="text-[9px] text-gray-500 mb-1">
-                    Anexar arquivo externo sem salvar no sistema
+                <div className="mb-4">
+                  <div className="text-sm font-medium text-gray-600 mb-1">📎 External Attachment (Resend):</div>
+                  <div className="text-sm text-gray-500 mb-2">
+                    Attach external file without saving to the system
                   </div>
                   {!externalAttachment ? (
                     <>
@@ -21715,22 +21715,22 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       />
                       <label
                         htmlFor="externalAttachmentFile"
-                        className="block px-2 py-1.5 border-2 border-dashed border-purple-300 bg-purple-50 rounded text-center cursor-pointer hover:bg-purple-100 text-[10px] text-purple-700"
+                        className="block px-3 py-2.5 border-2 border-dashed border-purple-300 bg-purple-50 rounded-lg text-center cursor-pointer hover:bg-purple-100 text-sm text-purple-700"
                       >
-                        📎 Selecionar anexo externo
+                        📎 Select external attachment
                       </label>
                     </>
                   ) : (
                     <div className="p-2 bg-purple-50 border border-purple-300 rounded flex items-center justify-between">
                       <div className="flex items-center gap-1">
-                        <span className="text-[10px] text-purple-700">📎</span>
-                        <span className="text-[10px] text-purple-800 font-medium truncate max-w-[180px]">
+                        <span className="text-xs text-purple-700">📎</span>
+                        <span className="text-xs text-purple-800 font-medium truncate max-w-[180px]">
                           {externalAttachment.filename}
                         </span>
                       </div>
                       <button
                         onClick={() => setExternalAttachment(null)}
-                        className="px-1.5 py-0.5 bg-red-100 text-red-600 rounded text-[9px] hover:bg-red-200"
+                        className="px-1.5 py-0.5 bg-red-100 text-red-600 rounded text-xs hover:bg-red-200"
                         title="Remover"
                       >
                         ✕
@@ -21742,17 +21742,17 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
             </div>
 
             {/* Footer - always visible */}
-            <div className="p-2 border-t bg-gray-50 flex justify-between rounded-b-lg flex-shrink-0">
+            <div className="p-3 border-t bg-gray-50 flex justify-between rounded-b-lg flex-shrink-0">
               <button
                 onClick={() => setSendingOrder(null)}
-                className="px-3 py-1.5 bg-gray-400 text-white rounded text-xs hover:bg-gray-500"
+                className="px-4 py-2 bg-gray-400 text-white rounded text-sm hover:bg-gray-500"
               >
                 Cancel
               </button>
               <button
                 onClick={() => sendTranslationToClient(sendingOrder.id)}
                 disabled={sendingToClient}
-                className={`px-3 py-1.5 text-white rounded text-xs disabled:bg-gray-400 ${
+                className={`px-4 py-2 text-white rounded text-sm disabled:bg-gray-400 ${
                   sendingOrder.translation_status === 'delivered'
                     ? 'bg-blue-600 hover:bg-blue-700'
                     : 'bg-blue-600 hover:bg-blue-700'
@@ -21990,7 +21990,7 @@ const NewQuotePage = ({ adminKey, user }) => {
 
   const SERVICE_TYPES = {
     certified: { name: 'Certified Translation', price: 24.99, description: 'Official documents, legal, immigration' },
-    sworn: { name: 'Sworn Translation (Tradução Juramentada)', price: 34.99, description: 'Court-recognized, notarized by sworn translator' },
+    sworn: { name: 'Sworn Translation', price: 34.99, description: 'Court-recognized, notarized by sworn translator' },
     apostille: { name: 'Apostille Service', price: 85.00, description: 'HCCH Apostille authentication', comingSoon: true },
     standard: { name: 'Standard Translation', price: 19.99, description: 'General use, no certification' }
   };
@@ -22600,7 +22600,7 @@ const FollowupsPage = ({ adminKey }) => {
     setTogglingAuto(true);
     try {
       await axios.post(`${API}/admin/quotes/toggle-auto-followup?admin_key=${adminKey}&enabled=${newEnabled}`);
-      showToast(`Follow-up automatico ${newEnabled ? 'ativado' : 'desativado'}`);
+      showToast(`Automatic follow-up ${newEnabled ? 'enabled' : 'disabled'}`);
       fetchFollowupStatus();
     } catch (err) {
       showToast('Error changing automatic follow-up');
@@ -22611,7 +22611,7 @@ const FollowupsPage = ({ adminKey }) => {
   };
 
   const excludeFromFollowup = async (quoteId, quoteType) => {
-    if (!window.confirm('Tem certeza que deseja remover este cliente do follow-up automatico?')) {
+    if (!window.confirm('Are you sure you want to remove this client from automatic follow-up?')) {
       return;
     }
     try {
@@ -23452,25 +23452,25 @@ const SettingsPage = ({ adminKey, archivedPartnerMessages = [], archivedTranslat
                 <tr key={perm.name} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                   <td className="p-3 border-b">
                     <div className="font-medium text-gray-800">{perm.name}</div>
-                    <div className="text-[10px] text-gray-500">{perm.desc}</div>
+                    <div className="text-xs text-gray-500">{perm.desc}</div>
                   </td>
                   <td className={`p-3 border-b text-center ${perm.admin ? 'bg-green-50' : 'bg-red-50'}`}>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${perm.admin ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${perm.admin ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                       {perm.admin ? 'Yes' : 'No'}
                     </span>
                   </td>
                   <td className={`p-3 border-b text-center ${perm.pm ? 'bg-green-50' : 'bg-red-50'}`}>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${perm.pm ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${perm.pm ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                       {perm.pm ? 'Yes' : 'No'}
                     </span>
                   </td>
                   <td className={`p-3 border-b text-center ${perm.sales ? 'bg-green-50' : 'bg-red-50'}`}>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${perm.sales ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${perm.sales ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                       {perm.sales ? 'Yes' : 'No'}
                     </span>
                   </td>
                   <td className={`p-3 border-b text-center ${perm.translator ? 'bg-green-50' : 'bg-red-50'}`}>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${perm.translator ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${perm.translator ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                       {perm.translator ? 'Yes' : 'No'}
                     </span>
                   </td>
@@ -23529,14 +23529,14 @@ const SettingsPage = ({ adminKey, archivedPartnerMessages = [], archivedTranslat
                 <span className="mr-2">💳</span>
                 <span>Stripe</span>
               </div>
-              <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-medium">Connected</span>
+              <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">Connected</span>
             </div>
             <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
               <div className="flex items-center">
                 <span className="mr-2">📧</span>
                 <span>Resend Email</span>
               </div>
-              <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-medium">Connected</span>
+              <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">Connected</span>
             </div>
             {/* QuickBooks Integration */}
             <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
@@ -23545,18 +23545,18 @@ const SettingsPage = ({ adminKey, archivedPartnerMessages = [], archivedTranslat
                 <div>
                   <span>QuickBooks Online</span>
                   {qbStatus.connected && qbStatus.company_name && (
-                    <span className="text-[10px] text-gray-500 ml-1">({qbStatus.company_name})</span>
+                    <span className="text-xs text-gray-500 ml-1">({qbStatus.company_name})</span>
                   )}
                 </div>
               </div>
               {qbStatus.loading ? (
-                <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px]">Checking...</span>
+                <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded text-xs">Checking...</span>
               ) : qbStatus.connected ? (
                 <div className="flex items-center space-x-2">
-                  <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-medium">Connected</span>
+                  <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">Connected</span>
                   <button
                     onClick={disconnectQuickBooks}
-                    className="px-2 py-0.5 bg-red-100 text-red-600 rounded text-[10px] hover:bg-red-200"
+                    className="px-2 py-0.5 bg-red-100 text-red-600 rounded text-xs hover:bg-red-200"
                   >
                     Disconnect
                   </button>
@@ -23565,7 +23565,7 @@ const SettingsPage = ({ adminKey, archivedPartnerMessages = [], archivedTranslat
                 <button
                   onClick={connectQuickBooks}
                   disabled={qbConnecting}
-                  className="px-3 py-1 bg-green-600 text-white rounded text-[10px] font-medium hover:bg-green-700 disabled:bg-gray-300"
+                  className="px-3 py-1 bg-green-600 text-white rounded text-xs font-medium hover:bg-green-700 disabled:bg-gray-300"
                 >
                   {qbConnecting ? 'Connecting...' : 'Connect'}
                 </button>
@@ -23633,12 +23633,12 @@ const SettingsPage = ({ adminKey, archivedPartnerMessages = [], archivedTranslat
                   <div key={`partner-${msg.id}`} className="flex items-center justify-between p-3 bg-yellow-50 rounded border border-yellow-100">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-0.5">
-                        <span className="text-[10px] px-1.5 py-0.5 bg-yellow-200 text-yellow-800 rounded font-medium">Partner</span>
+                        <span className="text-xs px-1.5 py-0.5 bg-yellow-200 text-yellow-800 rounded font-medium">Partner</span>
                         <span className="text-xs font-medium text-gray-800 truncate">{msg.from_partner_name}</span>
                         {msg.order_number && (
-                          <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">{msg.order_number}</span>
+                          <span className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">{msg.order_number}</span>
                         )}
-                        <span className="text-[10px] text-gray-400">
+                        <span className="text-xs text-gray-400">
                           {msg.created_at ? new Date(msg.created_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' }) : ''}
                         </span>
                       </div>
@@ -23657,12 +23657,12 @@ const SettingsPage = ({ adminKey, archivedPartnerMessages = [], archivedTranslat
                   <div key={`translator-${msg.id}`} className="flex items-center justify-between p-3 bg-blue-50 rounded border border-blue-100">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-0.5">
-                        <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded font-medium">Translator</span>
+                        <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded font-medium">Translator</span>
                         <span className="text-xs font-medium text-gray-800 truncate">{msg.from_translator_name}</span>
                         {msg.order_number && (
-                          <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">{msg.order_number}</span>
+                          <span className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">{msg.order_number}</span>
                         )}
-                        <span className="text-[10px] text-gray-400">
+                        <span className="text-xs text-gray-400">
                           {msg.created_at ? new Date(msg.created_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' }) : ''}
                         </span>
                       </div>
@@ -23700,7 +23700,7 @@ const SettingsPage = ({ adminKey, archivedPartnerMessages = [], archivedTranslat
             {/* Export Projects */}
             <div className="border rounded p-3">
               <h3 className="text-xs font-semibold text-gray-700 mb-2">Export Projects</h3>
-              <p className="text-[10px] text-gray-500 mb-3">Download all project data including status, client info, and pricing</p>
+              <p className="text-xs text-gray-500 mb-3">Download all project data including status, client info, and pricing</p>
               <div className="flex space-x-2">
                 <button
                   onClick={() => exportProjects('csv')}
@@ -23722,7 +23722,7 @@ const SettingsPage = ({ adminKey, archivedPartnerMessages = [], archivedTranslat
             {/* Export Clients */}
             <div className="border rounded p-3">
               <h3 className="text-xs font-semibold text-gray-700 mb-2">Export Clients</h3>
-              <p className="text-[10px] text-gray-500 mb-3">Download client contact info, phone numbers, and order history</p>
+              <p className="text-xs text-gray-500 mb-3">Download client contact info, phone numbers, and order history</p>
               <div className="flex space-x-2">
                 <button
                   onClick={() => exportClients('csv')}
@@ -23744,7 +23744,7 @@ const SettingsPage = ({ adminKey, archivedPartnerMessages = [], archivedTranslat
             {/* Export Translators */}
             <div className="border rounded p-3">
               <h3 className="text-xs font-semibold text-gray-700 mb-2">Export Translators</h3>
-              <p className="text-[10px] text-gray-500 mb-3">Download translator profiles, language pairs, and rates</p>
+              <p className="text-xs text-gray-500 mb-3">Download translator profiles, language pairs, and rates</p>
               <div className="flex space-x-2">
                 <button
                   onClick={() => exportTranslators('csv')}
@@ -23766,7 +23766,7 @@ const SettingsPage = ({ adminKey, archivedPartnerMessages = [], archivedTranslat
             {/* Export Financial Report */}
             <div className="border rounded p-3">
               <h3 className="text-xs font-semibold text-gray-700 mb-2">Financial Report</h3>
-              <p className="text-[10px] text-gray-500 mb-3">Download financial data including pricing and payment status</p>
+              <p className="text-xs text-gray-500 mb-3">Download financial data including pricing and payment status</p>
               <div className="flex space-x-2">
                 <button
                   onClick={() => exportFinancialReport('csv')}
@@ -23792,8 +23792,8 @@ const SettingsPage = ({ adminKey, archivedPartnerMessages = [], archivedTranslat
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-xs font-semibold text-gray-700">Full System Backup</h3>
-                  <p className="text-[10px] text-gray-500 mt-1">Create a complete backup of all projects, users, and translators in JSON format</p>
-                  <p className="text-[10px] text-blue-600 mt-1">Files are saved to your browser's Downloads folder</p>
+                  <p className="text-xs text-gray-500 mt-1">Create a complete backup of all projects, users, and translators in JSON format</p>
+                  <p className="text-xs text-blue-600 mt-1">Files are saved to your browser's Downloads folder</p>
                 </div>
                 <button
                   onClick={createFullBackup}
@@ -23825,7 +23825,7 @@ const SettingsPage = ({ adminKey, archivedPartnerMessages = [], archivedTranslat
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-xs font-semibold text-gray-700">Download Source Code</h3>
-                  <p className="text-[10px] text-gray-500 mt-1">Download Python backend and React frontend as ZIP file</p>
+                  <p className="text-xs text-gray-500 mt-1">Download Python backend and React frontend as ZIP file</p>
                 </div>
                 <button
                   onClick={downloadSourceCode}
@@ -23900,10 +23900,10 @@ const SettingsPage = ({ adminKey, archivedPartnerMessages = [], archivedTranslat
                         <div className="flex items-center">
                           <span className="text-xs font-medium text-gray-800">{rp.name}</span>
                           {rp.is_auto_backup && (
-                            <span className="ml-2 px-1.5 py-0.5 bg-yellow-200 text-yellow-800 text-[10px] rounded">Auto</span>
+                            <span className="ml-2 px-1.5 py-0.5 bg-yellow-200 text-yellow-800 text-xs rounded">Auto</span>
                           )}
                         </div>
-                        <div className="text-[10px] text-gray-500 mt-1">
+                        <div className="text-xs text-gray-500 mt-1">
                           {new Date(rp.created_at).toLocaleString('en-US', { timeZone: 'America/New_York' })} |
                           {rp.stats?.orders_count || 0} orders, {rp.stats?.users_count || 0} users
                         </div>
@@ -23911,17 +23911,17 @@ const SettingsPage = ({ adminKey, archivedPartnerMessages = [], archivedTranslat
                       <div className="flex items-center space-x-2">
                         {showRestoreConfirm === rp.id ? (
                           <>
-                            <span className="text-[10px] text-red-600 mr-2">Are you sure?</span>
+                            <span className="text-xs text-red-600 mr-2">Are you sure?</span>
                             <button
                               onClick={() => restoreFromPoint(rp.id)}
                               disabled={restoringFrom === rp.id}
-                              className="px-2 py-1 bg-red-600 text-white text-[10px] rounded hover:bg-red-700 disabled:bg-gray-300"
+                              className="px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 disabled:bg-gray-300"
                             >
                               {restoringFrom === rp.id ? 'Restoring...' : 'Yes, Restore'}
                             </button>
                             <button
                               onClick={() => setShowRestoreConfirm(null)}
-                              className="px-2 py-1 bg-gray-300 text-gray-700 text-[10px] rounded hover:bg-gray-400"
+                              className="px-2 py-1 bg-gray-300 text-gray-700 text-xs rounded hover:bg-gray-400"
                             >
                               Cancel
                             </button>
@@ -23930,13 +23930,13 @@ const SettingsPage = ({ adminKey, archivedPartnerMessages = [], archivedTranslat
                           <>
                             <button
                               onClick={() => setShowRestoreConfirm(rp.id)}
-                              className="px-2 py-1 bg-blue-600 text-white text-[10px] rounded hover:bg-blue-700"
+                              className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
                             >
                               Restore
                             </button>
                             <button
                               onClick={() => deleteRestorePoint(rp.id)}
-                              className="px-2 py-1 bg-red-100 text-red-600 text-[10px] rounded hover:bg-red-200"
+                              className="px-2 py-1 bg-red-100 text-red-600 text-xs rounded hover:bg-red-200"
                             >
                               Delete
                             </button>
@@ -23950,7 +23950,7 @@ const SettingsPage = ({ adminKey, archivedPartnerMessages = [], archivedTranslat
             </div>
 
             <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
-              <p className="text-[10px] text-yellow-800">
+              <p className="text-xs text-yellow-800">
                 <strong>Warning:</strong> Restoring from a point will overwrite all current data. An automatic backup is created before each restore.
               </p>
             </div>
@@ -24792,10 +24792,10 @@ const UsersPage = ({ adminKey, user }) => {
   const TRANSLATOR_DOC_TYPES = [
     { value: 'id_document', label: 'Documento de Identidade (RG/ID)' },
     { value: 'cpf', label: 'CPF' },
-    { value: 'address_proof', label: 'Proof de Residência' },
-    { value: 'contract', label: 'Contrato de Prestação de Serviço' },
-    { value: 'bank_info', label: 'Dados Bancários' },
-    { value: 'certification', label: 'Certificação/Diploma' },
+    { value: 'address_proof', label: 'Proof of Residence' },
+    { value: 'contract', label: 'Service Agreement' },
+    { value: 'bank_info', label: 'Bank Details' },
+    { value: 'certification', label: 'Certification/Diploma' },
     { value: 'portfolio', label: 'Portfólio/Amostras' },
     { value: 'other', label: 'Outro Documento' }
   ];
@@ -25150,7 +25150,7 @@ const UsersPage = ({ adminKey, user }) => {
                     />
                   </div>
                 </div>
-                <p className="text-[10px] text-gray-400 mt-1">
+                <p className="text-xs text-gray-400 mt-1">
                   <strong>Contractor:</strong> Limited access (START + DELIVER tabs only) |
                   <strong> In-House:</strong> Full access (START, TRANSLATION, REVIEW, DELIVER tabs)
                 </p>
@@ -25278,7 +25278,7 @@ const UsersPage = ({ adminKey, user }) => {
                         <div className="bg-white rounded-lg p-4 border">
                           <div className="flex justify-between items-center mb-3">
                             <h4 className="font-bold text-sm text-gray-800 flex items-center gap-2">
-                              📋 Informações do Perfil
+                              📋 Profile Information
                             </h4>
                             {isAdmin && editingUser !== u.id && (
                               <button
@@ -25334,7 +25334,7 @@ const UsersPage = ({ adminKey, user }) => {
                               )}
                             </div>
                             <div>
-                              <span className="text-gray-500 text-xs">Função:</span>
+                              <span className="text-gray-500 text-xs">Role:</span>
                               {editingUser === u.id ? (
                                 <select
                                   value={editForm.role}
@@ -25389,7 +25389,7 @@ const UsersPage = ({ adminKey, user }) => {
                                 />
                               ) : (
                                 <div className="font-medium text-green-600">
-                                  {u.rate_per_page ? `$${u.rate_per_page.toFixed(2)}` : 'Não definido'}
+                                  {u.rate_per_page ? `$${u.rate_per_page.toFixed(2)}` : 'Not set'}
                                 </div>
                               )}
                             </div>
@@ -25406,7 +25406,7 @@ const UsersPage = ({ adminKey, user }) => {
                                 />
                               ) : (
                                 <div className="font-medium text-green-600">
-                                  {u.rate_per_word ? `$${u.rate_per_word.toFixed(3)}` : 'Não definido'}
+                                  {u.rate_per_word ? `$${u.rate_per_word.toFixed(3)}` : 'Not set'}
                                 </div>
                               )}
                             </div>
@@ -25430,7 +25430,7 @@ const UsersPage = ({ adminKey, user }) => {
                                         </span>
                                       ))}
                                     </div>
-                                  ) : 'Não definido'}
+                                  ) : 'Not set'}
                                 </div>
                               )}
                             </div>
@@ -25487,7 +25487,7 @@ const UsersPage = ({ adminKey, user }) => {
                                   />
                                 </label>
                               </div>
-                              <p className="text-[10px] text-gray-400 mt-1">PDF, DOC, JPG, PNG (max 10MB)</p>
+                              <p className="text-xs text-gray-400 mt-1">PDF, DOC, JPG, PNG (max 10MB)</p>
                             </div>
                           )}
 
@@ -25665,7 +25665,7 @@ const ProductionPage = ({ adminKey }) => {
   };
 
   const handleMarkAsPaid = async (paymentId) => {
-    if (!window.confirm('Confirm pagamento como completed?')) return;
+    if (!window.confirm('Confirm payment as completed?')) return;
     try {
       await axios.put(`${API}/admin/payments/${paymentId}?admin_key=${adminKey}`, { status: 'paid' });
       fetchPayments();
@@ -25921,7 +25921,7 @@ const ProductionPage = ({ adminKey }) => {
                         <span className={`px-2 py-1 rounded text-xs ${
                           payment.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
                         }`}>
-                          {payment.status === 'paid' ? 'Pago' : 'Pendente'}
+                          {payment.status === 'paid' ? 'Paid' : 'Pending'}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -26037,7 +26037,7 @@ const ProductionPage = ({ adminKey }) => {
                   className="w-full px-3 py-2 border rounded text-sm"
                 >
                   <option value="">Select...</option>
-                  <option value="bank_transfer">Transferência Bancária</option>
+                  <option value="bank_transfer">Bank Transfer</option>
                   <option value="paypal">PayPal</option>
                   <option value="pix">PIX</option>
                   <option value="check">Cheque</option>
@@ -26045,7 +26045,7 @@ const ProductionPage = ({ adminKey }) => {
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-gray-600 mb-1">Referência/ID da Transação</label>
+                <label className="block text-xs text-gray-600 mb-1">Reference/Transaction ID</label>
                 <input
                   type="text"
                   value={paymentForm.payment_reference}
@@ -26061,7 +26061,7 @@ const ProductionPage = ({ adminKey }) => {
                   onChange={(e) => setPaymentForm({...paymentForm, notes: e.target.value})}
                   className="w-full px-3 py-2 border rounded text-sm"
                   rows="2"
-                  placeholder="Observações opcionais..."
+                  placeholder="Optional notes..."
                 />
               </div>
               <div className="flex justify-end space-x-2 pt-2">
@@ -26396,7 +26396,7 @@ const ExpensesPage = ({ adminKey }) => {
       {/* Expense Modal */}
       {showExpenseModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
             <div className="p-4 border-b flex justify-between items-center flex-shrink-0">
               <h3 className="font-bold text-gray-800">New Expense</h3>
               <button onClick={() => setShowExpenseModal(false)} className="text-gray-500 hover:text-gray-700">✕</button>
@@ -30113,7 +30113,7 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
   if (verifying) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm text-center">
+        <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md text-center">
           <p className="text-gray-600">Verifying invitation...</p>
         </div>
       </div>
@@ -30123,7 +30123,7 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
   if (error && !userInfo) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
+        <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
           <div className="text-center mb-6">
             <div className="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center mx-auto mb-3">
               <span className="text-xl text-white">!</span>
@@ -30438,7 +30438,7 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
   // Step 1: Password setup
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-      <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
+      <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
         <div className="text-center mb-6">
           <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-3">
             <span className="text-xl text-white">🔐</span>
@@ -30558,7 +30558,7 @@ const ResetPasswordPage = ({ resetToken, onComplete }) => {
   if (verifying) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm text-center">
+        <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md text-center">
           <p className="text-gray-600">Verifying link...</p>
         </div>
       </div>
@@ -30568,7 +30568,7 @@ const ResetPasswordPage = ({ resetToken, onComplete }) => {
   if (error && !tokenValid) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
+        <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
           <div className="text-center mb-6">
             <div className="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center mx-auto mb-3">
               <span className="text-xl text-white">!</span>
@@ -30591,7 +30591,7 @@ const ResetPasswordPage = ({ resetToken, onComplete }) => {
 
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-      <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
+      <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
         <div className="text-center mb-6">
           <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-3">
             <span className="text-xl text-white">🔑</span>
@@ -31705,10 +31705,10 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
   // Archive a single order from PM Dashboard (hidden from PM, still visible to admin)
   const archivePmOrder = async (orderId, orderNumber) => {
-    if (!window.confirm(`Arquivar o projeto ${orderNumber}?\n\nO projeto será removido do seu painel, mas o admin ainda terá acesso.`)) return;
+    if (!window.confirm(`Archive project ${orderNumber}?\n\nThe project will be removed from your dashboard, but admin will still have access.`)) return;
     try {
       await axios.post(`${API}/admin/orders/${orderId}/archive?admin_key=${adminKey}`);
-      showToast(`Projeto ${orderNumber} arquivado com sucesso`);
+      showToast(`Project ${orderNumber} archived successfully`);
       fetchDashboardData();
     } catch (err) {
       console.error('Failed to archive order:', err);
@@ -31719,18 +31719,18 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   // Bulk archive selected orders
   const bulkArchiveOrders = async () => {
     if (selectedOrderIds.size === 0) {
-      showToast('Selecione os projetos que deseja arquivar');
+      showToast('Select the projects you want to archive');
       return;
     }
     const count = selectedOrderIds.size;
-    if (!window.confirm(`Arquivar ${count} projeto(s)?\n\nOs projetos serão removidos do seu painel, mas o admin ainda terá acesso.`)) return;
+    if (!window.confirm(`Archive ${count} project(s)?\n\nProjects will be removed from your dashboard, but admin will still have access.`)) return;
     setDeletingOrders(true);
     try {
       const res = await axios.post(`${API}/admin/orders/bulk-archive?admin_key=${adminKey}`, {
         order_ids: Array.from(selectedOrderIds)
       });
       const { archived_count, failed } = res.data;
-      showToast(`${archived_count} projeto(s) arquivado(s)${failed?.length ? `, ${failed.length} falharam` : ''}`);
+      showToast(`${archived_count} project(s) archived${failed?.length ? `, ${failed.length} failed` : ''}`);
       setSelectedOrderIds(new Set());
       fetchDashboardData();
     } catch (err) {
@@ -31748,14 +31748,14 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       showToast('No completed projects to archive');
       return;
     }
-    if (!window.confirm(`Arquivar TODOS os ${completedOrders.length} projetos finalizados/entregues?\n\nOs projetos serão removidos do seu painel, mas o admin ainda terá acesso.`)) return;
+    if (!window.confirm(`Archive ALL ${completedOrders.length} completed/delivered projects?\n\nProjects will be removed from your dashboard, but admin will still have access.`)) return;
     setDeletingOrders(true);
     try {
       const res = await axios.post(`${API}/admin/orders/bulk-archive?admin_key=${adminKey}`, {
         order_ids: completedOrders.map(o => o.id)
       });
       const { archived_count, failed } = res.data;
-      showToast(`${archived_count} projeto(s) arquivado(s)${failed?.length ? `, ${failed.length} falharam` : ''}`);
+      showToast(`${archived_count} project(s) archived${failed?.length ? `, ${failed.length} failed` : ''}`);
       setSelectedOrderIds(new Set());
       fetchDashboardData();
     } catch (err) {
@@ -33725,12 +33725,12 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
           setTranslatedContent({ ...translatedContent, html: generatedHtml });
         }
       } catch (e) {
-        translatedText = 'Não foi possível extrair texto da translation';
+        translatedText = 'Could not extract text from translation';
       }
     }
 
     if (!translatedText.trim()) {
-      setProofreadingError('Não foi possível extrair o texto da translation to review.');
+      setProofreadingError('Could not extract translation text for review.');
       return;
     }
 
@@ -33743,7 +33743,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       const claudeApiKey = localStorage.getItem('claude_api_key') || '';
 
       if (!claudeApiKey) {
-        setProofreadingError('Chave API do Claude não configurada. Configure em Configurações.');
+        setProofreadingError('Claude API key not configured. Set it in Settings.');
         setIsProofreading(false);
         return;
       }
@@ -33881,7 +33881,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
             <span className="mr-1">{section.icon}</span>
             {section.label}
             {section.id === 'review' && reviewQueue.length > 0 && (
-              <span className="ml-1 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+              <span className="ml-1 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
                 {reviewQueue.length}
               </span>
             )}
@@ -33895,27 +33895,27 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
           {/* Stats Cards */}
           <div className="grid grid-cols-6 gap-3">
             <div className="bg-white rounded-lg shadow p-4">
-              <div className="text-[10px] text-gray-500 uppercase">Total Projects</div>
+              <div className="text-xs text-gray-500 uppercase">Total Projects</div>
               <div className="text-2xl font-bold text-gray-800">{stats.totalProjects}</div>
             </div>
             <div className="bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-lg shadow p-4 text-white">
-              <div className="text-[10px] uppercase opacity-80">In Progress</div>
+              <div className="text-xs uppercase opacity-80">In Progress</div>
               <div className="text-2xl font-bold">{stats.inProgress}</div>
             </div>
             <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg shadow p-4 text-white">
-              <div className="text-[10px] uppercase opacity-80">Awaiting Review</div>
+              <div className="text-xs uppercase opacity-80">Awaiting Review</div>
               <div className="text-2xl font-bold">{stats.awaitingReview}</div>
             </div>
             <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-lg shadow p-4 text-white">
-              <div className="text-[10px] uppercase opacity-80">Completed</div>
+              <div className="text-xs uppercase opacity-80">Completed</div>
               <div className="text-2xl font-bold">{stats.completed}</div>
             </div>
             <div className="bg-gradient-to-r from-blue-500 to-blue-700 rounded-lg shadow p-4 text-white">
-              <div className="text-[10px] uppercase opacity-80">On Time</div>
+              <div className="text-xs uppercase opacity-80">On Time</div>
               <div className="text-2xl font-bold">{stats.onTime}</div>
             </div>
             <div className="bg-gradient-to-r from-red-500 to-red-600 rounded-lg shadow p-4 text-white">
-              <div className="text-[10px] uppercase opacity-80">Delayed</div>
+              <div className="text-xs uppercase opacity-80">Delayed</div>
               <div className="text-2xl font-bold">{stats.delayed}</div>
             </div>
           </div>
@@ -33956,7 +33956,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     disabled={deletingOrders}
                     className="px-3 py-1.5 bg-amber-500 text-white rounded text-xs hover:bg-amber-600 disabled:bg-gray-400 flex items-center gap-1"
                   >
-                    📦 Arquivar Selecionados ({selectedOrderIds.size})
+                    📦 Archive Selected ({selectedOrderIds.size})
                   </button>
                 )}
                 <button
@@ -33964,7 +33964,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   disabled={deletingOrders}
                   className="px-3 py-1.5 bg-amber-600 text-white rounded text-xs hover:bg-amber-700 disabled:bg-gray-400 flex items-center gap-1"
                 >
-                  {deletingOrders ? 'Arquivando...' : '📦 Arquivar Todos Finalizados'}
+                  {deletingOrders ? 'Archiving...' : '📦 Archive All Completed'}
                 </button>
               </div>
             </div>
@@ -34039,7 +34039,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                                   </span>
                                   <div className="flex flex-wrap gap-0.5 mt-1">
                                     {allTranslatorNames.map((name, i) => (
-                                      <span key={i} className="text-[9px] px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded border border-purple-200">
+                                      <span key={i} className="text-xs px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded border border-purple-200">
                                         {name}
                                       </span>
                                     ))}
@@ -34056,7 +34056,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                               )}
                               {order.translator_assignment_status === 'bulk_pending' && (
                                 <span
-                                  className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded w-fit border border-purple-200"
+                                  className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded w-fit border border-purple-200"
                                   title={`Bulk invite sent to ${order.bulk_invite_count || '?'} translators. Waiting for first acceptance.`}
                                 >
                                   📢 BULK INVITE ({order.bulk_invite_count || '?'}) - Awaiting
@@ -34070,7 +34070,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                                       updateTranslatorAssignmentStatus(order.id, 'accepted');
                                     }
                                   }}
-                                  className="text-[10px] px-1.5 py-0.5 bg-yellow-50 text-yellow-600 rounded w-fit border border-yellow-200 cursor-pointer hover:bg-yellow-100"
+                                  className="text-xs px-1.5 py-0.5 bg-yellow-50 text-yellow-600 rounded w-fit border border-yellow-200 cursor-pointer hover:bg-yellow-100"
                                   title="Click to mark as Accepted"
                                 >
                                   Pending
@@ -34084,7 +34084,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                                       updateTranslatorAssignmentStatus(order.id, 'pending');
                                     }
                                   }}
-                                  className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 rounded w-fit cursor-pointer hover:bg-green-200"
+                                  className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded w-fit cursor-pointer hover:bg-green-200"
                                   title="Click to change status"
                                 >
                                   ✓ Accepted
@@ -34092,10 +34092,10 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                               )}
                               {order.translator_assignment_status === 'declined' && (
                                 <div className="flex flex-col gap-1">
-                                  <span className="text-[10px] px-1.5 py-0.5 bg-red-100 text-red-700 rounded w-fit">✕ Declined</span>
+                                  <span className="text-xs px-1.5 py-0.5 bg-red-100 text-red-700 rounded w-fit">✕ Declined</span>
                                   <button
                                     onClick={() => openAssignTranslatorModal(order)}
-                                    className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 flex items-center gap-1 w-fit"
+                                    className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 flex items-center gap-1 w-fit"
                                   >
                                     🔄 Reassign
                                   </button>
@@ -34105,7 +34105,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                           ) : (
                             <button
                               onClick={() => openAssignTranslatorModal(order)}
-                              className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-[10px] hover:bg-blue-200 flex items-center gap-1"
+                              className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200 flex items-center gap-1"
                             >
                               📧 Email Invite
                             </button>
@@ -34113,7 +34113,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         })()}
                       </td>
                       <td className="py-2 px-2">
-                        <span className={`px-2 py-0.5 rounded text-[10px] ${STATUS_COLORS[order.translation_status] || 'bg-gray-100'}`}>
+                        <span className={`px-2 py-0.5 rounded text-xs ${STATUS_COLORS[order.translation_status] || 'bg-gray-100'}`}>
                           {order.translation_status}
                         </span>
                       </td>
@@ -34126,7 +34126,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                             <button
                               onClick={() => downloadOrderPackagePM(order)}
                               disabled={downloadingPackagePM === order.id}
-                              className="px-2 py-1 bg-purple-500 text-white rounded text-[10px] hover:bg-purple-600 disabled:bg-gray-400 flex items-center gap-1"
+                              className="px-2 py-1 bg-purple-500 text-white rounded text-xs hover:bg-purple-600 disabled:bg-gray-400 flex items-center gap-1"
                               title="Download complete translation package"
                             >
                               {downloadingPackagePM === order.id ? '...' : '📥 Package'}
@@ -34134,8 +34134,8 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                           )}
                           <button
                             onClick={() => archivePmOrder(order.id, order.order_number)}
-                            className="px-2 py-1 bg-amber-500 text-white rounded text-[10px] hover:bg-amber-600 flex items-center gap-1"
-                            title="Arquivar projeto"
+                            className="px-2 py-1 bg-amber-500 text-white rounded text-xs hover:bg-amber-600 flex items-center gap-1"
+                            title="Archive project"
                           >
                             📦
                           </button>
@@ -34162,7 +34162,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 {/* Client Info */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Client Name *</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Client Name *</label>
                     <input
                       type="text"
                       value={quoteForm.clientName}
@@ -34172,7 +34172,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Client Email *</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Client Email *</label>
                     <input
                       type="email"
                       value={quoteForm.clientEmail}
@@ -34185,7 +34185,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
                 {/* Document Type */}
                 <div>
-                  <label className="block text-[10px] font-medium text-gray-600 mb-1">Document Type</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Document Type</label>
                   <select
                     value={quoteForm.documentType}
                     onChange={(e) => setQuoteForm({...quoteForm, documentType: e.target.value})}
@@ -34198,7 +34198,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 {/* Languages */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Source Language</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Source Language</label>
                     <select
                       value={quoteForm.sourceLanguage}
                       onChange={(e) => setQuoteForm({...quoteForm, sourceLanguage: e.target.value})}
@@ -34208,7 +34208,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Target Language</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Target Language</label>
                     <select
                       value={quoteForm.targetLanguage}
                       onChange={(e) => setQuoteForm({...quoteForm, targetLanguage: e.target.value})}
@@ -34222,7 +34222,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 {/* Service Type & Urgency */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Service Type</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Service Type</label>
                     <select
                       value={quoteForm.serviceType}
                       onChange={(e) => {
@@ -34235,21 +34235,21 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                       }}
                       className="w-full px-2 py-1.5 text-xs border rounded"
                     >
-                      <option value="certified">Tradução Certificada (Certified)</option>
-                      <option value="sworn">Tradução Juramentada (Sworn)</option>
+                      <option value="certified">Certified Translation</option>
+                      <option value="sworn">Sworn Translation</option>
                       <option value="apostille" disabled>Apostila (Apostille) - Coming Soon</option>
-                      <option value="standard">Tradução Profissional (Standard)</option>
+                      <option value="standard">Standard Translation</option>
                     </select>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Urgência</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Urgency</label>
                     <select
                       value={quoteForm.urgency}
                       onChange={(e) => setQuoteForm({...quoteForm, urgency: e.target.value})}
                       className="w-full px-2 py-1.5 text-xs border rounded"
                     >
                       <option value="no">Normal (2-3 dias úteis)</option>
-                      <option value="priority">Prioritário (24 horas) +25%</option>
+                      <option value="priority">Priority (24 hours) +25%</option>
                       <option value="urgent">Urgente (12 horas) +100%</option>
                     </select>
                   </div>
@@ -34257,7 +34257,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
                 {/* Delivery Method */}
                 <div>
-                  <label className="block text-[10px] font-medium text-gray-600 mb-1">Método de Entrega</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Método de Entrega</label>
                   <select
                     value={quoteForm.deliveryMethod}
                     onChange={(e) => setQuoteForm({...quoteForm, deliveryMethod: e.target.value})}
@@ -34274,7 +34274,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 {/* Pricing */}
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Nº de Páginas</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Nº de Páginas</label>
                     <input
                       type="number"
                       value={quoteForm.pageCount}
@@ -34284,7 +34284,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Preço por Página ($)</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Preço por Página ($)</label>
                     <input
                       type="number"
                       value={quoteForm.pricePerPage}
@@ -34295,7 +34295,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Desconto (%)</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Desconto (%)</label>
                     <input
                       type="number"
                       value={quoteForm.discount}
@@ -34309,7 +34309,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
                 {/* Notes */}
                 <div>
-                  <label className="block text-[10px] font-medium text-gray-600 mb-1">Notes</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Notes</label>
                   <textarea
                     value={quoteForm.notes}
                     onChange={(e) => setQuoteForm({...quoteForm, notes: e.target.value})}
@@ -34321,7 +34321,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
                 {/* Quote Language Selection */}
                 <div>
-                  <label className="block text-[10px] font-medium text-gray-600 mb-1">Quote Language</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Quote Language</label>
                   <div className="flex gap-2">
                     {[
                       { value: 'en', label: '🇺🇸 English' },
@@ -34628,7 +34628,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                       <div>
                         <div className="font-mono text-blue-600 font-medium">{order.order_number}</div>
                         <div className="text-xs text-gray-500">{order.client_name}</div>
-                        <div className="text-[10px] text-gray-400">
+                        <div className="text-xs text-gray-400">
                           {order.translate_from} → {order.translate_to} • Translator: {order.assigned_translator || 'N/A'}
                         </div>
                       </div>
@@ -34668,7 +34668,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   {/* Workflow Status Indicator */}
                   <div className="flex flex-col items-end gap-2">
                     {/* Workflow Steps */}
-                    <div className="flex items-center gap-1 text-[10px] text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                    <div className="flex items-center gap-1 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
                       <span className={`px-1 py-0.5 rounded ${!proofreadingResult ? 'bg-blue-500 text-white' : 'bg-green-100 text-green-700'}`}>
                         1. Review
                       </span>
@@ -34923,7 +34923,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         <div className="mb-3 p-3 bg-orange-50 border border-orange-200 rounded-lg flex items-center justify-between">
                           <div>
                             <p className="text-xs font-medium text-orange-800">⚠️ Image format - cannot proofread</p>
-                            <p className="text-[10px] text-orange-600 mt-0.5">Convert to HTML text to enable proofreading</p>
+                            <p className="text-xs text-orange-600 mt-0.5">Convert to HTML text to enable proofreading</p>
                           </div>
                           <button onClick={handlePmConvertToHtml} disabled={pmConverting}
                             className="px-3 py-1.5 bg-orange-500 text-white text-xs rounded hover:bg-orange-600 disabled:bg-gray-400 flex items-center gap-1">
@@ -34944,7 +34944,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         <div className="mb-3 p-3 bg-orange-50 border border-orange-200 rounded-lg flex items-center justify-between">
                           <div>
                             <p className="text-xs font-medium text-orange-800">⚠️ PDF format - cannot proofread</p>
-                            <p className="text-[10px] text-orange-600 mt-0.5">Convert to HTML text to enable proofreading</p>
+                            <p className="text-xs text-orange-600 mt-0.5">Convert to HTML text to enable proofreading</p>
                           </div>
                           <button onClick={handlePmConvertToHtml} disabled={pmConverting}
                             className="px-3 py-1.5 bg-orange-500 text-white text-xs rounded hover:bg-orange-600 disabled:bg-gray-400 flex items-center gap-1">
@@ -35031,7 +35031,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                               <p className="text-xs font-medium text-orange-800">
                                 ⚠️ Translation is in image/PDF format
                               </p>
-                              <p className="text-[10px] text-orange-600 mt-1">
+                              <p className="text-xs text-orange-600 mt-1">
                                 Convert to HTML text to enable proofreading and corrections
                               </p>
                             </div>
@@ -35062,7 +35062,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                                   showToast('Translation page deleted!');
                                 }
                               }}
-                              className="px-1.5 py-0.5 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
+                              className="px-1.5 py-0.5 bg-red-500 text-white text-xs rounded hover:bg-red-600"
                             >
                               Delete
                             </button>
@@ -35170,7 +35170,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                           {proofreadingResult.resumo?.total_erros || 0} erro(s) found(s)
                         </span>
                       </div>
-                      <div className="grid grid-cols-4 gap-2 text-[10px]">
+                      <div className="grid grid-cols-4 gap-2 text-xs">
                         <div className="text-center p-1 bg-red-100 rounded">
                           <div className="font-bold text-red-600">{proofreadingResult.resumo?.criticos || 0}</div>
                           <div className="text-gray-600">Críticos</div>
@@ -35207,7 +35207,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                           </button>
                         </div>
                         <div className="max-h-60 overflow-y-auto border rounded">
-                          <table className="w-full text-[10px]">
+                          <table className="w-full text-xs">
                             <thead className="bg-gray-100 sticky top-0">
                               <tr>
                                 <th className="p-2 text-left">Tipo</th>
@@ -35215,7 +35215,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                                 <th className="p-2 text-left">Encontrado</th>
                                 <th className="p-2 text-left">Sugerido</th>
                                 <th className="p-2 text-center">Gravidade</th>
-                                <th className="p-2 text-center">Ação</th>
+                                <th className="p-2 text-center">Action</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -35254,16 +35254,16 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                                   </td>
                                   <td className="p-2 text-center">
                                     {erro.applied ? (
-                                      <span className="text-green-600 text-[10px] font-medium">✓ Applied</span>
+                                      <span className="text-green-600 text-xs font-medium">✓ Applied</span>
                                     ) : foundText && suggestionText ? (
                                       <button
                                         onClick={(e) => { e.stopPropagation(); applyPmProofreadingCorrection(erro, idx); }}
-                                        className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
+                                        className="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
                                       >
                                         Apply
                                       </button>
                                     ) : (
-                                      <span className="text-gray-400 text-[10px]">-</span>
+                                      <span className="text-gray-400 text-xs">-</span>
                                     )}
                                   </td>
                                 </tr>
@@ -35278,11 +35278,11 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     {/* Observations */}
                     {proofreadingResult.observacoes && (typeof proofreadingResult.observacoes === 'string' ? proofreadingResult.observacoes.length > 0 : proofreadingResult.observacoes.length > 0) && (
                       <div className="p-3 bg-blue-50 border border-blue-200 rounded">
-                        <h5 className="text-xs font-bold text-blue-700 mb-2">📌 Observações:</h5>
+                        <h5 className="text-xs font-bold text-blue-700 mb-2">📌 Notes:</h5>
                         {typeof proofreadingResult.observacoes === 'string' ? (
-                          <p className="text-[10px] text-gray-700">{proofreadingResult.observacoes}</p>
+                          <p className="text-xs text-gray-700">{proofreadingResult.observacoes}</p>
                         ) : (
-                          <ul className="text-[10px] text-gray-700 space-y-1">
+                          <ul className="text-xs text-gray-700 space-y-1">
                             {proofreadingResult.observacoes.map((obs, idx) => (
                               <li key={idx}>• {typeof obs === 'string' ? obs : obs.texto || obs.observacao || JSON.stringify(obs)}</li>
                             ))}
@@ -35296,7 +35296,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                       <h5 className="text-xs font-bold text-purple-700 mb-2 flex items-center gap-2">
                         🤖 Claude AI - Final Corrections
                       </h5>
-                      <p className="text-[10px] text-gray-600 mb-2">
+                      <p className="text-xs text-gray-600 mb-2">
                         Send instructions to Claude to automatically fix issues in the translation.
                       </p>
                       <div className="flex gap-2">
@@ -35323,28 +35323,28 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                       </div>
                       {proofreadingResult.erros && proofreadingResult.erros.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1">
-                          <span className="text-[10px] text-gray-500">Quick:</span>
+                          <span className="text-xs text-gray-500">Quick:</span>
                           <button
                             onClick={() => setPmCorrectionCommand('Fix all special character encoding errors (ã, õ, é, ç, etc)')}
-                            className="text-[10px] px-2 py-0.5 bg-purple-100 text-purple-700 rounded hover:bg-purple-200"
+                            className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded hover:bg-purple-200"
                           >
                             Fix encoding
                           </button>
                           <button
                             onClick={() => setPmCorrectionCommand('Apply all suggested corrections from the proofreading analysis')}
-                            className="text-[10px] px-2 py-0.5 bg-purple-100 text-purple-700 rounded hover:bg-purple-200"
+                            className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded hover:bg-purple-200"
                           >
                             Apply all corrections
                           </button>
                           <button
                             onClick={() => setPmCorrectionCommand('Fix formatting, spacing, and punctuation issues')}
-                            className="text-[10px] px-2 py-0.5 bg-purple-100 text-purple-700 rounded hover:bg-purple-200"
+                            className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded hover:bg-purple-200"
                           >
                             Fix formatting
                           </button>
                           <button
                             onClick={() => setPmCorrectionCommand('Review and fix any translation errors or mistranslations')}
-                            className="text-[10px] px-2 py-0.5 bg-purple-100 text-purple-700 rounded hover:bg-purple-200"
+                            className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded hover:bg-purple-200"
                           >
                             Fix translations
                           </button>
@@ -35519,7 +35519,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         )}
                       </td>
                       <td className="p-2">
-                        <span className={`px-2 py-0.5 rounded text-[10px] ${
+                        <span className={`px-2 py-0.5 rounded text-xs ${
                           order.translation_status === 'in_translation' ? 'bg-yellow-100 text-yellow-800' :
                           order.translation_status === 'review' ? 'bg-blue-100 text-blue-800' :
                           order.translation_status === 'pending_pm_review' ? 'bg-purple-100 text-purple-800' :
@@ -35567,7 +35567,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                                 }`}>
                                   {formatDateLocal(order.translator_deadline)}
                                 </span>
-                                <span className={`text-[10px] px-1 py-0.5 rounded ${
+                                <span className={`text-xs px-1 py-0.5 rounded ${
                                   order.trDaysLeft < 0 ? 'bg-red-100 text-red-700' :
                                   order.trDaysLeft <= 2 ? 'bg-yellow-100 text-yellow-700' :
                                   'bg-green-100 text-green-700'
@@ -35669,28 +35669,28 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         <div className={`w-3 h-3 rounded-full mr-2 ${isBusy ? 'bg-yellow-500' : 'bg-green-500'}`}></div>
                         <span className="font-medium text-sm">{translator.name}</span>
                       </div>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full ${isBusy ? 'bg-yellow-500 text-white' : 'bg-green-500 text-white'}`}>
-                        {isBusy ? 'Ocupado' : 'Disponível'}
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${isBusy ? 'bg-yellow-500 text-white' : 'bg-green-500 text-white'}`}>
+                        {isBusy ? 'Busy' : 'Available'}
                       </span>
                     </div>
-                    <div className="text-[10px] text-gray-500 mb-2">{translator.email}</div>
+                    <div className="text-xs text-gray-500 mb-2">{translator.email}</div>
 
                     <div className="grid grid-cols-2 gap-2 text-center mt-3">
                       <div className="bg-white rounded p-2">
                         <div className="text-lg font-bold text-yellow-600">{activeOrders.length}</div>
-                        <div className="text-[9px] text-gray-500">In Progress</div>
+                        <div className="text-xs text-gray-500">In Progress</div>
                       </div>
                       <div className="bg-white rounded p-2">
                         <div className="text-lg font-bold text-green-600">{completedOrders.length}</div>
-                        <div className="text-[9px] text-gray-500">Completed</div>
+                        <div className="text-xs text-gray-500">Completed</div>
                       </div>
                     </div>
 
                     {activeOrders.length > 0 && (
                       <div className="mt-3 pt-2 border-t">
-                        <div className="text-[10px] font-medium text-gray-600 mb-1">Active Projects:</div>
+                        <div className="text-xs font-medium text-gray-600 mb-1">Active Projects:</div>
                         {activeOrders.slice(0, 3).map((order, idx) => (
-                          <div key={idx} className="flex justify-between text-[10px] py-0.5">
+                          <div key={idx} className="flex justify-between text-xs py-0.5">
                             <span className="text-blue-600 font-mono">{order.order_number}</span>
                             <span className="text-gray-500">
                               {order.deadline ? formatDateLocal(order.deadline) : '-'}
@@ -35702,7 +35702,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
                     <button
                       onClick={() => { setSelectedTranslator(translator); setActiveSection('messages'); }}
-                      className="mt-3 w-full px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
+                      className="mt-3 w-full px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
                     >
                       💬 Send Message
                     </button>
@@ -35720,7 +35720,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
           <div className="bg-white rounded-lg shadow p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-bold text-gray-800">📅 Deadline Calendar</h3>
-              <div className="flex gap-2 text-[10px]">
+              <div className="flex gap-2 text-xs">
                 <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded">⏰ TR = Translator</span>
                 <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">📦 Client = Delivery</span>
               </div>
@@ -35738,7 +35738,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 >
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                      <span className={`px-2 py-0.5 rounded text-xs font-bold ${
                         item.deadlineType === 'translator'
                           ? 'bg-purple-500 text-white'
                           : 'bg-blue-500 text-white'
@@ -35748,7 +35748,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                       <span className="font-mono text-blue-600 font-medium">{item.order_number}</span>
                     </div>
                     <div className="text-xs text-gray-600 mt-1">{item.client_name}</div>
-                    <div className="text-[10px] text-gray-500">
+                    <div className="text-xs text-gray-500">
                       {item.translate_from} → {item.translate_to} • {item.assigned_translator || item.assigned_translator_name || 'No translator'}
                     </div>
                   </div>
@@ -35769,7 +35769,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     <div className="text-xs text-gray-500">
                       {item.deadlineDate.toLocaleDateString('en-US')} {item.deadlineDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                     </div>
-                    <span className={`mt-1 inline-block px-2 py-0.5 rounded text-[10px] ${STATUS_COLORS[item.translation_status] || 'bg-gray-100'}`}>
+                    <span className={`mt-1 inline-block px-2 py-0.5 rounded text-xs ${STATUS_COLORS[item.translation_status] || 'bg-gray-100'}`}>
                       {item.translation_status}
                     </span>
                   </div>
@@ -35796,13 +35796,13 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
             <div className="grid grid-cols-4 gap-4 mb-6">
               <div className="bg-blue-50 rounded-lg p-4 text-center">
                 <div className="text-3xl font-bold text-blue-600">{stats.totalProjects}</div>
-                <div className="text-xs text-gray-600">Total de Projetos</div>
+                <div className="text-xs text-gray-600">Total Projects</div>
               </div>
               <div className="bg-green-50 rounded-lg p-4 text-center">
                 <div className="text-3xl font-bold text-green-600">
                   {stats.totalProjects > 0 ? Math.round((stats.completed / stats.totalProjects) * 100) : 0}%
                 </div>
-                <div className="text-xs text-gray-600">Taxa de Conclusão</div>
+                <div className="text-xs text-gray-600">Completion Rate</div>
               </div>
               <div className="bg-blue-50 rounded-lg p-4 text-center">
                 <div className="text-3xl font-bold text-blue-600">
@@ -35830,7 +35830,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   item.count > 0 && (
                     <div
                       key={item.status}
-                      className={`${item.color} flex items-center justify-center text-white text-[10px]`}
+                      className={`${item.color} flex items-center justify-center text-white text-xs`}
                       style={{ width: `${(item.count / stats.totalProjects) * 100}%` }}
                       title={`${item.status}: ${item.count}`}
                     >
@@ -35839,7 +35839,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   )
                 ))}
               </div>
-              <div className="flex justify-between text-[9px] text-gray-500 mt-1">
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
                 <span>Received</span>
                 <span>In Translation</span>
                 <span>Review</span>
@@ -35920,7 +35920,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         }`}
                       >
                         <div className="font-medium">{translator.name}</div>
-                        <div className="text-[10px] opacity-70">{translator.email}</div>
+                        <div className="text-xs opacity-70">{translator.email}</div>
                       </button>
                     ))
                   ) : (
@@ -35953,7 +35953,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                                 : 'bg-white mr-8 border'
                             }`}
                           >
-                            <div className="font-medium text-[10px] text-gray-500 mb-1">
+                            <div className="font-medium text-xs text-gray-500 mb-1">
                               {msg.from} • {new Date(msg.timestamp).toLocaleString('en-US', { timeZone: 'America/New_York' })}
                             </div>
                             <div className="whitespace-pre-wrap">{msg.content}</div>
@@ -36037,7 +36037,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                       }`}
                     />
                     {!pmQuickDocumentType.trim() && (
-                      <p className="text-[10px] text-red-500 mt-1">⚠️ Document type is required</p>
+                      <p className="text-xs text-red-500 mt-1">⚠️ Document type is required</p>
                     )}
                   </div>
 
@@ -36068,7 +36068,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 {/* Upload Translation */}
                 <div className="p-4 bg-green-50 border border-green-200 rounded">
                   <h4 className="text-sm font-bold text-green-700 mb-2">📄 Upload Ready Translation</h4>
-                  <p className="text-[10px] text-green-600 mb-3">Upload your translation document (recommended: Word .docx)</p>
+                  <p className="text-xs text-green-600 mb-3">Upload your translation document (recommended: Word .docx)</p>
 
                   <div className={`border-2 border-dashed border-green-300 rounded-lg p-4 text-center transition-colors mb-2 ${pmQuickPackageLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-green-500'}`}>
                     <input
@@ -36085,13 +36085,13 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                       <span className="px-3 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700">
                         Upload Translation
                       </span>
-                      <p className="text-[10px] text-gray-500 mt-1">Word (.docx), HTML, TXT, PDF, Images</p>
+                      <p className="text-xs text-gray-500 mt-1">Word (.docx), HTML, TXT, PDF, Images</p>
                     </label>
                   </div>
 
                   {/* Paste HTML/Text */}
                   <div className="mt-3">
-                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Or paste text/HTML directly:</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Or paste text/HTML directly:</label>
                     <textarea
                       placeholder="Paste your translation text or HTML here..."
                       className="w-full h-24 px-3 py-2 text-xs border border-green-200 rounded resize-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
@@ -36134,7 +36134,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         <p className="text-xs font-medium text-green-700">{pmQuickTranslationFiles.length} image page(s):</p>
                         <button
                           onClick={() => setPmQuickTranslationFiles([])}
-                          className="text-[10px] text-gray-400 hover:text-red-500"
+                          className="text-xs text-gray-400 hover:text-red-500"
                           disabled={pmQuickPackageLoading}
                         >
                           Clear all
@@ -36161,7 +36161,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 {/* Upload Originals */}
                 <div className="p-4 bg-blue-50 border border-blue-200 rounded">
                   <h4 className="text-sm font-bold text-blue-700 mb-2">📑 Upload Original Documents</h4>
-                  <p className="text-[10px] text-blue-600 mb-3">Upload original document (PDF auto-converted to images)</p>
+                  <p className="text-xs text-blue-600 mb-3">Upload original document (PDF auto-converted to images)</p>
 
                   <div className={`border-2 border-dashed border-blue-300 rounded-lg p-4 text-center transition-colors mb-2 ${pmQuickPackageLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-blue-500'}`}>
                     <input
@@ -36178,7 +36178,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                       <span className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700">
                         Upload Originals
                       </span>
-                      <p className="text-[10px] text-gray-500 mt-1">PDF or images (PDF auto-converted)</p>
+                      <p className="text-xs text-gray-500 mt-1">PDF or images (PDF auto-converted)</p>
                     </label>
                   </div>
 
@@ -36188,7 +36188,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         <p className="text-xs font-medium text-blue-700">{pmQuickOriginalFiles.length} page(s) uploaded:</p>
                         <button
                           onClick={() => setPmQuickOriginalFiles([])}
-                          className="text-[10px] text-gray-400 hover:text-red-500"
+                          className="text-xs text-gray-400 hover:text-red-500"
                           disabled={pmQuickPackageLoading}
                         >
                           Clear all
@@ -36313,12 +36313,12 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     '📦 Generate Complete Package (Print/PDF)'
                   )}
                 </button>
-                <p className="text-[10px] text-gray-500 mt-1 text-center">
+                <p className="text-xs text-gray-500 mt-1 text-center">
                   Downloads PDF and opens preview window
                 </p>
 
                 {(!pmQuickDocumentType.trim() || (pmQuickTranslationFiles.length === 0 && !pmQuickTranslationHtml)) && (
-                  <p className="text-[10px] text-amber-600 text-center">
+                  <p className="text-xs text-amber-600 text-center">
                     ⚠️ Fill document type and upload translation first
                   </p>
                 )}
@@ -36371,7 +36371,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   ))}
                 </select>
                 {translators.length === 0 && (
-                  <p className="text-[10px] text-blue-600 mt-1">No translators found. Register translators in the Users tab first.</p>
+                  <p className="text-xs text-blue-600 mt-1">No translators found. Register translators in the Users tab first.</p>
                 )}
               </div>
 
@@ -36472,7 +36472,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   <span className="ml-1.5 inline-block w-2 h-2 bg-green-600 rounded-full"></span>
                 )}
                 {selectedProject?.translation_status === 'final' && (
-                  <span className="ml-1.5 text-[10px] bg-blue-200 text-blue-800 px-1.5 py-0.5 rounded font-bold">FINAL</span>
+                  <span className="ml-1.5 text-xs bg-blue-200 text-blue-800 px-1.5 py-0.5 rounded font-bold">FINAL</span>
                 )}
               </button>
             </div>
@@ -36726,7 +36726,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                           </span>
                           <div>
                             <div className="text-sm font-medium">{doc.filename || 'Document'}</div>
-                            <div className="text-[10px] text-gray-500">
+                            <div className="text-xs text-gray-500">
                               {doc.source === 'manual_upload' ? 'Manual upload' : doc.source === 'web_upload' ? 'Web' : 'Partner portal'}
                               {(doc.assigned_translator_name || fileAssignments[doc.id]?.name) && (
                                 <span className="ml-1 text-blue-600"> — {fileAssignments[doc.id]?.name || doc.assigned_translator_name}</span>
@@ -36779,7 +36779,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                                 fileAssignments[doc.id]?.name || doc.assigned_translator_name
                               )}
                               disabled={sendingFileInvite[doc.id]}
-                              className="px-2 py-1 bg-blue-600 text-white rounded text-[10px] hover:bg-blue-700 disabled:bg-gray-400 flex items-center gap-1"
+                              className="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:bg-gray-400 flex items-center gap-1"
                               title="Send email invitation to translator"
                             >
                               {sendingFileInvite[doc.id] ? '...' : '📧 Send'}
@@ -36789,7 +36789,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                             ) : doc.assignment_status === 'declined' ? (
                               <span className="text-xs text-red-600 font-medium">✗ Recusado</span>
                             ) : doc.assignment_status === 'pending' ? (
-                              <span className="text-xs text-yellow-600 font-medium">⏳ Pendente</span>
+                              <span className="text-xs text-yellow-600 font-medium">⏳ Pending</span>
                             ) : (
                               <span className="text-xs text-green-600 font-medium">✓ Atribuído</span>
                             )}
@@ -38133,13 +38133,13 @@ const SalesControlPage = ({ adminKey }) => {
       {/* Add Salesperson Modal */}
       {showAddSalesperson && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl w-full max-w-md max-h-[90vh] flex flex-col my-auto">
+          <div className="bg-white rounded-xl w-full max-w-lg max-h-[90vh] flex flex-col my-auto">
             <div className="p-3 border-b">
               <h3 className="text-base font-semibold flex items-center gap-2">
                 <span>👤</span> Add Salesperson
               </h3>
             </div>
-            <div className="p-3 overflow-y-auto flex-1 space-y-1.5">
+            <div className="p-4 overflow-y-auto flex-1 space-y-1.5">
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-0.5">Name *</label>
@@ -38540,7 +38540,7 @@ const SalesControlPage = ({ adminKey }) => {
       {/* Add Acquisition Modal */}
       {showAddAcquisition && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <span>🤝</span> Register Partner Acquisition
             </h3>
@@ -38774,7 +38774,7 @@ const SalesControlPage = ({ adminKey }) => {
       {/* Edit Acquisition Modal */}
       {editingAcquisition && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
               Edit Acquisition - {editingAcquisition.partner_name}
             </h3>
@@ -39673,7 +39673,7 @@ function AdminApp() {
                                 : 'bg-gray-100 text-gray-800'
                             }`}>
                               <div className="text-sm">{msg.content}</div>
-                              <div className={`text-[10px] mt-1 ${
+                              <div className={`text-xs mt-1 ${
                                 msg.type === 'admin_to_translator' ? 'text-blue-200' : 'text-gray-400'
                               }`}>
                                 {msg.order_number && <span className="mr-2">[{msg.order_number}]</span>}

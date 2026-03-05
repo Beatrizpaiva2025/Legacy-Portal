@@ -9,14 +9,15 @@ const API = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
 // ==================== STRIPE INITIALIZATION ====================
 let stripePromise = null;
-const getStripePromise = async () => {
+const getStripePromise = () => {
   if (!stripePromise) {
-    try {
-      const response = await axios.get(`${API}/stripe-config`);
-      stripePromise = loadStripe(response.data.publishable_key);
-    } catch (err) {
+    stripePromise = axios.get(`${API}/stripe-config`).then(response => {
+      return loadStripe(response.data.publishable_key);
+    }).catch(err => {
       console.error('Failed to load Stripe config:', err);
-    }
+      stripePromise = null; // Reset so it can retry
+      return null;
+    });
   }
   return stripePromise;
 };
@@ -1910,8 +1911,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
       });
 
       // Step 3: Load Stripe and show the form
-      const stripeObj = await getStripePromise();
-      setStripeInstance(stripeObj);
+      setStripeInstance(getStripePromise());
       setCardClientSecret(intentResponse.data.client_secret);
       setShowCardForm(true);
     } catch (err) {
