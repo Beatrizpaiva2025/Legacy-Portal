@@ -19986,6 +19986,34 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             </button>
                           )}
 
+                          {/* Reopen Project - Admin only, for delivered/final orders */}
+                          {isAdmin && (order.translation_status === 'delivered' || order.translation_status === 'final') && (
+                            <button
+                              onClick={async () => {
+                                if (!confirm(`Reabrir projeto ${order.order_number}?\n\nO status voltará para "Ready" e você poderá reenviar a tradução pelo fluxo normal.`)) return;
+                                try {
+                                  await axios.put(`${API}/admin/orders/${order.id}?admin_key=${adminKey}`, {
+                                    translation_status: 'ready',
+                                    translation_ready: true,
+                                    email_sent: null,
+                                    email_error: null
+                                  });
+                                  showToast(`✅ Projeto ${order.order_number} reaberto! Status: Ready.\nUse o botão 📤 para reenviar ao cliente.`);
+                                  fetchOrders();
+                                } catch (err) {
+                                  showToast(`Erro ao reabrir: ${err.response?.data?.detail || err.message}`);
+                                }
+                                setOpenActionsDropdown(null);
+                              }}
+                              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-amber-50 flex items-center gap-2"
+                            >
+                              <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                              </svg>
+                              Reopen Project
+                            </button>
+                          )}
+
                           {/* Duplicate Project - Admin only */}
                           {isAdmin && (
                             <button
@@ -21380,15 +21408,38 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         Sent to: {viewingOrder.client_email}
                       </div>
                       {isAdmin && (
-                        <button
-                          onClick={() => {
-                            setViewingOrder(null);
-                            openSendToClientModal(viewingOrder);
-                          }}
-                          className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 flex items-center gap-1"
-                        >
-                          🔄 Resend Translation
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              setViewingOrder(null);
+                              openSendToClientModal(viewingOrder);
+                            }}
+                            className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 flex items-center gap-1"
+                          >
+                            🔄 Resend Translation
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (!confirm(`Reabrir projeto ${viewingOrder.order_number}?\n\nO status voltará para "Ready" e você poderá reenviar pelo fluxo normal de entrega.`)) return;
+                              try {
+                                await axios.put(`${API}/admin/orders/${viewingOrder.id}?admin_key=${adminKey}`, {
+                                  translation_status: 'ready',
+                                  translation_ready: true,
+                                  email_sent: null,
+                                  email_error: null
+                                });
+                                showToast(`✅ Projeto ${viewingOrder.order_number} reaberto! Use o botão "Send to Client" para reenviar.`);
+                                setViewingOrder(prev => ({ ...prev, translation_status: 'ready', translation_ready: true }));
+                                fetchOrders();
+                              } catch (err) {
+                                showToast(`Erro ao reabrir: ${err.response?.data?.detail || err.message}`);
+                              }
+                            }}
+                            className="px-3 py-1.5 bg-amber-500 text-white rounded text-xs hover:bg-amber-600 flex items-center gap-1"
+                          >
+                            🔓 Reopen Project
+                          </button>
+                        </div>
                       )}
                     </div>
                   )}
