@@ -17321,17 +17321,28 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
       const response = await axios.post(`${API}/admin/orders/${orderId}/deliver?admin_key=${adminKey}`, payload);
 
+      // Check if email actually sent
+      if (response.data.status === 'email_failed' || response.data.client_email_sent === false) {
+        let errorMsg = '⚠️ WARNING: The order was marked as delivered, but the EMAIL WAS NOT SENT!\n\n';
+        errorMsg += `Error: ${response.data.client_email_error || response.data.error || 'Unknown error'}\n\n`;
+        errorMsg += 'Use the "Resend Email" button to try again.';
+        showToast(errorMsg);
+        setSendingOrder(null);
+        fetchOrders();
+        return;
+      }
+
       let message = '✅ Email sent to the client!\n\n';
 
       if (response.data.attachments_sent > 0) {
-        message += `📎 ${response.data.attachments_sent} attachment(s) sent(s)\n`;
+        message += `📎 ${response.data.attachments_sent} anexo(s) enviado(s)\n`;
         if (response.data.attachment_filenames) {
-          message += `   Files: ${response.data.attachment_filenames.join(', ')}\n`;
+          message += `   Arquivos: ${response.data.attachment_filenames.join(', ')}\n`;
         }
       } else if (response.data.attachment_sent) {
-        message += `📎 Attachment: ${response.data.attachment_filename || 'Yes'}\n`;
+        message += `📎 Anexo: ${response.data.attachment_filename || 'Sim'}\n`;
       } else {
-        message += '⚠️ Without attachment (no translation file found)\n';
+        message += '⚠️ Sem anexo (arquivo de tradução não encontrado)\n';
         if (response.data.debug) {
           message += `\nDebug: had_file=${response.data.debug.had_file}, had_html=${response.data.debug.had_html}, html_length=${response.data.debug.html_length}`;
         }
@@ -17342,10 +17353,12 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       }
 
       if (response.data.pm_notified) {
-        message += '\n📧 PM notified.';
+        message += '\n📧 PM notificado.';
       }
       if (response.data.bcc_sent) {
-        message += '\n📧 BCC copy sent.';
+        message += '\n📧 Cópia BCC enviada.';
+      } else if (response.data.bcc_error) {
+        message += `\n⚠️ Cópia BCC FALHOU: ${response.data.bcc_error}`;
       }
 
       showToast(message);
@@ -19689,9 +19702,9 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                               ? 'bg-blue-500 text-white hover:bg-blue-600'
                               : 'bg-blue-500 text-white hover:bg-blue-600'
                           }`}
-                          title={order.translation_status === 'delivered' ? 'Resend translation' : 'Send translation to client'}
+                          title={order.translation_status === 'delivered' ? (order.email_sent === false ? 'Email falhou - Reenviar' : 'Resend translation') : 'Send translation to client'}
                         >
-                          {order.translation_status === 'delivered' ? '🔄' : '📤'}
+                          {order.translation_status === 'delivered' ? (order.email_sent === false ? '⚠️' : '🔄') : '📤'}
                         </button>
                       )}
                     </div>
@@ -19970,6 +19983,34 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             >
                               <CheckIcon className="w-4 h-4 text-green-500" />
                               Mark as Final
+                            </button>
+                          )}
+
+                          {/* Reopen Project - Admin only, for delivered/final orders */}
+                          {isAdmin && (order.translation_status === 'delivered' || order.translation_status === 'final') && (
+                            <button
+                              onClick={async () => {
+                                if (!confirm(`Reabrir projeto ${order.order_number}?\n\nO status voltará para "Ready" e você poderá reenviar a tradução pelo fluxo normal.`)) return;
+                                try {
+                                  await axios.put(`${API}/admin/orders/${order.id}?admin_key=${adminKey}`, {
+                                    translation_status: 'ready',
+                                    translation_ready: true,
+                                    email_sent: null,
+                                    email_error: null
+                                  });
+                                  showToast(`✅ Projeto ${order.order_number} reaberto! Status: Ready.\nUse o botão 📤 para reenviar ao cliente.`);
+                                  fetchOrders();
+                                } catch (err) {
+                                  showToast(`Erro ao reabrir: ${err.response?.data?.detail || err.message}`);
+                                }
+                                setOpenActionsDropdown(null);
+                              }}
+                              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-amber-50 flex items-center gap-2"
+                            >
+                              <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                              </svg>
+                              Reopen Project
                             </button>
                           )}
 
@@ -21136,7 +21177,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
                                       if (confirm(`Send translation to ${viewingOrder.client_email}?\n\nSelected files:\n  - ${selectedFilenames}${bccEmail ? `\n\nCopy (BCC): ${bccEmail}` : ''}`)) {
                                         try {
-                                          await axios.post(`${API}/admin/orders/${viewingOrder.id}/deliver?admin_key=${adminKey}`, {
+                                          const resp = await axios.post(`${API}/admin/orders/${viewingOrder.id}/deliver?admin_key=${adminKey}`, {
                                             bcc_email: bccEmail,
                                             include_verification_page: true,
                                             certifier_name: 'Beatriz Paiva',
@@ -21149,7 +21190,14 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                               additional_document_ids: selectedDocsForDelivery
                                             }
                                           });
-                                          showToast(`Translation sent to client!\n\n${selectedDocsForDelivery.length} file(s) delivered.` + (bccEmail ? `\n\nCopy (BCC): ${bccEmail}` : ''));
+                                          if (resp.data.status === 'email_failed' || resp.data.client_email_sent === false) {
+                                            showToast(`⚠️ ATENÇÃO: Pedido marcado como entregue mas EMAIL NÃO ENVIADO!\n\nErro: ${resp.data.client_email_error || resp.data.error || 'Erro desconhecido'}\n\nUse "Reenviar Email" para tentar novamente.`);
+                                          } else {
+                                            let msg = `✅ Tradução enviada ao cliente!\n\n${selectedDocsForDelivery.length} arquivo(s) entregue(s).`;
+                                            if (bccEmail && resp.data.bcc_sent) msg += `\n\nCópia (BCC): ${bccEmail}`;
+                                            else if (bccEmail && resp.data.bcc_error) msg += `\n\n⚠️ Cópia BCC FALHOU: ${resp.data.bcc_error}`;
+                                            showToast(msg);
+                                          }
                                           setViewingOrder(prev => ({ ...prev, translation_status: 'delivered', delivered_at: new Date().toISOString() }));
                                           fetchOrders();
                                         } catch (err) {
@@ -21177,15 +21225,61 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
                             {/* Delivered Status */}
                             {viewingOrder.translation_status === 'delivered' && (
-                              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 flex items-center gap-2">
-                                <span className="text-2xl">✅</span>
-                                <div>
-                                  <div className="text-sm font-medium text-gray-700">Delivered to Client</div>
-                                  <div className="text-xs text-gray-500">
-                                    Translation sent successfully
-                                    {viewingOrder.delivered_at && ` — ${formatDateTimeLocal(viewingOrder.delivered_at)} (EST)`}
+                              <div className="space-y-2">
+                                <div className={`${viewingOrder.email_sent === false ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'} border rounded-lg p-3 flex items-center gap-2`}>
+                                  <span className="text-2xl">{viewingOrder.email_sent === false ? '⚠️' : '✅'}</span>
+                                  <div className="flex-1">
+                                    <div className={`text-sm font-medium ${viewingOrder.email_sent === false ? 'text-red-700' : 'text-gray-700'}`}>
+                                      {viewingOrder.email_sent === false ? 'Delivered - Email NOT sent' : 'Delivered to Client'}
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                      {viewingOrder.email_sent === false
+                                        ? `Email failed: ${viewingOrder.email_error || 'Unknown error'}`
+                                        : `Translation sent successfully${viewingOrder.delivered_at ? ` — ${formatDateTimeLocal(viewingOrder.delivered_at)} (EST)` : ''}`
+                                      }
+                                    </div>
                                   </div>
                                 </div>
+                                {/* Resend Email Button */}
+                                {isAdmin && (
+                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                    <div className="text-[10px] font-medium text-blue-700 mb-2">Reenviar Email de Entrega</div>
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        type="email"
+                                        placeholder="BCC email (opcional)"
+                                        id="resend-bcc-email"
+                                        className="flex-1 px-2 py-1.5 border border-blue-200 rounded text-xs focus:ring-2 focus:ring-blue-400 focus:outline-none"
+                                      />
+                                    </div>
+                                    <button
+                                      onClick={async () => {
+                                        const bccInput = document.getElementById('resend-bcc-email');
+                                        const bccEmail = bccInput?.value?.trim() || null;
+                                        if (!confirm(`Reenviar email de entrega para ${viewingOrder.client_email}?${bccEmail ? `\n\nCópia (BCC): ${bccEmail}` : ''}`)) return;
+                                        try {
+                                          const resp = await axios.post(`${API}/admin/orders/${viewingOrder.id}/resend-delivery?admin_key=${adminKey}`, {
+                                            bcc_email: bccEmail
+                                          });
+                                          if (resp.data.client_email_sent) {
+                                            let msg = `✅ Email reenviado com sucesso para ${viewingOrder.client_email}!`;
+                                            if (resp.data.bcc_sent) msg += `\n📧 Cópia BCC enviada para ${bccEmail}`;
+                                            else if (resp.data.bcc_error) msg += `\n⚠️ Cópia BCC falhou: ${resp.data.bcc_error}`;
+                                            showToast(msg);
+                                            setViewingOrder(prev => ({ ...prev, email_sent: true, email_error: null }));
+                                          } else {
+                                            showToast(`⚠️ Reenvio FALHOU: ${resp.data.client_email_error || resp.data.error || 'Erro desconhecido'}`);
+                                          }
+                                        } catch (err) {
+                                          showToast(`Erro ao reenviar: ${err.response?.data?.detail || err.message}`);
+                                        }
+                                      }}
+                                      className="w-full mt-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg flex items-center justify-center gap-2 transition-colors"
+                                    >
+                                      <span>🔄</span> Reenviar Email ao Cliente
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
@@ -21314,15 +21408,38 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         Sent to: {viewingOrder.client_email}
                       </div>
                       {isAdmin && (
-                        <button
-                          onClick={() => {
-                            setViewingOrder(null);
-                            openSendToClientModal(viewingOrder);
-                          }}
-                          className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 flex items-center gap-1"
-                        >
-                          🔄 Resend Translation
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              setViewingOrder(null);
+                              openSendToClientModal(viewingOrder);
+                            }}
+                            className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 flex items-center gap-1"
+                          >
+                            🔄 Resend Translation
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (!confirm(`Reabrir projeto ${viewingOrder.order_number}?\n\nO status voltará para "Ready" e você poderá reenviar pelo fluxo normal de entrega.`)) return;
+                              try {
+                                await axios.put(`${API}/admin/orders/${viewingOrder.id}?admin_key=${adminKey}`, {
+                                  translation_status: 'ready',
+                                  translation_ready: true,
+                                  email_sent: null,
+                                  email_error: null
+                                });
+                                showToast(`✅ Projeto ${viewingOrder.order_number} reaberto! Use o botão "Send to Client" para reenviar.`);
+                                setViewingOrder(prev => ({ ...prev, translation_status: 'ready', translation_ready: true }));
+                                fetchOrders();
+                              } catch (err) {
+                                showToast(`Erro ao reabrir: ${err.response?.data?.detail || err.message}`);
+                              }
+                            }}
+                            className="px-3 py-1.5 bg-amber-500 text-white rounded text-xs hover:bg-amber-600 flex items-center gap-1"
+                          >
+                            🔓 Reopen Project
+                          </button>
+                        </div>
                       )}
                     </div>
                   )}
@@ -26738,7 +26855,7 @@ const FinancesPage = ({ adminKey }) => {
   const handleOpenCreateInvoice = async (partner) => {
     setSelectedPartnerForInvoice(partner);
     setSelectedOrdersForInvoice([]);
-    setInvoiceDueDays(30);
+    setInvoiceDueDays(partner.payment_plan === 'biweekly' ? 15 : 30);
     setInvoiceNotes('');
     setInvoiceManualDiscount('');
     setInvoiceDiscountReason('');

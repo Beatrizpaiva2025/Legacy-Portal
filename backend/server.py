@@ -9509,7 +9509,7 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
         # Auto-generate partner invoice for this order
         partner_invoice_id = None
         try:
-            # Calculate due date using partner's fixed day or default 30 days
+            # Calculate due date using partner's fixed day or payment plan
             fixed_day = partner.get("invoice_fixed_due_day")
             if fixed_day and 1 <= fixed_day <= 28:
                 now = datetime.utcnow()
@@ -9521,7 +9521,10 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
                     else:
                         inv_due_date = now.replace(month=now.month + 1, day=fixed_day, hour=23, minute=59, second=59)
             else:
-                inv_due_date = datetime.utcnow() + timedelta(days=30)
+                # Biweekly = 15 days, monthly = 30 days
+                payment_plan = partner.get("payment_plan", "monthly")
+                due_days = 15 if payment_plan == "biweekly" else 30
+                inv_due_date = datetime.utcnow() + timedelta(days=due_days)
                 fixed_day = None
 
             # Build discount details if coupon was applied
@@ -9577,7 +9580,7 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
         raise HTTPException(status_code=500, detail="Failed to create order")
 
 @api_router.get("/orders")
-async def get_orders(token: str, status: Optional[str] = None):
+async def get_orders(token: str, status: Optional[str] = None, translation_filter: Optional[str] = None):
     """Get all orders for a partner"""
     try:
         partner = await get_current_partner(token)
@@ -9588,6 +9591,11 @@ async def get_orders(token: str, status: Optional[str] = None):
         query = {"partner_id": partner["id"]}
         if status:
             query["payment_status"] = status
+        if translation_filter:
+            if translation_filter == "in_progress":
+                query["translation_status"] = {"$in": ["received", "in_translation", "review"]}
+            elif translation_filter == "delivered":
+                query["translation_status"] = {"$in": ["ready", "delivered"]}
 
         orders = await db.translation_orders.find(query).sort("created_at", -1).to_list(100)
 
@@ -12895,7 +12903,11 @@ async def create_partner_invoice(invoice_data: PartnerInvoiceCreate, admin_key: 
                 else:
                     due_date = now.replace(month=now.month + 1, day=fixed_day, hour=23, minute=59, second=59)
         else:
-            due_date = datetime.utcnow() + timedelta(days=invoice_data.due_days)
+            # Use provided due_days, but if it's the default (30) and partner is biweekly, use 15
+            effective_due_days = invoice_data.due_days
+            if effective_due_days == 30 and partner.get("payment_plan") == "biweekly":
+                effective_due_days = 15
+            due_date = datetime.utcnow() + timedelta(days=effective_due_days)
             fixed_day = None
 
         # Get partner's effective tier for invoice
@@ -16231,18 +16243,10 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
     # Get partner
     partner = await db.partners.find_one({"id": order["partner_id"]})
 
-    # Update order status
-    await db.translation_orders.update_one(
-        {"id": order_id},
-        {"$set": {
-            "translation_status": "delivered",
-            "delivered_at": datetime.utcnow()
-        }}
-    )
-
     # Track what was sent
     pm_notified = False
     bcc_sent = False
+    client_email_sent = False
     all_attachments = []
     attachment_filenames = []
 
@@ -17725,23 +17729,43 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
         # Use professional email template
         email_html = get_delivery_email_template(order['client_name'])
 
-        if has_attachments:
-            # Send to client WITH attachment(s)
-            await email_service.send_email_with_multiple_attachments(
-                order["client_email"],
-                f"Your Translation is Ready - {order['order_number']}",
-                email_html,
-                all_attachments
-            )
-        else:
-            # Send to client WITHOUT attachment
-            await email_service.send_email(
-                order["client_email"],
-                f"Your Translation is Ready - {order['order_number']}",
-                email_html
-            )
+        # Send email to client
+        client_email_error = None
+        try:
+            if has_attachments:
+                await email_service.send_email_with_multiple_attachments(
+                    order["client_email"],
+                    f"Your Translation is Ready - {order['order_number']}",
+                    email_html,
+                    all_attachments
+                )
+            else:
+                await email_service.send_email(
+                    order["client_email"],
+                    f"Your Translation is Ready - {order['order_number']}",
+                    email_html
+                )
+            client_email_sent = True
+            logger.info(f"Client email sent successfully to {order['client_email']} for order {order['order_number']}")
+        except Exception as e:
+            client_email_error = str(e)
+            logger.error(f"FAILED to send client email to {order['client_email']} for order {order['order_number']}: {client_email_error}")
+
+        # Update order status AFTER email send attempt
+        delivery_update = {
+            "translation_status": "delivered",
+            "delivered_at": datetime.utcnow(),
+            "email_sent": client_email_sent,
+            "email_sent_at": datetime.utcnow() if client_email_sent else None,
+            "email_error": client_email_error
+        }
+        await db.translation_orders.update_one(
+            {"id": order_id},
+            {"$set": delivery_update}
+        )
 
         # Send BCC if provided
+        bcc_error = None
         if bcc_email:
             try:
                 bcc_subject = f"[BCC] Translation Delivered - {order['order_number']}"
@@ -17762,7 +17786,8 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                     await email_service.send_email(bcc_email, bcc_subject, bcc_html)
                 bcc_sent = True
             except Exception as e:
-                logger.error(f"Failed to send BCC: {str(e)}")
+                bcc_error = str(e)
+                logger.error(f"Failed to send BCC to {bcc_email}: {bcc_error}")
 
         # Notify PM if requested
         if notify_pm and order.get("assigned_pm_id"):
@@ -17817,9 +17842,19 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
             }
             await db.messages.insert_one(message)
 
+        # Determine overall status
+        if client_email_sent:
+            status = "success"
+            message = "Certified translation delivered successfully"
+        else:
+            status = "email_failed"
+            message = f"Order marked as delivered but email to client FAILED: {client_email_error}"
+
         return {
-            "status": "success",
-            "message": "Certified translation delivered successfully",
+            "status": status,
+            "message": message,
+            "client_email_sent": client_email_sent,
+            "client_email_error": client_email_error,
             "attachment_sent": has_attachments,
             "attachments_sent": len(all_attachments),
             "attachment_filenames": attachment_filenames,
@@ -17827,6 +17862,7 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
             "combined_pdf": generate_combined_pdf,
             "pm_notified": pm_notified,
             "bcc_sent": bcc_sent,
+            "bcc_error": bcc_error,
             "external_attachment_sent": external_attachment_sent,
             "external_attachment_filename": external_attachment_filename,
             "certification": {
@@ -17852,7 +17888,158 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
         logger.error(f"Failed to send delivery emails: {str(e)}")
         import traceback
         traceback.print_exc()
-        return {"status": "partial", "message": "Order marked as delivered but email sending failed", "error": str(e)}
+        # Still update order status so it's not stuck
+        try:
+            await db.translation_orders.update_one(
+                {"id": order_id},
+                {"$set": {
+                    "translation_status": "delivered",
+                    "delivered_at": datetime.utcnow(),
+                    "email_sent": False,
+                    "email_error": str(e)
+                }}
+            )
+        except Exception:
+            pass
+        return {"status": "email_failed", "message": "Order marked as delivered but email sending failed", "error": str(e), "client_email_sent": False}
+
+@api_router.post("/admin/orders/{order_id}/resend-delivery")
+async def resend_delivery_email(order_id: str, request: DeliverOrderRequest = None, admin_key: str = None):
+    """Resend delivery email for an already-delivered order (admin/PM only)"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    order = await db.translation_orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    bcc_email = request.bcc_email if request else None
+
+    try:
+        # Get the most recent certification for this order
+        certification_data = await db.certifications.find_one(
+            {"order_id": order_id},
+            sort=[("certified_at", -1)]
+        )
+
+        # Look for the combined PDF that was previously generated
+        # Re-generate attachments from order_documents
+        all_attachments = []
+        translated_docs = await db.order_documents.find({
+            "order_id": order_id,
+            "source": "translated_document"
+        }).sort("uploaded_at", -1).to_list(10)
+
+        # Try to rebuild combined PDF using the same delivery flow
+        # For simplicity, we call the deliver endpoint logic but just for email sending
+        has_attachments = False
+
+        if translated_docs:
+            for trans_doc in translated_docs:
+                trans_data = None
+                if trans_doc.get("gridfs_id"):
+                    try:
+                        trans_data = await get_file_base64_from_gridfs(trans_doc["gridfs_id"])
+                    except Exception:
+                        pass
+                if not trans_data:
+                    trans_data = trans_doc.get("file_data") or trans_doc.get("data")
+                if trans_data and len(str(trans_data)) > 100:
+                    file_bytes = base64.b64decode(trans_data)
+                    all_attachments.append({
+                        "content": trans_data,
+                        "filename": trans_doc.get("filename", "translation.pdf"),
+                        "content_type": trans_doc.get("content_type", "application/pdf")
+                    })
+                    has_attachments = True
+                    break
+
+        # Fallback to translated_file on order
+        if not has_attachments and order.get("translated_file"):
+            all_attachments.append({
+                "content": order["translated_file"],
+                "filename": order.get("translated_filename", "translation.pdf"),
+                "content_type": order.get("translated_file_type", "application/pdf")
+            })
+            has_attachments = True
+
+        email_html = get_delivery_email_template(order['client_name'])
+
+        # Send to client
+        client_email_sent = False
+        client_email_error = None
+        try:
+            if has_attachments:
+                await email_service.send_email_with_multiple_attachments(
+                    order["client_email"],
+                    f"Your Translation is Ready - {order['order_number']}",
+                    email_html,
+                    all_attachments
+                )
+            else:
+                await email_service.send_email(
+                    order["client_email"],
+                    f"Your Translation is Ready - {order['order_number']}",
+                    email_html
+                )
+            client_email_sent = True
+            logger.info(f"RESEND: Client email sent to {order['client_email']} for order {order['order_number']}")
+        except Exception as e:
+            client_email_error = str(e)
+            logger.error(f"RESEND FAILED: Client email to {order['client_email']} for order {order['order_number']}: {client_email_error}")
+
+        # Update order email status
+        await db.translation_orders.update_one(
+            {"id": order_id},
+            {"$set": {
+                "email_sent": client_email_sent,
+                "email_sent_at": datetime.utcnow() if client_email_sent else None,
+                "email_error": client_email_error,
+                "email_resent_at": datetime.utcnow() if client_email_sent else None
+            }}
+        )
+
+        # Send BCC if provided
+        bcc_sent = False
+        bcc_error = None
+        if bcc_email:
+            try:
+                bcc_subject = f"[BCC] Translation Delivered - {order['order_number']}"
+                bcc_html = f"""
+                <div style="background: #fef3c7; padding: 10px; margin-bottom: 15px; border-radius: 5px;">
+                    <strong>BCC Copy (Resent)</strong> - This email was sent to: {order['client_email']}
+                </div>
+                {email_html}
+                """
+                if has_attachments:
+                    await email_service.send_email_with_multiple_attachments(
+                        bcc_email, bcc_subject, bcc_html, all_attachments
+                    )
+                else:
+                    await email_service.send_email(bcc_email, bcc_subject, bcc_html)
+                bcc_sent = True
+            except Exception as e:
+                bcc_error = str(e)
+                logger.error(f"RESEND BCC FAILED: {bcc_error}")
+
+        status = "success" if client_email_sent else "email_failed"
+        return {
+            "status": status,
+            "message": f"Delivery email {'resent successfully' if client_email_sent else 'FAILED to resend: ' + (client_email_error or 'Unknown error')}",
+            "client_email_sent": client_email_sent,
+            "client_email_error": client_email_error,
+            "bcc_sent": bcc_sent,
+            "bcc_error": bcc_error,
+            "attachment_sent": has_attachments,
+            "attachments_sent": len(all_attachments)
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to resend delivery email: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return {"status": "email_failed", "message": f"Failed to resend: {str(e)}", "client_email_sent": False, "error": str(e)}
 
 @api_router.get("/admin/orders/{order_id}/translated-document")
 async def get_translated_document(order_id: str, admin_key: str):
