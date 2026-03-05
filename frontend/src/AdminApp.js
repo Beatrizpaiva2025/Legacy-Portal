@@ -19698,7 +19698,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         <span className="text-gray-400 text-xs block">{order.client_email}</span>
                       </div>
                       {/* Send translation button - Admin only - shows when ready, review, or delivered (for resend) */}
-                      {['ready', 'review', 'delivered', 'pending_admin_approval', 'pending_admin_review', 'finalized_pending_admin'].includes(order.translation_status) && isAdmin && (
+                      {['ready', 'review', 'delivered', 'final', 'pending_admin_approval', 'pending_admin_review', 'finalized_pending_admin'].includes(order.translation_status) && isAdmin && (
                         <button
                           onClick={() => openSendToClientModal(order)}
                           className={`px-1 py-0.5 rounded text-xs ${
