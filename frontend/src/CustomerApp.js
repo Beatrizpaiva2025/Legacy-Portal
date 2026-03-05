@@ -9,17 +9,31 @@ const API = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
 // ==================== STRIPE INITIALIZATION ====================
 let stripePromise = null;
-const getStripePromise = async () => {
+const getStripePromise = (forceRetry = false) => {
+  if (forceRetry) {
+    stripePromise = null;
+  }
   if (!stripePromise) {
-    try {
-      const response = await axios.get(`${API}/stripe-config`);
-      stripePromise = loadStripe(response.data.publishable_key);
-    } catch (err) {
+    stripePromise = axios.get(`${API}/stripe-config`).then(response => {
+      return loadStripe(response.data.publishable_key);
+    }).then(stripeInstance => {
+      if (!stripeInstance) {
+        console.error('Stripe.js failed to initialize (returned null)');
+        stripePromise = null; // Reset cache so retry is possible
+        return null;
+      }
+      return stripeInstance;
+    }).catch(err => {
       console.error('Failed to load Stripe config:', err);
-    }
+      stripePromise = null; // Reset so it can retry
+      return null;
+    });
   }
   return stripePromise;
 };
+
+// Pre-load Stripe eagerly so it's ready when user clicks Pay
+getStripePromise();
 
 // Inline Card Payment Form Component (used inside Elements provider)
 const CardPaymentForm = ({ onSuccess, onError, amount, currency, t, formatPrice }) => {
@@ -27,10 +41,14 @@ const CardPaymentForm = ({ onSuccess, onError, amount, currency, t, formatPrice 
   const elements = useElements();
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
+  const [elementReady, setElementReady] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!stripe || !elements) return;
+    if (!stripe || !elements) {
+      setError(t.cardPaymentError || 'Payment system not ready. Please try again.');
+      return;
+    }
 
     setProcessing(true);
     setError('');
@@ -76,7 +94,22 @@ const CardPaymentForm = ({ onSuccess, onError, amount, currency, t, formatPrice 
 
   return (
     <form onSubmit={handleSubmit}>
-      <PaymentElement options={{ layout: 'tabs' }} />
+      {!elementReady && (
+        <div className="flex items-center justify-center py-6">
+          <div className="animate-spin rounded-full h-5 w-5 border-2 border-teal-600 border-t-transparent"></div>
+          <span className="ml-2 text-sm text-gray-500">{t.loadingPaymentForm || 'Loading payment form...'}</span>
+        </div>
+      )}
+      <div style={!elementReady ? { position: 'absolute', opacity: 0, pointerEvents: 'none' } : undefined}>
+        <PaymentElement
+          options={{ layout: 'tabs' }}
+          onReady={() => setElementReady(true)}
+          onLoadError={(event) => {
+            console.error('PaymentElement load error:', event);
+            setError(event?.error?.message || t.cardPaymentError || 'Failed to load payment form. Please refresh and try again.');
+          }}
+        />
+      </div>
       {error && (
         <div className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-2">
           {error}
@@ -84,7 +117,7 @@ const CardPaymentForm = ({ onSuccess, onError, amount, currency, t, formatPrice 
       )}
       <button
         type="submit"
-        disabled={!stripe || processing}
+        disabled={!stripe || !elementReady || processing}
         className="w-full mt-4 py-3 bg-teal-600 text-white rounded-md font-semibold hover:bg-teal-700 transition-colors disabled:bg-gray-400"
       >
         {processing ? t.payingAmount : `${t.payNow} - ${formatPrice}`}
@@ -366,6 +399,8 @@ const CUSTOMER_TRANSLATIONS = {
     payingAmount: 'Processing payment...',
     cardPaymentSuccess: 'Payment successful! Your order has been confirmed. Check your email for details.',
     cardPaymentError: 'Payment failed. Please check your card details and try again.',
+    loadingPaymentForm: 'Loading payment form...',
+    stripeLoadError: 'Unable to load payment system. Please refresh the page and try again.',
 
     // Buttons
     continueToPayment: 'Continue to Payment',
@@ -593,6 +628,8 @@ const CUSTOMER_TRANSLATIONS = {
     payingAmount: 'Procesando pago...',
     cardPaymentSuccess: '¡Pago exitoso! Tu pedido ha sido confirmado. Revisa tu correo para más detalles.',
     cardPaymentError: 'El pago falló. Verifica los datos de tu tarjeta e intenta de nuevo.',
+    loadingPaymentForm: 'Cargando formulario de pago...',
+    stripeLoadError: 'No se pudo cargar el sistema de pago. Actualiza la página e intenta de nuevo.',
 
     // Buttons
     continueToPayment: 'Continuar al Pago',
@@ -820,6 +857,8 @@ const CUSTOMER_TRANSLATIONS = {
     payingAmount: 'Processando pagamento...',
     cardPaymentSuccess: 'Pagamento realizado! Seu pedido foi confirmado. Verifique seu e-mail para detalhes.',
     cardPaymentError: 'O pagamento falhou. Verifique os dados do seu cartão e tente novamente.',
+    loadingPaymentForm: 'Carregando formulário de pagamento...',
+    stripeLoadError: 'Não foi possível carregar o sistema de pagamento. Atualize a página e tente novamente.',
 
     // Buttons
     continueToPayment: 'Continuar para Pagamento',
@@ -1910,8 +1949,21 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
       });
 
       // Step 3: Load Stripe and show the form
-      const stripeObj = await getStripePromise();
-      setStripeInstance(stripeObj);
+      const stripeP = getStripePromise();
+      // Verify Stripe can actually load before showing the form
+      const stripeObj = await stripeP;
+      if (!stripeObj) {
+        // Retry once with force
+        const retryP = getStripePromise(true);
+        const retryObj = await retryP;
+        if (!retryObj) {
+          setError(t.cardPaymentError || 'Unable to load payment system. Please refresh the page and try again.');
+          return;
+        }
+        setStripeInstance(retryP);
+      } else {
+        setStripeInstance(stripeP);
+      }
       setCardClientSecret(intentResponse.data.client_secret);
       setShowCardForm(true);
     } catch (err) {
@@ -2919,7 +2971,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
                 ) : (
                   <div className="mt-2">
                     <p className="text-sm text-teal-600 mb-3">{t.enterCardDetails}</p>
-                    {cardClientSecret && stripeInstance && (
+                    {cardClientSecret && stripeInstance ? (
                       <Elements
                         stripe={stripeInstance}
                         options={{
@@ -2942,6 +2994,11 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
                           formatPrice={formatLocalPrice(quote?.total_price || 0)}
                         />
                       </Elements>
+                    ) : (
+                      <div className="flex items-center justify-center py-6">
+                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-teal-600 border-t-transparent"></div>
+                        <span className="ml-2 text-sm text-gray-500">{t.loadingPaymentForm || 'Loading payment form...'}</span>
+                      </div>
                     )}
                     <button
                       type="button"
