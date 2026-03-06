@@ -396,17 +396,63 @@ class EmailService:
         attachments: list of dicts with keys: content (base64), filename, content_type
 
         If total attachment size exceeds 25MB, attachments are split across multiple emails.
-        Always sends ALL attachments in a single email. The Resend hard limit is 40MB.
+        The Resend hard limit is 40MB per email.
+        Returns a single email ID (str) if one email, or a list of email IDs if split.
         """
+        # Calculate raw sizes for each attachment
+        att_sizes = []
         total_raw_size = 0
         for att in attachments:
             # base64 string is ~33% larger than raw bytes, so raw ≈ len(base64) * 3/4
-            total_raw_size += len(att["content"]) * 3 // 4
+            raw_size = len(att["content"]) * 3 // 4
+            att_sizes.append(raw_size)
+            total_raw_size += raw_size
 
-        logger.info(f"Total attachment size (estimated raw): {total_raw_size / (1024*1024):.1f}MB for {len(attachments)} file(s)")
+        total_mb = total_raw_size / (1024 * 1024)
+        logger.info(f"Total attachment size (estimated raw): {total_mb:.1f}MB for {len(attachments)} file(s)")
 
-        # Always send all attachments in one email - never split
-        return await self._send_email_with_attachments_batch(to, subject, content, attachments)
+        # If total size is under 25MB, send as single email
+        MAX_BATCH_SIZE = 25 * 1024 * 1024  # 25MB per email to stay safely under Resend 40MB limit
+        if total_raw_size <= MAX_BATCH_SIZE:
+            return await self._send_email_with_attachments_batch(to, subject, content, attachments)
+
+        # Split attachments into batches that fit under the size limit
+        batches = []
+        current_batch = []
+        current_size = 0
+        for i, att in enumerate(attachments):
+            att_size = att_sizes[i]
+            # If adding this attachment would exceed limit, start a new batch
+            # (unless current batch is empty - single file larger than limit gets its own batch)
+            if current_batch and (current_size + att_size) > MAX_BATCH_SIZE:
+                batches.append(current_batch)
+                current_batch = []
+                current_size = 0
+            current_batch.append(att)
+            current_size += att_size
+        if current_batch:
+            batches.append(current_batch)
+
+        logger.info(f"Splitting {len(attachments)} attachment(s) ({total_mb:.1f}MB) into {len(batches)} email(s)")
+
+        # Send each batch as a separate email
+        email_ids = []
+        for batch_idx, batch in enumerate(batches):
+            batch_subject = f"{subject} (Part {batch_idx + 1}/{len(batches)})" if len(batches) > 1 else subject
+            batch_filenames = [att['filename'] for att in batch]
+            logger.info(f"Sending batch {batch_idx + 1}/{len(batches)}: {len(batch)} file(s) - {batch_filenames}")
+            try:
+                email_id = await self._send_email_with_attachments_batch(to, batch_subject, content, batch)
+                email_ids.append(email_id)
+            except Exception as e:
+                logger.error(f"Failed to send batch {batch_idx + 1}/{len(batches)}: {str(e)}")
+                raise EmailDeliveryError(
+                    f"Failed to send email batch {batch_idx + 1}/{len(batches)}: {str(e)}. "
+                    f"Successfully sent {len(email_ids)}/{len(batches)} email(s) before failure."
+                )
+
+        logger.info(f"All {len(batches)} email batch(es) sent successfully. IDs: {email_ids}")
+        return email_ids if len(email_ids) > 1 else email_ids[0]
 
     async def _send_email_with_attachments_batch(self, to: str, subject: str, content: str,
                                                    attachments: list):
