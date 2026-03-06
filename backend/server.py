@@ -11011,14 +11011,14 @@ async def get_production_stats(admin_key: str, translator_id: Optional[str] = No
             if end_date:
                 query["created_at"]["$lte"] = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
 
-        # Get orders
-        orders = await db.orders.find(query).to_list(1000)
+        # Get orders from translation_orders collection (where projects are stored)
+        orders = await db.translation_orders.find(query).to_list(1000)
 
         # Calculate stats
         total_pages = 0
         completed_pages = 0
         pending_pages = 0
-        completed_statuses = {"ready", "delivered"}
+        completed_statuses = {"ready", "delivered", "final", "Final", "Delivered", "approved"}
 
         for order in orders:
             pages = order.get("page_count", 0) or 0
@@ -11048,7 +11048,7 @@ async def get_production_stats(admin_key: str, translator_id: Optional[str] = No
             "paid_pages": paid_pages,
             "pending_payment_pages": pending_payment_pages,
             "orders_count": len(orders),
-            "completed_orders": len([o for o in orders if o.get("translation_status") in ("ready", "delivered")])
+            "completed_orders": len([o for o in orders if o.get("translation_status") in ("ready", "delivered", "final", "Final", "Delivered", "approved")])
         })
 
     return {"stats": stats}
@@ -11090,10 +11090,10 @@ async def get_translator_metrics(admin_key: str, period: Optional[str] = "month"
             "assigned_translator_id": tid,
             "created_at": {"$gte": jan_start}
         }
-        all_orders = await db.orders.find(query).sort("created_at", -1).to_list(5000)
+        all_orders = await db.translation_orders.find(query).sort("created_at", -1).to_list(5000)
 
-        # Completed = ready or delivered (these are done translations)
-        completed_statuses = {"ready", "delivered"}
+        # Completed = final, delivered, approved (these are done translations)
+        completed_statuses = {"ready", "delivered", "final", "Final", "Delivered", "approved"}
         orders = [o for o in all_orders if o.get("translation_status") in completed_statuses]
         # In-progress orders (received, in_translation, review)
         in_progress_orders = [o for o in all_orders if o.get("translation_status") not in completed_statuses]
@@ -11191,7 +11191,7 @@ async def get_translator_orders(translator_id: str, admin_key: str, status: Opti
     if status:
         # Map "completed" to actual completed statuses
         if status == "completed":
-            query["translation_status"] = {"$in": ["ready", "delivered"]}
+            query["translation_status"] = {"$in": ["ready", "delivered", "final", "Final", "Delivered", "approved"]}
         else:
             query["translation_status"] = status
 
@@ -11202,7 +11202,7 @@ async def get_translator_orders(translator_id: str, admin_key: str, status: Opti
         if end_date:
             query["created_at"]["$lte"] = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
 
-    orders = await db.orders.find(query).sort("created_at", -1).to_list(500)
+    orders = await db.translation_orders.find(query).sort("created_at", -1).to_list(500)
 
     for order in orders:
         if '_id' in order:
