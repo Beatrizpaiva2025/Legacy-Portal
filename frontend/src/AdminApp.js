@@ -4,7 +4,7 @@ import mammoth from 'mammoth';
 import * as pdfjsLib from 'pdfjs-dist';
 import html2pdf from 'html2pdf.js';
 import { THEMES, getTheme } from './themes';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
 
 // Configure PDF.js worker (pdfjs-dist 5.x uses .mjs files)
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -25721,14 +25721,36 @@ const ProductionPage = ({ adminKey }) => {
         </div>
       </div>
 
-      {activeView === 'stats' && (
+      {activeView === 'stats' && (() => {
+        const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#84cc16', '#f43f5e'];
+        const totalAllPages = translatorMetrics.reduce((s, t) => s + (t.total_pages || 0), 0);
+        const totalCompletedPages = translatorMetrics.reduce((s, t) => s + (t.completed_pages || 0), 0);
+        const totalPendingPayment = translatorMetrics.reduce((s, t) => s + (t.pending_payment_pages || 0), 0);
+        const totalPaidPages = translatorMetrics.reduce((s, t) => s + (t.paid_pages || 0), 0);
+        const totalProjects = translatorMetrics.reduce((s, t) => s + (t.total_translations || 0), 0);
+        const periodProjects = translatorMetrics.reduce((s, t) => s + (t.period_translations || 0), 0);
+        const periodPages = translatorMetrics.reduce((s, t) => s + (t.period_pages || 0), 0);
+
+        const pieDataPages = translatorMetrics.filter(t => t.total_pages > 0).map((t, i) => ({
+          name: t.translator_name, value: t.total_pages, color: PIE_COLORS[i % PIE_COLORS.length]
+        }));
+        const pieDataProjects = translatorMetrics.filter(t => t.total_translations > 0).map((t, i) => ({
+          name: t.translator_name, value: t.total_translations, color: PIE_COLORS[i % PIE_COLORS.length]
+        }));
+        const paymentPieData = [
+          { name: 'Paid', value: totalPaidPages, color: '#10b981' },
+          { name: 'Pending Payment', value: totalPendingPayment, color: '#f59e0b' },
+          { name: 'In Progress', value: Math.max(0, totalAllPages - totalCompletedPages), color: '#3b82f6' }
+        ].filter(d => d.value > 0);
+
+        return (
         <div className="space-y-6">
           {/* Period Filter */}
-          <div className="bg-white rounded-lg shadow p-4">
+          <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg shadow p-5 text-white">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-sm font-bold text-gray-800">Financial Reports - Translator Production</h2>
-                <p className="text-xs text-gray-500 mt-1">Projects assigned and pages for payment since January 2025</p>
+                <h2 className="text-lg font-bold">Financial Reports - Translator Production</h2>
+                <p className="text-blue-100 text-sm mt-1">Projects assigned and pages for payment since January 2025</p>
               </div>
               <div className="flex space-x-2">
                 {[
@@ -25739,10 +25761,10 @@ const ProductionPage = ({ adminKey }) => {
                   <button
                     key={key}
                     onClick={() => setMetricsPeriod(key)}
-                    className={`px-4 py-2 rounded text-xs font-medium transition-colors ${
+                    className={`px-4 py-2 rounded-lg text-xs font-medium transition-all ${
                       metricsPeriod === key
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        ? 'bg-white text-blue-700 shadow-lg'
+                        : 'bg-white/20 text-white hover:bg-white/30'
                     }`}
                   >
                     {label}
@@ -25752,81 +25774,207 @@ const ProductionPage = ({ adminKey }) => {
             </div>
           </div>
 
-          {/* Translator Metrics Cards */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white rounded-lg shadow">
+          {/* Summary Cards Row */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-white rounded-xl shadow-sm border-l-4 border-blue-500 p-4">
+              <div className="text-xs text-gray-500 uppercase tracking-wide">Total Projects</div>
+              <div className="text-2xl font-bold text-blue-700 mt-1">{totalProjects}</div>
+              <div className="text-xs text-gray-400 mt-1">Since Jan 2025</div>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm border-l-4 border-green-500 p-4">
+              <div className="text-xs text-gray-500 uppercase tracking-wide">Total Pages</div>
+              <div className="text-2xl font-bold text-green-700 mt-1">{totalAllPages}</div>
+              <div className="text-xs text-gray-400 mt-1">{totalCompletedPages} completed</div>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm border-l-4 border-purple-500 p-4">
+              <div className="text-xs text-gray-500 uppercase tracking-wide">
+                {metricsPeriod === 'day' ? 'Today' : metricsPeriod === 'week' ? 'This Week' : 'This Month'}
+              </div>
+              <div className="text-2xl font-bold text-purple-700 mt-1">{periodProjects} proj</div>
+              <div className="text-xs text-gray-400 mt-1">{periodPages} pages</div>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm border-l-4 border-orange-500 p-4">
+              <div className="text-xs text-gray-500 uppercase tracking-wide">Pending Payment</div>
+              <div className="text-2xl font-bold text-orange-700 mt-1">{totalPendingPayment} pg</div>
+              <div className="text-xs text-gray-400 mt-1">{formatCurrency(totalPendingPayment * 25)}</div>
+            </div>
+          </div>
+
+          {/* Charts Row - Pie Charts */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Pages per Translator Pie */}
+            <div className="bg-white rounded-xl shadow-sm p-4">
+              <h3 className="text-sm font-bold text-gray-700 mb-3">Pages per Translator</h3>
+              {pieDataPages.length > 0 ? (
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie data={pieDataPages} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} innerRadius={40} paddingAngle={3} label={({ name, value }) => `${value}`}>
+                      {pieDataPages.map((entry, index) => (
+                        <Cell key={index} fill={entry.color} stroke="white" strokeWidth={2} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value, name) => [`${value} pages`, name]} />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="text-center text-gray-400 py-12 text-sm">No data yet</div>
+              )}
+            </div>
+
+            {/* Projects per Translator Pie */}
+            <div className="bg-white rounded-xl shadow-sm p-4">
+              <h3 className="text-sm font-bold text-gray-700 mb-3">Projects per Translator</h3>
+              {pieDataProjects.length > 0 ? (
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie data={pieDataProjects} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} innerRadius={40} paddingAngle={3} label={({ name, value }) => `${value}`}>
+                      {pieDataProjects.map((entry, index) => (
+                        <Cell key={index} fill={entry.color} stroke="white" strokeWidth={2} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value, name) => [`${value} projects`, name]} />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="text-center text-gray-400 py-12 text-sm">No data yet</div>
+              )}
+            </div>
+
+            {/* Payment Status Pie */}
+            <div className="bg-white rounded-xl shadow-sm p-4">
+              <h3 className="text-sm font-bold text-gray-700 mb-3">Payment Status (Pages)</h3>
+              {paymentPieData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie data={paymentPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} innerRadius={40} paddingAngle={3} label={({ name, value }) => `${value}`}>
+                      {paymentPieData.map((entry, index) => (
+                        <Cell key={index} fill={entry.color} stroke="white" strokeWidth={2} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value, name) => [`${value} pages`, name]} />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="text-center text-gray-400 py-12 text-sm">No data yet</div>
+              )}
+            </div>
+          </div>
+
+          {/* Monthly Production Area Chart */}
+          {chartData.length > 0 && (
+            <div className="bg-white rounded-xl shadow-sm">
               <div className="p-4 border-b">
-                <h2 className="text-sm font-bold text-gray-800">Translators</h2>
+                <h2 className="text-sm font-bold text-gray-700">Monthly Production per Translator</h2>
+                <p className="text-xs text-gray-400 mt-1">Projects assigned by month since January 2025</p>
+              </div>
+              <div className="p-4">
+                <ResponsiveContainer width="100%" height={350}>
+                  <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                    <Tooltip contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
+                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                    {translatorNames.map((name, index) => (
+                      <Bar
+                        key={name}
+                        dataKey={name}
+                        fill={CHART_COLORS[index % CHART_COLORS.length]}
+                        radius={[4, 4, 0, 0]}
+                      />
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+
+          {/* Translator Detail Cards + Orders */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-white rounded-xl shadow-sm">
+              <div className="p-4 border-b">
+                <h2 className="text-sm font-bold text-gray-700">Translators</h2>
               </div>
               <div className="p-4 space-y-3 max-h-[600px] overflow-y-auto">
                 {translatorMetrics.length === 0 ? (
                   <div className="text-center text-gray-500 py-4">No translators found</div>
                 ) : (
-                  translatorMetrics.map((translator) => {
+                  translatorMetrics.map((translator, tIdx) => {
                     const matchingStat = stats.find(s => s.translator_id === translator.translator_id);
+                    const tColor = PIE_COLORS[tIdx % PIE_COLORS.length];
                     return (
                       <div
                         key={translator.translator_id}
                         onClick={() => handleSelectTranslator(translator)}
-                        className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                        className={`p-4 border-l-4 rounded-lg cursor-pointer transition-all hover:shadow-md ${
                           selectedTranslator?.translator_id === translator.translator_id
-                            ? 'border-blue-500 bg-blue-50'
-                            : 'border-gray-200 hover:border-teal-300'
+                            ? 'border-l-blue-500 bg-blue-50 shadow-md'
+                            : 'border-l-gray-200 hover:border-l-blue-300 bg-white'
                         }`}
+                        style={{ borderLeftColor: selectedTranslator?.translator_id === translator.translator_id ? tColor : undefined }}
                       >
                         <div className="flex justify-between items-start mb-3">
                           <div>
-                            <div className="font-medium text-gray-800">{translator.translator_name}</div>
+                            <div className="font-semibold text-gray-800 flex items-center gap-2">
+                              <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: tColor }}></span>
+                              {translator.translator_name}
+                            </div>
                             <div className="text-xs text-gray-500">{translator.translator_email}</div>
                           </div>
                           {translator.pending_payment_pages > 0 && (
                             <button
                               onClick={(e) => { e.stopPropagation(); openPaymentModal(matchingStat || translator); }}
-                              className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
+                              className="px-3 py-1.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg text-xs hover:shadow-lg transition-shadow font-medium"
                             >
                               Register Payment
                             </button>
                           )}
                         </div>
                         <div className="grid grid-cols-3 gap-2 text-center text-xs mb-2">
-                          <div className="bg-blue-50 rounded p-2">
-                            <div className="text-gray-500">Projects (since Jan)</div>
-                            <div className="font-bold text-blue-700">{translator.total_translations}</div>
+                          <div className="bg-blue-50 rounded-lg p-2">
+                            <div className="text-gray-500">Projects</div>
+                            <div className="font-bold text-blue-700 text-base">{translator.total_translations}</div>
                           </div>
-                          <div className="bg-green-50 rounded p-2">
+                          <div className="bg-green-50 rounded-lg p-2">
                             <div className="text-gray-500">Total Pages</div>
-                            <div className="font-bold text-green-700">{translator.total_pages}</div>
+                            <div className="font-bold text-green-700 text-base">{translator.total_pages}</div>
                           </div>
-                          <div className="bg-teal-50 rounded p-2">
+                          <div className="bg-teal-50 rounded-lg p-2">
                             <div className="text-gray-500">Completed</div>
-                            <div className="font-bold text-teal-700">{translator.completed_translations} ({translator.completed_pages} pg)</div>
+                            <div className="font-bold text-teal-700 text-base">{translator.completed_pages}</div>
+                            <div className="text-gray-400">{translator.completed_translations} proj</div>
                           </div>
                         </div>
                         <div className="grid grid-cols-3 gap-2 text-center text-xs mb-2">
-                          <div className="bg-purple-50 rounded p-2">
+                          <div className="bg-purple-50 rounded-lg p-2">
                             <div className="text-purple-600">
                               {metricsPeriod === 'day' ? 'Today' : metricsPeriod === 'week' ? 'This Week' : 'This Month'}
                             </div>
                             <div className="font-bold text-purple-700">{translator.period_translations} proj</div>
                           </div>
-                          <div className="bg-yellow-50 rounded p-2">
+                          <div className="bg-yellow-50 rounded-lg p-2">
                             <div className="text-yellow-600">Period Pages</div>
                             <div className="font-bold text-yellow-700">{translator.period_pages}</div>
                           </div>
-                          <div className="bg-indigo-50 rounded p-2">
+                          <div className="bg-indigo-50 rounded-lg p-2">
                             <div className="text-indigo-600">Period Done</div>
                             <div className="font-bold text-indigo-700">{translator.period_completed_pages} pg</div>
                           </div>
                         </div>
                         {(translator.pending_payment_pages > 0 || translator.paid_pages > 0) && (
                           <div className="grid grid-cols-2 gap-2 text-center text-xs border-t pt-2 mt-1">
-                            <div className="bg-orange-50 rounded p-2">
-                              <div className="text-orange-600">Pending Payment</div>
+                            <div className="bg-orange-50 rounded-lg p-2 border border-orange-200">
+                              <div className="text-orange-600 font-medium">Pending Payment</div>
                               <div className="font-bold text-orange-700">{translator.pending_payment_pages} pages</div>
+                              <div className="text-orange-500">{formatCurrency(translator.pending_payment_pages * 25)}</div>
                             </div>
-                            <div className="bg-emerald-50 rounded p-2">
-                              <div className="text-emerald-600">Already Paid</div>
+                            <div className="bg-emerald-50 rounded-lg p-2 border border-emerald-200">
+                              <div className="text-emerald-600 font-medium">Already Paid</div>
                               <div className="font-bold text-emerald-700">{translator.paid_pages} pages</div>
+                              <div className="text-emerald-500">{formatCurrency(translator.paid_pages * 25)}</div>
                             </div>
                           </div>
                         )}
@@ -25838,70 +25986,77 @@ const ProductionPage = ({ adminKey }) => {
             </div>
 
             {/* Selected Translator Orders */}
-            <div className="bg-white rounded-lg shadow">
+            <div className="bg-white rounded-xl shadow-sm">
               <div className="p-4 border-b">
-                <h2 className="text-sm font-bold text-gray-800">
+                <h2 className="text-sm font-bold text-gray-700">
                   {selectedTranslator ? `${selectedTranslator.translator_name}'s Projects` : 'Select a translator'}
                 </h2>
               </div>
               <div className="p-4">
                 {!selectedTranslator ? (
-                  <div className="text-center text-gray-500 py-8">
-                    Click on a translator to view their projects
+                  <div className="text-center text-gray-400 py-12">
+                    <div className="text-4xl mb-3">&#128203;</div>
+                    <div>Click on a translator to view their projects</div>
                   </div>
                 ) : translatorOrders.length === 0 ? (
-                  <div className="text-center text-gray-500 py-4">No projects assigned</div>
+                  <div className="text-center text-gray-400 py-8">No projects assigned</div>
                 ) : (
                   <>
-                    <div className="mb-3 p-3 bg-gray-50 rounded-lg text-xs">
-                      <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl text-xs border border-blue-100">
+                      <div className="grid grid-cols-3 gap-3 text-center">
                         <div>
-                          <div className="text-gray-500">Total Projects</div>
-                          <div className="font-bold text-gray-800">{translatorOrders.length}</div>
+                          <div className="text-gray-500 uppercase tracking-wide">Projects</div>
+                          <div className="font-bold text-gray-800 text-lg">{translatorOrders.length}</div>
                         </div>
                         <div>
-                          <div className="text-gray-500">Total Pages</div>
-                          <div className="font-bold text-blue-700">{translatorOrders.reduce((sum, o) => sum + (o.page_count || 0), 0)}</div>
+                          <div className="text-gray-500 uppercase tracking-wide">Pages</div>
+                          <div className="font-bold text-blue-700 text-lg">{translatorOrders.reduce((sum, o) => sum + (o.page_count || 0), 0)}</div>
                         </div>
                         <div>
-                          <div className="text-gray-500">Est. Payment</div>
-                          <div className="font-bold text-green-700">
-                            {formatCurrency(translatorOrders.filter(o => ['ready', 'delivered'].includes(o.translation_status)).reduce((sum, o) => sum + (o.page_count || 0), 0) * 25)}
+                          <div className="text-gray-500 uppercase tracking-wide">Est. Payment</div>
+                          <div className="font-bold text-green-700 text-lg">
+                            {formatCurrency(translatorOrders.filter(o => ['ready', 'delivered', 'final', 'Final', 'Delivered', 'approved'].includes(o.translation_status)).reduce((sum, o) => sum + (o.page_count || 0), 0) * 25)}
                           </div>
                         </div>
                       </div>
                     </div>
-                    <div className="space-y-2 max-h-96 overflow-y-auto">
+                    <div className="space-y-2 max-h-[450px] overflow-y-auto">
                       {translatorOrders.map((order) => {
-                        const statusColors = {
-                          'received': 'bg-gray-100 text-gray-700',
-                          'in_translation': 'bg-blue-100 text-blue-700',
-                          'review': 'bg-purple-100 text-purple-700',
-                          'ready': 'bg-green-100 text-green-700',
-                          'delivered': 'bg-teal-100 text-teal-700'
+                        const statusConfig = {
+                          'Received': { bg: 'bg-gray-100', text: 'text-gray-700', dot: '#9ca3af' },
+                          'received': { bg: 'bg-gray-100', text: 'text-gray-700', dot: '#9ca3af' },
+                          'In Progress': { bg: 'bg-blue-100', text: 'text-blue-700', dot: '#3b82f6' },
+                          'in_translation': { bg: 'bg-blue-100', text: 'text-blue-700', dot: '#3b82f6' },
+                          'review': { bg: 'bg-purple-100', text: 'text-purple-700', dot: '#8b5cf6' },
+                          'ready_for_review': { bg: 'bg-purple-100', text: 'text-purple-700', dot: '#8b5cf6' },
+                          'ready': { bg: 'bg-green-100', text: 'text-green-700', dot: '#10b981' },
+                          'approved': { bg: 'bg-green-100', text: 'text-green-700', dot: '#10b981' },
+                          'final': { bg: 'bg-emerald-100', text: 'text-emerald-700', dot: '#059669' },
+                          'Final': { bg: 'bg-emerald-100', text: 'text-emerald-700', dot: '#059669' },
+                          'delivered': { bg: 'bg-teal-100', text: 'text-teal-700', dot: '#14b8a6' },
+                          'Delivered': { bg: 'bg-teal-100', text: 'text-teal-700', dot: '#14b8a6' },
+                          'Quote': { bg: 'bg-yellow-100', text: 'text-yellow-700', dot: '#f59e0b' },
+                          'pending': { bg: 'bg-yellow-100', text: 'text-yellow-700', dot: '#f59e0b' },
+                          'pm_upload_ready': { bg: 'bg-indigo-100', text: 'text-indigo-700', dot: '#6366f1' },
+                          'pending_pm_review': { bg: 'bg-orange-100', text: 'text-orange-700', dot: '#f97316' }
                         };
-                        const statusLabels = {
-                          'received': 'Received',
-                          'in_translation': 'In Translation',
-                          'review': 'Review',
-                          'ready': 'Ready',
-                          'delivered': 'Delivered'
-                        };
+                        const sc = statusConfig[order.translation_status] || { bg: 'bg-gray-100', text: 'text-gray-600', dot: '#6b7280' };
                         return (
-                          <div key={order.id} className="p-3 border rounded-lg text-xs">
+                          <div key={order.id} className="p-3 border rounded-xl text-xs hover:shadow-sm transition-shadow">
                             <div className="flex justify-between items-start">
                               <div>
-                                <div className="font-medium text-gray-800">{order.order_number || order.reference}</div>
+                                <div className="font-medium text-gray-800">{order.order_number || order.reference || 'N/A'}</div>
                                 <div className="text-gray-500">{order.client_name}</div>
                               </div>
                               <div className="text-right">
-                                <div className="font-bold text-blue-600">{order.page_count || 0} pages</div>
-                                <div className="text-gray-500">{formatDate(order.created_at)}</div>
+                                <div className="font-bold text-blue-600 text-sm">{order.page_count || 0} pages</div>
+                                <div className="text-gray-400">{formatDate(order.created_at)}</div>
                               </div>
                             </div>
-                            <div className="mt-1">
-                              <span className={`px-2 py-0.5 rounded text-xs ${statusColors[order.translation_status] || 'bg-gray-100 text-gray-600'}`}>
-                                {statusLabels[order.translation_status] || order.translation_status}
+                            <div className="mt-2 flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: sc.dot }}></span>
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${sc.bg} ${sc.text}`}>
+                                {order.translation_status || 'Unknown'}
                               </span>
                             </div>
                           </div>
@@ -25913,37 +26068,9 @@ const ProductionPage = ({ adminKey }) => {
               </div>
             </div>
           </div>
-
-          {/* Monthly Chart */}
-          {chartData.length > 0 && (
-            <div className="bg-white rounded-lg shadow">
-              <div className="p-4 border-b">
-                <h2 className="text-sm font-bold text-gray-800">Monthly Production per Translator</h2>
-                <p className="text-xs text-gray-500 mt-1">Projects assigned by month since January 2025</p>
-              </div>
-              <div className="p-4">
-                <ResponsiveContainer width="100%" height={350}>
-                  <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                    <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                    <Tooltip />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
-                    {translatorNames.map((name, index) => (
-                      <Bar
-                        key={name}
-                        dataKey={name}
-                        fill={CHART_COLORS[index % CHART_COLORS.length]}
-                        radius={[2, 2, 0, 0]}
-                      />
-                    ))}
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          )}
         </div>
-      )}
+        );
+      })()}
 
       {activeView === 'payments' && (
         <div className="bg-white rounded-lg shadow">
