@@ -25562,7 +25562,7 @@ const ProductionPage = ({ adminKey }) => {
   const [stats, setStats] = useState([]);
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeView, setActiveView] = useState('stats'); // stats, payments
+  const [activeView, setActiveView] = useState('stats');
   const [selectedTranslator, setSelectedTranslator] = useState(null);
   const [translatorOrders, setTranslatorOrders] = useState([]);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -25570,12 +25570,14 @@ const ProductionPage = ({ adminKey }) => {
   const [chartData, setChartData] = useState([]);
   const [translatorNames, setTranslatorNames] = useState([]);
   const [metricsPeriod, setMetricsPeriod] = useState('month');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
   const [paymentForm, setPaymentForm] = useState({
     translator_id: '',
     period_start: '',
     period_end: '',
     pages_count: 0,
-    rate_per_page: 25.0,
+    rate_per_page: 5.0,
     total_amount: 0,
     payment_method: '',
     payment_reference: '',
@@ -25600,18 +25602,24 @@ const ProductionPage = ({ adminKey }) => {
     }
   };
 
-  const fetchTranslatorOrders = async (translatorId) => {
+  const fetchTranslatorOrders = async (translatorId, startDate, endDate) => {
     try {
-      const response = await axios.get(`${API}/admin/production/translator/${translatorId}/orders?admin_key=${adminKey}`);
+      let url = `${API}/admin/production/translator/${translatorId}/orders?admin_key=${adminKey}`;
+      if (startDate) url += `&start_date=${startDate}`;
+      if (endDate) url += `&end_date=${endDate}`;
+      const response = await axios.get(url);
       setTranslatorOrders(response.data.orders || []);
     } catch (err) {
       console.error('Error fetching translator orders:', err);
     }
   };
 
-  const fetchTranslatorMetrics = async (period) => {
+  const fetchTranslatorMetrics = async (period, startDate, endDate) => {
     try {
-      const response = await axios.get(`${API}/admin/production/translator-metrics?admin_key=${adminKey}&period=${period}`);
+      let url = `${API}/admin/production/translator-metrics?admin_key=${adminKey}&period=${period}`;
+      if (startDate) url += `&start_date=${startDate}`;
+      if (endDate) url += `&end_date=${endDate}`;
+      const response = await axios.get(url);
       setTranslatorMetrics(response.data.metrics || []);
       setChartData(response.data.chart_data || []);
       setTranslatorNames(response.data.translator_names || []);
@@ -25620,35 +25628,63 @@ const ProductionPage = ({ adminKey }) => {
     }
   };
 
+  const refreshAllData = async () => {
+    setLoading(true);
+    const sd = metricsPeriod === 'custom' ? customStartDate : undefined;
+    const ed = metricsPeriod === 'custom' ? customEndDate : undefined;
+    await Promise.all([fetchStats(), fetchPayments(), fetchTranslatorMetrics(metricsPeriod, sd, ed)]);
+    if (selectedTranslator) {
+      const tid = selectedTranslator.translator_id || selectedTranslator.id;
+      await fetchTranslatorOrders(tid, sd, ed);
+    }
+    setLoading(false);
+  };
+
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      await Promise.all([fetchStats(), fetchPayments(), fetchTranslatorMetrics(metricsPeriod)]);
-      setLoading(false);
-    };
-    loadData();
+    refreshAllData();
   }, [adminKey]);
 
   useEffect(() => {
-    fetchTranslatorMetrics(metricsPeriod);
+    if (metricsPeriod !== 'custom') {
+      fetchTranslatorMetrics(metricsPeriod);
+      if (selectedTranslator) {
+        const tid = selectedTranslator.translator_id || selectedTranslator.id;
+        fetchTranslatorOrders(tid);
+      }
+    }
   }, [metricsPeriod]);
+
+  const handleApplyCustomDates = () => {
+    if (customStartDate && customEndDate) {
+      fetchTranslatorMetrics('custom', customStartDate, customEndDate);
+      if (selectedTranslator) {
+        const tid = selectedTranslator.translator_id || selectedTranslator.id;
+        fetchTranslatorOrders(tid, customStartDate, customEndDate);
+      }
+    }
+  };
 
   const handleSelectTranslator = async (translator) => {
     setSelectedTranslator(translator);
     const tid = translator.translator_id || translator.id;
-    await fetchTranslatorOrders(tid);
+    const sd = metricsPeriod === 'custom' ? customStartDate : undefined;
+    const ed = metricsPeriod === 'custom' ? customEndDate : undefined;
+    await fetchTranslatorOrders(tid, sd, ed);
   };
 
   const openPaymentModal = (translator) => {
     const today = new Date().toISOString().split('T')[0];
     const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+    const rate = translator.rate_config?.rate || translator.rate_config?.rate_normal || 5.0;
+    const pendingAmount = translator.pending_payment_amount || 0;
+    const pendingPages = translator.pending_payment_pages || 0;
     setPaymentForm({
       translator_id: translator.translator_id,
       period_start: firstOfMonth,
       period_end: today,
-      pages_count: translator.pending_payment_pages || 0,
-      rate_per_page: 25.0,
-      total_amount: (translator.pending_payment_pages || 0) * 25.0,
+      pages_count: pendingPages,
+      rate_per_page: rate,
+      total_amount: pendingAmount > 0 ? pendingAmount : pendingPages * rate,
       payment_method: 'bank_transfer',
       payment_reference: '',
       notes: ''
@@ -25661,31 +25697,28 @@ const ProductionPage = ({ adminKey }) => {
     try {
       await axios.post(`${API}/admin/payments?admin_key=${adminKey}`, paymentForm);
       setShowPaymentModal(false);
-      fetchStats();
-      fetchPayments();
-      showToast('Payment registrado successfully!');
+      await refreshAllData();
+      showToast('Payment registrado com sucesso!');
     } catch (err) {
       showToast(err.response?.data?.detail || 'Error registering payment');
     }
   };
 
   const handleMarkAsPaid = async (paymentId) => {
-    if (!window.confirm('Confirm payment as completed?')) return;
+    if (!window.confirm('Confirmar pagamento como concluído?')) return;
     try {
       await axios.put(`${API}/admin/payments/${paymentId}?admin_key=${adminKey}`, { status: 'paid' });
-      fetchPayments();
-      fetchStats();
+      await refreshAllData();
     } catch (err) {
       showToast('Error updating payment');
     }
   };
 
   const handleDeletePayment = async (paymentId) => {
-    if (!window.confirm('Delete this payment record?')) return;
+    if (!window.confirm('Deletar este registro de pagamento?')) return;
     try {
       await axios.delete(`${API}/admin/payments/${paymentId}?admin_key=${adminKey}`);
-      fetchPayments();
-      fetchStats();
+      await refreshAllData();
     } catch (err) {
       showToast('Error deleting payment');
     }
@@ -25730,6 +25763,10 @@ const ProductionPage = ({ adminKey }) => {
         const totalProjects = translatorMetrics.reduce((s, t) => s + (t.total_translations || 0), 0);
         const periodProjects = translatorMetrics.reduce((s, t) => s + (t.period_translations || 0), 0);
         const periodPages = translatorMetrics.reduce((s, t) => s + (t.period_pages || 0), 0);
+        const totalPendingAmount = translatorMetrics.reduce((s, t) => s + (t.pending_payment_amount || 0), 0);
+        const totalPaidAmount = translatorMetrics.reduce((s, t) => s + (t.paid_amount || 0), 0);
+        const totalEstimatedPayment = translatorMetrics.reduce((s, t) => s + (t.total_estimated_payment || 0), 0);
+        const periodEstimatedPayment = translatorMetrics.reduce((s, t) => s + (t.period_estimated_payment || 0), 0);
 
         const pieDataPages = translatorMetrics.filter(t => t.total_pages > 0).map((t, i) => ({
           name: t.translator_name, value: t.total_pages, color: PIE_COLORS[i % PIE_COLORS.length]
@@ -25747,16 +25784,17 @@ const ProductionPage = ({ adminKey }) => {
         <div className="space-y-6">
           {/* Period Filter */}
           <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg shadow p-5 text-white">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-lg font-bold">Financial Reports - Translator Production</h2>
-                <p className="text-blue-100 text-sm mt-1">Projects assigned and pages for payment since January 2025</p>
+                <p className="text-blue-100 text-sm mt-1">Projects and payments since March 2026</p>
               </div>
-              <div className="flex space-x-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {[
                   { key: 'day', label: 'Today' },
                   { key: 'week', label: 'This Week' },
-                  { key: 'month', label: 'This Month' }
+                  { key: 'month', label: 'This Month' },
+                  { key: 'custom', label: 'Select Period' }
                 ].map(({ key, label }) => (
                   <button
                     key={key}
@@ -25772,31 +25810,54 @@ const ProductionPage = ({ adminKey }) => {
                 ))}
               </div>
             </div>
+            {metricsPeriod === 'custom' && (
+              <div className="flex items-center gap-3 mt-4 pt-3 border-t border-white/20">
+                <div>
+                  <label className="text-xs text-blue-100">Start Date</label>
+                  <input type="date" value={customStartDate} onChange={(e) => setCustomStartDate(e.target.value)}
+                    className="block w-full px-3 py-1.5 rounded text-sm text-gray-800 mt-1" />
+                </div>
+                <div>
+                  <label className="text-xs text-blue-100">End Date</label>
+                  <input type="date" value={customEndDate} onChange={(e) => setCustomEndDate(e.target.value)}
+                    className="block w-full px-3 py-1.5 rounded text-sm text-gray-800 mt-1" />
+                </div>
+                <button onClick={handleApplyCustomDates}
+                  className="mt-5 px-5 py-2 bg-white text-blue-700 rounded-lg text-xs font-bold hover:bg-blue-50 transition-colors shadow">
+                  Apply
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Summary Cards Row */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div className="bg-white rounded-xl shadow-sm border-l-4 border-blue-500 p-4">
               <div className="text-xs text-gray-500 uppercase tracking-wide">Total Projects</div>
               <div className="text-2xl font-bold text-blue-700 mt-1">{totalProjects}</div>
-              <div className="text-xs text-gray-400 mt-1">Since Jan 2025</div>
+              <div className="text-xs text-gray-400 mt-1">{totalAllPages} pages</div>
             </div>
             <div className="bg-white rounded-xl shadow-sm border-l-4 border-green-500 p-4">
-              <div className="text-xs text-gray-500 uppercase tracking-wide">Total Pages</div>
-              <div className="text-2xl font-bold text-green-700 mt-1">{totalAllPages}</div>
-              <div className="text-xs text-gray-400 mt-1">{totalCompletedPages} completed</div>
+              <div className="text-xs text-gray-500 uppercase tracking-wide">Completed</div>
+              <div className="text-2xl font-bold text-green-700 mt-1">{totalCompletedPages} pg</div>
+              <div className="text-xs text-gray-400 mt-1">{formatCurrency(totalEstimatedPayment)}</div>
             </div>
             <div className="bg-white rounded-xl shadow-sm border-l-4 border-purple-500 p-4">
               <div className="text-xs text-gray-500 uppercase tracking-wide">
-                {metricsPeriod === 'day' ? 'Today' : metricsPeriod === 'week' ? 'This Week' : 'This Month'}
+                {metricsPeriod === 'day' ? 'Today' : metricsPeriod === 'week' ? 'This Week' : metricsPeriod === 'custom' ? 'Selected Period' : 'This Month'}
               </div>
               <div className="text-2xl font-bold text-purple-700 mt-1">{periodProjects} proj</div>
-              <div className="text-xs text-gray-400 mt-1">{periodPages} pages</div>
+              <div className="text-xs text-gray-400 mt-1">{periodPages} pg / {formatCurrency(periodEstimatedPayment)}</div>
             </div>
             <div className="bg-white rounded-xl shadow-sm border-l-4 border-orange-500 p-4">
               <div className="text-xs text-gray-500 uppercase tracking-wide">Pending Payment</div>
               <div className="text-2xl font-bold text-orange-700 mt-1">{totalPendingPayment} pg</div>
-              <div className="text-xs text-gray-400 mt-1">{formatCurrency(totalPendingPayment * 25)}</div>
+              <div className="text-xs text-orange-500 mt-1 font-semibold">{formatCurrency(totalPendingAmount)}</div>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm border-l-4 border-emerald-500 p-4">
+              <div className="text-xs text-gray-500 uppercase tracking-wide">Already Paid</div>
+              <div className="text-2xl font-bold text-emerald-700 mt-1">{totalPaidPages} pg</div>
+              <div className="text-xs text-emerald-500 mt-1 font-semibold">{formatCurrency(totalPaidAmount)}</div>
             </div>
           </div>
 
@@ -25868,7 +25929,7 @@ const ProductionPage = ({ adminKey }) => {
             <div className="bg-white rounded-xl shadow-sm">
               <div className="p-4 border-b">
                 <h2 className="text-sm font-bold text-gray-700">Monthly Production per Translator</h2>
-                <p className="text-xs text-gray-400 mt-1">Projects assigned by month since January 2025</p>
+                <p className="text-xs text-gray-400 mt-1">Projects assigned by month since March 2026</p>
               </div>
               <div className="p-4">
                 <ResponsiveContainer width="100%" height={350}>
@@ -25933,6 +25994,10 @@ const ProductionPage = ({ adminKey }) => {
                             </button>
                           )}
                         </div>
+                        {/* Rate info */}
+                        <div className="text-xs text-gray-400 mb-2">
+                          Rate: {translator.rate_config?.description || '$5.00/page'}
+                        </div>
                         <div className="grid grid-cols-3 gap-2 text-center text-xs mb-2">
                           <div className="bg-blue-50 rounded-lg p-2">
                             <div className="text-gray-500">Projects</div>
@@ -25945,13 +26010,13 @@ const ProductionPage = ({ adminKey }) => {
                           <div className="bg-teal-50 rounded-lg p-2">
                             <div className="text-gray-500">Completed</div>
                             <div className="font-bold text-teal-700 text-base">{translator.completed_pages}</div>
-                            <div className="text-gray-400">{translator.completed_translations} proj</div>
+                            <div className="text-teal-500 font-semibold">{formatCurrency(translator.total_estimated_payment)}</div>
                           </div>
                         </div>
                         <div className="grid grid-cols-3 gap-2 text-center text-xs mb-2">
                           <div className="bg-purple-50 rounded-lg p-2">
                             <div className="text-purple-600">
-                              {metricsPeriod === 'day' ? 'Today' : metricsPeriod === 'week' ? 'This Week' : 'This Month'}
+                              {metricsPeriod === 'day' ? 'Today' : metricsPeriod === 'week' ? 'This Week' : metricsPeriod === 'custom' ? 'Period' : 'This Month'}
                             </div>
                             <div className="font-bold text-purple-700">{translator.period_translations} proj</div>
                           </div>
@@ -25960,8 +26025,8 @@ const ProductionPage = ({ adminKey }) => {
                             <div className="font-bold text-yellow-700">{translator.period_pages}</div>
                           </div>
                           <div className="bg-indigo-50 rounded-lg p-2">
-                            <div className="text-indigo-600">Period Done</div>
-                            <div className="font-bold text-indigo-700">{translator.period_completed_pages} pg</div>
+                            <div className="text-indigo-600">Period Payment</div>
+                            <div className="font-bold text-indigo-700">{formatCurrency(translator.period_estimated_payment)}</div>
                           </div>
                         </div>
                         {(translator.pending_payment_pages > 0 || translator.paid_pages > 0) && (
@@ -25969,12 +26034,12 @@ const ProductionPage = ({ adminKey }) => {
                             <div className="bg-orange-50 rounded-lg p-2 border border-orange-200">
                               <div className="text-orange-600 font-medium">Pending Payment</div>
                               <div className="font-bold text-orange-700">{translator.pending_payment_pages} pages</div>
-                              <div className="text-orange-500">{formatCurrency(translator.pending_payment_pages * 25)}</div>
+                              <div className="text-orange-500 font-semibold">{formatCurrency(translator.pending_payment_amount)}</div>
                             </div>
                             <div className="bg-emerald-50 rounded-lg p-2 border border-emerald-200">
                               <div className="text-emerald-600 font-medium">Already Paid</div>
                               <div className="font-bold text-emerald-700">{translator.paid_pages} pages</div>
-                              <div className="text-emerald-500">{formatCurrency(translator.paid_pages * 25)}</div>
+                              <div className="text-emerald-500 font-semibold">{formatCurrency(translator.paid_amount)}</div>
                             </div>
                           </div>
                         )}
@@ -26003,7 +26068,7 @@ const ProductionPage = ({ adminKey }) => {
                 ) : (
                   <>
                     <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl text-xs border border-blue-100">
-                      <div className="grid grid-cols-3 gap-3 text-center">
+                      <div className="grid grid-cols-4 gap-3 text-center">
                         <div>
                           <div className="text-gray-500 uppercase tracking-wide">Projects</div>
                           <div className="font-bold text-gray-800 text-lg">{translatorOrders.length}</div>
@@ -26013,9 +26078,13 @@ const ProductionPage = ({ adminKey }) => {
                           <div className="font-bold text-blue-700 text-lg">{translatorOrders.reduce((sum, o) => sum + (o.page_count || 0), 0)}</div>
                         </div>
                         <div>
-                          <div className="text-gray-500 uppercase tracking-wide">Est. Payment</div>
+                          <div className="text-gray-500 uppercase tracking-wide">Completed</div>
+                          <div className="font-bold text-teal-700 text-lg">{translatorOrders.filter(o => o.is_completed).reduce((sum, o) => sum + (o.page_count || 0), 0)} pg</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500 uppercase tracking-wide">Payment</div>
                           <div className="font-bold text-green-700 text-lg">
-                            {formatCurrency(translatorOrders.filter(o => ['ready', 'delivered', 'final', 'Final', 'Delivered', 'approved'].includes(o.translation_status)).reduce((sum, o) => sum + (o.page_count || 0), 0) * 25)}
+                            {formatCurrency(translatorOrders.filter(o => o.is_completed).reduce((sum, o) => sum + (o.order_payment || 0), 0))}
                           </div>
                         </div>
                       </div>
@@ -26049,8 +26118,10 @@ const ProductionPage = ({ adminKey }) => {
                                 <div className="text-gray-500">{order.client_name}</div>
                               </div>
                               <div className="text-right">
-                                <div className="font-bold text-blue-600 text-sm">{order.page_count || 0} pages</div>
+                                <div className="font-bold text-blue-600 text-sm">{order.page_count || 0} pg</div>
                                 <div className="text-gray-400">{formatDate(order.created_at)}</div>
+                                <div className="font-semibold text-green-600">{formatCurrency(order.order_payment || 0)}</div>
+                                <div className="text-gray-400">${order.rate_per_page?.toFixed(2)}/pg{order.is_urgent ? ' (Urgent)' : ''}</div>
                               </div>
                             </div>
                             <div className="mt-2 flex items-center gap-1.5">
