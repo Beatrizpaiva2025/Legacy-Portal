@@ -21197,7 +21197,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                           if (resp.data.status === 'email_failed' || resp.data.client_email_sent === false) {
                                             showToast(`⚠️ ATENÇÃO: Pedido marcado como entregue mas EMAIL NÃO ENVIADO!\n\nErro: ${resp.data.client_email_error || resp.data.error || 'Erro desconhecido'}\n\nUse "Reenviar Email" para tentar novamente.`);
                                           } else {
-                                            let msg = `✅ Tradução enviada ao cliente!\n\n${selectedDocsForDelivery.length} arquivo(s) entregue(s).`;
+                                            const emailCount = Array.isArray(resp.data.resend_email_id) ? resp.data.resend_email_id.length : 1;
+                                            let msg = `✅ Tradução enviada ao cliente!\n\n${selectedDocsForDelivery.length} arquivo(s) entregue(s)${emailCount > 1 ? ` em ${emailCount} email(s)` : ''}.`;
                                             if (bccEmail && resp.data.bcc_sent) msg += `\n\nCópia (BCC): ${bccEmail}`;
                                             else if (bccEmail && resp.data.bcc_error) msg += `\n\n⚠️ Cópia BCC FALHOU: ${resp.data.bcc_error}`;
                                             showToast(msg);
