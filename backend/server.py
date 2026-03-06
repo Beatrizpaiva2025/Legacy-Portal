@@ -11018,11 +11018,12 @@ async def get_production_stats(admin_key: str, translator_id: Optional[str] = No
         total_pages = 0
         completed_pages = 0
         pending_pages = 0
+        completed_statuses = {"ready", "delivered"}
 
         for order in orders:
             pages = order.get("page_count", 0) or 0
             total_pages += pages
-            if order.get("translation_status") == "completed":
+            if order.get("translation_status") in completed_statuses:
                 completed_pages += pages
             else:
                 pending_pages += pages
@@ -11047,7 +11048,7 @@ async def get_production_stats(admin_key: str, translator_id: Optional[str] = No
             "paid_pages": paid_pages,
             "pending_payment_pages": pending_payment_pages,
             "orders_count": len(orders),
-            "completed_orders": len([o for o in orders if o.get("translation_status") == "completed"])
+            "completed_orders": len([o for o in orders if o.get("translation_status") in ("ready", "delivered")])
         })
 
     return {"stats": stats}
@@ -11083,26 +11084,46 @@ async def get_translator_metrics(admin_key: str, period: Optional[str] = "month"
     for translator in translators:
         tid = translator["id"]
 
-        # Get all completed orders since Jan 2025
+        # Get all orders assigned to this translator since Jan 2025
+        # Include all statuses to count pages assigned for translation
         query = {
             "assigned_translator_id": tid,
-            "translation_status": "completed",
             "created_at": {"$gte": jan_start}
         }
-        orders = await db.orders.find(query).sort("created_at", -1).to_list(5000)
+        all_orders = await db.orders.find(query).sort("created_at", -1).to_list(5000)
 
-        # Total since January
-        total_translations = len(orders)
-        total_pages = sum(o.get("page_count", 0) or 0 for o in orders)
+        # Completed = ready or delivered (these are done translations)
+        completed_statuses = {"ready", "delivered"}
+        orders = [o for o in all_orders if o.get("translation_status") in completed_statuses]
+        # In-progress orders (received, in_translation, review)
+        in_progress_orders = [o for o in all_orders if o.get("translation_status") not in completed_statuses]
 
-        # Count for selected period
-        period_orders = [o for o in orders if o.get("created_at") and o["created_at"] >= period_start]
-        period_translations = len(period_orders)
-        period_pages = sum(o.get("page_count", 0) or 0 for o in period_orders)
+        # Total since January (all assigned orders)
+        total_translations = len(all_orders)
+        total_pages = sum(o.get("page_count", 0) or 0 for o in all_orders)
+        completed_translations = len(orders)
+        completed_pages = sum(o.get("page_count", 0) or 0 for o in orders)
+        in_progress_translations = len(in_progress_orders)
+        in_progress_pages = sum(o.get("page_count", 0) or 0 for o in in_progress_orders)
 
-        # Monthly breakdown for chart
+        # Count for selected period (all orders in the period)
+        period_all_orders = [o for o in all_orders if o.get("created_at") and o["created_at"] >= period_start]
+        period_completed = [o for o in period_all_orders if o.get("translation_status") in completed_statuses]
+        period_in_progress = [o for o in period_all_orders if o.get("translation_status") not in completed_statuses]
+        period_translations = len(period_all_orders)
+        period_pages = sum(o.get("page_count", 0) or 0 for o in period_all_orders)
+        period_completed_translations = len(period_completed)
+        period_completed_pages = sum(o.get("page_count", 0) or 0 for o in period_completed)
+
+        # Get paid pages from payments for financial calculation
+        paid_query = {"translator_id": tid, "status": "paid"}
+        paid_payments = await db.translator_payments.find(paid_query).to_list(100)
+        paid_pages = sum(p.get("pages_count", 0) for p in paid_payments)
+        pending_payment_pages = max(0, completed_pages - paid_pages)
+
+        # Monthly breakdown for chart (all assigned orders)
         monthly_breakdown = {}
-        for order in orders:
+        for order in all_orders:
             created = order.get("created_at")
             if created:
                 month_key = created.strftime("%Y-%m")
@@ -11128,8 +11149,16 @@ async def get_translator_metrics(admin_key: str, period: Optional[str] = "month"
             "translator_email": translator.get("email", ""),
             "total_translations": total_translations,
             "total_pages": total_pages,
+            "completed_translations": completed_translations,
+            "completed_pages": completed_pages,
+            "in_progress_translations": in_progress_translations,
+            "in_progress_pages": in_progress_pages,
             "period_translations": period_translations,
             "period_pages": period_pages,
+            "period_completed_translations": period_completed_translations,
+            "period_completed_pages": period_completed_pages,
+            "pending_payment_pages": pending_payment_pages,
+            "paid_pages": paid_pages,
             "monthly_breakdown": sorted_monthly
         })
 
@@ -11160,7 +11189,11 @@ async def get_translator_orders(translator_id: str, admin_key: str, status: Opti
     query = {"assigned_translator_id": translator_id}
 
     if status:
-        query["translation_status"] = status
+        # Map "completed" to actual completed statuses
+        if status == "completed":
+            query["translation_status"] = {"$in": ["ready", "delivered"]}
+        else:
+            query["translation_status"] = status
 
     if start_date or end_date:
         query["created_at"] = {}

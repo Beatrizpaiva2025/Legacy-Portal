@@ -25602,7 +25602,7 @@ const ProductionPage = ({ adminKey }) => {
 
   const fetchTranslatorOrders = async (translatorId) => {
     try {
-      const response = await axios.get(`${API}/admin/production/translator/${translatorId}/orders?admin_key=${adminKey}&status=completed`);
+      const response = await axios.get(`${API}/admin/production/translator/${translatorId}/orders?admin_key=${adminKey}`);
       setTranslatorOrders(response.data.orders || []);
     } catch (err) {
       console.error('Error fetching translator orders:', err);
@@ -25635,7 +25635,8 @@ const ProductionPage = ({ adminKey }) => {
 
   const handleSelectTranslator = async (translator) => {
     setSelectedTranslator(translator);
-    await fetchTranslatorOrders(translator.translator_id);
+    const tid = translator.translator_id || translator.id;
+    await fetchTranslatorOrders(tid);
   };
 
   const openPaymentModal = (translator) => {
@@ -25726,8 +25727,8 @@ const ProductionPage = ({ adminKey }) => {
           <div className="bg-white rounded-lg shadow p-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-sm font-bold text-gray-800">Translations Count</h2>
-                <p className="text-xs text-gray-500 mt-1">Completed translations since January 2025</p>
+                <h2 className="text-sm font-bold text-gray-800">Financial Reports - Translator Production</h2>
+                <p className="text-xs text-gray-500 mt-1">Projects assigned and pages for payment since January 2025</p>
               </div>
               <div className="flex space-x-2">
                 {[
@@ -25766,9 +25767,7 @@ const ProductionPage = ({ adminKey }) => {
                     return (
                       <div
                         key={translator.translator_id}
-                        onClick={() => {
-                          if (matchingStat) handleSelectTranslator(matchingStat);
-                        }}
+                        onClick={() => handleSelectTranslator(translator)}
                         className={`p-4 border rounded-lg cursor-pointer transition-colors ${
                           selectedTranslator?.translator_id === translator.translator_id
                             ? 'border-blue-500 bg-blue-50'
@@ -25780,35 +25779,57 @@ const ProductionPage = ({ adminKey }) => {
                             <div className="font-medium text-gray-800">{translator.translator_name}</div>
                             <div className="text-xs text-gray-500">{translator.translator_email}</div>
                           </div>
-                          {matchingStat && matchingStat.pending_payment_pages > 0 && (
+                          {translator.pending_payment_pages > 0 && (
                             <button
-                              onClick={(e) => { e.stopPropagation(); openPaymentModal(matchingStat); }}
+                              onClick={(e) => { e.stopPropagation(); openPaymentModal(matchingStat || translator); }}
                               className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
                             >
                               Register Payment
                             </button>
                           )}
                         </div>
-                        <div className="grid grid-cols-4 gap-2 text-center text-xs">
+                        <div className="grid grid-cols-3 gap-2 text-center text-xs mb-2">
                           <div className="bg-blue-50 rounded p-2">
-                            <div className="text-gray-500">Total (since Jan)</div>
+                            <div className="text-gray-500">Projects (since Jan)</div>
                             <div className="font-bold text-blue-700">{translator.total_translations}</div>
                           </div>
                           <div className="bg-green-50 rounded p-2">
                             <div className="text-gray-500">Total Pages</div>
                             <div className="font-bold text-green-700">{translator.total_pages}</div>
                           </div>
+                          <div className="bg-teal-50 rounded p-2">
+                            <div className="text-gray-500">Completed</div>
+                            <div className="font-bold text-teal-700">{translator.completed_translations} ({translator.completed_pages} pg)</div>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 text-center text-xs mb-2">
                           <div className="bg-purple-50 rounded p-2">
                             <div className="text-purple-600">
                               {metricsPeriod === 'day' ? 'Today' : metricsPeriod === 'week' ? 'This Week' : 'This Month'}
                             </div>
-                            <div className="font-bold text-purple-700">{translator.period_translations}</div>
+                            <div className="font-bold text-purple-700">{translator.period_translations} proj</div>
                           </div>
                           <div className="bg-yellow-50 rounded p-2">
                             <div className="text-yellow-600">Period Pages</div>
                             <div className="font-bold text-yellow-700">{translator.period_pages}</div>
                           </div>
+                          <div className="bg-indigo-50 rounded p-2">
+                            <div className="text-indigo-600">Period Done</div>
+                            <div className="font-bold text-indigo-700">{translator.period_completed_pages} pg</div>
+                          </div>
                         </div>
+                        {(translator.pending_payment_pages > 0 || translator.paid_pages > 0) && (
+                          <div className="grid grid-cols-2 gap-2 text-center text-xs border-t pt-2 mt-1">
+                            <div className="bg-orange-50 rounded p-2">
+                              <div className="text-orange-600">Pending Payment</div>
+                              <div className="font-bold text-orange-700">{translator.pending_payment_pages} pages</div>
+                            </div>
+                            <div className="bg-emerald-50 rounded p-2">
+                              <div className="text-emerald-600">Already Paid</div>
+                              <div className="font-bold text-emerald-700">{translator.paid_pages} pages</div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })
@@ -25829,24 +25850,65 @@ const ProductionPage = ({ adminKey }) => {
                     Click on a translator to view their projects
                   </div>
                 ) : translatorOrders.length === 0 ? (
-                  <div className="text-center text-gray-500 py-4">No completed projects</div>
+                  <div className="text-center text-gray-500 py-4">No projects assigned</div>
                 ) : (
-                  <div className="space-y-2 max-h-96 overflow-y-auto">
-                    {translatorOrders.map((order) => (
-                      <div key={order.id} className="p-3 border rounded-lg text-xs">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <div className="font-medium text-gray-800">{order.order_number || order.reference}</div>
-                            <div className="text-gray-500">{order.client_name}</div>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-bold text-blue-600">{order.page_count || 0} pages</div>
-                            <div className="text-gray-500">{formatDate(order.created_at)}</div>
+                  <>
+                    <div className="mb-3 p-3 bg-gray-50 rounded-lg text-xs">
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div>
+                          <div className="text-gray-500">Total Projects</div>
+                          <div className="font-bold text-gray-800">{translatorOrders.length}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500">Total Pages</div>
+                          <div className="font-bold text-blue-700">{translatorOrders.reduce((sum, o) => sum + (o.page_count || 0), 0)}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500">Est. Payment</div>
+                          <div className="font-bold text-green-700">
+                            {formatCurrency(translatorOrders.filter(o => ['ready', 'delivered'].includes(o.translation_status)).reduce((sum, o) => sum + (o.page_count || 0), 0) * 25)}
                           </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                    <div className="space-y-2 max-h-96 overflow-y-auto">
+                      {translatorOrders.map((order) => {
+                        const statusColors = {
+                          'received': 'bg-gray-100 text-gray-700',
+                          'in_translation': 'bg-blue-100 text-blue-700',
+                          'review': 'bg-purple-100 text-purple-700',
+                          'ready': 'bg-green-100 text-green-700',
+                          'delivered': 'bg-teal-100 text-teal-700'
+                        };
+                        const statusLabels = {
+                          'received': 'Received',
+                          'in_translation': 'In Translation',
+                          'review': 'Review',
+                          'ready': 'Ready',
+                          'delivered': 'Delivered'
+                        };
+                        return (
+                          <div key={order.id} className="p-3 border rounded-lg text-xs">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <div className="font-medium text-gray-800">{order.order_number || order.reference}</div>
+                                <div className="text-gray-500">{order.client_name}</div>
+                              </div>
+                              <div className="text-right">
+                                <div className="font-bold text-blue-600">{order.page_count || 0} pages</div>
+                                <div className="text-gray-500">{formatDate(order.created_at)}</div>
+                              </div>
+                            </div>
+                            <div className="mt-1">
+                              <span className={`px-2 py-0.5 rounded text-xs ${statusColors[order.translation_status] || 'bg-gray-100 text-gray-600'}`}>
+                                {statusLabels[order.translation_status] || order.translation_status}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
                 )}
               </div>
             </div>
@@ -25856,8 +25918,8 @@ const ProductionPage = ({ adminKey }) => {
           {chartData.length > 0 && (
             <div className="bg-white rounded-lg shadow">
               <div className="p-4 border-b">
-                <h2 className="text-sm font-bold text-gray-800">Monthly Translations per Translator</h2>
-                <p className="text-xs text-gray-500 mt-1">Completed translations by month since January 2025</p>
+                <h2 className="text-sm font-bold text-gray-800">Monthly Production per Translator</h2>
+                <p className="text-xs text-gray-500 mt-1">Projects assigned by month since January 2025</p>
               </div>
               <div className="p-4">
                 <ResponsiveContainer width="100%" height={350}>
