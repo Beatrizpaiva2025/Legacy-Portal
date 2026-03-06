@@ -341,14 +341,8 @@ class EmailService:
 
             # Use Resend SDK with tracking disabled
             response = resend.Emails.send(params)
-            email_id = response.get("id") if isinstance(response, dict) else None
-            if not email_id:
-                logger.error(f"Resend API returned unexpected response (no email ID): {response}")
-                raise EmailDeliveryError(f"Resend API did not return email ID. Response: {response}")
-            logger.info(f"Email sent successfully. Resend ID: {email_id}, to: {to}")
-            return email_id
-        except EmailDeliveryError:
-            raise
+            logger.info(f"Email sent successfully: {response}")
+            return True
         except Exception as e:
             logger.error(f"Failed to send email: {str(e)}")
             raise EmailDeliveryError(f"Failed to send email: {str(e)}")
@@ -359,6 +353,7 @@ class EmailService:
         try:
             # Decode base64 content for attachment
             file_bytes = base64.b64decode(file_content)
+
             params = {
                 "from": self.sender_email,
                 "to": [to],
@@ -372,20 +367,14 @@ class EmailService:
                 "attachments": [
                     {
                         "filename": filename,
-                        "content": list(file_bytes),
+                        "content": list(file_bytes),  # Resend expects list of bytes
                     }
                 ]
             }
 
             response = resend.Emails.send(params)
-            email_id = response.get("id") if isinstance(response, dict) else None
-            if not email_id:
-                logger.error(f"Resend API returned unexpected response (no email ID): {response}")
-                raise EmailDeliveryError(f"Resend API did not return email ID. Response: {response}")
-            logger.info(f"Email with attachment sent successfully. Resend ID: {email_id}, to: {to}")
-            return email_id
-        except EmailDeliveryError:
-            raise
+            logger.info(f"Email with attachment sent successfully: {response}")
+            return True
         except Exception as e:
             logger.error(f"Failed to send email with attachment: {str(e)}")
             raise EmailDeliveryError(f"Failed to send email with attachment: {str(e)}")
@@ -394,86 +383,15 @@ class EmailService:
                                                     attachments: list):
         """Send email with multiple file attachments via Resend
         attachments: list of dicts with keys: content (base64), filename, content_type
-
-        If total attachment size exceeds 25MB, attachments are split across multiple emails.
-        The Resend hard limit is 40MB per email.
-        Returns a single email ID (str) if one email, or a list of email IDs if split.
         """
-        # Calculate raw sizes for each attachment
-        att_sizes = []
-        total_raw_size = 0
-        for att in attachments:
-            # base64 string is ~33% larger than raw bytes, so raw ≈ len(base64) * 3/4
-            raw_size = len(att["content"]) * 3 // 4
-            att_sizes.append(raw_size)
-            total_raw_size += raw_size
-
-        total_mb = total_raw_size / (1024 * 1024)
-        logger.info(f"Total attachment size (estimated raw): {total_mb:.1f}MB for {len(attachments)} file(s)")
-
-        # If total size is under 25MB, send as single email
-        MAX_BATCH_SIZE = 25 * 1024 * 1024  # 25MB per email to stay safely under Resend 40MB limit
-        if total_raw_size <= MAX_BATCH_SIZE:
-            return await self._send_email_with_attachments_batch(to, subject, content, attachments)
-
-        # Split attachments into batches that fit under the size limit
-        batches = []
-        current_batch = []
-        current_size = 0
-        for i, att in enumerate(attachments):
-            att_size = att_sizes[i]
-            # If adding this attachment would exceed limit, start a new batch
-            # (unless current batch is empty - single file larger than limit gets its own batch)
-            if current_batch and (current_size + att_size) > MAX_BATCH_SIZE:
-                batches.append(current_batch)
-                current_batch = []
-                current_size = 0
-            current_batch.append(att)
-            current_size += att_size
-        if current_batch:
-            batches.append(current_batch)
-
-        logger.info(f"Splitting {len(attachments)} attachment(s) ({total_mb:.1f}MB) into {len(batches)} email(s)")
-
-        # Send each batch as a separate email
-        email_ids = []
-        for batch_idx, batch in enumerate(batches):
-            batch_subject = f"{subject} (Part {batch_idx + 1}/{len(batches)})" if len(batches) > 1 else subject
-            batch_filenames = [att['filename'] for att in batch]
-            logger.info(f"Sending batch {batch_idx + 1}/{len(batches)}: {len(batch)} file(s) - {batch_filenames}")
-            try:
-                email_id = await self._send_email_with_attachments_batch(to, batch_subject, content, batch)
-                email_ids.append(email_id)
-            except Exception as e:
-                logger.error(f"Failed to send batch {batch_idx + 1}/{len(batches)}: {str(e)}")
-                raise EmailDeliveryError(
-                    f"Failed to send email batch {batch_idx + 1}/{len(batches)}: {str(e)}. "
-                    f"Successfully sent {len(email_ids)}/{len(batches)} email(s) before failure."
-                )
-
-        logger.info(f"All {len(batches)} email batch(es) sent successfully. IDs: {email_ids}")
-        return email_ids if len(email_ids) > 1 else email_ids[0]
-
-    async def _send_email_with_attachments_batch(self, to: str, subject: str, content: str,
-                                                   attachments: list):
-        """Internal: send a single email with attachments using base64 content directly."""
         try:
             attachment_list = []
-            total_size = 0
             for att in attachments:
                 file_bytes = base64.b64decode(att["content"])
-                total_size += len(file_bytes)
                 attachment_list.append({
                     "filename": att["filename"],
                     "content": list(file_bytes),
                 })
-
-            total_size_mb = total_size / (1024 * 1024)
-            logger.info(f"Sending email with {len(attachments)} attachment(s), total size: {total_size_mb:.1f}MB")
-
-            # Resend limit is 40MB total (including email HTML). Warn if close.
-            if total_size_mb > 35:
-                logger.warning(f"Attachments are very large ({total_size_mb:.1f}MB), may exceed Resend 40MB limit")
 
             params = {
                 "from": self.sender_email,
@@ -488,17 +406,10 @@ class EmailService:
             }
 
             response = resend.Emails.send(params)
-            # Validate the Resend API response - it should return {"id": "email-uuid"}
-            email_id = response.get("id") if isinstance(response, dict) else None
-            if not email_id:
-                logger.error(f"Resend API returned unexpected response (no email ID): {response}")
-                raise EmailDeliveryError(f"Resend API did not return email ID. Response: {response}")
-            logger.info(f"Email with {len(attachments)} attachment(s) sent successfully. Resend ID: {email_id}, to: {to}")
-            return email_id
-        except EmailDeliveryError:
-            raise
+            logger.info(f"Email with {len(attachments)} attachment(s) sent successfully: {response}")
+            return True
         except Exception as e:
-            logger.error(f"Failed to send email with attachments: {str(e)}")
+            logger.error(f"Failed to send email with multiple attachments: {str(e)}")
             raise EmailDeliveryError(f"Failed to send email with attachments: {str(e)}")
 
     async def send_order_confirmation_email(self, recipient_email: str, order_details: dict, is_partner: bool = True):
