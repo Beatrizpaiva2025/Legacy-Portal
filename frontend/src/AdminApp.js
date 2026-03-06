@@ -4,7 +4,7 @@ import mammoth from 'mammoth';
 import * as pdfjsLib from 'pdfjs-dist';
 import html2pdf from 'html2pdf.js';
 import { THEMES, getTheme } from './themes';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 // Configure PDF.js worker (pdfjs-dist 5.x uses .mjs files)
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -25774,11 +25774,7 @@ const ProductionPage = ({ adminKey }) => {
         const pieDataProjects = translatorMetrics.filter(t => t.total_translations > 0).map((t, i) => ({
           name: t.translator_name, value: t.total_translations, color: PIE_COLORS[i % PIE_COLORS.length]
         }));
-        const paymentPieData = [
-          { name: 'Paid', value: totalPaidPages, color: '#10b981' },
-          { name: 'Pending Payment', value: totalPendingPayment, color: '#f59e0b' },
-          { name: 'In Progress', value: Math.max(0, totalAllPages - totalCompletedPages), color: '#3b82f6' }
-        ].filter(d => d.value > 0);
+        // Payment data removed per user request
 
         return (
         <div className="space-y-6">
@@ -25862,7 +25858,7 @@ const ProductionPage = ({ adminKey }) => {
           </div>
 
           {/* Charts Row - Pie Charts */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Pages per Translator Pie */}
             <div className="bg-white rounded-xl shadow-sm p-4">
               <h3 className="text-sm font-bold text-gray-700 mb-3">Pages per Translator</h3>
@@ -25903,25 +25899,6 @@ const ProductionPage = ({ adminKey }) => {
               )}
             </div>
 
-            {/* Payment Status Pie */}
-            <div className="bg-white rounded-xl shadow-sm p-4">
-              <h3 className="text-sm font-bold text-gray-700 mb-3">Payment Status (Pages)</h3>
-              {paymentPieData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={220}>
-                  <PieChart>
-                    <Pie data={paymentPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} innerRadius={40} paddingAngle={3} label={({ name, value }) => `${value}`}>
-                      {paymentPieData.map((entry, index) => (
-                        <Cell key={index} fill={entry.color} stroke="white" strokeWidth={2} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value, name) => [`${value} pages`, name]} />
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="text-center text-gray-400 py-12 text-sm">No data yet</div>
-              )}
-            </div>
           </div>
 
           {/* Monthly Production Area Chart */}

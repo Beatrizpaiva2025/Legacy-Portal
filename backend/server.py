@@ -11055,196 +11055,195 @@ async def get_production_stats(admin_key: str, translator_id: Optional[str] = No
 
 @api_router.get("/admin/production/translator-metrics")
 async def get_translator_metrics(admin_key: str, period: Optional[str] = "month", start_date: Optional[str] = None, end_date: Optional[str] = None):
-    """Get translator translation counts since January 2025 with monthly breakdown for charts.
-    period: 'day', 'week', or 'month' for filtering the summary view.
-    start_date/end_date: optional custom date range (ISO format).
-    """
+    """Get translator translation counts with monthly breakdown for charts."""
     if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
-    # Get all active translators
-    translators = await db.admin_users.find({"role": "translator", "is_active": True}).to_list(100)
+    try:
+        # Get all active translators
+        translators = await db.admin_users.find({"role": "translator", "is_active": True}).to_list(100)
 
-    # Since beginning of March 2026
-    data_start = datetime(2026, 3, 1)
-    now = datetime.utcnow()
+        now = datetime.utcnow()
 
-    # Custom date range or period-based
-    if start_date and end_date:
-        period_start = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
-        period_end = datetime.fromisoformat(end_date.replace('Z', '+00:00')).replace(hour=23, minute=59, second=59)
-    else:
-        period_end = now
-        if period == "day":
-            period_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        elif period == "week":
-            days_since_monday = now.weekday()
-            period_start = (now - timedelta(days=days_since_monday)).replace(hour=0, minute=0, second=0, microsecond=0)
-        else:  # month
-            period_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-
-    # Translator rate configuration
-    # Ana Clara: $0.70/page until Feb 28 2026 (paid), $1.00 normal / $2.00 urgent from March 2026
-    # Yasmin, Beatriz, Lara, Patricia: $5.00/page
-    feb_28_2026 = datetime(2026, 2, 28, 23, 59, 59)
-    mar_01_2026 = datetime(2026, 3, 1)
-
-    def get_translator_rate_config(translator_name):
-        """Return rate config for a translator"""
-        name_lower = translator_name.lower().strip()
-        if "ana clara" in name_lower:
-            return {
-                "type": "ana_clara",
-                "rate_before_march": 0.70,
-                "rate_normal": 1.00,
-                "rate_urgent": 2.00,
-                "description": "R$0.70/pg (until Feb), R$1.00/pg normal, R$2.00/pg urgent (from Mar)"
-            }
-        elif any(n in name_lower for n in ["yasmin", "beatriz", "lara", "patricia"]):
-            return {
-                "type": "standard_5",
-                "rate": 5.00,
-                "description": "$5.00/page"
-            }
+        # Custom date range or period-based
+        if start_date and end_date:
+            try:
+                period_start = datetime.fromisoformat(start_date.replace('Z', '+00:00').replace('+00:00', ''))
+                period_end = datetime.fromisoformat(end_date.replace('Z', '+00:00').replace('+00:00', '')).replace(hour=23, minute=59, second=59)
+            except:
+                period_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+                period_end = now
         else:
-            return {
-                "type": "default",
-                "rate": 5.00,
-                "description": "$5.00/page"
-            }
+            period_end = now
+            if period == "day":
+                period_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            elif period == "week":
+                days_since_monday = now.weekday()
+                period_start = (now - timedelta(days=days_since_monday)).replace(hour=0, minute=0, second=0, microsecond=0)
+            else:  # month
+                period_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
-    def calculate_order_payment(order, rate_config):
-        """Calculate payment for a single order based on translator rate config"""
-        pages = order.get("page_count", 0) or 0
-        created = order.get("created_at")
-        urgency = (order.get("urgency") or "no").lower()
-        is_urgent = urgency in ("urgent", "priority")
+        # Helper to safely parse created_at (can be datetime or string)
+        def safe_datetime(val):
+            if val is None:
+                return None
+            if isinstance(val, datetime):
+                return val
+            if isinstance(val, str):
+                try:
+                    return datetime.fromisoformat(val.replace('Z', '+00:00').replace('+00:00', ''))
+                except:
+                    return None
+            return None
 
-        if rate_config["type"] == "ana_clara":
-            if created and created <= feb_28_2026:
-                return pages * rate_config["rate_before_march"]
+        # Translator rate configuration
+        feb_28_2026 = datetime(2026, 2, 28, 23, 59, 59)
+
+        def get_translator_rate_config(translator_name):
+            name_lower = translator_name.lower().strip()
+            if "ana clara" in name_lower:
+                return {
+                    "type": "ana_clara",
+                    "rate_before_march": 0.70,
+                    "rate_normal": 1.00,
+                    "rate_urgent": 2.00,
+                    "description": "$0.70/pg (until Feb), $1.00/pg normal, $2.00/pg urgent (from Mar)"
+                }
+            elif any(n in name_lower for n in ["yasmin", "beatriz", "lara", "patricia"]):
+                return {"type": "standard_5", "rate": 5.00, "description": "$5.00/page"}
             else:
-                if is_urgent:
-                    return pages * rate_config["rate_urgent"]
+                return {"type": "default", "rate": 5.00, "description": "$5.00/page"}
+
+        def calculate_order_payment(order, rate_config):
+            pages = order.get("page_count", 0) or 0
+            created = safe_datetime(order.get("created_at"))
+            urgency = (order.get("urgency") or "no").lower()
+            is_urgent = urgency in ("urgent", "priority")
+            if rate_config["type"] == "ana_clara":
+                if created and created <= feb_28_2026:
+                    return pages * rate_config["rate_before_march"]
                 else:
-                    return pages * rate_config["rate_normal"]
-        else:
-            return pages * rate_config.get("rate", 5.00)
+                    return pages * (rate_config["rate_urgent"] if is_urgent else rate_config["rate_normal"])
+            else:
+                return pages * rate_config.get("rate", 5.00)
 
-    translator_metrics = []
-    # Collect all monthly data for the chart (all translators combined)
-    all_monthly_data = {}
-
-    for translator in translators:
-        tid = translator["id"]
-        translator_name = translator.get("name", "Unknown")
-        rate_config = get_translator_rate_config(translator_name)
-
-        # Get all orders assigned to this translator since Jan 2025
-        query = {
-            "assigned_translator_id": tid,
-            "created_at": {"$gte": data_start}
-        }
-        all_orders = await db.translation_orders.find(query).sort("created_at", -1).to_list(5000)
-
-        # Completed = final, delivered, approved (these are done translations)
+        translator_metrics = []
+        all_monthly_data = {}
         completed_statuses = {"ready", "delivered", "final", "Final", "Delivered", "approved"}
-        orders = [o for o in all_orders if o.get("translation_status") in completed_statuses]
-        in_progress_orders = [o for o in all_orders if o.get("translation_status") not in completed_statuses]
 
-        # Total since January (all assigned orders)
-        total_translations = len(all_orders)
-        total_pages = sum(o.get("page_count", 0) or 0 for o in all_orders)
-        completed_translations = len(orders)
-        completed_pages = sum(o.get("page_count", 0) or 0 for o in orders)
-        in_progress_translations = len(in_progress_orders)
-        in_progress_pages = sum(o.get("page_count", 0) or 0 for o in in_progress_orders)
+        for translator in translators:
+            tid = translator["id"]
+            translator_name = translator.get("name", "Unknown")
+            rate_config = get_translator_rate_config(translator_name)
 
-        # Calculate total estimated payment for all completed orders
-        total_estimated_payment = sum(calculate_order_payment(o, rate_config) for o in orders)
+            # Get ALL orders assigned to this translator (no date filter in DB query to avoid type issues)
+            all_orders_raw = await db.translation_orders.find({"assigned_translator_id": tid}).sort("created_at", -1).to_list(5000)
 
-        # Count for selected period
-        period_all_orders = [o for o in all_orders if o.get("created_at") and o["created_at"] >= period_start and o["created_at"] <= period_end]
-        period_completed = [o for o in period_all_orders if o.get("translation_status") in completed_statuses]
-        period_translations = len(period_all_orders)
-        period_pages = sum(o.get("page_count", 0) or 0 for o in period_all_orders)
-        period_completed_translations = len(period_completed)
-        period_completed_pages = sum(o.get("page_count", 0) or 0 for o in period_completed)
-        period_estimated_payment = sum(calculate_order_payment(o, rate_config) for o in period_completed)
+            # Parse dates and filter
+            all_orders = []
+            for o in all_orders_raw:
+                o["_parsed_date"] = safe_datetime(o.get("created_at"))
+                all_orders.append(o)
 
-        # Get paid amounts from payments for financial calculation
-        paid_query = {"translator_id": tid, "status": "paid"}
-        paid_payments = await db.translator_payments.find(paid_query).to_list(100)
-        paid_pages = sum(p.get("pages_count", 0) for p in paid_payments)
-        paid_amount = sum(p.get("total_amount", 0) for p in paid_payments)
-        pending_payment_pages = max(0, completed_pages - paid_pages)
-        pending_payment_amount = max(0, total_estimated_payment - paid_amount)
+            # Completed orders
+            orders = [o for o in all_orders if o.get("translation_status") in completed_statuses]
+            in_progress_orders = [o for o in all_orders if o.get("translation_status") not in completed_statuses]
 
-        # Monthly breakdown for chart
-        monthly_breakdown = {}
-        for order in all_orders:
-            created = order.get("created_at")
-            if created:
-                month_key = created.strftime("%Y-%m")
-                month_label = created.strftime("%b %Y")
-                if month_key not in monthly_breakdown:
-                    monthly_breakdown[month_key] = {"month": month_key, "label": month_label, "translations": 0, "pages": 0, "amount": 0}
-                monthly_breakdown[month_key]["translations"] += 1
-                monthly_breakdown[month_key]["pages"] += order.get("page_count", 0) or 0
-                if order.get("translation_status") in completed_statuses:
-                    monthly_breakdown[month_key]["amount"] += calculate_order_payment(order, rate_config)
+            total_translations = len(all_orders)
+            total_pages = sum(o.get("page_count", 0) or 0 for o in all_orders)
+            completed_translations = len(orders)
+            completed_pages = sum(o.get("page_count", 0) or 0 for o in orders)
+            in_progress_translations = len(in_progress_orders)
+            in_progress_pages = sum(o.get("page_count", 0) or 0 for o in in_progress_orders)
+            total_estimated_payment = sum(calculate_order_payment(o, rate_config) for o in orders)
 
-                # Also collect for the combined chart
-                if month_key not in all_monthly_data:
-                    all_monthly_data[month_key] = {"month": month_key, "label": month_label}
-                translator_key = translator_name
-                if translator_key not in all_monthly_data[month_key]:
-                    all_monthly_data[month_key][translator_key] = 0
-                all_monthly_data[month_key][translator_key] += 1
+            # Period filter using parsed dates
+            period_all_orders = [o for o in all_orders if o["_parsed_date"] and o["_parsed_date"] >= period_start and o["_parsed_date"] <= period_end]
+            period_completed = [o for o in period_all_orders if o.get("translation_status") in completed_statuses]
+            period_translations = len(period_all_orders)
+            period_pages = sum(o.get("page_count", 0) or 0 for o in period_all_orders)
+            period_completed_pages = sum(o.get("page_count", 0) or 0 for o in period_completed)
+            period_estimated_payment = sum(calculate_order_payment(o, rate_config) for o in period_completed)
 
-        sorted_monthly = sorted(monthly_breakdown.values(), key=lambda x: x["month"])
+            # Payments
+            paid_payments = await db.translator_payments.find({"translator_id": tid, "status": "paid"}).to_list(100)
+            paid_pages = sum(p.get("pages_count", 0) for p in paid_payments)
+            paid_amount = sum(p.get("total_amount", 0) for p in paid_payments)
+            pending_payment_pages = max(0, completed_pages - paid_pages)
+            pending_payment_amount = max(0, total_estimated_payment - paid_amount)
 
-        translator_metrics.append({
-            "translator_id": tid,
-            "translator_name": translator_name,
-            "translator_email": translator.get("email", ""),
-            "total_translations": total_translations,
-            "total_pages": total_pages,
-            "completed_translations": completed_translations,
-            "completed_pages": completed_pages,
-            "in_progress_translations": in_progress_translations,
-            "in_progress_pages": in_progress_pages,
-            "period_translations": period_translations,
-            "period_pages": period_pages,
-            "period_completed_translations": period_completed_translations,
-            "period_completed_pages": period_completed_pages,
-            "period_estimated_payment": round(period_estimated_payment, 2),
-            "pending_payment_pages": pending_payment_pages,
-            "pending_payment_amount": round(pending_payment_amount, 2),
-            "paid_pages": paid_pages,
-            "paid_amount": round(paid_amount, 2),
-            "total_estimated_payment": round(total_estimated_payment, 2),
-            "rate_config": rate_config,
-            "monthly_breakdown": sorted_monthly
-        })
+            # Monthly breakdown
+            monthly_breakdown = {}
+            for order in all_orders:
+                dt = order["_parsed_date"]
+                if dt:
+                    month_key = dt.strftime("%Y-%m")
+                    month_label = dt.strftime("%b %Y")
+                    if month_key not in monthly_breakdown:
+                        monthly_breakdown[month_key] = {"month": month_key, "label": month_label, "translations": 0, "pages": 0, "amount": 0}
+                    monthly_breakdown[month_key]["translations"] += 1
+                    monthly_breakdown[month_key]["pages"] += order.get("page_count", 0) or 0
+                    if order.get("translation_status") in completed_statuses:
+                        monthly_breakdown[month_key]["amount"] += calculate_order_payment(order, rate_config)
 
-    # Sort by total translations descending
-    translator_metrics.sort(key=lambda x: -x["total_translations"])
+                    if month_key not in all_monthly_data:
+                        all_monthly_data[month_key] = {"month": month_key, "label": month_label}
+                    if translator_name not in all_monthly_data[month_key]:
+                        all_monthly_data[month_key][translator_name] = 0
+                    all_monthly_data[month_key][translator_name] += 1
 
-    # Build chart data sorted by month
-    chart_data = sorted(all_monthly_data.values(), key=lambda x: x["month"])
+            sorted_monthly = sorted(monthly_breakdown.values(), key=lambda x: x["month"])
 
-    # Get unique translator names for chart series
-    translator_names = [t.get("name", "Unknown") for t in translators]
+            # Remove internal field before adding to response
+            for o in all_orders:
+                o.pop("_parsed_date", None)
 
-    return {
-        "metrics": translator_metrics,
-        "chart_data": chart_data,
-        "translator_names": translator_names,
-        "period": period,
-        "period_start": period_start.isoformat(),
-        "since": data_start.isoformat()
-    }
+            translator_metrics.append({
+                "translator_id": tid,
+                "translator_name": translator_name,
+                "translator_email": translator.get("email", ""),
+                "total_translations": total_translations,
+                "total_pages": total_pages,
+                "completed_translations": completed_translations,
+                "completed_pages": completed_pages,
+                "in_progress_translations": in_progress_translations,
+                "in_progress_pages": in_progress_pages,
+                "period_translations": period_translations,
+                "period_pages": period_pages,
+                "period_completed_pages": period_completed_pages,
+                "period_estimated_payment": round(period_estimated_payment, 2),
+                "pending_payment_pages": pending_payment_pages,
+                "pending_payment_amount": round(pending_payment_amount, 2),
+                "paid_pages": paid_pages,
+                "paid_amount": round(paid_amount, 2),
+                "total_estimated_payment": round(total_estimated_payment, 2),
+                "rate_config": rate_config,
+                "monthly_breakdown": sorted_monthly
+            })
+
+        translator_metrics.sort(key=lambda x: -x["total_translations"])
+        chart_data = sorted(all_monthly_data.values(), key=lambda x: x["month"])
+        translator_names = [t.get("name", "Unknown") for t in translators]
+
+        return {
+            "metrics": translator_metrics,
+            "chart_data": chart_data,
+            "translator_names": translator_names,
+            "period": period,
+            "period_start": period_start.isoformat(),
+        }
+    except Exception as e:
+        logger.error(f"Error in get_translator_metrics: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return {
+            "metrics": [],
+            "chart_data": [],
+            "translator_names": [],
+            "period": period,
+            "period_start": "",
+            "error": str(e)
+        }
 
 @api_router.get("/admin/production/translator/{translator_id}/orders")
 async def get_translator_orders(translator_id: str, admin_key: str, status: Optional[str] = None, start_date: Optional[str] = None, end_date: Optional[str] = None):
@@ -11252,61 +11251,85 @@ async def get_translator_orders(translator_id: str, admin_key: str, status: Opti
     if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
-    query = {"assigned_translator_id": translator_id}
+    try:
+        query = {"assigned_translator_id": translator_id}
 
-    if status:
-        if status == "completed":
-            query["translation_status"] = {"$in": ["ready", "delivered", "final", "Final", "Delivered", "approved"]}
-        else:
-            query["translation_status"] = status
-
-    # Default to March 2026 start if no date filters
-    if start_date or end_date:
-        query["created_at"] = {}
-        if start_date:
-            query["created_at"]["$gte"] = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
-        if end_date:
-            query["created_at"]["$lte"] = datetime.fromisoformat(end_date.replace('Z', '+00:00')).replace(hour=23, minute=59, second=59)
-    else:
-        query["created_at"] = {"$gte": datetime(2026, 3, 1)}
-
-    orders = await db.translation_orders.find(query).sort("created_at", -1).to_list(500)
-
-    # Get translator info for rate calculation
-    translator = await db.admin_users.find_one({"id": translator_id})
-    translator_name = translator.get("name", "Unknown") if translator else "Unknown"
-
-    # Rate config
-    feb_28_2026 = datetime(2026, 2, 28, 23, 59, 59)
-    name_lower = translator_name.lower().strip()
-    completed_statuses = {"ready", "delivered", "final", "Final", "Delivered", "approved"}
-
-    for order in orders:
-        if '_id' in order:
-            del order['_id']
-        # Calculate per-order payment amount
-        pages = order.get("page_count", 0) or 0
-        created = order.get("created_at")
-        urgency = (order.get("urgency") or "no").lower()
-        is_urgent = urgency in ("urgent", "priority")
-
-        if "ana clara" in name_lower:
-            if created and created <= feb_28_2026:
-                order["rate_per_page"] = 0.70
-            elif is_urgent:
-                order["rate_per_page"] = 2.00
+        if status:
+            if status == "completed":
+                query["translation_status"] = {"$in": ["ready", "delivered", "final", "Final", "Delivered", "approved"]}
             else:
-                order["rate_per_page"] = 1.00
-        elif any(n in name_lower for n in ["yasmin", "beatriz", "lara", "patricia"]):
-            order["rate_per_page"] = 5.00
-        else:
-            order["rate_per_page"] = 5.00
+                query["translation_status"] = status
 
-        order["order_payment"] = round(pages * order["rate_per_page"], 2)
-        order["is_urgent"] = is_urgent
-        order["is_completed"] = order.get("translation_status") in completed_statuses
+        # Get all orders for this translator (filter by date in Python to handle mixed date types)
+        all_orders = await db.translation_orders.find(query).sort("created_at", -1).to_list(500)
 
-    return {"orders": orders, "translator_name": translator_name}
+        # Helper to safely parse dates
+        def safe_datetime(val):
+            if val is None:
+                return None
+            if isinstance(val, datetime):
+                return val
+            if isinstance(val, str):
+                try:
+                    return datetime.fromisoformat(val.replace('Z', '+00:00').replace('+00:00', ''))
+                except:
+                    return None
+            return None
+
+        # Parse date range
+        try:
+            dt_start = datetime.fromisoformat(start_date.replace('Z', '+00:00').replace('+00:00', '')) if start_date else None
+            dt_end = datetime.fromisoformat(end_date.replace('Z', '+00:00').replace('+00:00', '')).replace(hour=23, minute=59, second=59) if end_date else None
+        except:
+            dt_start = None
+            dt_end = None
+
+        # Filter by date in Python
+        orders = []
+        for order in all_orders:
+            dt = safe_datetime(order.get("created_at"))
+            if dt_start and dt and dt < dt_start:
+                continue
+            if dt_end and dt and dt > dt_end:
+                continue
+            orders.append(order)
+
+        # Get translator info for rate calculation
+        translator = await db.admin_users.find_one({"id": translator_id})
+        translator_name = translator.get("name", "Unknown") if translator else "Unknown"
+
+        feb_28_2026 = datetime(2026, 2, 28, 23, 59, 59)
+        name_lower = translator_name.lower().strip()
+        completed_statuses = {"ready", "delivered", "final", "Final", "Delivered", "approved"}
+
+        for order in orders:
+            if '_id' in order:
+                del order['_id']
+            pages = order.get("page_count", 0) or 0
+            created = safe_datetime(order.get("created_at"))
+            urgency = (order.get("urgency") or "no").lower()
+            is_urgent = urgency in ("urgent", "priority")
+
+            if "ana clara" in name_lower:
+                if created and created <= feb_28_2026:
+                    order["rate_per_page"] = 0.70
+                elif is_urgent:
+                    order["rate_per_page"] = 2.00
+                else:
+                    order["rate_per_page"] = 1.00
+            elif any(n in name_lower for n in ["yasmin", "beatriz", "lara", "patricia"]):
+                order["rate_per_page"] = 5.00
+            else:
+                order["rate_per_page"] = 5.00
+
+            order["order_payment"] = round(pages * order["rate_per_page"], 2)
+            order["is_urgent"] = is_urgent
+            order["is_completed"] = order.get("translation_status") in completed_statuses
+
+        return {"orders": orders, "translator_name": translator_name}
+    except Exception as e:
+        logger.error(f"Error in get_translator_orders: {str(e)}")
+        return {"orders": [], "translator_name": "", "error": str(e)}
 
 @api_router.post("/admin/payments")
 async def create_payment(payment_data: PaymentCreate, admin_key: str, token: Optional[str] = None):
